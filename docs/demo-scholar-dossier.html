@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="ScholarOS reproducible academic manuscript, Citation Verification Firewall, PDF provenance, and PRISMA 2020 screening audit dossier.">
+  <meta name="description" content="ScholarOS bilingual reproducible academic manuscript, Citation Verification Firewall, PDF provenance, and PRISMA 2020 screening audit dossier.">
   <title>ScholarOS Audit Dossier: Verifiable Citation Firewalls &amp; Sandboxes</title>
   <style>
-  /* Hallmark, v2.0.0, scope: app, genre: editorial-archival, posture: restrained, shape: app screen, surface: absolute */
+  /* Hallmark · v2.0.0 · scope: app · genre: editorial-archival · posture: restrained · shape: app screen · surface: absolute */
   :root {
     --bg-linen: #F8F6F0;
     --bg-paper: #FDFCF8;
-    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-    --font-serif: Georgia, "Times New Roman", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-serif: Georgia, "Times New Roman", "Songti SC", serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     --bg-vellum: #F1EEE6;
     --border-stone: #DEDAD0;
@@ -48,6 +48,54 @@
     border-radius: 6px;
     padding: 24px 28px;
     margin-bottom: 20px;
+  }
+  .masthead-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-linen);
+    border: 1px solid var(--accent-forest);
+    border-radius: 999px;
+  }
+  .lang-btn {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--accent-forest);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 4px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .lang-btn.is-active {
+    background: var(--accent-forest);
+    color: var(--bg-paper);
+  }
+  .lang-btn:hover:not(.is-active):not(:disabled) {
+    background: var(--bg-vellum);
+  }
+  .lang-btn:active:not(:disabled) {
+    background: var(--accent-forest);
+    color: var(--bg-paper);
+  }
+  .lang-btn:disabled {
+    color: var(--ink-muted);
+    cursor: not-allowed;
+  }
+  .lang-btn:focus-visible {
+    outline: 2px solid var(--accent-forest);
+    outline-offset: 2px;
   }
   .eyebrow {
     font-size: 12px;
@@ -145,7 +193,7 @@
   }
   .pill {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 4px 8px;
     border-radius: 4px;
     font-size: 11px;
     font-weight: 600;
@@ -191,66 +239,74 @@
 <body>
   <div class="container">
     <header class="masthead">
-      <p class="eyebrow">ScholarOS v1.0.0, Reproducible Academic Audit Dossier</p>
-      <h1>Verifiable Citation Firewalls &amp; Sandboxes</h1>
-      <p class="subtitle">Primary Manuscript: <span class="mono">main.tex</span>, Schema v4, LSP Errors: 1, Firewall Violations: 1</p>
+      <div class="masthead-row">
+        <div>
+          <p class="eyebrow" data-en="ScholarOS v1.1.0, Reproducible Academic Audit Dossier" data-zh="ScholarOS v1.1.0，可复现学术手稿与引文核验档案">ScholarOS v1.1.0, Reproducible Academic Audit Dossier</p>
+          <h1 data-en="Verifiable Citation Firewalls &amp; Sandboxes" data-zh="可验证引文真实性防火墙与隔离审稿沙盒">Verifiable Citation Firewalls &amp; Sandboxes</h1>
+          <p class="subtitle" data-en="Primary Manuscript: main.tex, Schema v4, LSP Errors: 1, Firewall Violations: 1" data-zh="主手稿文件：main.tex，数据库架构 v4，LSP 错误：1，防火墙拦截违规：1">Primary Manuscript: main.tex, Schema v4, LSP Errors: 1, Firewall Violations: 1</p>
+        </div>
+        <div class="lang-toggle" role="group" aria-label="Language switcher">
+          <button type="button" class="lang-btn" id="btn-lang-zh" data-lang-choice="zh" aria-pressed="false">中文</button>
+          <button type="button" class="lang-btn is-active" id="btn-lang-en" data-lang-choice="en" aria-pressed="true">EN</button>
+        </div>
+      </div>
     </header>
 
     <div class="kpi-strip">
       <div class="kpi-card">
-        <div class="kpi-label">Manuscript Words</div>
+        <div class="kpi-label" data-en="Manuscript Words" data-zh="手稿总词数">Manuscript Words</div>
         <div class="kpi-value">228</div>
-        <div class="kpi-note">3 source file(s)</div>
+        <div class="kpi-note" data-en="3 source file(s)" data-zh="共 3 份源码文件">3 source file(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Verified References</div>
+        <div class="kpi-label" data-en="Verified References" data-zh="已核验参考文献">Verified References</div>
         <div class="kpi-value">12 / 16</div>
-        <div class="kpi-note">1 blocked by firewall</div>
+        <div class="kpi-note" data-en="1 blocked by firewall" data-zh="防火墙已拦截 1 篇">1 blocked by firewall</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">PRISMA Cohen Kappa</div>
+        <div class="kpi-label" data-en="PRISMA Cohen Kappa" data-zh="PRISMA 双盲一致性 Kappa">PRISMA Cohen Kappa</div>
         <div class="kpi-value">0.600</div>
-        <div class="kpi-note">10 dual-blind studies</div>
+        <div class="kpi-note" data-en="10 dual-blind studies" data-zh="共 10 篇双盲筛查研究">10 dual-blind studies</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">PDF Provenance</div>
+        <div class="kpi-label" data-en="PDF Provenance" data-zh="PDF 证据溯源段落">PDF Provenance</div>
         <div class="kpi-value">14</div>
-        <div class="kpi-note">5 linked claims</div>
+        <div class="kpi-note" data-en="5 linked claims" data-zh="已对齐 5 条正文断言">5 linked claims</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Editorial JS Audit</div>
+        <div class="kpi-label" data-en="Editorial JS Audit" data-zh="顶会审稿插件发现">Editorial JS Audit</div>
         <div class="kpi-value">8</div>
-        <div class="kpi-note">3 submission blocker(s)</div>
+        <div class="kpi-note" data-en="3 submission blocker(s)" data-zh="含 3 项投稿阻断问题">3 submission blocker(s)</div>
       </div>
     </div>
 
     <section class="panel">
-      <h2>1. Numbered Manuscript Outline &amp; Section Telemetry</h2>
+      <h2 data-en="1. Numbered Manuscript Outline &amp; Section Telemetry" data-zh="1. 手稿章节大纲与字数统计">1. Numbered Manuscript Outline &amp; Section Telemetry</h2>
       <table>
         <thead>
           <tr>
-            <th>Section</th>
-            <th>Heading Title</th>
-            <th>Source Span</th>
-            <th class="num">Words</th>
+            <th data-en="Section" data-zh="章节号">Section</th>
+            <th data-en="Heading Title" data-zh="章节标题">Heading Title</th>
+            <th data-en="Source Span" data-zh="源码定位">Source Span</th>
+            <th class="num" data-en="Words" data-zh="词数">Words</th>
           </tr>
         </thead>
         <tbody>
           <tr>
   <td class="mono">1</td>
-  <td style="padding-left:12px">Introduction</td>
+  <td style="padding-left:12px"><span data-en="Introduction" data-zh="引言">Introduction</span></td>
   <td class="mono">main.tex:12</td>
   <td class="mono num">32</td>
 </tr>
 <tr>
   <td class="mono">2</td>
-  <td style="padding-left:12px">Hardware Citation Firewall</td>
+  <td style="padding-left:12px"><span data-en="Hardware Citation Firewall" data-zh="硬件级引文真实性防火墙">Hardware Citation Firewall</span></td>
   <td class="mono">main.tex:17</td>
   <td class="mono num">42</td>
 </tr>
 <tr>
   <td class="mono">3</td>
-  <td style="padding-left:12px">Provenance &amp; Psychometrics</td>
+  <td style="padding-left:12px"><span data-en="Provenance &amp; Psychometrics" data-zh="PDF 证据溯源与心理测量信度">Provenance &amp; Psychometrics</span></td>
   <td class="mono">main.tex:25</td>
   <td class="mono num">17</td>
 </tr>
@@ -259,111 +315,111 @@
     </section>
 
     <section class="panel">
-      <h2>2. 5-Class Citation Verification Firewall Ledger</h2>
+      <h2 data-en="2. 5-Class Citation Verification Firewall Ledger" data-zh="2. 五级引文真实性核验防火墙台账">2. 5-Class Citation Verification Firewall Ledger</h2>
       <table>
         <thead>
           <tr>
-            <th>Cite Key</th>
-            <th>Firewall Class</th>
-            <th>Persistent ID</th>
-            <th>Formatted APA 7th Entry</th>
+            <th data-en="Cite Key" data-zh="引文键">Cite Key</th>
+            <th data-en="Firewall Class" data-zh="防火墙分级">Firewall Class</th>
+            <th data-en="Persistent ID" data-zh="权威标识符">Persistent ID</th>
+            <th data-en="Formatted APA 7th Entry" data-zh="APA 7th 标准引文格式">Formatted APA 7th Entry</th>
           </tr>
         </thead>
         <tbody>
           <tr>
   <td class="mono">blondel2008louvain</td>
-  <td><span class="pill pill-ok">Verified Preprint</span></td>
-  <td class="mono">arXiv:0803.0476</td>
+  <td><span class="pill pill-ok" data-en="Verified Preprint" data-zh="已验证预印本">Verified Preprint</span></td>
+  <td class="mono"><span data-en="arXiv:0803.0476" data-zh="arXiv:0803.0476">arXiv:0803.0476</span></td>
   <td>Blondel, V. D., &amp; Guillaume, J. L. (2008). Fast unfolding of communities in large networks. Journal of Statistical Mechanics: Theory and Experiment, 2008, P10008.</td>
 </tr>
 <tr>
   <td class="mono">byrt1993pabak</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1016/0895-4356(93)90018-V</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1016/0895-4356(93)90018-V" data-zh="doi:10.1016/0895-4356(93)90018-V">doi:10.1016/0895-4356(93)90018-V</span></td>
   <td>Byrt, T., Bishop, J., &amp; Carlin, J. B. (1993). Bias, prevalence and kappa. Journal of Clinical Epidemiology, 46(5), 423 to 429. https://doi.org/10.1016/0895-4356(93)90018-v</td>
 </tr>
 <tr>
   <td class="mono">cohen1960kappa</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1177/001316446002000104</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1177/001316446002000104" data-zh="doi:10.1177/001316446002000104">doi:10.1177/001316446002000104</span></td>
   <td>Cohen, J. (1960). A Coefficient of Agreement for Nominal Scales. Educational and Psychological Measurement, 20(1), 37 to 46. https://doi.org/10.1177/001316446002000104</td>
 </tr>
 <tr>
   <td class="mono">dersimonian1986meta</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1016/0197-2456(86)90046-2</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1016/0197-2456(86)90046-2" data-zh="doi:10.1016/0197-2456(86)90046-2">doi:10.1016/0197-2456(86)90046-2</span></td>
   <td>DerSimonian, R., &amp; Laird, N. (1986). Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), 177 to 188. https://doi.org/10.1016/0197-2456(86)90046-2</td>
 </tr>
 <tr>
   <td class="mono">gao2023aclarc</td>
-  <td><span class="pill pill-warn">Metadata Drift</span></td>
-  <td class="mono">doi:10.18653/v1/2023.emnlp-main.398</td>
+  <td><span class="pill pill-warn" data-en="Metadata Drift" data-zh="元数据漂移">Metadata Drift</span></td>
+  <td class="mono"><span data-en="doi:10.18653/v1/2023.emnlp-main.398" data-zh="doi:10.18653/v1/2023.emnlp-main.398">doi:10.18653/v1/2023.emnlp-main.398</span></td>
   <td>Gao, T., Yen, H., &amp; Chen, D. (2023). Enabling Large Language Models to Generate Text with Citations.  https://doi.org/10.18653/v1/2023.emnlp-main.398</td>
 </tr>
 <tr>
   <td class="mono">gwet2008ac1</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1348/000711006X126600</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1348/000711006X126600" data-zh="doi:10.1348/000711006X126600">doi:10.1348/000711006X126600</span></td>
   <td>Gwet, K. L. (2008). Computing inter-rater reliability and its variance in the presence of high agreement. British Journal of Mathematical and Statistical Psychology, 61(1), 29 to 48. https://doi.org/10.1348/000711006x126600</td>
 </tr>
 <tr>
   <td class="mono">kleinberg2003bursty</td>
-  <td><span class="pill pill-block">Unverified</span></td>
-  <td class="mono">none</td>
+  <td><span class="pill pill-block" data-en="Unverified" data-zh="待核验">Unverified</span></td>
+  <td class="mono"><span data-en="none" data-zh="无标识符">none</span></td>
   <td>Kleinberg, J. (2003). Bursty and Hierarchical Structure in Streams. Data Mining and Knowledge Discovery, 7(4), 373 to 397.</td>
 </tr>
 <tr>
   <td class="mono">lewis2020rag</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.5555/3495724.3496517</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.5555/3495724.3496517" data-zh="doi:10.5555/3495724.3496517">doi:10.5555/3495724.3496517</span></td>
   <td>Lewis, P., &amp; Perez, E. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 9459 to 9474). https://doi.org/10.5555/3495724.3496517</td>
 </tr>
 <tr>
   <td class="mono">lin2004rouge</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.3115/1218955.1219032</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.3115/1218955.1219032" data-zh="doi:10.3115/1218955.1219032">doi:10.3115/1218955.1219032</span></td>
   <td>Lin, C. Y. (2004). ROUGE: A Package for Automatic Evaluation of Summaries. In ACL Workshop on Text Summarization Branches Out (pp. 74 to 81). https://doi.org/10.3115/1218955.1219032</td>
 </tr>
 <tr>
   <td class="mono">min2023factscore</td>
-  <td><span class="pill pill-ok">Verified Preprint</span></td>
-  <td class="mono">doi:10.18653/v1/2023.emnlp-main.741</td>
+  <td><span class="pill pill-ok" data-en="Verified Preprint" data-zh="已验证预印本">Verified Preprint</span></td>
+  <td class="mono"><span data-en="doi:10.18653/v1/2023.emnlp-main.741" data-zh="doi:10.18653/v1/2023.emnlp-main.741">doi:10.18653/v1/2023.emnlp-main.741</span></td>
   <td>Min, S., &amp; Krishna, K. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. In Proceedings of EMNLP 2023 (pp. 12076 to 12100). https://doi.org/10.18653/v1/2023.emnlp-main.741</td>
 </tr>
 <tr>
   <td class="mono">page2021prisma</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1136/bmj.n71</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1136/bmj.n71" data-zh="doi:10.1136/bmj.n71">doi:10.1136/bmj.n71</span></td>
   <td>Page, M. J., McKenzie, J. E., &amp; Moher, D. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. BMJ, 372, n71. https://doi.org/10.1136/bmj.n71</td>
 </tr>
 <tr>
   <td class="mono">robertson2009bm25</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1561/1500000019</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1561/1500000019" data-zh="doi:10.1561/1500000019">doi:10.1561/1500000019</span></td>
   <td>Robertson, S., &amp; Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval, 3(4), 333 to 389. https://doi.org/10.1561/1500000019</td>
 </tr>
 <tr>
   <td class="mono">smith2025hallucinated</td>
-  <td><span class="pill pill-block">Blocked (Fake/Retracted)</span></td>
-  <td class="mono">doi:10.9999/fake.2025.001</td>
+  <td><span class="pill pill-block" data-en="Blocked (Fake/Retracted)" data-zh="已拦截 (伪造/撤稿)">Blocked (Fake/Retracted)</span></td>
+  <td class="mono"><span data-en="doi:10.9999/fake.2025.001" data-zh="doi:10.9999/fake.2025.001">doi:10.9999/fake.2025.001</span></td>
   <td>Smith, J., &amp; Doe, A. (2025). Zero-Shot Autonomous Neural Proof of Undecidable LaTeX Grammars. Journal of Universal AI Hallucinations. https://doi.org/10.9999/fake.2025.001</td>
 </tr>
 <tr>
   <td class="mono">sterne2019rob2</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.1136/bmj.l4898</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.1136/bmj.l4898" data-zh="doi:10.1136/bmj.l4898">doi:10.1136/bmj.l4898</span></td>
   <td>Sterne, J. A. C., Savovic, J., &amp; Higgins, J. P. T. (2019). RoB 2: a revised tool for assessing risk of bias in randomised trials. BMJ, 366, l4898. https://doi.org/10.1136/bmj.l4898</td>
 </tr>
 <tr>
   <td class="mono">vaswani2017attention</td>
-  <td><span class="pill pill-ok">Verified DOI</span></td>
-  <td class="mono">doi:10.5555/3295222.3295349</td>
+  <td><span class="pill pill-ok" data-en="Verified DOI" data-zh="已验证 DOI">Verified DOI</span></td>
+  <td class="mono"><span data-en="doi:10.5555/3295222.3295349" data-zh="doi:10.5555/3295222.3295349">doi:10.5555/3295222.3295349</span></td>
   <td>Vaswani, A., &amp; Shazeer, N. (2017). Attention Is All You Need. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 5998 to 6008). https://doi.org/10.5555/3295222.3295349</td>
 </tr>
 <tr>
   <td class="mono">vaswani2017neurips_dup</td>
-  <td><span class="pill pill-warn">Metadata Drift</span></td>
-  <td class="mono">doi:10.5555/3295222.3295349</td>
+  <td><span class="pill pill-warn" data-en="Metadata Drift" data-zh="元数据漂移">Metadata Drift</span></td>
+  <td class="mono"><span data-en="doi:10.5555/3295222.3295349" data-zh="doi:10.5555/3295222.3295349">doi:10.5555/3295222.3295349</span></td>
   <td>Vaswani, A., &amp; Shazeer, N. (2017). Attention is all you need (NeurIPS Proceedings Copy).  https://doi.org/10.5555/3295222.3295349</td>
 </tr>
         </tbody>
@@ -398,50 +454,50 @@ Vaswani, A., &amp; Shazeer, N. (2017b). Attention is all you need (NeurIPS Proce
     </section>
 
     <section class="panel">
-      <h2>3. Claim-to-PDF Bounding-Box Provenance &amp; Entailment</h2>
+      <h2 data-en="3. Claim-to-PDF Bounding-Box Provenance &amp; Entailment" data-zh="3. 手稿断言至 PDF 边界框证据溯源矩阵">3. Claim-to-PDF Bounding-Box Provenance &amp; Entailment</h2>
       <table>
         <thead>
           <tr>
-            <th>Manuscript Line</th>
-            <th>Source Passage</th>
-            <th>Entailment Verdict</th>
-            <th class="num">BM25</th>
-            <th>Claim Excerpt</th>
+            <th data-en="Manuscript Line" data-zh="手稿行号">Manuscript Line</th>
+            <th data-en="Source Passage" data-zh="原文献段落">Source Passage</th>
+            <th data-en="Entailment Verdict" data-zh="证据核验结论">Entailment Verdict</th>
+            <th class="num" data-en="BM25" data-zh="BM25 分值">BM25</th>
+            <th data-en="Claim Excerpt" data-zh="手稿断言摘录">Claim Excerpt</th>
           </tr>
         </thead>
         <tbody>
           <tr>
   <td class="mono">main.tex:16</td>
-  <td class="mono">chen2025aegisvm, p.1</td>
-  <td><span class="pill pill-ok">Grounded</span></td>
+  <td class="mono"><span data-en="chen2025aegisvm, p.1" data-zh="chen2025aegisvm，第1页">chen2025aegisvm, p.1</span></td>
+  <td><span class="pill pill-ok" data-en="Grounded" data-zh="证据吻合">Grounded</span></td>
   <td class="mono num">14.82</td>
   <td>Multi-head scaled dot-product attention achieves 28.4 BLEU on WMT 2014 EN-DE without recurrence.</td>
 </tr>
 <tr>
   <td class="mono">main.tex:22</td>
-  <td class="mono">chen2025aegisvm, p.1</td>
-  <td><span class="pill pill-block">Numeric mismatch</span></td>
+  <td class="mono"><span data-en="chen2025aegisvm, p.1" data-zh="chen2025aegisvm，第1页">chen2025aegisvm, p.1</span></td>
+  <td><span class="pill pill-block" data-en="Numeric mismatch" data-zh="数值偏差">Numeric mismatch</span></td>
   <td class="mono num">11.36</td>
   <td>Hardware citation firewall gates eliminate 99.4% of hallucinated BibTeX keys prior to compilation.</td>
 </tr>
 <tr>
   <td class="mono">main.tex:27</td>
-  <td class="mono">smith2025hallucinated, p.1</td>
-  <td><span class="pill pill-block">Unsupported</span></td>
+  <td class="mono"><span data-en="smith2025hallucinated, p.1" data-zh="smith2025hallucinated，第1页">smith2025hallucinated, p.1</span></td>
+  <td><span class="pill pill-block" data-en="Unsupported" data-zh="缺乏证据">Unsupported</span></td>
   <td class="mono num">0.42</td>
   <td>Zero-shot neural theorem synthesis resolves every undecidable macro expansion cycle in O(1) time.</td>
 </tr>
 <tr>
   <td class="mono">sections/methodology.tex:11</td>
-  <td class="mono">patel2026vericite, p.1</td>
-  <td><span class="pill pill-ok">Grounded</span></td>
+  <td class="mono"><span data-en="patel2026vericite, p.1" data-zh="patel2026vericite，第1页">patel2026vericite, p.1</span></td>
+  <td><span class="pill pill-ok" data-en="Grounded" data-zh="证据吻合">Grounded</span></td>
   <td class="mono num">13.15</td>
   <td>PRISMA 2020 flow reporting separates database records (n = 412) from trial registry records (n = 38).</td>
 </tr>
 <tr>
   <td class="mono">sections/methodology.tex:19</td>
-  <td class="mono">chen2025aegisvm, p.1</td>
-  <td><span class="pill pill-warn">Partial</span></td>
+  <td class="mono"><span data-en="chen2025aegisvm, p.1" data-zh="chen2025aegisvm，第1页">chen2025aegisvm, p.1</span></td>
+  <td><span class="pill pill-warn" data-en="Partial" data-zh="部分支持">Partial</span></td>
   <td class="mono num">9.74</td>
   <td>Byrt’s PABAK mitigates high-prevalence kappa attenuation when inclusion rates fall below 12%.</td>
 </tr>
@@ -450,7 +506,7 @@ Vaswani, A., &amp; Shazeer, N. (2017b). Attention is all you need (NeurIPS Proce
     </section>
 
     <section class="panel">
-      <h2>4. PRISMA 2020 Dual-Blind Screening Flow</h2>
+      <h2 data-en="4. PRISMA 2020 Dual-Blind Screening Flow" data-zh="4. PRISMA 2020 双盲系统综述文献筛选流图">4. PRISMA 2020 Dual-Blind Screening Flow</h2>
       <div class="svg-frame">
         <svg aria-label="PRISMA 2020 systematic review flow diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 560" width="860" height="560" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif">
   <rect width="860" height="560" fill="#F8F6F0" rx="8"/>
@@ -461,41 +517,41 @@ Vaswani, A., &amp; Shazeer, N. (2017b). Attention is all you need (NeurIPS Proce
   </defs>
   <!-- Left Spine Boxes -->
   <rect x="44" y="32" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
-  <text x="60" y="56" font-size="13" font-weight="700" fill="#1D4D3E">1. Identification</text>
+  <text x="60" y="56" font-size="13" font-weight="700" fill="#1D4D3E" data-en="1. Identification" data-zh="1. 文献检索识别">1. Identification</text>
   <text x="60" y="77" font-size="12" fill="#2A2E2B">Databases: n = 36, Registers: n = 38</text>
 
   <rect x="44" y="140" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
-  <text x="60" y="164" font-size="13" font-weight="700" fill="#1D4D3E">2. Dual-Blind Screening</text>
+  <text x="60" y="164" font-size="13" font-weight="700" fill="#1D4D3E" data-en="2. Dual-Blind Screening" data-zh="2. 双盲题摘初筛">2. Dual-Blind Screening</text>
   <text x="60" y="185" font-size="12" fill="#2A2E2B">Screened: n = 10 (κ = 0.60, PABAK = 0.60)</text>
 
   <rect x="44" y="248" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
-  <text x="60" y="272" font-size="13" font-weight="700" fill="#1D4D3E">3. Report Retrieval</text>
-  <text x="60" y="293" font-size="12" fill="#2A2E2B">Reports sought for retrieval: n = 10</text>
+  <text x="60" y="272" font-size="13" font-weight="700" fill="#1D4D3E" data-en="3. Report Retrieval" data-zh="3. 全文报告调取">3. Report Retrieval</text>
+  <text x="60" y="293" font-size="12" fill="#2A2E2B" data-en="Reports sought for retrieval: n = 10" data-zh="拟调取全文报告：n = 10">Reports sought for retrieval: n = 10</text>
 
   <rect x="44" y="356" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
-  <text x="60" y="380" font-size="13" font-weight="700" fill="#1D4D3E">4. Full-Text Eligibility</text>
-  <text x="60" y="401" font-size="12" fill="#2A2E2B">Full-text reports assessed: n = 8</text>
+  <text x="60" y="380" font-size="13" font-weight="700" fill="#1D4D3E" data-en="4. Full-Text Eligibility" data-zh="4. 全文合格性评估">4. Full-Text Eligibility</text>
+  <text x="60" y="401" font-size="12" fill="#2A2E2B" data-en="Full-text reports assessed: n = 8" data-zh="完成全文评估：n = 8">Full-text reports assessed: n = 8</text>
 
   <rect x="44" y="464" width="330" height="68" rx="6" fill="#E6F0EC" stroke="#1D4D3E" stroke-width="2"/>
-  <text x="60" y="490" font-size="13" font-weight="700" fill="#1D4D3E">5. Included Cohort</text>
-  <text x="60" y="512" font-size="13" font-weight="600" fill="#13352B">Studies included in synthesis: n = 6</text>
+  <text x="60" y="490" font-size="13" font-weight="700" fill="#1D4D3E" data-en="5. Included Cohort" data-zh="5. 最终纳入队列">5. Included Cohort</text>
+  <text x="60" y="512" font-size="13" font-weight="600" fill="#13352B" data-en="Studies included in synthesis: n = 6" data-zh="最终纳入综合分析：n = 6">Studies included in synthesis: n = 6</text>
 
   <!-- Right Exclusion Boxes -->
   <rect x="454" y="32" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
-  <text x="470" y="56" font-size="12" font-weight="600" fill="#4A463F">Pre-Screening Deduplication</text>
-  <text x="470" y="77" font-size="12" fill="#5C574F">Duplicates removed: n = 64</text>
+  <text x="470" y="56" font-size="12" font-weight="600" fill="#4A463F" data-en="Pre-Screening Deduplication" data-zh="初筛前重复剔除">Pre-Screening Deduplication</text>
+  <text x="470" y="77" font-size="12" fill="#5C574F" data-en="Duplicates removed: n = 64" data-zh="去重剔除记录：n = 64">Duplicates removed: n = 64</text>
 
   <rect x="454" y="140" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
-  <text x="470" y="164" font-size="12" font-weight="600" fill="#4A463F">Title &amp; Abstract Exclusions</text>
-  <text x="470" y="185" font-size="12" fill="#5C574F">Excluded records: n = 2</text>
+  <text x="470" y="164" font-size="12" font-weight="600" fill="#4A463F" data-en="Title &amp; Abstract Exclusions" data-zh="标题与摘要排除">Title &amp; Abstract Exclusions</text>
+  <text x="470" y="185" font-size="12" fill="#5C574F" data-en="Excluded records: n = 2" data-zh="初筛排除记录：n = 2">Excluded records: n = 2</text>
 
   <rect x="454" y="248" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
-  <text x="470" y="272" font-size="12" font-weight="600" fill="#4A463F">Unretrieved Reports</text>
-  <text x="470" y="293" font-size="12" fill="#5C574F">Reports not retrieved: n = 2</text>
+  <text x="470" y="272" font-size="12" font-weight="600" fill="#4A463F" data-en="Unretrieved Reports" data-zh="未获取全文报告">Unretrieved Reports</text>
+  <text x="470" y="293" font-size="12" fill="#5C574F" data-en="Reports not retrieved: n = 2" data-zh="未能获取全文：n = 2">Reports not retrieved: n = 2</text>
 
   <rect x="454" y="356" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
   <text x="470" y="380" font-size="12" font-weight="600" fill="#4A463F">Full-Text Exclusions (n = 0)</text>
-  <text x="470" y="401" font-size="11" fill="#5C574F">None</text>
+  <text x="470" y="401" font-size="11" fill="#5C574F" data-en="None" data-zh="无">None</text>
 
   <!-- Connectors -->
   <line x1="209" y1="106" x2="209" y2="138" stroke="#1D4D3E" stroke-width="1.6" marker-end="url(#prisma-arrow)"/>
@@ -512,72 +568,120 @@ Vaswani, A., &amp; Shazeer, N. (2017b). Attention is all you need (NeurIPS Proce
     </section>
 
     <section class="panel">
-      <h2>5. JavaScriptCore Editorial Plugin Findings</h2>
+      <h2 data-en="5. JavaScriptCore Editorial Plugin Findings" data-zh="5. JavaScriptCore 隔离沙盒顶会审稿插件报告">5. JavaScriptCore Editorial Plugin Findings</h2>
       <table>
         <thead>
           <tr>
-            <th>Severity</th>
-            <th>Location</th>
-            <th>Plugin</th>
-            <th>Editorial Explanation</th>
+            <th data-en="Severity" data-zh="严重级别">Severity</th>
+            <th data-en="Location" data-zh="源码位置">Location</th>
+            <th data-en="Plugin" data-zh="审稿插件">Plugin</th>
+            <th data-en="Editorial Explanation" data-zh="学术审计说明">Editorial Explanation</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td><span class="pill pill-block" data-en="Submission blocker" data-zh="投稿阻断">Submission blocker</span></td>
   <td class="mono">main.tex:4</td>
-  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
-  <td>Explicit author identity ('Dr. Eleanor Vance, Cambridge Computing Lab') breaks double-blind peer review anonymity.</td>
+  <td><span data-en="Double-Blind &amp; Camera-Ready Venue Gate" data-zh="双盲匿名与顶会定稿门禁">Double-Blind &amp; Camera-Ready Venue Gate</span></td>
+  <td><span data-en="Explicit author identity (&#39;Dr. Eleanor Vance, Cambridge Computing Lab&#39;) breaks double-blind peer review anonymity." data-zh="双盲投稿模式下检测到非匿名 \author 署名与机构信息，定稿前须替换为 Anonymous Submission。">Explicit author identity ('Dr. Eleanor Vance, Cambridge Computing Lab') breaks double-blind peer review anonymity.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td><span class="pill pill-block" data-en="Submission blocker" data-zh="投稿阻断">Submission blocker</span></td>
   <td class="mono">main.tex:22</td>
-  <td>Overclaiming &amp; Causal Rhetoric Auditor</td>
-  <td>Claiming 100% immunity or zero error rate without confidence intervals violates falsifiability and invites immediate reviewer rejection. Matched phrase: '100% immune'.</td>
+  <td><span data-en="Overclaiming &amp; Causal Rhetoric Auditor" data-zh="过度宣称与因果措辞审计器">Overclaiming &amp; Causal Rhetoric Auditor</span></td>
+  <td><span data-en="Claiming 100% immunity or zero error rate without confidence intervals violates falsifiability and invites immediate reviewer rejection. Matched phrase: &#39;100% immune&#39;." data-zh="在未给出置信区间的情况下宣称“100% 免疫”或零误差率违背可证伪性原则，极易触发审稿人直接拒稿。">Claiming 100% immunity or zero error rate without confidence intervals violates falsifiability and invites immediate reviewer rejection. Matched phrase: '100% immune'.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td><span class="pill pill-block" data-en="Submission blocker" data-zh="投稿阻断">Submission blocker</span></td>
   <td class="mono">main.tex:24</td>
-  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
-  <td>Cited key 'smith2025hallucinated' is classified as BLOCKED_HALLUCINATED by Citation Firewall (BLOCKED (ERR_UNVERIFIED_CITATION): Invalid prefix 10.9999, HTTP 404 on Crossref/arXiv, unindexed venue.). Remove or replace with a verified source.</td>
+  <td><span data-en="Double-Blind &amp; Camera-Ready Venue Gate" data-zh="双盲匿名与顶会定稿门禁">Double-Blind &amp; Camera-Ready Venue Gate</span></td>
+  <td><span data-en="Cited key &#39;smith2025hallucinated&#39; is classified as BLOCKED_HALLUCINATED by Citation Firewall (BLOCKED (ERR_UNVERIFIED_CITATION): Invalid prefix 10.9999, HTTP 404 on Crossref/arXiv, unindexed venue.). Remove or replace with a verified source." data-zh="正文引用了被五级引文防火墙拦截的伪造/未核验文献键，违反顶会定稿门禁要求。">Cited key 'smith2025hallucinated' is classified as BLOCKED_HALLUCINATED by Citation Firewall (BLOCKED (ERR_UNVERIFIED_CITATION): Invalid prefix 10.9999, HTTP 404 on Crossref/arXiv, unindexed venue.). Remove or replace with a verified source.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td><span class="pill pill-warn" data-en="Rigor warning" data-zh="严谨性警告">Rigor warning</span></td>
   <td class="mono">main.tex:13</td>
-  <td>Anti-AI Academic Prose Sanitizer</td>
-  <td>Figurative 'tapestry' metaphors obscure technical specificity in empirical writing.</td>
+  <td><span data-en="Anti-AI Academic Prose Sanitizer" data-zh="去 AI 套话学术文风净化器">Anti-AI Academic Prose Sanitizer</span></td>
+  <td><span data-en="Figurative &#39;tapestry&#39; metaphors obscure technical specificity in empirical writing." data-zh="“rich tapestry”等比喻性修辞削弱了实证论文的技术精确度，建议直接指明具体的异构结构或证据体系。">Figurative 'tapestry' metaphors obscure technical specificity in empirical writing.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td><span class="pill pill-warn" data-en="Rigor warning" data-zh="严谨性警告">Rigor warning</span></td>
   <td class="mono">main.tex:22</td>
-  <td>Overclaiming &amp; Causal Rhetoric Auditor</td>
-  <td>Rhetorical intensifiers ('undeniably', 'indisputably', 'without exception') substitute epistemic force for statistical uncertainty quantification. Matched phrase: 'undeniably guarantees'.</td>
+  <td><span data-en="Overclaiming &amp; Causal Rhetoric Auditor" data-zh="过度宣称与因果措辞审计器">Overclaiming &amp; Causal Rhetoric Auditor</span></td>
+  <td><span data-en="Rhetorical intensifiers (&#39;undeniably&#39;, &#39;indisputably&#39;, &#39;without exception&#39;) substitute epistemic force for statistical uncertainty quantification. Matched phrase: &#39;undeniably guarantees&#39;." data-zh="绝对化强化副词（如 undeniably）以修辞语气替代了严格的统计不确定性量化，建议改为受实验范围限定的客观表述。">Rhetorical intensifiers ('undeniably', 'indisputably', 'without exception') substitute epistemic force for statistical uncertainty quantification. Matched phrase: 'undeniably guarantees'.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td><span class="pill pill-warn" data-en="Rigor warning" data-zh="严谨性警告">Rigor warning</span></td>
   <td class="mono">main.tex:23</td>
-  <td>APA 7th Statistical &amp; p-Value Consistency Verifier</td>
-  <td>Reported p-value (p = .001) for t(48) = 2.42 deviates by 0.018 from exact recomputed p = .019 (0.0194). Verify degrees of freedom or rounding.</td>
+  <td><span data-en="APA 7th Statistical &amp; p-Value Consistency Verifier" data-zh="APA 7th 统计量与 p 值核验器">APA 7th Statistical &amp; p-Value Consistency Verifier</span></td>
+  <td><span data-en="Reported p-value (p = .001) for t(48) = 2.42 deviates by 0.018 from exact recomputed p = .019 (0.0194). Verify degrees of freedom or rounding." data-zh="Lanczos 不完全 Beta 函数重算显示精确双尾 p = .0193，正文报告的 p = .001 夸大了统计显著性。">Reported p-value (p = .001) for t(48) = 2.42 deviates by 0.018 from exact recomputed p = .019 (0.0194). Verify degrees of freedom or rounding.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td><span class="pill pill-warn" data-en="Rigor warning" data-zh="严谨性警告">Rigor warning</span></td>
   <td class="mono">sections/methodology.tex:10</td>
-  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
-  <td>Cited key 'kleinberg2003bursty' has UNVERIFIED_OFFLINE status and has not been validated against Crossref, arXiv, or PubMed.</td>
+  <td><span data-en="Double-Blind &amp; Camera-Ready Venue Gate" data-zh="双盲匿名与顶会定稿门禁">Double-Blind &amp; Camera-Ready Venue Gate</span></td>
+  <td><span data-en="Cited key &#39;kleinberg2003bursty&#39; has UNVERIFIED_OFFLINE status and has not been validated against Crossref, arXiv, or PubMed." data-zh="正文引用了被五级引文防火墙拦截的伪造/未核验文献键，违反顶会定稿门禁要求。">Cited key 'kleinberg2003bursty' has UNVERIFIED_OFFLINE status and has not been validated against Crossref, arXiv, or PubMed.</span></td>
 </tr>
 <tr>
-  <td><span class="pill pill-neutral">STYLE</span></td>
+  <td><span class="pill pill-neutral" data-en="Style suggestion" data-zh="文风建议">Style suggestion</span></td>
   <td class="mono">main.tex:13</td>
-  <td>Anti-AI Academic Prose Sanitizer</td>
-  <td>'delve into' exhibits &gt;10x post-2023 LLM frequency inflation in scientific prose; prefer direct analytical verbs ('examine', 'analyze', 'investigate').</td>
+  <td><span data-en="Anti-AI Academic Prose Sanitizer" data-zh="去 AI 套话学术文风净化器">Anti-AI Academic Prose Sanitizer</span></td>
+  <td><span data-en="&#39;delve into&#39; exhibits &gt;10x post-2023 LLM frequency inflation in scientific prose; prefer direct analytical verbs (&#39;examine&#39;, &#39;analyze&#39;, &#39;investigate&#39;)." data-zh="“delve into”在 2023 年后的大模型生成文本中出现频率激增逾 10 倍，建议替换为 examine 或 analyze 等直接分析动词。">'delve into' exhibits &gt;10x post-2023 LLM frequency inflation in scientific prose; prefer direct analytical verbs ('examine', 'analyze', 'investigate').</span></td>
 </tr>
         </tbody>
       </table>
     </section>
 
-    <footer>
-      Generated locally by ScholarOS 1.0.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall
+    <footer data-en="Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall" data-zh="由 ScholarOS 1.1.0 本地离线生成，剑桥亚麻学术排版引擎与硬件级五级引文真实性防火墙">
+      Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall
     </footer>
   </div>
+  <script>
+  (function () {
+    var STORAGE_KEY = "io.github.zxu756.ScholarOS.language";
+    var btnZh = document.getElementById("btn-lang-zh");
+    var btnEn = document.getElementById("btn-lang-en");
+
+    function applyLanguage(lang) {
+      var resolved = (lang === "zh" || lang === "zh-Hans") ? "zh" : "en";
+      document.documentElement.lang = resolved === "zh" ? "zh-CN" : "en";
+      var nodes = document.querySelectorAll("[data-en][data-zh]");
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        var nextText = resolved === "zh" ? el.getAttribute("data-zh") : el.getAttribute("data-en");
+        if (nextText !== null) {
+          el.textContent = nextText;
+        }
+      }
+      if (btnZh && btnEn) {
+        var zhActive = resolved === "zh";
+        btnZh.classList.toggle("is-active", zhActive);
+        btnZh.setAttribute("aria-pressed", zhActive ? "true" : "false");
+        btnEn.classList.toggle("is-active", !zhActive);
+        btnEn.setAttribute("aria-pressed", !zhActive ? "true" : "false");
+      }
+      try {
+        window.localStorage.setItem(STORAGE_KEY, resolved === "zh" ? "zh-Hans" : "en");
+      } catch (_) {}
+    }
+
+    function detectInitialLanguage() {
+      try {
+        var saved = window.localStorage.getItem(STORAGE_KEY);
+        if (saved && saved.toLowerCase().indexOf("zh") === 0) return "zh";
+        if (saved && saved.toLowerCase().indexOf("en") === 0) return "en";
+      } catch (_) {}
+      var nav = (window.navigator && window.navigator.language) ? window.navigator.language.toLowerCase() : "en";
+      return nav.indexOf("zh") === 0 ? "zh" : "en";
+    }
+
+    if (btnZh) {
+      btnZh.addEventListener("click", function () { applyLanguage("zh"); });
+    }
+    if (btnEn) {
+      btnEn.addEventListener("click", function () { applyLanguage("en"); });
+    }
+    applyLanguage(detectInitialLanguage());
+  })();
+  </script>
 </body>
 </html>

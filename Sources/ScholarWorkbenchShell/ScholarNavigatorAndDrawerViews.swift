@@ -10,6 +10,7 @@ import ScholarPluginSDK
 /// snapshot creation, split-pane toggles, and `⌘K` / `⌘,` triggers in Cambridge Linen & Library Forest Green.
 public struct ScholarTopWorkbenchToolbarView: View {
     @ObservedObject public var docking: ScholarDockingController
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     public let projectTitle: String
     public let activeSectionTitle: String?
     public let canUndo: Bool
@@ -52,8 +53,8 @@ public struct ScholarTopWorkbenchToolbarView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Row 1: Studio Pill Switcher + Command Palette + Undo/Redo/Snapshot + Preferences
-            HStack(spacing: 10) {
+            // Row 1: Studio Pill Switcher + Command Palette + Undo/Redo/Snapshot + Language Toggle + Preferences
+            HStack(spacing: 8) {
                 Button {
                     docking.toggleLeftSidebar()
                 } label: {
@@ -75,15 +76,17 @@ public struct ScholarTopWorkbenchToolbarView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help("Toggle Left Project & Outline Sidebar (⌘B)")
+                .help(localizer.L("Toggle Left Project & Outline Sidebar (⌘B)", "显示 / 隐藏左侧项目与大纲导航栏 (⌘B)"))
 
                 studioTabStrip
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
 
                 commandPaletteTriggerButton
 
                 undoRedoSnapshotCluster
+
+                ScholarLanguageTogglePill(localizer: localizer)
 
                 preferencesAndShortcutsCluster
             }
@@ -110,8 +113,9 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "menubar.dock.rectangle")
                             .font(.system(size: 11, weight: .semibold))
-                        Text(docking.activeDrawerChannel.rawValue)
+                        Text(docking.activeDrawerChannel.localizedTitle(localizer.language))
                             .font(CambridgeTypography.uiSectionLabel)
+                            .tracking(0)
                     }
                     .foregroundStyle(
                         docking.isBottomDrawerVisible
@@ -131,7 +135,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     .fixedSize(horizontal: true, vertical: false)
                 }
                 .buttonStyle(.plain)
-                .help("Toggle 4-Channel Bottom Drawer (⌘J)")
+                .help(localizer.L("Toggle 4-Channel Bottom Drawer (⌘J)", "显示 / 隐藏四通道底部诊断抽屉 (⌘J)"))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -150,14 +154,15 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     Button {
                         docking.activeStudioTab = tab
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4.5) {
                             Image(systemName: CambridgeLinenPalette.resolvedSymbolName(for: tab.sfSymbolName))
                                 .font(.system(size: 11.5, weight: .semibold))
-                            Text(tab.rawValue)
+                            Text(tab.localizedTitle(localizer.language))
                                 .font(isActive ? CambridgeTypography.uiControlSemibold : CambridgeTypography.uiControlMedium)
+                                .tracking(0)
                         }
                         .foregroundStyle(isActive ? CambridgeLinenPalette.archivalPaper : CambridgeLinenPalette.oxfordCharcoal)
-                        .padding(.horizontal, 9.5)
+                        .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(
                             RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
@@ -182,16 +187,17 @@ public struct ScholarTopWorkbenchToolbarView: View {
         Button {
             docking.isCommandPalettePresented = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("Jump / Cite")
+                Text(localizer.L("Jump / Cite", "跳转 / 引用"))
                     .font(CambridgeTypography.uiControlMedium)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                 ScholarKeycapBadge("⌘K")
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 7.5)
             .padding(.vertical, 4.5)
             .background(
                 RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
@@ -204,7 +210,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
             .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
-        .help("Open Subsequence Fuzzy Command, Section & Citation Palette (⌘K)")
+        .help(localizer.L("Open Subsequence Fuzzy Command, Section & Citation Palette (⌘K)", "打开子序列模糊命令、章节与参考文献跳转面板 (⌘K)"))
     }
 
     private var undoRedoSnapshotCluster: some View {
@@ -233,7 +239,9 @@ public struct ScholarTopWorkbenchToolbarView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canUndo)
-            .help(canUndo ? "Undo \(topUndoTitle ?? "Last Action") (⌘Z)" : "Undo Stack Empty")
+            .help(canUndo
+                  ? localizer.L("Undo \(topUndoTitle ?? "Last Action") (⌘Z)", "撤销 \(topUndoTitle ?? "上一步修改") (⌘Z)")
+                  : localizer.L("Undo Stack Empty", "撤销栈为空"))
 
             Button(action: onRedo) {
                 HStack(spacing: 3) {
@@ -259,18 +267,21 @@ public struct ScholarTopWorkbenchToolbarView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canRedo)
-            .help(canRedo ? "Redo \(topRedoTitle ?? "Next Action") (⇧⌘Z)" : "Redo Stack Empty")
+            .help(canRedo
+                  ? localizer.L("Redo \(topRedoTitle ?? "Next Action") (⇧⌘Z)", "重做 \(topRedoTitle ?? "下一步修改") (⇧⌘Z)")
+                  : localizer.L("Redo Stack Empty", "重做栈为空"))
 
             Button(action: onCreateSnapshot) {
                 HStack(spacing: 4) {
                     Image(systemName: "camera.aperture")
                         .font(.system(size: 11.5, weight: .semibold))
-                    Text("Snapshot")
+                    Text(localizer.L("Snapshot", "快照"))
                         .font(CambridgeTypography.uiControlMedium)
+                        .tracking(0)
                 }
             }
             .buttonStyle(CambridgeSecondaryButtonStyle())
-            .help("Save Named Manuscript Revision Snapshot (⌥⌘S)")
+            .help(localizer.L("Save Named Manuscript Revision Snapshot (⌥⌘S)", "保存命名手稿修订快照 (⌥⌘S)"))
         }
     }
 
@@ -293,7 +304,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     )
             }
             .buttonStyle(.plain)
-            .help("Keyboard Shortcut Legend (⌘/)")
+            .help(localizer.L("Keyboard Shortcut Legend (⌘/)", "全局键盘快捷键手册 (⌘/)"))
 
             Button {
                 docking.isPreferencesPresented = true
@@ -312,7 +323,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     )
             }
             .buttonStyle(.plain)
-            .help("ScholarOS Preferences (⌘,)")
+            .help(localizer.L("ScholarOS Preferences (⌘,)", "ScholarOS 偏好设置 (⌘,)"))
         }
     }
 
@@ -322,9 +333,11 @@ public struct ScholarTopWorkbenchToolbarView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
 
-            Text(shortenedProjectTitle)
+            Text(localizedProjectTitle)
                 .font(.system(size: 12.5, weight: .semibold, design: .serif))
+                .tracking(0)
                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+                .fixedSize(horizontal: true, vertical: false)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .bold))
@@ -342,9 +355,10 @@ public struct ScholarTopWorkbenchToolbarView: View {
                 Text(section)
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                    .fixedSize(horizontal: true, vertical: false)
             }
 
-            Text(docking.synchronizedCursor.lineColumnLabel)
+            Text(docking.synchronizedCursor.localizedLineColumnLabel(localizer.language))
                 .font(CambridgeTypography.monoSmall)
                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 .padding(.horizontal, 6)
@@ -357,9 +371,11 @@ public struct ScholarTopWorkbenchToolbarView: View {
         }
     }
 
-    private var shortenedProjectTitle: String {
-        if projectTitle.count <= 48 { return projectTitle }
-        return String(projectTitle.prefix(46)).trimmingCharacters(in: .whitespaces) + "…"
+    private var localizedProjectTitle: String {
+        if projectTitle == "Verifiable Citation Firewalls & Sandboxes" {
+            return localizer.L("Verifiable Citation Firewalls & Sandboxes", "可验证引文防火墙与沙盒审稿工作站")
+        }
+        return String(projectTitle.prefix(48))
     }
 
     private var rightInspectorSplitPicker: some View {
@@ -372,8 +388,9 @@ public struct ScholarTopWorkbenchToolbarView: View {
                     HStack(spacing: 4) {
                         Image(systemName: mode.sfSymbolName)
                             .font(.system(size: 10.5, weight: .semibold))
-                        Text(mode.shortLabel)
+                        Text(mode.localizedShortLabel(localizer.language))
                             .font(CambridgeTypography.uiSectionLabel)
+                            .tracking(0)
                     }
                     .foregroundStyle(isSelected ? CambridgeLinenPalette.libraryForestGreen : CambridgeLinenPalette.slateEditorial)
                     .padding(.horizontal, 7)
@@ -402,6 +419,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
 /// Multi-file document tab bar above the manuscript editor well.
 public struct ScholarOpenManuscriptTabStripView: View {
     @ObservedObject public var docking: ScholarDockingController
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public init(docking: ScholarDockingController) {
         self.docking = docking
@@ -433,7 +451,7 @@ public struct ScholarOpenManuscriptTabStripView: View {
                                         .frame(width: 6, height: 6)
                                 }
                                 if tab.wordCount > 0 {
-                                    Text("\(tab.wordCount)w")
+                                    Text(localizer.L("\(tab.wordCount)w", "\(tab.wordCount)词"))
                                         .font(CambridgeTypography.monoSmall)
                                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                 }
@@ -481,6 +499,7 @@ public struct ScholarOpenManuscriptTabStripView: View {
 /// and quick Citation Firewall + PRISMA Cohen's $\kappa$ integrity summary cards.
 public struct ScholarLeftNavigatorSidebarView: View {
     @ObservedObject public var docking: ScholarDockingController
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     public let manuscriptFiles: [ManuscriptFileRecord]
     public let primaryManuscriptPath: String
     public let outlineEntries: [DocumentOutlineEntry]
@@ -538,8 +557,9 @@ public struct ScholarLeftNavigatorSidebarView: View {
     private var manuscriptFilesSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("MANUSCRIPT FILES")
+                Text(localizer.L("MANUSCRIPT FILES", "手稿文件"))
                     .font(CambridgeTypography.uiSectionLabel)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 Spacer()
                 Text("\(manuscriptFiles.count)")
@@ -572,7 +592,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
 
                         Spacer(minLength: 4)
 
-                        Text("\(file.wordCount)w")
+                        Text(localizer.L("\(file.wordCount)w", "\(file.wordCount)词"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(isSelected ? CambridgeLinenPalette.libraryForestGreen : CambridgeLinenPalette.slateEditorial)
                             .fixedSize(horizontal: true, vertical: false)
@@ -599,8 +619,9 @@ public struct ScholarLeftNavigatorSidebarView: View {
     private var numberedOutlineSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("SECTION OUTLINE")
+                Text(localizer.L("SECTION OUTLINE", "章节大纲"))
                     .font(CambridgeTypography.uiSectionLabel)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 Spacer()
                 Text("\(outlineEntries.count)")
@@ -609,7 +630,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
             }
 
             if outlineEntries.isEmpty {
-                Text("No \\section or Typst headings parsed yet.")
+                Text(localizer.L("No \\section or Typst headings parsed yet.", "尚未解析到 \\section 或 Typst 章节标题。"))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     .padding(.vertical, 6)
@@ -642,7 +663,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
                             Spacer(minLength: 4)
 
                             if entry.wordCountInSection > 0 {
-                                Text("\(entry.wordCountInSection)w")
+                                Text(localizer.L("\(entry.wordCountInSection)w", "\(entry.wordCountInSection)词"))
                                     .font(CambridgeTypography.monoSmall)
                                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                     .fixedSize(horizontal: true, vertical: false)
@@ -681,11 +702,12 @@ public struct ScholarLeftNavigatorSidebarView: View {
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(blockedCount > 0 ? CambridgeLinenPalette.blockedCrimson : CambridgeLinenPalette.verifiedEmerald)
-                        Text("Citation Firewall")
+                        Text(localizer.L("Citation Firewall", "引文防火墙"))
                             .font(CambridgeTypography.uiControlSemibold)
+                            .tracking(0)
                             .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                         Spacer()
-                        Text("\(verifiedCount)/\(totalBib) OK")
+                        Text(localizer.L("\(verifiedCount)/\(totalBib) OK", "\(verifiedCount)/\(totalBib) 已核验"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
                             .fixedSize(horizontal: true, vertical: false)
@@ -693,7 +715,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
 
                     HStack(spacing: 8) {
                         if blockedCount > 0 {
-                            Text("\(blockedCount) Blocked")
+                            Text(localizer.L("\(blockedCount) Blocked", "已拦截 \(blockedCount) 篇"))
                                 .font(CambridgeTypography.monoSmall)
                                 .foregroundStyle(CambridgeLinenPalette.blockedCrimson)
                                 .padding(.horizontal, 5)
@@ -704,7 +726,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
                                 )
                                 .fixedSize(horizontal: true, vertical: false)
                         } else {
-                            Text("Zero Hallucinations")
+                            Text(localizer.L("Zero Hallucinations", "零幻觉引文"))
                                 .font(CambridgeTypography.uiCaption)
                                 .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
                         }
@@ -729,17 +751,23 @@ public struct ScholarLeftNavigatorSidebarView: View {
             } label: {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("PRISMA κ & Audit")
+                        Text(localizer.L("PRISMA κ & Audit", "PRISMA 信度与审稿"))
                             .font(CambridgeTypography.uiSectionLabel)
+                            .tracking(0)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                        Text(String(format: "κ = %.2f • %d studies", kappa, prismaCount))
+                        Text(
+                            localizer.L(
+                                String(format: "κ = %.2f • %d studies", kappa, prismaCount),
+                                String(format: "κ = %.2f • %d 篇研究", kappa, prismaCount)
+                            )
+                        )
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                             .fixedSize(horizontal: true, vertical: false)
                     }
                     Spacer()
                     if editorialCount > 0 {
-                        Text("\(editorialCount) flags")
+                        Text(localizer.L("\(editorialCount) flags", "\(editorialCount) 项提示"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.driftAmber)
                             .padding(.horizontal, 6)
@@ -771,6 +799,7 @@ public struct ScholarLeftNavigatorSidebarView: View {
 /// Resizable 4-channel bottom inspection drawer (`Diagnostics`, `Citation Firewall`, `Editorial Audit`, `Build & SyncTeX`).
 public struct ScholarBottomDrawerView: View {
     @ObservedObject public var docking: ScholarDockingController
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     public let diagnostics: [LSPDiagnostic]
     public let bibliographyEntries: [BibliographyEntry]
     public let editorialFindings: [EditorialAuditFinding]
@@ -862,8 +891,9 @@ public struct ScholarBottomDrawerView: View {
                     HStack(spacing: 5) {
                         Image(systemName: CambridgeLinenPalette.resolvedSymbolName(for: channel.sfSymbolName))
                             .font(.system(size: 11, weight: .semibold))
-                        Text(channel.rawValue)
+                        Text(channel.localizedTitle(localizer.language))
                             .font(isSelected ? CambridgeTypography.uiControlSemibold : CambridgeTypography.uiControlMedium)
+                            .tracking(0)
                         Text("\(badgeCount)")
                             .font(CambridgeTypography.monoSmall)
                             .padding(.horizontal, 5)
@@ -905,7 +935,7 @@ public struct ScholarBottomDrawerView: View {
                     .padding(5)
             }
             .buttonStyle(.plain)
-            .help("Collapse Bottom Drawer")
+            .help(localizer.L("Collapse Bottom Drawer", "收起底部诊断抽屉"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -917,23 +947,27 @@ public struct ScholarBottomDrawerView: View {
         switch docking.activeDrawerChannel {
         case .diagnostics:
             HStack(spacing: 4) {
-                Button("All") { minimumDiagnosticSeverity = nil }
+                Button(localizer.L("All", "全部")) { minimumDiagnosticSeverity = nil }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: minimumDiagnosticSeverity == nil))
-                Button("Warnings+") { minimumDiagnosticSeverity = .warning }
+                Button(localizer.L("Warnings+", "警告+")) { minimumDiagnosticSeverity = .warning }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: minimumDiagnosticSeverity == .warning))
-                Button("Errors") { minimumDiagnosticSeverity = .error }
+                Button(localizer.L("Errors", "错误")) { minimumDiagnosticSeverity = .error }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: minimumDiagnosticSeverity == .error))
             }
         case .citationFirewall:
-            Button(firewallFilterOnlyIssues ? "Showing Blocked/Drift" : "Filter Issues Only") {
+            Button(
+                firewallFilterOnlyIssues
+                    ? localizer.L("Showing Blocked/Drift", "当前：仅看漂移与拦截")
+                    : localizer.L("Filter Issues Only", "仅筛查异常引文")
+            ) {
                 firewallFilterOnlyIssues.toggle()
             }
             .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: firewallFilterOnlyIssues))
         case .editorialAudit:
             HStack(spacing: 6) {
-                Button("All") { minimumEditorialSeverity = nil }
+                Button(localizer.L("All", "全部")) { minimumEditorialSeverity = nil }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: minimumEditorialSeverity == nil))
-                Button("Blockers") { minimumEditorialSeverity = .submissionBlocker }
+                Button(localizer.L("Blockers", "投稿阻断")) { minimumEditorialSeverity = .submissionBlocker }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: minimumEditorialSeverity == .submissionBlocker))
                 Button {
                     onRunEditorialAudit()
@@ -941,13 +975,19 @@ public struct ScholarBottomDrawerView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 10))
-                        Text("Run JS Plugins")
+                        Text(localizer.L("Run JS Plugins", "运行审稿插件"))
+                            .tracking(0)
                     }
                 }
                 .buttonStyle(CambridgePrimaryButtonStyle())
             }
         case .syncTeXLog:
-            Text("\(syncTeXAnchors.count) SyncTeX anchors • \(pluginLogs.count) JS logs")
+            Text(
+                localizer.L(
+                    "\(syncTeXAnchors.count) SyncTeX anchors • \(pluginLogs.count) JS logs",
+                    "\(syncTeXAnchors.count) 处 SyncTeX 锚点 • \(pluginLogs.count) 条沙盒日志"
+                )
+            )
                 .font(CambridgeTypography.monoSmall)
                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 .fixedSize(horizontal: true, vertical: false)
@@ -978,8 +1018,11 @@ public struct ScholarBottomDrawerView: View {
             if filtered.isEmpty {
                 emptyDrawerPlaceholder(
                     symbol: "checkmark.seal",
-                    title: "Zero Markup or Macro Diagnostics",
-                    detail: "Incremental LaTeX/Typst CST parser and cycle-safe macro symbol table reported clean syntax."
+                    title: localizer.L("Zero Markup or Macro Diagnostics", "零语法或宏展开异常"),
+                    detail: localizer.L(
+                        "Incremental LaTeX/Typst CST parser and cycle-safe macro symbol table reported clean syntax.",
+                        "增量式 LaTeX/Typst 语法树解析器与防环宏符号表核查全部通过。"
+                    )
                 )
             } else {
                 LazyVStack(alignment: .leading, spacing: 6) {
@@ -993,7 +1036,7 @@ public struct ScholarBottomDrawerView: View {
                                 .fixedSize(horizontal: true, vertical: false)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(diag.message)
+                                Text(diag.localizedMessage(localizer.language))
                                     .font(CambridgeTypography.uiControl)
                                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                                 Text("\(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column)")
@@ -1004,7 +1047,7 @@ public struct ScholarBottomDrawerView: View {
                             Spacer(minLength: 8)
 
                             if diag.suggestedFix != nil {
-                                Button("Apply Quick Fix") {
+                                Button(localizer.L("Apply Quick Fix", "一键修复")) {
                                     onApplyDiagnosticFix(diag)
                                 }
                                 .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -1036,8 +1079,11 @@ public struct ScholarBottomDrawerView: View {
             if filtered.isEmpty {
                 emptyDrawerPlaceholder(
                     symbol: "lock.shield",
-                    title: "All Cited Entries Verified",
-                    detail: "No blocked, hallucinated, retracted, or drifted bibliography keys match the current filter."
+                    title: localizer.L("All Cited Entries Verified", "全部引用文献均已通过核验"),
+                    detail: localizer.L(
+                        "No blocked, hallucinated, retracted, or drifted bibliography keys match the current filter.",
+                        "当前筛选条件下无被拦截、伪造、撤稿或元数据漂移的文献键。"
+                    )
                 )
             } else {
                 LazyVStack(alignment: .leading, spacing: 6) {
@@ -1054,7 +1100,8 @@ public struct ScholarBottomDrawerView: View {
                                 Text(entry.title)
                                     .font(CambridgeTypography.uiControlMedium)
                                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                                Text(entry.firewallAuditNote.isEmpty ? "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d."))" : entry.firewallAuditNote)
+                                let localizedNote = entry.localizedFirewallAuditNote(localizer.language)
+                                Text(localizedNote.isEmpty ? "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d."))" : localizedNote)
                                     .font(CambridgeTypography.uiCaption)
                                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             }
@@ -1068,7 +1115,7 @@ public struct ScholarBottomDrawerView: View {
                                     .fixedSize(horizontal: true, vertical: false)
                             }
 
-                            Button("Inspect") {
+                            Button(localizer.L("Inspect", "核查详情")) {
                                 docking.focusCitation(entry.citeKey, openRightInspector: true)
                             }
                             .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -1117,8 +1164,11 @@ public struct ScholarBottomDrawerView: View {
                 if filtered.isEmpty {
                     emptyDrawerPlaceholder(
                         symbol: "highlighter",
-                        title: "Manuscript Passed Editorial & Statistical Rigor Checks",
-                        detail: "No overclaiming rhetoric, AI prose tropes, APA 7th p-value discrepancies, or venue leaks matched."
+                        title: localizer.L("Manuscript Passed Editorial & Statistical Rigor Checks", "手稿已通过全部审稿与统计严谨性核查"),
+                        detail: localizer.L(
+                            "No overclaiming rhetoric, AI prose tropes, APA 7th p-value discrepancies, or venue leaks matched.",
+                            "未检测到过度宣称、AI 套话修辞、APA 7th p 值不一致或双盲匿名泄漏。"
+                        )
                     )
                 } else {
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -1126,20 +1176,21 @@ public struct ScholarBottomDrawerView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(spacing: 8) {
                                     EditorialSeverityPill(severity: finding.severity, compact: true)
-                                    Text(finding.category)
+                                    Text(finding.localizedCategory(localizer.language))
                                         .font(CambridgeTypography.uiControlSemibold)
+                                        .tracking(0)
                                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                                     Text("\(finding.filePath):\(finding.line)")
                                         .font(CambridgeTypography.monoSmall)
                                         .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                                         .fixedSize(horizontal: true, vertical: false)
                                     Spacer()
-                                    Text(finding.pluginName)
+                                    Text(finding.localizedPluginName(localizer.language))
                                         .font(CambridgeTypography.uiCaption)
                                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                 }
 
-                                Text(finding.explanation)
+                                Text(finding.localizedExplanation(localizer.language))
                                     .font(CambridgeTypography.uiControl)
                                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
 
@@ -1156,7 +1207,7 @@ public struct ScholarBottomDrawerView: View {
                                     Spacer(minLength: 6)
 
                                     if let rewrite = finding.suggestedRewrite, !rewrite.isEmpty {
-                                        Button("Apply Scholarly Rewrite") {
+                                        Button(localizer.L("Apply Scholarly Rewrite", "采纳学术改写")) {
                                             onApplyEditorialRewrite(finding)
                                         }
                                         .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))
@@ -1189,12 +1240,16 @@ public struct ScholarBottomDrawerView: View {
         HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("BIDIRECTIONAL SYNCTEX ANCHORS")
+                    Text(localizer.L("BIDIRECTIONAL SYNCTEX ANCHORS", "双向 SYNCTEX 坐标锚点"))
                         .font(CambridgeTypography.uiSectionLabel)
+                        .tracking(0)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
 
                     if syncTeXAnchors.isEmpty {
-                        Text("Compile or preview manuscript to populate deterministic source-to-PDF anchors.")
+                        Text(localizer.L(
+                            "Compile or preview manuscript to populate deterministic source-to-PDF anchors.",
+                            "预览手稿后即可自动生成确定性源码至 PDF 双向坐标锚点。"
+                        ))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             .padding(.top, 4)
@@ -1210,7 +1265,12 @@ public struct ScholarBottomDrawerView: View {
                                     Image(systemName: "arrow.left.and.right")
                                         .font(.system(size: 10))
                                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                                    Text(String(format: "Page %d (%.0f, %.0f pt)", anchor.pdfPageIndex + 1, anchor.xPt, anchor.yPt))
+                                    Text(
+                                        localizer.L(
+                                            String(format: "Page %d (%.0f, %.0f pt)", anchor.pdfPageIndex + 1, anchor.xPt, anchor.yPt),
+                                            String(format: "第 %d 页 (%.0f, %.0f pt)", anchor.pdfPageIndex + 1, anchor.xPt, anchor.yPt)
+                                        )
+                                    )
                                         .font(CambridgeTypography.monoSmall)
                                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                                     Spacer()
@@ -1234,12 +1294,16 @@ public struct ScholarBottomDrawerView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("JAVASCRIPTCORE SANDBOX RING BUFFER")
+                    Text(localizer.L("JAVASCRIPTCORE SANDBOX RING BUFFER", "JAVASCRIPTCORE 沙盒环形日志"))
                         .font(CambridgeTypography.uiSectionLabel)
+                        .tracking(0)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
 
                     if pluginLogs.isEmpty {
-                        Text("Run JS Editorial Plugins to inspect deterministic console ring telemetry.")
+                        Text(localizer.L(
+                            "Run JS Editorial Plugins to inspect deterministic console ring telemetry.",
+                            "运行 JS 审稿插件即可查看隔离沙盒控制台环形日志。"
+                        ))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             .padding(.top, 4)

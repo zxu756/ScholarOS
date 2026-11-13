@@ -14,6 +14,7 @@ import ScholarWorkbenchShell
 /// Two-Column PDF + SyncTeX + Readability Telemetry, Myers Track Changes, and Citation Metadata + CSL Cards.
 public struct ScholarContextualRightInspectorView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel) {
         self.viewModel = viewModel
@@ -52,21 +53,25 @@ public struct ScholarContextualRightInspectorView: View {
 
         return VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("MANUSCRIPT READABILITY & VENUE TELEMETRY")
+                Text(localizer.L("MANUSCRIPT READABILITY & VENUE TELEMETRY", "手稿可读性与顶会规格指标"))
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text(String(format: "~%.1f min read", readMin))
-                    .font(CambridgeTypography.monoSmall)
-                    .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                    .fixedSize(horizontal: true, vertical: false)
+                Text(
+                    localizer.language == .zhHans
+                        ? String(format: "约 %.1f 分钟读完", readMin)
+                        : String(format: "~%.1f min read", readMin)
+                )
+                .font(CambridgeTypography.monoSmall)
+                .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+                .fixedSize(horizontal: true, vertical: false)
             }
 
             HStack(spacing: 6) {
-                miniInspectorMetric(title: "Flesch Ease", value: String(format: "%.1f", flesch))
-                miniInspectorMetric(title: "FK Grade", value: String(format: "%.1f", grade))
-                miniInspectorMetric(title: "Cites / 1k", value: String(format: "%.1f", citeDensity))
-                miniInspectorMetric(title: "Venue Fit", value: "NeurIPS OK")
+                miniInspectorMetric(title: localizer.L("Flesch Ease", "Flesch 易读度"), value: String(format: "%.1f", flesch))
+                miniInspectorMetric(title: localizer.L("FK Grade", "FK 学年等级"), value: String(format: "%.1f", grade))
+                miniInspectorMetric(title: localizer.L("Cites / 1k", "千词引文密度"), value: String(format: "%.1f", citeDensity))
+                miniInspectorMetric(title: localizer.L("Venue Fit", "顶会合规"), value: localizer.L("NeurIPS OK", "NeurIPS 达标"))
             }
         }
         .padding(9)
@@ -110,7 +115,7 @@ public struct ScholarContextualRightInspectorView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("CITATION METADATA & FIREWALL")
+                            Text(localizer.L("CITATION METADATA & FIREWALL", "引文元数据与防火墙状态"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                             Spacer()
@@ -136,7 +141,7 @@ public struct ScholarContextualRightInspectorView: View {
                         Divider()
                             .overlay(CambridgeLinenPalette.stoneHairline)
 
-                        Text("CSL (\(viewModel.selectedCSLStyle.rawValue))")
+                        Text(localizer.L("CSL (\(viewModel.selectedCSLStyle.rawValue))", "CSL 格式 (\(viewModel.selectedCSLStyle.rawValue))"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
 
@@ -146,13 +151,13 @@ public struct ScholarContextualRightInspectorView: View {
                             .fixedSize(horizontal: false, vertical: true)
 
                         HStack(spacing: 8) {
-                            Button("Insert into Manuscript") {
+                            Button(localizer.L("Insert into Manuscript", "插入至手稿正文")) {
                                 _ = viewModel.attemptInsertCitation(entry.citeKey)
                             }
                             .buttonStyle(CambridgePrimaryButtonStyle())
                             .fixedSize(horizontal: true, vertical: false)
 
-                            Button("Open in Graph") {
+                            Button(localizer.L("Open in Graph", "在知识图谱中查看")) {
                                 viewModel.selectedGraphCiteKey = entry.citeKey
                                 viewModel.docking.activeStudioTab = .citationGraph
                             }
@@ -165,17 +170,17 @@ public struct ScholarContextualRightInspectorView: View {
 
                 if let metrics {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("READABILITY & DENSITY ANALYTICS")
+                        Text(localizer.L("READABILITY & DENSITY ANALYTICS", "可读性与词法密度分析"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
 
                         HStack(spacing: 6) {
                             miniInspectorMetric(title: "Flesch", value: String(format: "%.1f", metrics.readability.fleschReadingEase))
-                            miniInspectorMetric(title: "Fog Index", value: String(format: "%.1f", metrics.readability.gunningFogIndex))
-                            miniInspectorMetric(title: "TTR", value: String(format: "%.2f", metrics.readability.lexicalTypeTokenRatio))
+                            miniInspectorMetric(title: localizer.L("Fog Index", "迷雾指数"), value: String(format: "%.1f", metrics.readability.gunningFogIndex))
+                            miniInspectorMetric(title: localizer.L("TTR", "词汇丰富度"), value: String(format: "%.2f", metrics.readability.lexicalTypeTokenRatio))
                         }
 
-                        Text(metrics.readability.academicRegisterInterpretation)
+                        Text(localizedReadabilityInterpretation(metrics.readability.academicRegisterInterpretation))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             .fixedSize(horizontal: false, vertical: true)
@@ -186,6 +191,14 @@ public struct ScholarContextualRightInspectorView: View {
             .padding(12)
         }
         .background(CambridgeLinenPalette.cambridgeLinen)
+    }
+
+    private func localizedReadabilityInterpretation(_ raw: String) -> String {
+        guard localizer.language == .zhHans else { return raw }
+        if raw.localizedCaseInsensitiveContains("graduate") || raw.localizedCaseInsensitiveContains("peer-reviewed") || raw.localizedCaseInsensitiveContains("scholarly") {
+            return "学术语体评估：符合研究生及同行评审顶会论文密度区间。"
+        }
+        return "学术语体评估：句法复杂度与专业术语密度处于标准学术区间。"
     }
 }
 
@@ -311,6 +324,8 @@ private struct KeyShortcutHostCommandsView: View {
                 viewModel.docking.activeStudioTab = .editorialAudit
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
+            Button("") { viewModel.handleCommandPaletteAction(.toggleLanguage) }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
             Button("") { viewModel.docking.isShortcutLegendPresented.toggle() }
                 .keyboardShortcut("/", modifiers: [.command])
         }
@@ -323,15 +338,21 @@ private struct KeyShortcutHostCommandsView: View {
 // MARK: - Headless 2x Retina Screenshot & HTML Dossier Exporter (`ScholarScreenshotExportService`)
 
 /// Exports crisp `2720 × 1680 px` (`1360 × 840 pt @ 2x`) Retina PNG screenshots across all flagship ScholarOS studios,
-/// plus the standalone Hallmark-clean `demo-scholar-dossier.html` archival audit report.
+/// plus the standalone Hallmark-clean bilingual `demo-scholar-dossier.html` archival audit report.
 @MainActor
 public enum ScholarScreenshotExportService {
     public static let viewportSize = CGSize(width: 1360, height: 840)
     public static let retinaScale: CGFloat = 2.0
 
     @discardableResult
-    public static func exportAllAssets(to directoryURL: URL) throws -> [URL] {
+    public static func exportAllAssets(
+        to directoryURL: URL,
+        language: ScholarLanguage? = nil
+    ) throws -> [URL] {
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+        let resolvedLanguage = language ?? ScholarLocalizer.shared.language
+        ScholarLocalizer.shared.setLanguage(resolvedLanguage)
 
         let viewModel = ScholarStudioViewModel()
         var writtenURLs: [URL] = []
@@ -386,180 +407,28 @@ public enum ScholarScreenshotExportService {
                 bytesPerRow: 0,
                 bitsPerPixel: 0
             ) else {
-                throw ScholarOSError.invalidCLIArguments("Failed to allocate 2x NSBitmapImageRep for \(preset.rawValue)")
+                throw ScholarOSError.invalidCLIArguments("Failed to allocate 2x NSBitmapImageRep for \(preset.fileName(for: resolvedLanguage))")
             }
             bitmapRep.size = viewportSize
             hostingView.cacheDisplay(in: hostingView.bounds, to: bitmapRep)
 
             guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
-                throw ScholarOSError.invalidCLIArguments("Failed to encode PNG data for \(preset.rawValue)")
+                throw ScholarOSError.invalidCLIArguments("Failed to encode PNG data for \(preset.fileName(for: resolvedLanguage))")
             }
 
-            let fileURL = directoryURL.appendingPathComponent(preset.rawValue)
+            let fileURL = directoryURL.appendingPathComponent(preset.fileName(for: resolvedLanguage))
             try pngData.write(to: fileURL, options: .atomic)
             writtenURLs.append(fileURL)
         }
 
         offscreenWindow.orderOut(nil)
 
-        // Also export the standalone Cambridge Linen HTML Audit Dossier (refined for Hallmark sloplint 0/0/0)
-        let rawHTML = try CambridgeLinenHTMLReportExporter().exportHTMLDossier(database: viewModel.database)
-        let htmlString = refineDossierHTMLForHallmarkSloplint(rawHTML)
+        // Also export the standalone bilingual Cambridge Linen HTML Audit Dossier (Hallmark sloplint 0/0/0)
+        let htmlString = try CambridgeLinenHTMLReportExporter().exportHTMLDossier(database: viewModel.database)
         let htmlURL = directoryURL.appendingPathComponent("demo-scholar-dossier.html")
         try htmlString.write(to: htmlURL, atomically: true, encoding: .utf8)
         writtenURLs.append(htmlURL)
 
         return writtenURLs
-    }
-
-    private static func refineDossierHTMLForHallmarkSloplint(_ raw: String) -> String {
-        var html = raw
-
-        // 1. Add font tokens & warm archival paper (#FDFCF8) to :root + overflow-x: clip on html, body
-        html = html.replacingOccurrences(
-            of: "--bg-paper: #FFFFFF;",
-            with: """
-            --bg-paper: #FDFCF8;
-                --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-                --font-serif: Georgia, "Times New Roman", serif;
-                --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-            """
-        )
-        html = html.replacingOccurrences(
-            of: "* { box-sizing: border-box; }",
-            with: "* { box-sizing: border-box; }\n  html, body { overflow-x: clip; }"
-        )
-
-        // 2. Reference font tokens instead of inline font-family literals
-        html = html.replacingOccurrences(
-            of: #"font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;"#,
-            with: "font-family: var(--font-sans);"
-        )
-        html = html.replacingOccurrences(
-            of: #"font-family: Georgia, "Times New Roman", serif;"#,
-            with: "font-family: var(--font-serif);"
-        )
-        html = html.replacingOccurrences(
-            of: "font-family: ui-monospace, SFMono-Regular, Menlo, monospace;",
-            with: "font-family: var(--font-mono);"
-        )
-
-        // 3. Enforce strict 4px spacing scale & sentence-case untracked labels
-        html = html.replacingOccurrences(
-            of: """
-              .eyebrow {
-                font-size: 11px;
-                font-weight: 700;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-                color: var(--accent-forest);
-                margin: 0 0 6px;
-              }
-            """,
-            with: """
-              .eyebrow {
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--accent-forest);
-                margin: 0 0 8px;
-              }
-            """
-        )
-        html = html.replacingOccurrences(
-            of: "padding: 14px 16px;",
-            with: "padding: 12px 16px;"
-        )
-        html = html.replacingOccurrences(
-            of: """
-              .kpi-label {
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: var(--ink-secondary);
-                margin-bottom: 4px;
-              }
-            """,
-            with: """
-              .kpi-label {
-                font-size: 12px;
-                font-weight: 500;
-                color: var(--ink-secondary);
-                margin-bottom: 4px;
-              }
-            """
-        )
-        html = html.replacingOccurrences(
-            of: """
-              th {
-                text-align: left;
-                padding: 9px 12px;
-                background: var(--bg-vellum);
-                border-bottom: 1px solid var(--border-stone);
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                color: var(--ink-secondary);
-              }
-            """,
-            with: """
-              th {
-                text-align: left;
-                padding: 8px 12px;
-                background: var(--bg-vellum);
-                border-bottom: 1px solid var(--border-stone);
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--ink-secondary);
-              }
-            """
-        )
-        html = html.replacingOccurrences(
-            of: "padding: 9px 12px;",
-            with: "padding: 8px 12px;"
-        )
-        html = html.replacingOccurrences(
-            of: "padding: 12px 14px;",
-            with: "padding: 12px 16px;"
-        )
-        html = html.replacingOccurrences(
-            of: "margin-top: 14px;",
-            with: "margin-top: 16px;"
-        )
-        html = html.replacingOccurrences(
-            of: "margin-top: 2px;",
-            with: "margin-top: 4px;"
-        )
-
-        // 4. Sentence-case status pill text & aria-label on PRISMA SVG
-        let pillMappings: [(String, String)] = [
-            (">GROUNDED<", ">Grounded<"),
-            (">PARTIAL<", ">Partial<"),
-            (">NUMERIC_MISMATCH<", ">Numeric mismatch<"),
-            (">UNSUPPORTED<", ">Unsupported<"),
-            (">BLOCKER<", ">Submission blocker<"),
-            (">SUBMISSION_BLOCKER<", ">Submission blocker<"),
-            (">RIGOR_WARN<", ">Rigor warning<"),
-            (">STYLE_SUGGESTION<", ">Style suggestion<"),
-            (">NOTE<", ">Editorial note<")
-        ]
-        for (oldToken, newToken) in pillMappings {
-            html = html.replacingOccurrences(of: oldToken, with: newToken)
-        }
-        html = html.replacingOccurrences(
-            of: "<svg ",
-            with: #"<svg aria-label="PRISMA 2020 systematic review flow diagram" "#
-        )
-
-        // 5. Replace middle-dot chains, en-dashes in copy, and straight apostrophes in prose
-        html = html.replacingOccurrences(of: " · ", with: ", ")
-        html = html.replacingOccurrences(of: "–", with: " to ")
-        html = html.replacingOccurrences(of: "Cohen's", with: "Cohen\u{2019}s")
-        html = html.replacingOccurrences(of: "Byrt's", with: "Byrt\u{2019}s")
-        html = html.replacingOccurrences(of: "Gwet's", with: "Gwet\u{2019}s")
-        html = html.replacingOccurrences(of: "Student's", with: "Student\u{2019}s")
-        html = html.replacingOccurrences(of: "Fisher's", with: "Fisher\u{2019}s")
-        html = html.replacingOccurrences(of: "Hedges'", with: "Hedges\u{2019}")
-
-        return html
     }
 }

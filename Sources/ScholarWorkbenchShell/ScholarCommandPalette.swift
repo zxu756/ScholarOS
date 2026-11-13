@@ -26,6 +26,17 @@ public enum ScholarPaletteCategory: String, Sendable, Codable, Hashable, CaseIte
         case .actions: return "bolt.horizontal"
         }
     }
+
+    public func localizedTitle(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .all: return lang.L("All", "全部")
+        case .studio: return lang.L("Studios", "工作台")
+        case .sections: return lang.L("Sections", "章节")
+        case .citations: return lang.L("Citations", "参考文献")
+        case .files: return lang.L("Files", "文件")
+        case .actions: return lang.L("Actions", "命令")
+        }
+    }
 }
 
 /// Deterministic action dispatched when the user confirms a `ScholarPaletteItem` via `↩` or click.
@@ -41,6 +52,7 @@ public enum ScholarPaletteCommandAction: Sendable, Hashable {
     case createSnapshot
     case undo
     case redo
+    case toggleLanguage
     case openPreferences
     case openShortcutLegend
     case custom(id: String)
@@ -378,7 +390,8 @@ public enum ScholarCommandPaletteCatalog {
         canUndo: Bool = false,
         topUndoTitle: String? = nil,
         canRedo: Bool = false,
-        topRedoTitle: String? = nil
+        topRedoTitle: String? = nil,
+        language: ScholarLanguage = .en
     ) -> [ScholarPaletteItem] {
         var items: [ScholarPaletteItem] = []
 
@@ -387,9 +400,9 @@ public enum ScholarCommandPaletteCatalog {
             items.append(
                 ScholarPaletteItem(
                     id: "studio.\(tab.rawValue)",
-                    title: "Open \(tab.rawValue)",
-                    subtitle: "Switch primary workstation studio canvas",
-                    monospacedTag: "Studio \(idx + 1)",
+                    title: language.L("Open \(tab.rawValue)", "打开工作台：\(tab.localizedTitle(language))"),
+                    subtitle: language.L("Switch primary workstation studio canvas", "切换主研究工作台画布 (\(tab.rawValue))"),
+                    monospacedTag: language.L("Studio \(idx + 1)", "工作台 \(idx + 1)"),
                     category: .studio,
                     sfSymbolName: CambridgeLinenPalette.resolvedSymbolName(for: tab.sfSymbolName),
                     shortcutHint: "⌘\(idx + 1)",
@@ -399,13 +412,16 @@ public enum ScholarCommandPaletteCatalog {
             )
         }
 
-        // 2. High-Frequency Editorial, Snapshot, Docking & Preferences Actions
+        // 2. High-Frequency Editorial, Snapshot, Docking, Language & Preferences Actions
         items.append(contentsOf: [
             ScholarPaletteItem(
                 id: "action.run-editorial-audit",
-                title: "Run JavaScriptCore Editorial & Statistical Audit",
-                subtitle: "Execute Overclaiming, Anti-AI Prose, APA 7th p-Value, and Venue Gate plugins",
-                monospacedTag: "4 JS Plugins",
+                title: language.L("Run JavaScriptCore Editorial & Statistical Audit", "运行 JavaScriptCore 顶会审稿与统计核查"),
+                subtitle: language.L(
+                    "Execute Overclaiming, Anti-AI Prose, APA 7th p-Value, and Venue Gate plugins",
+                    "执行过度宣称检测、去 AI 套话、APA 7th p 值重算与双盲定稿门禁插件"
+                ),
+                monospacedTag: language.L("4 JS Plugins", "4 个 JS 插件"),
                 category: .actions,
                 sfSymbolName: "highlighter",
                 shortcutHint: "⇧⌘E",
@@ -413,9 +429,26 @@ public enum ScholarCommandPaletteCatalog {
                 action: .runEditorialPlugins
             ),
             ScholarPaletteItem(
+                id: "action.toggle-language",
+                title: language.L("Toggle Interface Language (中文 / EN)", "切换界面语言 (中文 / English)"),
+                subtitle: language.L(
+                    "Switch live workstation UI between Simplified Chinese and English",
+                    "在简体中文与英文界面之间实时无损切换"
+                ),
+                monospacedTag: "中文 | EN",
+                category: .actions,
+                sfSymbolName: "globe",
+                shortcutHint: "⇧⌘L",
+                baseWeight: 19.0,
+                action: .toggleLanguage
+            ),
+            ScholarPaletteItem(
                 id: "action.create-snapshot",
-                title: "Create Named Manuscript Snapshot",
-                subtitle: "Save immutable revision checkpoint for Myers word-level Track Changes diffing",
+                title: language.L("Create Named Manuscript Snapshot", "创建命名手稿修订快照"),
+                subtitle: language.L(
+                    "Save immutable revision checkpoint for Myers word-level Track Changes diffing",
+                    "保存不可变 SQLite WAL 修订检查点，用于 Myers 词级对比追踪"
+                ),
                 monospacedTag: "SQLite WAL",
                 category: .actions,
                 sfSymbolName: "camera.aperture",
@@ -425,8 +458,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.split-pdf",
-                title: "Toggle Right Split: PDF & SyncTeX Preview",
-                subtitle: "Synchronize manuscript cursor with compiled PDF bounding boxes",
+                title: language.L("Toggle Right Split: PDF & SyncTeX Preview", "切换右侧分栏：双栏 PDF 与 SyncTeX 预览"),
+                subtitle: language.L(
+                    "Synchronize manuscript cursor with compiled PDF bounding boxes",
+                    "将手稿光标与双栏 PDF 边界框证据坐标双向同步"
+                ),
                 category: .actions,
                 sfSymbolName: "doc.richtext",
                 shortcutHint: "⌥⌘1",
@@ -435,8 +471,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.split-diff",
-                title: "Toggle Right Split: Word-Level Track Changes",
-                subtitle: "Compare live LaTeX/Typst buffer against archival snapshots",
+                title: language.L("Toggle Right Split: Word-Level Track Changes", "切换右侧分栏：词级修订对比"),
+                subtitle: language.L(
+                    "Compare live LaTeX/Typst buffer against archival snapshots",
+                    "将当前 LaTeX/Typst 源码缓冲区与历史快照进行词级差异比对"
+                ),
                 category: .actions,
                 sfSymbolName: "arrow.left.arrow.right.square",
                 shortcutHint: "⌥⌘2",
@@ -445,8 +484,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.split-citation",
-                title: "Toggle Right Split: Citation & Provenance Inspector",
-                subtitle: "Inspect Crossref metadata and BM25 PDF bounding-box evidence",
+                title: language.L("Toggle Right Split: Citation & Provenance Inspector", "切换右侧分栏：引文元数据与证据溯源"),
+                subtitle: language.L(
+                    "Inspect Crossref metadata and BM25 PDF bounding-box evidence",
+                    "核查 Crossref 元数据与 BM25 双栏 PDF 边界框原文段落"
+                ),
                 category: .actions,
                 sfSymbolName: "quote.closing",
                 shortcutHint: "⌥⌘3",
@@ -455,8 +497,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.drawer-diagnostics",
-                title: "Reveal Bottom Drawer: LSP Diagnostics",
-                subtitle: "Inspect incremental LaTeX/Typst parser and macro cycle diagnostics",
+                title: language.L("Reveal Bottom Drawer: LSP Diagnostics", "展开底部抽屉：LSP 语法与宏诊断"),
+                subtitle: language.L(
+                    "Inspect incremental LaTeX/Typst parser and macro cycle diagnostics",
+                    "查看增量式 LaTeX/Typst 语法树与防环宏展开诊断结果"
+                ),
                 category: .actions,
                 sfSymbolName: "exclamationmark.bubble",
                 shortcutHint: "⌘J",
@@ -465,8 +510,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.drawer-firewall",
-                title: "Reveal Bottom Drawer: Citation Firewall Ledger",
-                subtitle: "Audit Verified DOI, Metadata Drift, Unverified, and Blocked citations",
+                title: language.L("Reveal Bottom Drawer: Citation Firewall Ledger", "展开底部抽屉：五级引文防火墙台账"),
+                subtitle: language.L(
+                    "Audit Verified DOI, Metadata Drift, Unverified, and Blocked citations",
+                    "审计已验证 DOI、元数据漂移、待核验及已拦截引文"
+                ),
                 category: .actions,
                 sfSymbolName: "lock.shield",
                 baseWeight: 11.8,
@@ -474,8 +522,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.drawer-editorial",
-                title: "Reveal Bottom Drawer: Editorial Audit Findings",
-                subtitle: "Browse JavaScriptCore plugin findings and one-click scholarly rewrites",
+                title: language.L("Reveal Bottom Drawer: Editorial Audit Findings", "展开底部抽屉：审稿插件审计结果"),
+                subtitle: language.L(
+                    "Browse JavaScriptCore plugin findings and one-click scholarly rewrites",
+                    "浏览 JavaScriptCore 审稿意见并一键采纳学术改写"
+                ),
                 category: .actions,
                 sfSymbolName: "highlighter",
                 baseWeight: 11.6,
@@ -483,8 +534,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.toggle-sidebar",
-                title: "Toggle Left Project & Outline Navigator",
-                subtitle: "Show or hide manuscript files, numbered sections, and Firewall/PRISMA cards",
+                title: language.L("Toggle Left Project & Outline Navigator", "显示 / 隐藏左侧项目与大纲导航栏"),
+                subtitle: language.L(
+                    "Show or hide manuscript files, numbered sections, and Firewall/PRISMA cards",
+                    "切换手稿文件列表、章节编号大纲与防火墙/PRISMA 摘要卡片"
+                ),
                 category: .actions,
                 sfSymbolName: "sidebar.left",
                 shortcutHint: "⌘B",
@@ -493,8 +547,11 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.preferences",
-                title: "Open ScholarOS Preferences…",
-                subtitle: "Configure Typography, Citation Firewall, Zotero SQLite, PRISMA κ, and JS Plugins",
+                title: language.L("Open ScholarOS Preferences…", "打开 ScholarOS 偏好设置…"),
+                subtitle: language.L(
+                    "Configure Language, Typography, Citation Firewall, Zotero SQLite, PRISMA κ, and JS Plugins",
+                    "配置界面语言、排版字体、引文防火墙、Zotero 桥接、PRISMA κ 与 JS 插件"
+                ),
                 category: .actions,
                 sfSymbolName: "gearshape",
                 shortcutHint: "⌘,",
@@ -503,8 +560,8 @@ public enum ScholarCommandPaletteCatalog {
             ),
             ScholarPaletteItem(
                 id: "action.shortcut-legend",
-                title: "Show Keyboard Shortcut Reference",
-                subtitle: "Display complete workstation keybinding legend",
+                title: language.L("Show Keyboard Shortcut Reference", "查看全局快捷键参考手册"),
+                subtitle: language.L("Display complete workstation keybinding legend", "显示完整工作站键盘快捷键指南"),
                 category: .actions,
                 sfSymbolName: "keyboard",
                 shortcutHint: "⌘/",
@@ -517,8 +574,8 @@ public enum ScholarCommandPaletteCatalog {
             items.append(
                 ScholarPaletteItem(
                     id: "action.undo",
-                    title: "Undo: \(topUndoTitle ?? "Last Mutation")",
-                    subtitle: "Revert top entry from persistent SQLite WAL undo journal",
+                    title: language.L("Undo: \(topUndoTitle ?? "Last Mutation")", "撤销：\(topUndoTitle ?? "上一步修改")"),
+                    subtitle: language.L("Revert top entry from persistent SQLite WAL undo journal", "回滚 SQLite WAL 持久化撤销日志栈顶操作"),
                     category: .actions,
                     sfSymbolName: "arrow.uturn.backward",
                     shortcutHint: "⌘Z",
@@ -532,8 +589,8 @@ public enum ScholarCommandPaletteCatalog {
             items.append(
                 ScholarPaletteItem(
                     id: "action.redo",
-                    title: "Redo: \(topRedoTitle ?? "Reverted Mutation")",
-                    subtitle: "Reapply top entry from persistent SQLite WAL redo journal",
+                    title: language.L("Redo: \(topRedoTitle ?? "Reverted Mutation")", "重做：\(topRedoTitle ?? "已撤销修改")"),
+                    subtitle: language.L("Reapply top entry from persistent SQLite WAL redo journal", "重新应用 SQLite WAL 持久化重做日志栈顶操作"),
                     category: .actions,
                     sfSymbolName: "arrow.uturn.forward",
                     shortcutHint: "⇧⌘Z",
@@ -549,8 +606,11 @@ public enum ScholarCommandPaletteCatalog {
                 ScholarPaletteItem(
                     id: "file.\(file.path)",
                     title: file.path,
-                    subtitle: "\(file.format.rawValue) Manuscript • \(file.wordCount) words",
-                    monospacedTag: "\(file.wordCount)w",
+                    subtitle: language.L(
+                        "\(file.format.rawValue) Manuscript • \(file.wordCount) words",
+                        "\(file.format.rawValue) 手稿文件 • \(file.wordCount) 词"
+                    ),
+                    monospacedTag: language.L("\(file.wordCount)w", "\(file.wordCount)词"),
                     category: .files,
                     sfSymbolName: "doc.text",
                     baseWeight: file.path == "main.tex" ? 17.0 : 12.5,
@@ -566,7 +626,10 @@ public enum ScholarCommandPaletteCatalog {
                 ScholarPaletteItem(
                     id: "section.\(entry.id)",
                     title: entry.title,
-                    subtitle: "\(entry.filePath):\(entry.line) • \(entry.wordCountInSection) words in section",
+                    subtitle: language.L(
+                        "\(entry.filePath):\(entry.line) • \(entry.wordCountInSection) words in section",
+                        "\(entry.filePath):\(entry.line) • 本节共 \(entry.wordCountInSection) 词"
+                    ),
                     monospacedTag: prefixDisplay,
                     category: .sections,
                     sfSymbolName: "list.number",
@@ -610,6 +673,7 @@ public struct ScholarCommandPaletteOverlayView: View {
     @Binding public var isPresented: Bool
     public let items: [ScholarPaletteItem]
     public let onTriggerAction: (ScholarPaletteCommandAction) -> Void
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     @State private var searchQuery: String = ""
     @State private var selectedCategory: ScholarPaletteCategory = .all
@@ -700,7 +764,13 @@ public struct ScholarCommandPaletteOverlayView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
 
-            TextField("Jump to studio, §section, @citeKey, manuscript file, or command…", text: $searchQuery)
+            TextField(
+                localizer.L(
+                    "Jump to studio, §section, @citeKey, manuscript file, or command…",
+                    "快速跳转工作台、§章节编号、@引文键、手稿文件或执行命令…"
+                ),
+                text: $searchQuery
+            )
                 .textFieldStyle(.plain)
                 .font(.system(size: 14, weight: .regular, design: .default))
                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
@@ -737,8 +807,9 @@ public struct ScholarCommandPaletteOverlayView: View {
                     HStack(spacing: 4) {
                         Image(systemName: cat.sfSymbolName)
                             .font(.system(size: 10.5, weight: .semibold))
-                        Text(cat.rawValue)
+                        Text(cat.localizedTitle(localizer.language))
                             .font(CambridgeTypography.uiSectionLabel)
+                            .tracking(0)
                     }
                     .foregroundStyle(isSelected ? CambridgeLinenPalette.archivalPaper : CambridgeLinenPalette.slateEditorial)
                     .padding(.horizontal, 8)
@@ -759,7 +830,7 @@ public struct ScholarCommandPaletteOverlayView: View {
                 .buttonStyle(.plain)
             }
             Spacer(minLength: 8)
-            Text("\(rankedResults.count) matches")
+            Text(localizer.L("\(rankedResults.count) matches", "共 \(rankedResults.count) 项"))
                 .font(CambridgeTypography.monoSmall)
                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 .fixedSize(horizontal: true, vertical: false)
@@ -778,10 +849,13 @@ public struct ScholarCommandPaletteOverlayView: View {
                         Image(systemName: "text.magnifyingglass")
                             .font(.system(size: 22))
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                        Text("No matching sections, citations, files, or studio actions")
+                        Text(localizer.L("No matching sections, citations, files, or studio actions", "未找到匹配的章节、参考文献、文件或工作台命令"))
                             .font(CambridgeTypography.uiControlMedium)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                        Text("Try a BibTeX key (@vaswani2017attention), section prefix (§2.1), or action ('Editorial').")
+                        Text(localizer.L(
+                            "Try a BibTeX key (@vaswani2017attention), section prefix (§2.1), or action ('Editorial').",
+                            "可尝试输入 BibTeX 键 (@vaswani2017attention)、章节号 (§2) 或命令名称。"
+                        ))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     }
@@ -895,24 +969,24 @@ public struct ScholarCommandPaletteOverlayView: View {
         HStack(spacing: 14) {
             HStack(spacing: 4) {
                 ScholarKeycapBadge("↑↓")
-                Text("Navigate")
+                Text(localizer.L("Navigate", "上下导航"))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
             }
             HStack(spacing: 4) {
                 ScholarKeycapBadge("↩")
-                Text("Execute / Jump")
+                Text(localizer.L("Execute / Jump", "执行 / 跳转"))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
             }
             HStack(spacing: 4) {
                 ScholarKeycapBadge("⎋")
-                Text("Dismiss")
+                Text(localizer.L("Dismiss", "关闭"))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
             }
             Spacer()
-            Text("Subsequence Fuzzy Index • Citation Firewall Enforced")
+            Text(localizer.L("Subsequence Fuzzy Index • Citation Firewall Enforced", "子序列模糊索引 • 五级引文防火墙强校验"))
                 .font(CambridgeTypography.uiCaption)
                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                 .fixedSize(horizontal: true, vertical: false)

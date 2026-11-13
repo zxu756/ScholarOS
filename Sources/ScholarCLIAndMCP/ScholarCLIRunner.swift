@@ -15,17 +15,18 @@ public struct ScholarCLIRunner: Sendable {
     public init() {}
 
     public func execute(arguments: [String]) async throws -> String {
-        guard let subcommand = arguments.first else {
+        let cleanedArgs = ScholarLocalizer.strippingLanguageArguments(arguments)
+        guard let subcommand = cleanedArgs.first else {
             return Self.helpBanner
         }
-        let rest = Array(arguments.dropFirst())
+        let rest = Array(cleanedArgs.dropFirst())
 
         switch subcommand {
         case "help", "--help", "-h":
             return Self.helpBanner
 
         case "version", "--version":
-            return "ScholarOS 1.0.0 (macOS arm64 · LaTeX/Typst Incremental LSP + Citation Firewall + PRISMA 2020)"
+            return "ScholarOS 1.1.0 (macOS arm64 · LaTeX/Typst Incremental LSP + Citation Firewall + PRISMA 2020 · 中文/EN)"
 
         case "init":
             let bundlePath = optionValue("--project", in: rest) ?? "ResearchStudy.scholarproj"
@@ -221,7 +222,9 @@ public struct ScholarCLIRunner: Sendable {
     }
 
     public static let helpBanner = """
-    ScholarOS 1.0.0 - Reproducible LaTeX/Typst Academic Workstation & Citation Firewall
+    ScholarOS 1.1.0 - Bilingual (中文/EN) Reproducible LaTeX/Typst Academic Workstation & Citation Firewall
+    Global Options:
+      --lang zh|en                                        Force UI / screenshot language (or set SCHOLAROS_LANG=zh|en)
     Subcommands:
       init [--project <dir.scholarproj>] [--seed-demo]    Initialize .scholarproj SQLite WAL bundle
       status [--project <dir.scholarproj>]                Print JSON project & firewall statistics
@@ -236,8 +239,8 @@ public struct ScholarCLIRunner: Sendable {
       track-changes [--project <dir.scholarproj>]         Diff manuscript snapshots with Myers O(ND) engine
       audit-editorial [--project <dir.scholarproj>]       Run JavaScriptCore editorial plugins
       export-bundle <dir> [--allow-unverified]            Export flattened arXiv/camera-ready submission bundle
-      export-html <out.html> [--project <dir>]            Export Hallmark Cambridge Linen HTML audit dossier
+      export-html <out.html> [--project <dir>]            Export bilingual Hallmark Cambridge Linen HTML audit dossier
       mcp [--project <dir.scholarproj>]                   Start hardware-gated JSON-RPC 2.0 MCP server on stdio
-      --export-screenshots <output-dir>                   Render 2x Retina Cambridge Linen screenshots
+      --export-screenshots <output-dir> [--lang zh|en]    Render 2x Retina Cambridge Linen screenshots
     """
 }

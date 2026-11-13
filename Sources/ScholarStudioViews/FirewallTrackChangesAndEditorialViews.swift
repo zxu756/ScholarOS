@@ -13,6 +13,7 @@ import ScholarWorkbenchShell
 /// 5-style CSL formatted preview, and Myers $O(ND)$ Word-Level Track Changes diff viewer.
 public struct CitationFirewallAndTrackChangesStudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
     @State private var showImportSheet: Bool = false
 
     public init(viewModel: ScholarStudioViewModel) {
@@ -68,18 +69,42 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 Image(systemName: "lock.shield.fill")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("5-Class Citation Verification Firewall")
+                Text(localizer.L("5-Class Citation Verification Firewall", "五级引文真实性核验防火墙"))
                     .font(CambridgeTypography.scholarlyHeadline)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     .fixedSize(horizontal: true, vertical: false)
             }
 
-            firewallTierFilterChip(title: "All (\(viewModel.bibliographyEntries.count))", target: nil, accent: CambridgeLinenPalette.oxfordCharcoal)
-            firewallTierFilterChip(title: "DOI (\(verifiedDOI))", target: .verifiedCanonicalDOI, accent: CambridgeLinenPalette.verifiedEmerald)
-            firewallTierFilterChip(title: "Preprint (\(verifiedPreprint))", target: .verifiedPreprintRegistry, accent: CambridgeLinenPalette.preprintOchre)
-            firewallTierFilterChip(title: "Drift (\(driftCount))", target: .metadataDriftAdvisory, accent: CambridgeLinenPalette.driftAmber)
-            firewallTierFilterChip(title: "Pending (\(pendingCount))", target: .unverifiedPendingCheck, accent: CambridgeLinenPalette.slateEditorial)
-            firewallTierFilterChip(title: "Blocked (\(blockedCount))", target: .blockedHallucinatedOrRetracted, accent: CambridgeLinenPalette.blockedCrimson)
+            firewallTierFilterChip(
+                title: localizer.L("All (\(viewModel.bibliographyEntries.count))", "全部 (\(viewModel.bibliographyEntries.count))"),
+                target: nil,
+                accent: CambridgeLinenPalette.oxfordCharcoal
+            )
+            firewallTierFilterChip(
+                title: localizer.L("DOI (\(verifiedDOI))", "已验证DOI (\(verifiedDOI))"),
+                target: .verifiedCanonicalDOI,
+                accent: CambridgeLinenPalette.verifiedEmerald
+            )
+            firewallTierFilterChip(
+                title: localizer.L("Preprint (\(verifiedPreprint))", "预印本 (\(verifiedPreprint))"),
+                target: .verifiedPreprintRegistry,
+                accent: CambridgeLinenPalette.preprintOchre
+            )
+            firewallTierFilterChip(
+                title: localizer.L("Drift (\(driftCount))", "漂移 (\(driftCount))"),
+                target: .metadataDriftAdvisory,
+                accent: CambridgeLinenPalette.driftAmber
+            )
+            firewallTierFilterChip(
+                title: localizer.L("Pending (\(pendingCount))", "待核验 (\(pendingCount))"),
+                target: .unverifiedPendingCheck,
+                accent: CambridgeLinenPalette.slateEditorial
+            )
+            firewallTierFilterChip(
+                title: localizer.L("Blocked (\(blockedCount))", "已拦截 (\(blockedCount))"),
+                target: .blockedHallucinatedOrRetracted,
+                accent: CambridgeLinenPalette.blockedCrimson
+            )
 
             Spacer(minLength: 4)
 
@@ -89,7 +114,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "xmark.octagon")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("Test Block Gate")
+                    Text(localizer.L("Test Block Gate", "测试拦截门禁"))
                 }
             }
             .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -101,7 +126,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "square.and.arrow.down")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("Import BibTeX / RIS")
+                    Text(localizer.L("Import BibTeX / RIS", "导入 BibTeX / RIS"))
                 }
             }
             .buttonStyle(CambridgePrimaryButtonStyle())
@@ -165,13 +190,18 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                         )
                         .fixedSize(horizontal: true, vertical: false)
 
-                    Text("Attempted insertion \(rejection.attemptedCommand) quarantined before AST write")
-                        .font(CambridgeTypography.uiControlSemibold)
-                        .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        localizer.L(
+                            "Attempted insertion \(rejection.attemptedCommand) quarantined before AST write",
+                            "尝试插入 \(rejection.attemptedCommand) 已被硬件门禁在写入 AST 前隔离拦截"
+                        )
+                    )
+                    .font(CambridgeTypography.uiControlSemibold)
+                    .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(rejection.reason)
+                Text(localizedRejectionReason(rejection))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                     .fixedSize(horizontal: false, vertical: true)
@@ -187,6 +217,14 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 .fill(CambridgeLinenPalette.blockedCrimsonBorder)
                 .frame(height: 1)
         }
+    }
+
+    private func localizedRejectionReason(_ rejection: FirewallGateRejectionRecord) -> String {
+        guard localizer.language == .zhHans else { return rejection.reason }
+        if rejection.citeKey == "smith2025hallucinated" || rejection.reason.contains("10.9999") {
+            return "引文防火墙硬件门禁拒绝合入：DOI 10.9999/fake.2025.001 在 Crossref 与 arXiv 返回 HTTP 404，且期刊 'Journal of Universal AI' 未被权威索引收录。"
+        }
+        return "引文防火墙拒绝合入未核验或被标记撤稿的文献键 @\(rejection.citeKey)。"
     }
 
     // MARK: 3. Left Firewall Ledger + Jaro-Winkler Deduplicator + CSL 5-Style Previewer
@@ -208,17 +246,26 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                                 .foregroundStyle(CambridgeLinenPalette.driftAmber)
 
                             VStack(alignment: .leading, spacing: 1.5) {
-                                Text(String(format: "Jaro-Winkler Duplicate Detected (%.1f%% Similarity)", dup.titleJaroWinkler * 100.0))
-                                    .font(CambridgeTypography.uiControlSemibold)
-                                    .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                                Text("@\(dup.duplicateCiteKey) duplicates canonical DOI record @\(dup.primaryCiteKey)")
-                                    .font(CambridgeTypography.uiCaption)
-                                    .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                                Text(
+                                    localizer.language == .zhHans
+                                        ? String(format: "检测到 Jaro-Winkler 疑似重复文献（相似度 %.1f%%）", dup.titleJaroWinkler * 100.0)
+                                        : String(format: "Jaro-Winkler Duplicate Detected (%.1f%% Similarity)", dup.titleJaroWinkler * 100.0)
+                                )
+                                .font(CambridgeTypography.uiControlSemibold)
+                                .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+                                Text(
+                                    localizer.L(
+                                        "@\(dup.duplicateCiteKey) duplicates canonical DOI record @\(dup.primaryCiteKey)",
+                                        "@\(dup.duplicateCiteKey) 与权威 DOI 文献条目 @\(dup.primaryCiteKey) 重复"
+                                    )
+                                )
+                                .font(CambridgeTypography.uiCaption)
+                                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             }
 
                             Spacer(minLength: 4)
 
-                            Button("Merge into @\(dup.primaryCiteKey)") {
+                            Button(localizer.L("Merge into @\(dup.primaryCiteKey)", "合并至 @\(dup.primaryCiteKey)")) {
                                 viewModel.mergeDuplicateReference(dup)
                             }
                             .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))
@@ -312,7 +359,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
 
-                    Button(isBlocked ? "Gate Check" : "Cite") {
+                    Button(isBlocked ? localizer.L("Gate Check", "触发门禁") : localizer.L("Cite", "引用")) {
                         _ = viewModel.attemptInsertCitation(entry.citeKey)
                     }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: !isBlocked && isSelected))
@@ -324,7 +371,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(entry.firewallAuditNote)
+                Text(entry.localizedFirewallAuditNote(localizer.language))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(isBlocked ? CambridgeLinenPalette.blockedCrimson : CambridgeLinenPalette.slateEditorial)
                     .fixedSize(horizontal: false, vertical: true)
@@ -352,7 +399,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Text("CSL 5-STYLE PREVIEW")
+                Text(localizer.L("CSL 5-STYLE PREVIEW", "CSL 五大期刊引文格式实时预览"))
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                     .fixedSize(horizontal: true, vertical: false)
@@ -375,7 +422,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
-                Text("In-Text: \(formatted.inTextParenthetical)")
+                Text(localizer.L("In-Text: \(formatted.inTextParenthetical)", "正文夹注: \(formatted.inTextParenthetical)"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                     .fixedSize(horizontal: true, vertical: false)
@@ -404,13 +451,18 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
     private var bibTeXAndRISImportModal: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Import BibTeX, RIS, or PubMed .nbib Records")
+            Text(localizer.L("Import BibTeX, RIS, or PubMed .nbib Records", "导入 BibTeX、RIS 或 PubMed .nbib 文献记录"))
                 .font(CambridgeTypography.scholarlyTitle)
                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
 
-            Text("Every imported entry is immediately audited through the 5-class Citation Verification Firewall and Jaro-Winkler deduplicator.")
-                .font(CambridgeTypography.uiCaption)
-                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+            Text(
+                localizer.L(
+                    "Every imported entry is immediately audited through the 5-class Citation Verification Firewall and Jaro-Winkler deduplicator.",
+                    "所有导入条目将立即经过五级引文真实性防火墙审计与 Jaro-Winkler 重复率检测。"
+                )
+            )
+            .font(CambridgeTypography.uiCaption)
+            .foregroundStyle(CambridgeLinenPalette.slateEditorial)
 
             TextEditor(text: $viewModel.bibtexImportDraft)
                 .font(CambridgeTypography.monoCode)
@@ -421,7 +473,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 )
 
             HStack {
-                Button("Load Sample BibTeX") {
+                Button(localizer.L("Load Sample BibTeX", "载入示例 BibTeX")) {
                     viewModel.bibtexImportDraft = """
                     @article{higgins2003measuring,
                       title = {Measuring inconsistency in meta-analyses},
@@ -438,10 +490,10 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
                 Spacer()
 
-                Button("Cancel") { showImportSheet = false }
+                Button(localizer.L("Cancel", "取消")) { showImportSheet = false }
                     .buttonStyle(CambridgeSecondaryButtonStyle())
 
-                Button("Audit & Import") {
+                Button(localizer.L("Audit & Import", "核验并导入")) {
                     viewModel.importBibliographyText(viewModel.bibtexImportDraft)
                     showImportSheet = false
                 }
@@ -462,6 +514,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 public struct ReusableTrackChangesInspectorPane: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
     public let compactHeader: Bool
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel, compactHeader: Bool = false) {
         self.viewModel = viewModel
@@ -476,20 +529,25 @@ public struct ReusableTrackChangesInspectorPane: View {
             // Header
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Myers O(ND) Word-Level Track Changes")
+                    Text(localizer.L("Myers O(ND) Word-Level Track Changes", "Myers O(ND) 词级修订追踪对比"))
                         .font(CambridgeTypography.uiControlSemibold)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     if let report {
-                        Text("+\(report.insertedWordCount) ins • −\(report.deletedWordCount) del • \(hunks.count) hunks")
-                            .font(CambridgeTypography.monoSmall)
-                            .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                            .fixedSize(horizontal: true, vertical: false)
+                        Text(
+                            localizer.L(
+                                "+\(report.insertedWordCount) ins • −\(report.deletedWordCount) del • \(hunks.count) hunks",
+                                "+\(report.insertedWordCount) 新增 • −\(report.deletedWordCount) 删除 • \(hunks.count) 处变更块"
+                            )
+                        )
+                        .font(CambridgeTypography.monoSmall)
+                        .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                        .fixedSize(horizontal: true, vertical: false)
                     }
                 }
 
                 Spacer(minLength: 4)
 
-                Button(viewModel.showLatexdiffSource ? "Word Hunks" : "%DIF latexdiff") {
+                Button(viewModel.showLatexdiffSource ? localizer.L("Word Hunks", "词级对比") : localizer.L("%DIF latexdiff", "%DIF 源码")) {
                     viewModel.showLatexdiffSource.toggle()
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.showLatexdiffSource))
@@ -539,14 +597,18 @@ public struct ReusableTrackChangesInspectorPane: View {
     private func inlineWordDiffCard(_ report: TrackChangesDiffReport) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
-                Text("\(report.baselineLabel) → \(report.revisedLabel)")
+                Text("\(localizedSnapshotLabel(report.baselineLabel)) → \(localizedSnapshotLabel(report.revisedLabel))")
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text(String(format: "Similarity %.0f%%", report.similarityRatio * 100.0))
-                    .font(CambridgeTypography.monoSmall)
-                    .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                    .fixedSize(horizontal: true, vertical: false)
+                Text(
+                    localizer.language == .zhHans
+                        ? String(format: "相似度 %.0f%%", report.similarityRatio * 100.0)
+                        : String(format: "Similarity %.0f%%", report.similarityRatio * 100.0)
+                )
+                .font(CambridgeTypography.monoSmall)
+                .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+                .fixedSize(horizontal: true, vertical: false)
             }
 
             composedWordDiffText(Array(report.spans.prefix(24)))
@@ -555,6 +617,17 @@ public struct ReusableTrackChangesInspectorPane: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .cambridgeArchivalCard(padding: 10)
+    }
+
+    private func localizedSnapshotLabel(_ raw: String) -> String {
+        guard localizer.language == .zhHans else { return raw }
+        switch raw {
+        case "v1.0 Initial Submission Draft": return "v1.0 初投稿基线"
+        case "v1.2 Camera-Ready Calibration": return "v1.2 录用定稿校订"
+        case "v1.0 Submission Baseline": return "v1.0 投稿基线"
+        case "Working Buffer": return "当前工作区手稿"
+        default: return raw
+        }
     }
 
     private func composedWordDiffText(_ spans: [TrackChangeWordSpan]) -> Text {
@@ -586,20 +659,20 @@ public struct ReusableTrackChangesInspectorPane: View {
     private func trackChangeHunkCard(_ hunk: TrackChangeHunk) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Hunk @ Ln \(hunk.approximateLine)")
+                Text(localizer.L("Hunk @ Ln \(hunk.approximateLine)", "变更块 @ 第\(hunk.approximateLine)行"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                     .fixedSize(horizontal: true, vertical: false)
 
                 Spacer()
 
-                Button("Accept") {
+                Button(localizer.L("Accept", "接受")) {
                     viewModel.acceptTrackChangeHunk(hunk)
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))
                 .fixedSize(horizontal: true, vertical: false)
 
-                Button("Reject") {
+                Button(localizer.L("Reject", "拒绝")) {
                     viewModel.rejectTrackChangeHunk(hunk)
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -610,7 +683,6 @@ public struct ReusableTrackChangesInspectorPane: View {
                 Text("− " + hunk.deletedText.trimmingCharacters(in: .whitespacesAndNewlines))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.blockedCrimson)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -618,7 +690,6 @@ public struct ReusableTrackChangesInspectorPane: View {
                 Text("+ " + hunk.insertedText.trimmingCharacters(in: .whitespacesAndNewlines))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -636,11 +707,11 @@ public struct ReusableTrackChangesInspectorPane: View {
     private var apaCompactSummaryCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("APA 7TH EXACT p-VALUE RECALCULATOR")
+                Text(localizer.L("APA 7TH EXACT p-VALUE RECALCULATOR", "APA 7th 精确 p 值重算核验器"))
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text("Lanczos Beta/Gamma")
+                Text(localizer.L("Lanczos Beta/Gamma", "Lanczos 特殊函数"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     .fixedSize(horizontal: true, vertical: false)
@@ -659,10 +730,14 @@ public struct ReusableTrackChangesInspectorPane: View {
 
                     Spacer(minLength: 4)
 
-                    Text(String(format: "Exact p = %.4f", row.recalculatedExactP))
-                        .font(CambridgeTypography.monoSmall)
-                        .foregroundStyle(row.isConsistent ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
-                        .fixedSize(horizontal: true, vertical: false)
+                    Text(
+                        localizer.language == .zhHans
+                            ? String(format: "精确 p = %.4f", row.recalculatedExactP)
+                            : String(format: "Exact p = %.4f", row.recalculatedExactP)
+                    )
+                    .font(CambridgeTypography.monoSmall)
+                    .foregroundStyle(row.isConsistent ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
             }
         }
@@ -677,6 +752,7 @@ public struct ReusableTrackChangesInspectorPane: View {
 /// displaying one-click scholarly rewrites, exact $t$/$F$/$\chi^2$ $p$-value recalculation, and a live JS Scratchpad.
 public struct EditorialJavaScriptAuditStudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel) {
         self.viewModel = viewModel
@@ -729,27 +805,35 @@ public struct EditorialJavaScriptAuditStudioView: View {
                 Image(systemName: "curlybraces.square.fill")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("Sandboxed JavaScriptCore Editorial & APA 7th Studio")
+                Text(localizer.L("Sandboxed JavaScriptCore Editorial & APA 7th Studio", "JavaScriptCore 隔离沙盒审稿与统计核验台"))
                     .font(CambridgeTypography.scholarlyHeadline)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     .fixedSize(horizontal: true, vertical: false)
             }
 
-            Text(blockers == 0 ? "GATE: CAMERA-READY" : "GATE: HOLD (\(blockers) BLOCKERS)")
-                .font(CambridgeTypography.monoSmall)
-                .foregroundStyle(blockers == 0 ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(blockers == 0 ? CambridgeLinenPalette.verifiedEmeraldBg : CambridgeLinenPalette.blockedCrimsonBg)
-                )
-                .fixedSize(horizontal: true, vertical: false)
+            Text(
+                blockers == 0
+                    ? localizer.L("GATE: CAMERA-READY", "门禁: 允许定稿")
+                    : localizer.L("GATE: HOLD (\(blockers) BLOCKERS)", "门禁: 阻断 (\(blockers) 项违规)")
+            )
+            .font(CambridgeTypography.monoSmall)
+            .foregroundStyle(blockers == 0 ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(blockers == 0 ? CambridgeLinenPalette.verifiedEmeraldBg : CambridgeLinenPalette.blockedCrimsonBg)
+            )
+            .fixedSize(horizontal: true, vertical: false)
 
-            Text("\(warnings) Rigor • \(styles) Style • \(String(format: "%.1f ms", elapsed))")
-                .font(CambridgeTypography.monoSmall)
-                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                .fixedSize(horizontal: true, vertical: false)
+            Text(
+                localizer.language == .zhHans
+                    ? String(format: "%d 严谨性 • %d 文风 • %.1f ms", warnings, styles, elapsed)
+                    : "\(warnings) Rigor • \(styles) Style • \(String(format: "%.1f ms", elapsed))"
+            )
+            .font(CambridgeTypography.monoSmall)
+            .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 4)
 
@@ -768,7 +852,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 10))
-                    Text("Run 4 JS Plugins")
+                    Text(localizer.L("Run 4 JS Plugins", "运行 4 款插件"))
                 }
             }
             .buttonStyle(CambridgePrimaryButtonStyle())
@@ -781,9 +865,9 @@ public struct EditorialJavaScriptAuditStudioView: View {
 
     private func shortVenueModeLabel(_ mode: EditorialVenueAuditMode) -> String {
         switch mode {
-        case .doubleBlindSubmission: return "Double-Blind"
-        case .cameraReady: return "Camera-Ready"
-        case .preprintDraft: return "Preprint"
+        case .doubleBlindSubmission: return localizer.L("Double-Blind", "双盲投稿")
+        case .cameraReady: return localizer.L("Camera-Ready", "录用定稿")
+        case .preprintDraft: return localizer.L("Preprint", "预印本")
         }
     }
 
@@ -807,7 +891,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
                             .labelsHidden()
                             .controlSize(.mini)
 
-                            Text(plugin.name)
+                            Text(plugin.localizedName(localizer.language))
                                 .font(CambridgeTypography.uiControlSemibold)
                                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                                 .fixedSize(horizontal: true, vertical: false)
@@ -820,10 +904,15 @@ public struct EditorialJavaScriptAuditStudioView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
 
-                        Text("JSVirtualMachine • \(plugin.capabilities.count) capabilities")
-                            .font(CambridgeTypography.uiCaption)
-                            .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                            .fixedSize(horizontal: true, vertical: false)
+                        Text(
+                            localizer.L(
+                                "JSVirtualMachine • \(plugin.capabilities.count) capabilities",
+                                "独立 JSVirtualMachine • \(plugin.capabilities.count) 项能力授权"
+                            )
+                        )
+                        .font(CambridgeTypography.uiCaption)
+                        .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+                        .fixedSize(horizontal: true, vertical: false)
                     }
                     .padding(8)
                     .background(
@@ -851,7 +940,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
                             EditorialSeverityPill(severity: finding.severity, compact: true)
                                 .fixedSize(horizontal: true, vertical: false)
 
-                            Text(finding.category)
+                            Text(finding.localizedCategory(localizer.language))
                                 .font(CambridgeTypography.uiControlSemibold)
                                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
 
@@ -863,7 +952,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
                             Spacer(minLength: 4)
 
                             if finding.suggestedRewrite != nil {
-                                Button("Apply Scholarly Rewrite") {
+                                Button(localizer.L("Apply Scholarly Rewrite", "应用学术改写建议")) {
                                     viewModel.applyEditorialRewrite(finding)
                                 }
                                 .buttonStyle(CambridgePrimaryButtonStyle())
@@ -871,7 +960,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
                             }
                         }
 
-                        Text(finding.explanation)
+                        Text(finding.localizedExplanation(localizer.language))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                             .fixedSize(horizontal: false, vertical: true)
@@ -914,11 +1003,11 @@ public struct EditorialJavaScriptAuditStudioView: View {
     private var apaStatisticalTableSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("APA 7TH HYPOTHESIS-TEST p-VALUE RECALCULATOR")
+                Text(localizer.L("APA 7TH HYPOTHESIS-TEST p-VALUE RECALCULATOR", "APA 7th 假设检验 p 值精确重算表"))
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text("Incomplete Beta & Gamma")
+                Text(localizer.L("Incomplete Beta & Gamma", "不完全 Beta 与 Gamma"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     .fixedSize(horizontal: true, vertical: false)
@@ -927,7 +1016,7 @@ public struct EditorialJavaScriptAuditStudioView: View {
             ForEach(viewModel.apaStatRows) { row in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(row.isConsistent ? "PASS" : "MISMATCH")
+                        Text(row.isConsistent ? localizer.L("PASS", "核验通过") : localizer.L("MISMATCH", "显著性矛盾"))
                             .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                             .foregroundStyle(row.isConsistent ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
                             .padding(.horizontal, 5)
@@ -945,13 +1034,17 @@ public struct EditorialJavaScriptAuditStudioView: View {
 
                         Spacer(minLength: 4)
 
-                        Text(String(format: "Exact p = %.4f", row.recalculatedExactP))
-                            .font(CambridgeTypography.monoSmall)
-                            .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                            .fixedSize(horizontal: true, vertical: false)
+                        Text(
+                            localizer.language == .zhHans
+                                ? String(format: "精确 p = %.4f", row.recalculatedExactP)
+                                : String(format: "Exact p = %.4f", row.recalculatedExactP)
+                        )
+                        .font(CambridgeTypography.monoSmall)
+                        .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                        .fixedSize(horizontal: true, vertical: false)
                     }
 
-                    Text(row.diagnosticSummary)
+                    Text(localizedAPADiagnostic(row))
                         .font(CambridgeTypography.uiCaption)
                         .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                         .fixedSize(horizontal: false, vertical: true)
@@ -970,14 +1063,30 @@ public struct EditorialJavaScriptAuditStudioView: View {
         .padding(12)
     }
 
+    private func localizedAPADiagnostic(_ row: APAStatVerificationRow) -> String {
+        guard localizer.language == .zhHans else { return row.diagnosticSummary }
+        switch row.id {
+        case "stat-t-discrepancy":
+            return String(format: "数值矛盾：重算精确双尾 p = %.4f，正文报告的 p = .001 夸大了统计显著性。", row.recalculatedExactP)
+        case "stat-f-consistent":
+            return String(format: "核验一致：不完全 Beta 函数 I_x 重算精确 p = %.4f，与 APA 7th 元组吻合。", row.recalculatedExactP)
+        case "stat-chi2-consistent":
+            return String(format: "核验一致：正则化上不完全 Gamma 函数 Q(k/2, χ²/2) 重算精确 p = %.4f。", row.recalculatedExactP)
+        case "stat-t-strong":
+            return String(format: "核验一致：重算精确 p = %.5f，满足 APA 7th p < .001 报告阈值。", row.recalculatedExactP)
+        default:
+            return row.diagnosticSummary
+        }
+    }
+
     private var jsScratchpadSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("INTERACTIVE JAVASCRIPTCORE SCRATCHPAD")
+                Text(localizer.L("INTERACTIVE JAVASCRIPTCORE SCRATCHPAD", "交互式 JAVASCRIPTCORE 插件演练场"))
                     .font(CambridgeTypography.uiSectionLabel)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Button("Evaluate JS") {
+                Button(localizer.L("Evaluate JS", "执行脚本")) {
                     viewModel.evaluateScratchpadJS()
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))

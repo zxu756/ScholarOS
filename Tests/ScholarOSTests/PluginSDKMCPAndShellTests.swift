@@ -315,10 +315,14 @@ struct PluginSDKMCPAndShellTests {
         let cli = ScholarCLIRunner()
 
         let versionOut = try await cli.execute(arguments: ["version"])
-        #expect(versionOut.contains("ScholarOS 1.0.0"))
+        #expect(versionOut.contains("ScholarOS 1.1.0"))
+
+        let versionWithLangOut = try await cli.execute(arguments: ["--lang", "zh", "version"])
+        #expect(versionWithLangOut.contains("ScholarOS 1.1.0"))
 
         let helpOut = try await cli.execute(arguments: ["--help"])
         #expect(helpOut.contains("verify-citations"))
+        #expect(helpOut.contains("--lang zh|en"))
 
         let initOut = try await cli.execute(arguments: ["init", "--project", bundlePath, "--seed-demo"])
         #expect(initOut.contains("Initialized"))
@@ -521,6 +525,12 @@ struct PluginSDKMCPAndShellTests {
         #expect(html.contains("/* Hallmark · v2.0.0"))
         #expect(html.contains("--bg-linen: #F8F6F0;"))
         #expect(html.contains("--accent-forest: #1D4D3E;"))
+        #expect(html.contains(#"id="btn-lang-zh""#))
+        #expect(html.contains(#"id="btn-lang-en""#))
+        #expect(html.contains(#"data-en=""#))
+        #expect(html.contains(#"data-zh=""#))
+        #expect(html.contains("io.github.zxu756.ScholarOS.language"))
+        #expect(html.contains("navigator.language"))
         #expect(html.contains("<svg"))
         #expect(html.contains("</svg>"))
         // Strict zero em-dash guarantee across the entire exported HTML document!
@@ -697,5 +707,135 @@ struct PluginSDKMCPAndShellTests {
         }
         toastCenter.dismissAll()
         #expect(!actionFired)
+    }
+
+    // MARK: - 7. Bilingual Localization Engine (中文 / EN)
+
+    @Test("ScholarLocalizer toggles zh-Hans <-> en live and persists to UserDefaults (io.github.zxu756.ScholarOS.language)")
+    @MainActor
+    func scholarLocalizerLiveToggleAndUserDefaultsPersistence() throws {
+        let suiteName = "io.github.zxu756.ScholarOS.tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let localizer = ScholarLocalizer(
+            arguments: ["ScholarOS"],
+            environment: [:],
+            userDefaults: defaults,
+            preferredLanguages: ["en-US"],
+            persistToUserDefaults: true
+        )
+        #expect(localizer.language == .en)
+        #expect(localizer.language.badge == "EN")
+        #expect(localizer.L("Citation Firewall", "引文防火墙") == "Citation Firewall")
+
+        localizer.toggleLanguage()
+        #expect(localizer.language == .zhHans)
+        #expect(localizer.language.rawValue == "zh-Hans")
+        #expect(localizer.language.badge == "中文")
+        #expect(localizer.L("Citation Firewall", "引文防火墙") == "引文防火墙")
+        #expect(defaults.string(forKey: ScholarLocalizer.userDefaultsKey) == "zh-Hans")
+
+        localizer.toggleLanguage()
+        #expect(localizer.language == .en)
+        #expect(defaults.string(forKey: ScholarLocalizer.userDefaultsKey) == "en")
+    }
+
+    @Test("ScholarLocalizer resolves --lang CLI > SCHOLAROS_LANG > UserDefaults > Chinese Locale auto-detection")
+    func scholarLocalizerResolutionOrderAndCLIArgumentStripping() throws {
+        let suiteName = "io.github.zxu756.ScholarOS.resolve.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        // 1. Locale auto-detection: preferredLanguages starting with "zh" defaults to .zhHans; English defaults to .en
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS"],
+                environment: [:],
+                userDefaults: defaults,
+                preferredLanguages: ["zh-Hans-CN", "en-US"]
+            ) == .zhHans
+        )
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS"],
+                environment: [:],
+                userDefaults: defaults,
+                preferredLanguages: ["zh-Hant-HK", "en-US"]
+            ) == .zhHans
+        )
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS"],
+                environment: [:],
+                userDefaults: defaults,
+                preferredLanguages: ["en-GB"]
+            ) == .en
+        )
+
+        // 2. UserDefaults overrides system locale
+        defaults.set("en", forKey: ScholarLocalizer.userDefaultsKey)
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS"],
+                environment: [:],
+                userDefaults: defaults,
+                preferredLanguages: ["zh-Hans-CN"]
+            ) == .en
+        )
+
+        // 3. SCHOLAROS_LANG overrides UserDefaults
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS"],
+                environment: ["SCHOLAROS_LANG": "zh"],
+                userDefaults: defaults,
+                preferredLanguages: ["en-US"]
+            ) == .zhHans
+        )
+
+        // 4. CLI --lang / --lang= overrides SCHOLAROS_LANG & UserDefaults
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS", "--lang", "en"],
+                environment: ["SCHOLAROS_LANG": "zh"],
+                userDefaults: defaults,
+                preferredLanguages: ["zh-Hans-CN"]
+            ) == .en
+        )
+        #expect(
+            ScholarLocalizer.resolveLanguage(
+                arguments: ["ScholarOS", "--lang=zh"],
+                environment: ["SCHOLAROS_LANG": "en"],
+                userDefaults: defaults,
+                preferredLanguages: ["en-US"]
+            ) == .zhHans
+        )
+
+        // 5. CLI stripping keeps subcommand positional arguments intact
+        let stripped = ScholarLocalizer.strippingLanguageArguments([
+            "--lang", "zh", "export-html", "--output", "/tmp/dossier.html", "--lang=en"
+        ])
+        #expect(stripped == ["export-html", "--output", "/tmp/dossier.html"])
+    }
+
+    @Test("Bilingual domain labels and Command Palette items localize cleanly across zh-Hans and en")
+    func bilingualDomainLabelsAndCommandPaletteLocalization() {
+        #expect(ScholarStudioTab.manuscriptEditor.localizedTitle(.zhHans).contains("手稿"))
+        #expect(ScholarStudioTab.citationGraph.localizedTitle(.zhHans) == "引文知识图谱")
+        #expect(ScholarStudioTab.prismaScreening.localizedTitle(.zhHans) == "PRISMA 2020 双盲筛查")
+        #expect(CitationFirewallClass.verifiedCanonicalDOI.localizedBadgeTitle(.zhHans) == "已验证 DOI")
+        #expect(CitationFirewallClass.blockedHallucinatedOrRetracted.localizedFilterChip(.zhHans) == "已拦截")
+
+        let zhItems = ScholarCommandPaletteCatalog.buildItems(
+            manuscriptFiles: [],
+            outlineEntries: [],
+            bibliographyEntries: [],
+            canUndo: false,
+            topUndoTitle: nil,
+            language: .zhHans
+        )
+        #expect(zhItems.contains { $0.action == .toggleLanguage && $0.shortcutHint == "⇧⌘L" })
+        #expect(zhItems.contains { $0.title.contains("引文知识图谱") })
     }
 }

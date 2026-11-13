@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CoreGraphics
 import Foundation
 import PDFKit
@@ -152,6 +153,20 @@ public enum ScholarRetinaScreenshotPreset: String, CaseIterable, Sendable {
     case citationGraph = "screenshot-citation-graph.png"
     case prismaScreening = "screenshot-prisma-screening.png"
     case firewallEditorial = "screenshot-firewall-editorial.png"
+
+    public func fileName(for language: ScholarLanguage) -> String {
+        guard language == .zhHans else { return rawValue }
+        switch self {
+        case .manuscriptLSP:
+            return "screenshot-manuscript-lsp-zh.png"
+        case .citationGraph:
+            return "screenshot-citation-graph-zh.png"
+        case .prismaScreening:
+            return "screenshot-prisma-screening-zh.png"
+        case .firewallEditorial:
+            return "screenshot-firewall-editorial-zh.png"
+        }
+    }
 }
 
 // MARK: - Primary Workstation Coordinator (`ScholarStudioViewModel`)
@@ -304,6 +319,7 @@ public final class ScholarStudioViewModel: ObservableObject {
     private let reliabilityEngine = InterRaterReliabilityAndSeedQCEngine()
     private let rob2Planner = RiskOfBiasAndMetaSynthesisPlanner()
     private let diffEngine = MyersWordLevelTrackChangesEngine()
+    private var languageCancellable: AnyCancellable?
 
     // MARK: - Initialization
 
@@ -360,6 +376,14 @@ public final class ScholarStudioViewModel: ObservableObject {
 
         seedRichAcademicStudyIfNeeded()
         rebuildAllSubsystems()
+
+        languageCancellable = ScholarLocalizer.shared.$language
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshActiveEditorLSPState()
+                self.objectWillChange.send()
+            }
     }
 
     // MARK: - Deterministic Rich Academic Corpus Seeding
@@ -621,16 +645,33 @@ public final class ScholarStudioViewModel: ObservableObject {
             maxItems: 8
         )
         if !rawCompletions.isEmpty {
-            completionCandidates = rawCompletions
+            let lang = ScholarLocalizer.shared.language
+            completionCandidates = rawCompletions.map { item in
+                guard lang == .zhHans, item.category == .citation,
+                      let entry = bibliographyEntries.first(where: { $0.citeKey == item.insertText })
+                else {
+                    return item
+                }
+                return LSPCompletionItem(
+                    id: item.id,
+                    insertText: item.insertText,
+                    title: item.title,
+                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(entry.firewallClass.localizedBadgeTitle(lang))",
+                    detailMarkdown: item.detailMarkdown,
+                    category: item.category,
+                    relevanceScore: item.relevanceScore
+                )
+            }
         } else {
+            let lang = ScholarLocalizer.shared.language
             // Provide deterministic citation completions so popover card is always rich when toggled
             completionCandidates = bibliographyEntries.prefix(6).map { entry in
                 LSPCompletionItem(
                     id: "cite-\(entry.citeKey)",
                     insertText: entry.citeKey,
                     title: "@\(entry.citeKey)",
-                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(entry.firewallClass.badgeTitle)",
-                    detailMarkdown: "\(entry.title) — \(entry.venue.isEmpty ? "Archival Preprint" : entry.venue)",
+                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(entry.firewallClass.localizedBadgeTitle(lang))",
+                    detailMarkdown: "\(entry.title) — \(entry.venue.isEmpty ? lang.L("Archival Preprint", "预印本档案") : entry.venue)",
                     category: .citation,
                     relevanceScore: entry.firewallClass.allowsManuscriptInsertion ? 0.96 : 0.15
                 )
@@ -638,15 +679,27 @@ public final class ScholarStudioViewModel: ObservableObject {
         }
 
         // Hover preview for selected citation or cursor token
+        let lang = ScholarLocalizer.shared.language
         if let hover = lspService.hover(atLine: cursor.line, column: cursor.column, in: activePath) {
-            activeHoverCard = hover
+            if let fw = hover.firewallClass, lang == .zhHans {
+                activeHoverCard = LSPHoverCard(
+                    title: hover.title,
+                    categoryBadge: fw.localizedBadgeTitle(lang),
+                    markdownBody: hover.markdownBody,
+                    firewallClass: fw,
+                    targetSpan: hover.targetSpan,
+                    expandedPreview: hover.expandedPreview
+                )
+            } else {
+                activeHoverCard = hover
+            }
         } else if let selectedKey = docking.selectedCiteKey,
                   let entry = bibliographyEntries.first(where: { $0.citeKey == selectedKey })
         {
             let csl = cslEngine.formatEntry(entry, style: selectedCSLStyle)
             activeHoverCard = LSPHoverCard(
                 title: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) — @\(entry.citeKey)",
-                categoryBadge: entry.firewallClass.badgeTitle,
+                categoryBadge: entry.firewallClass.localizedBadgeTitle(lang),
                 markdownBody: entry.title,
                 firewallClass: entry.firewallClass,
                 targetSpan: TextSpan(
@@ -882,13 +935,15 @@ public final class ScholarStudioViewModel: ObservableObject {
             manuscriptFiles = (try? database.listManuscriptFiles()) ?? manuscriptFiles
             refreshActiveEditorLSPState()
             projectStats = try? database.computeProjectStats()
+            let lang = ScholarLocalizer.shared.language
             toastCenter.enqueue(
                 tone: .verified,
-                title: "Inserted Verified Citation @\(entry.citeKey)",
-                detail: "\(entry.firewallClass.badgeTitle) — \(entry.doi ?? entry.arxivID ?? "Archival Registry")"
+                title: lang.L("Inserted Verified Citation @\(entry.citeKey)", "已插入权威核验引文 @\(entry.citeKey)"),
+                detail: "\(entry.firewallClass.localizedBadgeTitle(lang)) — \(entry.doi ?? entry.arxivID ?? lang.L("Archival Registry", "学术注册库"))"
             )
             return true
         } catch let error as ScholarOSError {
+            let lang = ScholarLocalizer.shared.language
             let entryClass = bibliographyEntries.first(where: { $0.citeKey == citeKey })?.firewallClass ?? .blockedHallucinatedOrRetracted
             let rejection = FirewallGateRejectionRecord(
                 citeKey: citeKey,
@@ -900,9 +955,12 @@ public final class ScholarStudioViewModel: ObservableObject {
             lastBlockedInsertionAlert = rejection
             toastCenter.enqueue(
                 tone: .blocker,
-                title: "BLOCKED \(error.errorCodeIdentifier): @\(citeKey)",
-                detail: "Unverified or hallucinated citation cannot enter manuscript prose.",
-                actionTitle: "Inspect Firewall"
+                title: lang.L("BLOCKED \(error.errorCodeIdentifier): @\(citeKey)", "防火墙已拦截 \(error.errorCodeIdentifier): @\(citeKey)"),
+                detail: lang.L(
+                    "Unverified or hallucinated citation cannot enter manuscript prose.",
+                    "未核验或被标记为伪造/撤稿的引文禁止写入手稿正文。"
+                ),
+                actionTitle: lang.L("Inspect Firewall", "查看防火墙")
             ) { [weak self] in
                 self?.docking.focusCitation(citeKey, switchToFirewallStudio: true)
             }
@@ -980,10 +1038,17 @@ public final class ScholarStudioViewModel: ObservableObject {
         )
         refreshPRISMAAndMetaSynthesis()
         projectStats = try? database.computeProjectStats()
+        let lang = ScholarLocalizer.shared.language
         toastCenter.enqueue(
             tone: .verified,
-            title: "Conflict Adjudicated (\(decision.summaryLabel))",
-            detail: "Updated PRISMA 2020 flow counts and Reviewer B unblinded audit log."
+            title: lang.L(
+                "Conflict Adjudicated (\(decision.summaryLabel))",
+                "已完成分歧裁决 (\(decision.localizedSummaryLabel(lang)))"
+            ),
+            detail: lang.L(
+                "Updated PRISMA 2020 flow counts and Reviewer B unblinded audit log.",
+                "已同步更新 PRISMA 2020 流程计数与审稿人 B 审计日志。"
+            )
         )
     }
 
@@ -1046,10 +1111,14 @@ public final class ScholarStudioViewModel: ObservableObject {
         manuscriptFiles = (try? database.listManuscriptFiles()) ?? manuscriptFiles
         refreshActiveEditorLSPState()
         runEditorialPluginSuite()
+        let lang = ScholarLocalizer.shared.language
         toastCenter.enqueue(
             tone: .verified,
-            title: "Applied Scholarly Rewrite (\(finding.filePath):\(finding.line))",
-            detail: finding.suggestedRewrite ?? finding.category
+            title: lang.L(
+                "Applied Scholarly Rewrite (\(finding.filePath):\(finding.line))",
+                "已应用学术改写建议 (\(finding.filePath):\(finding.line))"
+            ),
+            detail: finding.suggestedRewrite ?? finding.localizedCategory(lang)
         )
     }
 
@@ -1202,10 +1271,11 @@ public final class ScholarStudioViewModel: ObservableObject {
             snapshots = (try? database.listSnapshots(filePath: primaryManuscriptPath)) ?? snapshots
             selectedRevisedSnapshotID = snap.id
             recomputeTrackChangesDiff()
+            let lang = ScholarLocalizer.shared.language
             toastCenter.enqueue(
                 tone: .verified,
-                title: "Saved Snapshot \(snap.label)",
-                detail: "\(snap.wordCount) words archived in SQLite WAL."
+                title: lang.L("Saved Snapshot \(snap.label)", "已保存修订快照 \(snap.label)"),
+                detail: lang.L("\(snap.wordCount) words archived in SQLite WAL.", "共 \(snap.wordCount) 词已归档至 SQLite WAL。")
             )
         }
     }
@@ -1214,7 +1284,8 @@ public final class ScholarStudioViewModel: ObservableObject {
         guard undoRedo.canUndo else { return }
         if let label = try? undoRedo.undo() {
             rebuildAllSubsystems()
-            toastCenter.enqueue(tone: .info, title: "Undid \(label)")
+            let lang = ScholarLocalizer.shared.language
+            toastCenter.enqueue(tone: .info, title: lang.L("Undid \(label)", "已撤销 \(label)"))
         }
     }
 
@@ -1222,7 +1293,8 @@ public final class ScholarStudioViewModel: ObservableObject {
         guard undoRedo.canRedo else { return }
         if let label = try? undoRedo.redo() {
             rebuildAllSubsystems()
-            toastCenter.enqueue(tone: .info, title: "Redid \(label)")
+            let lang = ScholarLocalizer.shared.language
+            toastCenter.enqueue(tone: .info, title: lang.L("Redid \(label)", "已重做 \(label)"))
         }
     }
 
@@ -1265,6 +1337,14 @@ public final class ScholarStudioViewModel: ObservableObject {
             docking.isPreferencesPresented = true
         case .openShortcutLegend:
             docking.isShortcutLegendPresented = true
+        case .toggleLanguage:
+            ScholarLocalizer.shared.toggleLanguage()
+            let lang = ScholarLocalizer.shared.language
+            toastCenter.enqueue(
+                tone: .info,
+                title: lang.L("Switched to English", "已切换至简体中文"),
+                detail: lang.L("All ScholarOS studios updated live.", "全部学术工作台界面已实时切换。")
+            )
         case .custom:
             break
         }

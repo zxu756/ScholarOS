@@ -12,6 +12,7 @@ import ScholarWorkbenchShell
 /// DerSimonian-Laird random-effects forest plot.
 public struct PRISMAScreeningAndRoB2StudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel) {
         self.viewModel = viewModel
@@ -69,7 +70,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 Image(systemName: "checklist.checked")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("PRISMA 2020 & Psychometric QC")
+                Text(localizer.L("PRISMA 2020 & Psychometric QC", "PRISMA 2020 双盲筛查与信度质控"))
                     .font(CambridgeTypography.scholarlyHeadline)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     .fixedSize(horizontal: true, vertical: false)
@@ -78,12 +79,16 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
             qcMetricPill(label: "Cohen's κ", value: String(format: "%.2f", kappa), isHealthy: kappa >= 0.61)
             qcMetricPill(label: "PABAK", value: String(format: "%.2f", pabak), isHealthy: pabak >= 0.61)
             qcMetricPill(label: "Gwet's AC1", value: String(format: "%.2f", ac1), isHealthy: ac1 >= 0.61)
-            qcMetricPill(label: "Seed Recall", value: String(format: "%.0f%% (%d/%d)", seedRecall, retainedSeeds, totalSeeds), isHealthy: seedRecall >= 99.0)
+            qcMetricPill(
+                label: localizer.L("Seed Recall", "种子召回"),
+                value: String(format: "%.0f%% (%d/%d)", seedRecall, retainedSeeds, totalSeeds),
+                isHealthy: seedRecall >= 99.0
+            )
 
             Spacer(minLength: 4)
 
             HStack(spacing: 4) {
-                Button("All") {
+                Button(localizer.L("All", "全部")) {
                     viewModel.prismaStageFilter = nil
                     viewModel.prismaConflictsOnly = false
                     viewModel.refreshPRISMAAndMetaSynthesis()
@@ -91,7 +96,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.prismaStageFilter == nil && !viewModel.prismaConflictsOnly))
                 .fixedSize(horizontal: true, vertical: false)
 
-                Button("T/A") {
+                Button(localizer.L("T/A", "题摘初筛")) {
                     viewModel.prismaStageFilter = .titleAbstract
                     viewModel.prismaConflictsOnly = false
                     viewModel.refreshPRISMAAndMetaSynthesis()
@@ -99,7 +104,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.prismaStageFilter == .titleAbstract))
                 .fixedSize(horizontal: true, vertical: false)
 
-                Button("Full-Text") {
+                Button(localizer.L("Full-Text", "全文复筛")) {
                     viewModel.prismaStageFilter = .fullText
                     viewModel.prismaConflictsOnly = false
                     viewModel.refreshPRISMAAndMetaSynthesis()
@@ -107,14 +112,18 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.prismaStageFilter == .fullText))
                 .fixedSize(horizontal: true, vertical: false)
 
-                Button("Conflicts (\(conflictCount))") {
+                Button(localizer.L("Conflicts (\(conflictCount))", "分歧 (\(conflictCount))")) {
                     viewModel.prismaConflictsOnly.toggle()
                     viewModel.refreshPRISMAAndMetaSynthesis()
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.prismaConflictsOnly))
                 .fixedSize(horizontal: true, vertical: false)
 
-                Button(viewModel.revealBlindedReviewerB ? "Rater B: Visible" : "Rater B: Blinded") {
+                Button(
+                    viewModel.revealBlindedReviewerB
+                        ? localizer.L("Rater B: Visible", "审稿人B: 已揭盲")
+                        : localizer.L("Rater B: Blinded", "审稿人B: 双盲")
+                ) {
                     viewModel.revealBlindedReviewerB.toggle()
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: !viewModel.revealBlindedReviewerB))
@@ -166,11 +175,11 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("PRISMA 2020 FLOW DIAGRAM")
+                    Text(localizer.L("PRISMA 2020 FLOW DIAGRAM", "PRISMA 2020 四阶段筛选流图"))
                         .font(CambridgeTypography.uiSectionLabel)
                         .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                     Spacer()
-                    Text("Item 16a/16b")
+                    Text(localizer.L("Item 16a/16b", "条目 16a/16b"))
                         .font(CambridgeTypography.monoSmall)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                         .fixedSize(horizontal: true, vertical: false)
@@ -178,11 +187,14 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                 // Phase 1: Identification
                 prismaPhaseNode(
-                    phaseBadge: "1. IDENTIFICATION",
-                    title: "Databases & Registers",
+                    phaseBadge: localizer.L("1. IDENTIFICATION", "1. 文献检索识别"),
+                    title: localizer.L("Databases & Registers", "文献数据库与注册库"),
                     primaryStat: "n = \(totalIdentified)",
-                    detail: "DB: \(max(412, m.databaseRecordsIdentified)) • Reg: \(max(38, m.registerRecordsIdentified))",
-                    sideBranchTitle: "Duplicates Removed",
+                    detail: localizer.L(
+                        "DB: \(max(412, m.databaseRecordsIdentified)) • Reg: \(max(38, m.registerRecordsIdentified))",
+                        "数据库: \(max(412, m.databaseRecordsIdentified)) • 注册库: \(max(38, m.registerRecordsIdentified))"
+                    ),
+                    sideBranchTitle: localizer.L("Duplicates Removed", "去重剔除记录"),
                     sideBranchStat: "−\(dupRemoved)",
                     isSideExcluded: false
                 )
@@ -191,11 +203,11 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                 // Phase 2: Screening
                 prismaPhaseNode(
-                    phaseBadge: "2. SCREENING",
-                    title: "Title & Abstract Screened",
+                    phaseBadge: localizer.L("2. SCREENING", "2. 标题与摘要初筛"),
+                    title: localizer.L("Title & Abstract Screened", "完成标题与摘要初筛"),
                     primaryStat: "n = \(screenedCount)",
-                    detail: "Dual-blind Rater A & Rater B",
-                    sideBranchTitle: "Excluded at T/A",
+                    detail: localizer.L("Dual-blind Rater A & Rater B", "审稿人 A 与审稿人 B 独立双盲"),
+                    sideBranchTitle: localizer.L("Excluded at T/A", "题摘阶段排除"),
                     sideBranchStat: "−\(taExcluded)",
                     isSideExcluded: true
                 )
@@ -204,11 +216,11 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                 // Phase 3: Eligibility
                 prismaPhaseNode(
-                    phaseBadge: "3. ELIGIBILITY",
-                    title: "Full-Text Reports Assessed",
+                    phaseBadge: localizer.L("3. ELIGIBILITY", "3. 全文合格性评估"),
+                    title: localizer.L("Full-Text Reports Assessed", "完成全文合格性评估"),
                     primaryStat: "n = \(assessedFT)",
-                    detail: "Sought: \(soughtRetrieval) (Unretrieved: 2)",
-                    sideBranchTitle: "FT Excluded",
+                    detail: localizer.L("Sought: \(soughtRetrieval) (Unretrieved: 2)", "拟调取全文: \(soughtRetrieval)（未获取: 2）"),
+                    sideBranchTitle: localizer.L("FT Excluded", "全文阶段排除"),
                     sideBranchStat: "E1:14 E2:9 E3:6",
                     isSideExcluded: true
                 )
@@ -218,7 +230,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 // Phase 4: Included
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("4. INCLUDED IN SYNTHESIS")
+                        Text(localizer.L("4. INCLUDED IN SYNTHESIS", "4. 最终纳入定量综合"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
                         Spacer()
@@ -234,12 +246,12 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
 
-                    Text("Studies Retained for Quantitative Meta-Synthesis & RoB 2.0")
+                    Text(localizer.L("Studies Retained for Quantitative Meta-Synthesis & RoB 2.0", "纳入定量 Meta 分析与 RoB 2.0 偏倚风险评估的研究"))
                         .font(CambridgeTypography.uiControlSemibold)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("100% Gold-Standard Seed Recall verified.")
+                    Text(localizer.L("100% Gold-Standard Seed Recall verified.", "100% 金标准种子文献召回核验通过。"))
                         .font(CambridgeTypography.uiCaption)
                         .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                 }
@@ -255,7 +267,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                 // PICO Summary Card
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("PROSPERO / PICO PROTOCOL")
+                    Text(localizer.L("PROSPERO / PICO PROTOCOL", "PROSPERO / PICO 审查方案"))
                         .font(CambridgeTypography.uiSectionLabel)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     Text("P: \(viewModel.picoProtocol.population)")
@@ -355,7 +367,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 } label: {
                     HStack(spacing: 3) {
                         ScholarKeycapBadge("K")
-                        Text("Prev")
+                        Text(localizer.L("Prev", "上一篇"))
                             .font(CambridgeTypography.uiCaption)
                     }
                 }
@@ -394,17 +406,22 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                     Spacer(minLength: 4)
 
                     let activeIdx = (viewModel.screeningStudies.firstIndex(where: { $0.id == viewModel.selectedScreeningStudy?.id }) ?? 0) + 1
-                    Text("Card \(activeIdx)/\(max(1, viewModel.screeningStudies.count))")
-                        .font(CambridgeTypography.monoSmall)
-                        .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                        .fixedSize(horizontal: true, vertical: false)
+                    Text(
+                        localizer.L(
+                            "Card \(activeIdx)/\(max(1, viewModel.screeningStudies.count))",
+                            "第 \(activeIdx)/\(max(1, viewModel.screeningStudies.count)) 篇"
+                        )
+                    )
+                    .font(CambridgeTypography.monoSmall)
+                    .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
 
                 Button {
                     viewModel.selectNextScreeningStudy(delta: 1)
                 } label: {
                     HStack(spacing: 3) {
-                        Text("Next")
+                        Text(localizer.L("Next", "下一篇"))
                             .font(CambridgeTypography.uiCaption)
                         ScholarKeycapBadge("J")
                     }
@@ -419,16 +436,20 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                         // Active Candidate Study Dossier Card
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
-                                Text(study.stage.rawValue.uppercased())
-                                    .font(CambridgeTypography.uiSectionLabel)
-                                    .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                            .fill(CambridgeLinenPalette.libraryForestTint)
-                                    )
-                                    .fixedSize(horizontal: true, vertical: false)
+                                Text(
+                                    localizer.language == .zhHans
+                                        ? study.stage.localizedLabel(.zhHans)
+                                        : study.stage.rawValue.uppercased()
+                                )
+                                .font(CambridgeTypography.uiSectionLabel)
+                                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(CambridgeLinenPalette.libraryForestTint)
+                                )
+                                .fixedSize(horizontal: true, vertical: false)
 
                                 Text("@\(study.citeKey)")
                                     .font(CambridgeTypography.monoSmall)
@@ -438,7 +459,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 Spacer(minLength: 4)
 
                                 if study.hasReviewerConflict {
-                                    Text("CONFLICT NEEDS ADJUDICATION")
+                                    Text(localizer.L("CONFLICT NEEDS ADJUDICATION", "双盲分歧 • 待第三方裁决"))
                                         .font(.system(size: 9.5, weight: .bold, design: .monospaced))
                                         .foregroundStyle(CambridgeLinenPalette.driftAmber)
                                         .padding(.horizontal, 6)
@@ -464,7 +485,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                             Divider()
                                 .overlay(CambridgeLinenPalette.stoneHairline)
 
-                            Text("ABSTRACT & ELIGIBILITY EVIDENCE")
+                            Text(localizer.L("ABSTRACT & ELIGIBILITY EVIDENCE", "摘要与纳入合格性证据"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
 
@@ -480,25 +501,26 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                             // Dual-Blind Ballot Row
                             HStack(spacing: 8) {
                                 ballotBadge(
-                                    role: "Reviewer A",
-                                    decisionLabel: study.reviewerADecision?.summaryLabel ?? "Pending",
+                                    role: localizer.L("Reviewer A", "审稿人 A"),
+                                    decisionLabel: study.reviewerADecision?.localizedSummaryLabel(localizer.language)
+                                        ?? localizer.L("Pending", "待评"),
                                     accent: decisionColor(study.reviewerADecision)
                                 )
 
                                 ballotBadge(
-                                    role: "Reviewer B",
+                                    role: localizer.L("Reviewer B", "审稿人 B"),
                                     decisionLabel: viewModel.revealBlindedReviewerB
-                                        ? (study.reviewerBDecision?.summaryLabel ?? "Pending")
-                                        : "Blinded Mask",
+                                        ? (study.reviewerBDecision?.localizedSummaryLabel(localizer.language) ?? localizer.L("Pending", "待评"))
+                                        : localizer.L("Blinded Mask", "双盲遮蔽"),
                                     accent: viewModel.revealBlindedReviewerB
                                         ? decisionColor(study.reviewerBDecision)
                                         : CambridgeLinenPalette.mutedMetadata
                                 )
 
                                 ballotBadge(
-                                    role: "Adjudicator",
-                                    decisionLabel: study.adjudicatedDecision?.summaryLabel
-                                        ?? (study.hasReviewerConflict ? "Required" : "Consensus"),
+                                    role: localizer.L("Adjudicator", "第三裁决人"),
+                                    decisionLabel: study.adjudicatedDecision?.localizedSummaryLabel(localizer.language)
+                                        ?? (study.hasReviewerConflict ? localizer.L("Required", "需裁决") : localizer.L("Consensus", "一致通过")),
                                     accent: study.adjudicatedDecision != nil
                                         ? decisionColor(study.adjudicatedDecision)
                                         : (study.hasReviewerConflict ? CambridgeLinenPalette.driftAmber : CambridgeLinenPalette.verifiedEmerald)
@@ -510,7 +532,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                         // Keyboard-Driven Voting & Ordered Exclusion Rules Card
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text("KEYBOARD SCREENING VOTE & ORDERED EXCLUSION CODES")
+                                Text(localizer.L("KEYBOARD SCREENING VOTE & ORDERED EXCLUSION CODES", "键盘双盲投票与有序排除编码（E1–E6）"))
                                     .font(CambridgeTypography.uiSectionLabel)
                                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                                 Spacer()
@@ -522,7 +544,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 } label: {
                                     HStack(spacing: 5) {
                                         ScholarKeycapBadge("I")
-                                        Text("Include")
+                                        Text(localizer.L("Include", "纳入"))
                                     }
                                 }
                                 .buttonStyle(CambridgePrimaryButtonStyle())
@@ -533,7 +555,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 } label: {
                                     HStack(spacing: 5) {
                                         ScholarKeycapBadge("M")
-                                        Text("Maybe")
+                                        Text(localizer.L("Maybe", "待定"))
                                     }
                                 }
                                 .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -546,7 +568,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 } label: {
                                     HStack(spacing: 5) {
                                         ScholarKeycapBadge("E")
-                                        Text("Exclude (\(viewModel.selectedExclusionReasonCode))")
+                                        Text(localizer.L("Exclude (\(viewModel.selectedExclusionReasonCode))", "排除 (\(viewModel.selectedExclusionReasonCode))"))
                                     }
                                 }
                                 .buttonStyle(CambridgeSecondaryButtonStyle())
@@ -580,12 +602,12 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                     .overlay(CambridgeLinenPalette.stoneHairline)
 
                                 HStack(spacing: 8) {
-                                    Text("Third-Reviewer Adjudication:")
+                                    Text(localizer.L("Third-Reviewer Adjudication:", "第三审稿人裁决:"))
                                         .font(CambridgeTypography.uiControlSemibold)
                                         .foregroundStyle(CambridgeLinenPalette.driftAmber)
                                         .fixedSize(horizontal: true, vertical: false)
 
-                                    Button("Resolve → Include") {
+                                    Button(localizer.L("Resolve → Include", "裁决 → 纳入")) {
                                         viewModel.adjudicateSelectedScreeningStudy(
                                             decision: .include,
                                             rationale: viewModel.adjudicationRationaleDraft
@@ -594,7 +616,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))
                                     .fixedSize(horizontal: true, vertical: false)
 
-                                    Button("Resolve → Exclude (\(viewModel.selectedExclusionReasonCode))") {
+                                    Button(localizer.L("Resolve → Exclude (\(viewModel.selectedExclusionReasonCode))", "裁决 → 排除 (\(viewModel.selectedExclusionReasonCode))")) {
                                         viewModel.adjudicateSelectedScreeningStudy(
                                             decision: .exclude(reasonCode: viewModel.selectedExclusionReasonCode),
                                             rationale: "Adjudicated exclusion under priority code \(viewModel.selectedExclusionReasonCode)."
@@ -656,12 +678,12 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
     private func shortExclusionLabel(_ code: String) -> String {
         switch code {
-        case "E1": return "Population"
-        case "E2": return "Method"
-        case "E3": return "Opinion"
-        case "E4": return "No PDF"
-        case "E5": return "Duplicate"
-        case "E6": return "Retracted"
+        case "E1": return localizer.L("Population", "对象不符")
+        case "E2": return localizer.L("Method", "方法缺失")
+        case "E3": return localizer.L("Opinion", "观点评论")
+        case "E4": return localizer.L("No PDF", "无全文")
+        case "E5": return localizer.L("Duplicate", "重复发表")
+        case "E6": return localizer.L("Retracted", "已撤稿")
         default: return code
         }
     }
@@ -678,15 +700,20 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading, spacing: 1.5) {
-                            Text("COCHRANE RoB 2.0 TRAFFIC-LIGHT MATRIX")
+                            Text(localizer.L("COCHRANE RoB 2.0 TRAFFIC-LIGHT MATRIX", "COCHRANE RoB 2.0 偏倚风险交通灯矩阵"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                            Text("Domains D1–D5 signaling appraisal (Sterne et al., BMJ 2019)")
-                                .font(CambridgeTypography.uiCaption)
-                                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                            Text(
+                                localizer.L(
+                                    "Domains D1–D5 signaling appraisal (Sterne et al., BMJ 2019)",
+                                    "D1–D5 五维偏倚信号评估 (Sterne et al., BMJ 2019)"
+                                )
+                            )
+                            .font(CambridgeTypography.uiCaption)
+                            .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                         }
                         Spacer()
-                        Text("GRADE: High ⊕⊕⊕⊕")
+                        Text(localizer.L("GRADE: High ⊕⊕⊕⊕", "GRADE: 高质量 ⊕⊕⊕⊕"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
                             .fixedSize(horizontal: true, vertical: false)
@@ -694,7 +721,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                     // Header Row
                     HStack(spacing: 4) {
-                        Text("Study")
+                        Text(localizer.L("Study", "纳入研究"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                             .frame(width: 146, alignment: .leading)
@@ -707,7 +734,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 .fixedSize(horizontal: true, vertical: false)
                         }
 
-                        Text("Overall")
+                        Text(localizer.L("Overall", "总体风险"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                             .frame(width: 56)
@@ -715,7 +742,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
 
                         Spacer(minLength: 2)
 
-                        Text("Wt%")
+                        Text(localizer.L("Wt%", "权重%"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                             .frame(width: 44, alignment: .trailing)
@@ -761,12 +788,17 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading, spacing: 1.5) {
-                            Text("DERSIMONIAN-LAIRD RANDOM-EFFECTS FOREST PLOT")
+                            Text(localizer.L("DERSIMONIAN-LAIRD RANDOM-EFFECTS FOREST PLOT", "DERSIMONIAN-LAIRD 随机效应森林图"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                            Text("Outcome: Citation Hallucination Reduction (Hedges' g, 95% CI)")
-                                .font(CambridgeTypography.uiCaption)
-                                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                            Text(
+                                localizer.L(
+                                    "Outcome: Citation Hallucination Reduction (Hedges' g, 95% CI)",
+                                    "结局指标: 引文幻觉降低效应量 (Hedges' g, 95% CI)"
+                                )
+                            )
+                            .font(CambridgeTypography.uiCaption)
+                            .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                         }
                         Spacer()
                         if let plan {
@@ -799,7 +831,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                     let pooledHi = plan?.randomEffects95CIUpper ?? 0.90
 
                     forestPlotRow(
-                        label: "Pooled DL Random-Effects",
+                        label: localizer.L("Pooled DL Random-Effects", "DL 随机效应合并估计"),
                         estimate: pooledEst,
                         lowerCI: pooledLo,
                         upperCI: pooledHi,
@@ -813,7 +845,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                                 .font(CambridgeTypography.monoSmall)
                                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                             Spacer()
-                            Text("Favors Firewall Gate (g > 0)")
+                            Text(localizer.L("Favors Firewall Gate (g > 0)", "支持防火墙门禁显著有效 (g > 0)"))
                                 .font(CambridgeTypography.uiCaption)
                                 .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
                                 .fixedSize(horizontal: true, vertical: false)

@@ -23,6 +23,15 @@ public enum ScholarPreferencesTab: String, Sendable, Codable, Hashable, CaseIter
         case .editorialJSPlugins: return "curlybraces.square"
         }
     }
+
+    public func localizedTitle(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .typographyAndEditor: return lang.L("Typography & Editor", "语言、排版与编辑器")
+        case .citationAndZotero: return lang.L("Citation & Zotero Firewall", "引文与 Zotero 防火墙")
+        case .prismaAndScreening: return lang.L("PRISMA & Screening", "PRISMA 双盲筛查")
+        case .editorialJSPlugins: return lang.L("Editorial JS Plugins", "JS 审稿插件")
+        }
+    }
 }
 
 /// Observable workstation configuration store backing `ScholarPreferencesSheetView` and runtime editorial gates.
@@ -111,6 +120,7 @@ public final class ScholarWorkbenchPreferences: ObservableObject {
 /// Archival Cambridge Linen & Pure Paper `⌘,` Preferences modal sheet.
 public struct ScholarPreferencesSheetView: View {
     @ObservedObject public var preferences: ScholarWorkbenchPreferences
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     @Binding public var isPresented: Bool
     public let onSyncPluginsToDatabase: ([ScholarPluginManifest]) -> Void
 
@@ -160,7 +170,7 @@ public struct ScholarPreferencesSheetView: View {
 
             preferencesFooter
         }
-        .frame(width: 800, height: 560)
+        .frame(width: 800, height: 580)
         .background(CambridgeLinenPalette.cambridgeLinen)
         .preferredColorScheme(.light)
     }
@@ -168,14 +178,19 @@ public struct ScholarPreferencesSheetView: View {
     private var preferencesHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("ScholarOS Workstation Preferences")
+                Text(localizer.L("ScholarOS Workstation Preferences", "ScholarOS 学术工作站偏好设置"))
                     .font(CambridgeTypography.scholarlyTitle)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                Text("Configure archival typography, hardware-gated Citation Firewall rules, PRISMA 2020 blinding, and JavaScriptCore sandboxes.")
+                Text(localizer.L(
+                    "Configure interface language, archival typography, hardware-gated Citation Firewall rules, PRISMA 2020 blinding, and JavaScriptCore sandboxes.",
+                    "配置界面语言、古典纸感排版、五级引文硬件防火墙、PRISMA 2020 双盲筛查及 JavaScriptCore 审稿沙盒。"
+                ))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
             }
             Spacer()
+            ScholarLanguageTogglePill(localizer: localizer)
             ScholarKeycapBadge("⌘,")
         }
         .padding(.horizontal, 18)
@@ -193,8 +208,9 @@ public struct ScholarPreferencesSheetView: View {
                     HStack(spacing: 6) {
                         Image(systemName: tab.sfSymbolName)
                             .font(.system(size: 12, weight: .semibold))
-                        Text(tab.rawValue)
+                        Text(tab.localizedTitle(localizer.language))
                             .font(isSelected ? CambridgeTypography.uiControlSemibold : CambridgeTypography.uiControlMedium)
+                            .tracking(0)
                     }
                     .foregroundStyle(isSelected ? CambridgeLinenPalette.archivalPaper : CambridgeLinenPalette.oxfordCharcoal)
                     .padding(.horizontal, 11)
@@ -221,18 +237,47 @@ public struct ScholarPreferencesSheetView: View {
         .background(CambridgeLinenPalette.warmVellum)
     }
 
-    // MARK: Tab 1 — Typography & Editor
+    // MARK: Tab 1 — Language, Typography & Editor
 
     private var typographyAndEditorPane: some View {
         VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                CambridgeSectionHeader(
+                    title: localizer.L("Interface Language (中文 / EN)", "界面语言切换 (中文 / English)"),
+                    subtitle: localizer.L(
+                        "Resolution priority: CLI --lang zh|en -> SCHOLAROS_LANG -> UserDefaults -> macOS Locale",
+                        "解析优先级：CLI --lang zh|en -> 环境变量 SCHOLAROS_LANG -> UserDefaults -> 系统首选语言"
+                    )
+                ) {
+                    ScholarKeycapBadge("⇧⌘L")
+                }
+
+                HStack(spacing: 8) {
+                    Text(localizer.L("Active Workstation Language", "当前工作站界面语言"))
+                        .font(CambridgeTypography.uiControlMedium)
+                        .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+                    Spacer()
+                    ForEach(ScholarLanguage.allCases) { lang in
+                        Button("\(lang.badge) · \(lang.displayName)") {
+                            localizer.setLanguage(lang)
+                        }
+                        .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: localizer.language == lang))
+                    }
+                }
+            }
+            .cambridgeArchivalCard(padding: 14)
+
             VStack(alignment: .leading, spacing: 12) {
                 CambridgeSectionHeader(
-                    title: "Archival Manuscript Typography",
-                    subtitle: "Cambridge Linen (#F8F6F0) canvas with Pure Archival Paper (#FFFFFF) editor well"
+                    title: localizer.L("Archival Manuscript Typography", "古典学术手稿排版"),
+                    subtitle: localizer.L(
+                        "Cambridge Linen (#F8F6F0) canvas with Pure Archival Paper (#FFFFFF) editor well",
+                        "剑桥亚麻画布 (#F8F6F0) 搭配纯白档案纸编辑区 (#FFFFFF)"
+                    )
                 )
 
                 HStack {
-                    Text("Editor Monospace Font Size")
+                    Text(localizer.L("Editor Monospace Font Size", "编辑器等宽字体字号"))
                         .font(CambridgeTypography.uiControlMedium)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     Spacer()
@@ -245,7 +290,7 @@ public struct ScholarPreferencesSheetView: View {
                 }
 
                 HStack {
-                    Text("Editorial Line Height Multiple")
+                    Text(localizer.L("Editorial Line Height Multiple", "学术编辑行高倍数"))
                         .font(CambridgeTypography.uiControlMedium)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     Spacer()
@@ -258,12 +303,12 @@ public struct ScholarPreferencesSheetView: View {
                 }
 
                 HStack {
-                    Text("Wrap & Column Ruler Guide")
+                    Text(localizer.L("Wrap & Column Ruler Guide", "自动折行与列宽标尺"))
                         .font(CambridgeTypography.uiControlMedium)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     Spacer()
                     ForEach([80, 100, 120], id: \.self) { col in
-                        Button("\(col) cols") {
+                        Button(localizer.L("\(col) cols", "\(col) 列")) {
                             preferences.columnRulerWidth = col
                         }
                         .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: preferences.columnRulerWidth == col))
@@ -274,20 +319,35 @@ public struct ScholarPreferencesSheetView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 CambridgeSectionHeader(
-                    title: "Incremental LaTeX / Typst LSP & Venue Budget",
-                    subtitle: "Sub-20ms incremental CST re-lexing and live texcount budget tracking"
+                    title: localizer.L("Incremental LaTeX / Typst LSP & Venue Budget", "增量式 LaTeX / Typst 语言服务与顶会篇幅预算"),
+                    subtitle: localizer.L(
+                        "Sub-20ms incremental CST re-lexing and live texcount budget tracking",
+                        "亚 20 毫秒增量语法树词法重解析与实时字数/页数合规追踪"
+                    )
                 )
 
-                Toggle("Enable live LaTeX / Typst CST & cycle-safe macro diagnostics", isOn: $preferences.enableLiveLSPDiagnostics)
+                Toggle(
+                    localizer.L(
+                        "Enable live LaTeX / Typst CST & cycle-safe macro diagnostics",
+                        "启用实时 LaTeX / Typst 语法树与防环宏展开诊断"
+                    ),
+                    isOn: $preferences.enableLiveLSPDiagnostics
+                )
                     .font(CambridgeTypography.uiControl)
-                Toggle("Show monospaced gutter line numbers and section fold markers", isOn: $preferences.showLineNumbersAndCodeFolding)
+                Toggle(
+                    localizer.L(
+                        "Show monospaced gutter line numbers and section fold markers",
+                        "显示等宽行号边栏与章节折叠标记"
+                    ),
+                    isOn: $preferences.showLineNumbersAndCodeFolding
+                )
                     .font(CambridgeTypography.uiControl)
 
                 HStack {
-                    Text("Target Submission Venue Preset")
+                    Text(localizer.L("Target Submission Venue Preset", "目标投稿会议 / 期刊预设"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
-                    TextField("Venue Preset", text: $preferences.targetVenuePresetLabel)
+                    TextField(localizer.L("Venue Preset", "会议/期刊预设"), text: $preferences.targetVenuePresetLabel)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 280)
                 }
@@ -302,12 +362,15 @@ public struct ScholarPreferencesSheetView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 12) {
                 CambridgeSectionHeader(
-                    title: "Hardware-Gated 5-Class Citation Verification Firewall",
-                    subtitle: "Prevents unverified, hallucinated, or retracted citeKeys from entering manuscripts via UI, CLI, or MCP"
+                    title: localizer.L("Hardware-Gated 5-Class Citation Verification Firewall", "硬件门控五级引文验证防火墙"),
+                    subtitle: localizer.L(
+                        "Prevents unverified, hallucinated, or retracted citeKeys from entering manuscripts via UI, CLI, or MCP",
+                        "在界面、CLI 与 MCP 通道全面阻断未核验、幻觉伪造或已撤稿引文写入手稿"
+                    )
                 )
 
                 HStack {
-                    Text("Default CSL Citation Format")
+                    Text(localizer.L("Default CSL Citation Format", "默认 CSL 参考文献格式"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     ForEach(CitationFormatStyle.allCases) { style in
@@ -318,13 +381,25 @@ public struct ScholarPreferencesSheetView: View {
                     }
                 }
 
-                Toggle("Enforce ERR_UNVERIFIED_CITATION block on BLOCKED_HALLUCINATED entries", isOn: $preferences.enforceStrictHardwareFirewallGate)
+                Toggle(
+                    localizer.L(
+                        "Enforce ERR_UNVERIFIED_CITATION block on BLOCKED_HALLUCINATED entries",
+                        "对伪造/撤稿文献强制触发 ERR_UNVERIFIED_CITATION 硬件拦截"
+                    ),
+                    isOn: $preferences.enforceStrictHardwareFirewallGate
+                )
                     .font(CambridgeTypography.uiControl)
-                Toggle("Require DOI / arXiv / PubMed verification before inserting UNVERIFIED_OFFLINE keys", isOn: $preferences.blockUnverifiedOfflineCitations)
+                Toggle(
+                    localizer.L(
+                        "Require DOI / arXiv / PubMed verification before inserting UNVERIFIED_OFFLINE keys",
+                        "离线待核验文献须完成 DOI / arXiv / PubMed 校验后方允许引用"
+                    ),
+                    isOn: $preferences.blockUnverifiedOfflineCitations
+                )
                     .font(CambridgeTypography.uiControl)
 
                 HStack {
-                    Text("Jaro-Winkler Title Deduplication Threshold")
+                    Text(localizer.L("Jaro-Winkler Title Deduplication Threshold", "Jaro-Winkler 标题去重相似度阈值"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     Slider(value: $preferences.jaroWinklerDeduplicationThreshold, in: 0.84...0.98, step: 0.01)
@@ -339,12 +414,15 @@ public struct ScholarPreferencesSheetView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 CambridgeSectionHeader(
-                    title: "Local Zotero SQLite Read-Only Bridge & Crossref Polite Pool",
-                    subtitle: "Zero-lock immutable SQLite snapshot import from Zotero 7"
+                    title: localizer.L("Local Zotero SQLite Read-Only Bridge & Crossref Polite Pool", "本地 Zotero SQLite 只读桥接与 Crossref 礼貌池"),
+                    subtitle: localizer.L(
+                        "Zero-lock immutable SQLite snapshot import from Zotero 7",
+                        "零文件锁无损读取本地 Zotero 7 SQLite 文献库快照"
+                    )
                 )
 
                 HStack {
-                    Text("Zotero SQLite Path")
+                    Text(localizer.L("Zotero SQLite Path", "Zotero 数据库路径"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     TextField("~/Zotero/zotero.sqlite", text: $preferences.zoteroSQLiteDatabasePath)
@@ -354,7 +432,7 @@ public struct ScholarPreferencesSheetView: View {
                 }
 
                 HStack {
-                    Text("Crossref Polite-Pool Contact Email")
+                    Text(localizer.L("Crossref Polite-Pool Contact Email", "Crossref 礼貌池联系邮箱"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     TextField("researcher@institution.edu", text: $preferences.crossrefPolitePoolEmail)
@@ -373,17 +451,32 @@ public struct ScholarPreferencesSheetView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 12) {
                 CambridgeSectionHeader(
-                    title: "PRISMA 2020 Dual-Blind Screening Protocol",
-                    subtitle: "Independent nominal reviewer voting, priority exclusion codes, and chance-corrected Cohen's κ"
+                    title: localizer.L("PRISMA 2020 Dual-Blind Screening Protocol", "PRISMA 2020 双盲文献筛查规程"),
+                    subtitle: localizer.L(
+                        "Independent nominal reviewer voting, priority exclusion codes, and chance-corrected Cohen's κ",
+                        "双审稿人独立设盲投票、优先级排除码与随机校正 Cohen's κ 一致性检验"
+                    )
                 )
 
-                Toggle("Mask Reviewer B's decisions until Reviewer A has committed a vote", isOn: $preferences.blindReviewerBUntilCommitted)
+                Toggle(
+                    localizer.L(
+                        "Mask Reviewer B's decisions until Reviewer A has committed a vote",
+                        "在审稿人 A 提交决定前对审稿人 B 投票结果严格设盲"
+                    ),
+                    isOn: $preferences.blindReviewerBUntilCommitted
+                )
                     .font(CambridgeTypography.uiControl)
-                Toggle("Require priority-ordered exclusion reason code on every EXCLUDE vote", isOn: $preferences.enforcePriorityExclusionCodes)
+                Toggle(
+                    localizer.L(
+                        "Require priority-ordered exclusion reason code on every EXCLUDE vote",
+                        "每次投出排除票时强制要求选择按优先级排序的排除原因代码"
+                    ),
+                    isOn: $preferences.enforcePriorityExclusionCodes
+                )
                     .font(CambridgeTypography.uiControl)
 
                 HStack {
-                    Text("Minimum Target Inter-Rater Reliability (Cohen's κ)")
+                    Text(localizer.L("Minimum Target Inter-Rater Reliability (Cohen's κ)", "目标最低评定者间一致性信度 (Cohen's κ)"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     Slider(value: $preferences.minimumTargetCohensKappa, in: 0.55...0.95, step: 0.01)
@@ -395,14 +488,18 @@ public struct ScholarPreferencesSheetView: View {
                 }
 
                 HStack {
-                    Text("Active Local Reviewer Slot")
+                    Text(localizer.L("Active Local Reviewer Slot", "当前本地审稿人席位"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
-                    ForEach(["Reviewer A", "Reviewer B", "Adjudicator"], id: \.self) { slot in
-                        Button(slot) {
-                            preferences.activeReviewerHandle = slot
+                    ForEach([
+                        ("Reviewer A", localizer.L("Reviewer A", "审稿人 A")),
+                        ("Reviewer B", localizer.L("Reviewer B", "审稿人 B")),
+                        ("Adjudicator", localizer.L("Adjudicator", "第三方裁决人"))
+                    ], id: \.0) { slotKey, slotLabel in
+                        Button(slotLabel) {
+                            preferences.activeReviewerHandle = slotKey
                         }
-                        .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: preferences.activeReviewerHandle == slot))
+                        .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: preferences.activeReviewerHandle == slotKey))
                     }
                 }
             }
@@ -416,16 +513,26 @@ public struct ScholarPreferencesSheetView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 CambridgeSectionHeader(
-                    title: "Venue Gate & Abstract Budget Policy",
-                    subtitle: "Passed to isolated JavaScriptCore plugin sandboxes via scholar.getConfig()"
+                    title: localizer.L("Venue Gate & Abstract Budget Policy", "投稿门禁与摘要字数预算策略"),
+                    subtitle: localizer.L(
+                        "Passed to isolated JavaScriptCore plugin sandboxes via scholar.getConfig()",
+                        "通过 scholar.getConfig() 安全注入隔离 JavaScriptCore 审稿插件沙盒"
+                    )
                 )
 
                 HStack {
-                    Text("Venue Anonymization Mode")
+                    Text(localizer.L("Venue Anonymization Mode", "投稿匿名审查模式"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     ForEach(EditorialVenueAuditMode.allCases) { mode in
-                        Button(mode.displayTitle) {
+                        let modeTitle: String = {
+                            switch mode {
+                            case .doubleBlindSubmission: return localizer.L(mode.displayTitle, "双盲匿名投稿")
+                            case .cameraReady: return localizer.L(mode.displayTitle, "录用定稿模式")
+                            case .preprintDraft: return localizer.L(mode.displayTitle, "开放预印本")
+                            }
+                        }()
+                        Button(modeTitle) {
                             preferences.venueAuditMode = mode
                         }
                         .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: preferences.venueAuditMode == mode))
@@ -433,11 +540,11 @@ public struct ScholarPreferencesSheetView: View {
                 }
 
                 HStack {
-                    Text("Maximum Abstract Word Count")
+                    Text(localizer.L("Maximum Abstract Word Count", "摘要最大词数上限"))
                         .font(CambridgeTypography.uiControlMedium)
                     Spacer()
                     Stepper(value: $preferences.maxAbstractWords, in: 100...500, step: 25) {
-                        Text("\(preferences.maxAbstractWords) words")
+                        Text(localizer.L("\(preferences.maxAbstractWords) words", "\(preferences.maxAbstractWords) 词"))
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                     }
@@ -447,11 +554,14 @@ public struct ScholarPreferencesSheetView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 CambridgeSectionHeader(
-                    title: "Installed JavaScriptCore Editorial Sandboxes",
-                    subtitle: "Each plugin executes inside its own isolated JSVirtualMachine with capability-gated scholar.* APIs",
+                    title: localizer.L("Installed JavaScriptCore Editorial Sandboxes", "已安装的 JavaScriptCore 隔离审稿沙盒"),
+                    subtitle: localizer.L(
+                        "Each plugin executes inside its own isolated JSVirtualMachine with capability-gated scholar.* APIs",
+                        "每个插件均运行于独立 JSVirtualMachine 实例，仅暴露细粒度授权的 scholar.* 接口"
+                    ),
                     countBadge: preferences.pluginManifests.count
                 ) {
-                    Button("Add Cross-Ref Starter Plugin") {
+                    Button(localizer.L("Add Cross-Ref Starter Plugin", "添加交叉引用检查示例插件")) {
                         let title = customDraftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                         let newID = title.isEmpty
                             ? "custom.crossref-\(preferences.pluginManifests.count + 1)"
@@ -489,8 +599,9 @@ public struct ScholarPreferencesSheetView: View {
                             )
                             .labelsHidden()
 
-                            Text(plugin.name)
+                            Text(plugin.localizedName(localizer.language))
                                 .font(CambridgeTypography.uiControlSemibold)
+                                .tracking(0)
                                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
 
                             Text("v\(plugin.version)")
@@ -498,8 +609,9 @@ public struct ScholarPreferencesSheetView: View {
                                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
 
                             if plugin.isBuiltIn {
-                                Text("Built-In")
+                                Text(localizer.L("Built-In", "内置"))
                                     .font(CambridgeTypography.uiSectionLabel)
+                                    .tracking(0)
                                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -511,18 +623,20 @@ public struct ScholarPreferencesSheetView: View {
 
                             Spacer()
 
-                            Text(validation.isReadyToExecute ? "JS Valid" : "Check Syntax")
+                            Text(validation.isReadyToExecute
+                                 ? localizer.L("JS Valid", "语法有效")
+                                 : localizer.L("Check Syntax", "语法错误"))
                                 .font(CambridgeTypography.monoSmall)
                                 .foregroundStyle(validation.isReadyToExecute ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.blockedCrimson)
                         }
 
-                        Text(plugin.summary)
+                        Text(plugin.localizedSummary(localizer.language))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
 
                         HStack(spacing: 5) {
                             ForEach(plugin.capabilities, id: \.self) { cap in
-                                Text(cap.rawValue)
+                                Text(cap.localizedLabel(localizer.language))
                                     .font(CambridgeTypography.monoSmall)
                                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                                     .padding(.horizontal, 6)
@@ -553,7 +667,7 @@ public struct ScholarPreferencesSheetView: View {
 
     private var preferencesFooter: some View {
         HStack {
-            Button("Restore Archival Defaults") {
+            Button(localizer.L("Restore Archival Defaults", "恢复默认学术预设")) {
                 preferences.restoreDefaults()
                 onSyncPluginsToDatabase(preferences.pluginManifests)
             }
@@ -561,7 +675,7 @@ public struct ScholarPreferencesSheetView: View {
 
             Spacer()
 
-            Button("Done") {
+            Button(localizer.L("Done", "完成")) {
                 onSyncPluginsToDatabase(preferences.pluginManifests)
                 isPresented = false
             }
@@ -778,9 +892,11 @@ public struct ScholarShortcutEntry: Sendable, Hashable, Identifiable {
 /// Complete workstation keybinding legend presented via `⌘/`.
 public struct ScholarShortcutLegendSheetView: View {
     @Binding public var isPresented: Bool
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public static let canonicalShortcuts: [ScholarShortcutEntry] = [
         ScholarShortcutEntry(group: "Command & Studio Navigation", keys: "⌘K", command: "Open Fuzzy Command, §Section & @Citation Palette"),
+        ScholarShortcutEntry(group: "Command & Studio Navigation", keys: "⇧⌘L", command: "Toggle Interface Language (中文 / EN)"),
         ScholarShortcutEntry(group: "Command & Studio Navigation", keys: "⌘1 – ⌘6", command: "Switch Primary Studio (Manuscript, Provenance, Graph, PRISMA, Firewall, Editorial)"),
         ScholarShortcutEntry(group: "Command & Studio Navigation", keys: "⌘B", command: "Toggle Left Project & Numbered Outline Sidebar"),
         ScholarShortcutEntry(group: "Command & Studio Navigation", keys: "⌘J", command: "Toggle 4-Channel Resizable Bottom Drawer"),
@@ -792,14 +908,34 @@ public struct ScholarShortcutLegendSheetView: View {
         ScholarShortcutEntry(group: "Screening & Editorial Gate", keys: "⌘, / ⌘/", command: "Open Workstation Preferences / Show Shortcut Legend")
     ]
 
+    public static func localizedShortcuts(for lang: ScholarLanguage) -> [ScholarShortcutEntry] {
+        guard lang == .zhHans else { return canonicalShortcuts }
+        return [
+            ScholarShortcutEntry(group: "命令面板与工作台导航", keys: "⌘K", command: "打开子序列模糊命令、§章节与 @引文跳转面板"),
+            ScholarShortcutEntry(group: "命令面板与工作台导航", keys: "⇧⌘L", command: "实时切换工作站界面语言 (中文 / EN)"),
+            ScholarShortcutEntry(group: "命令面板与工作台导航", keys: "⌘1 – ⌘6", command: "切换六大核心学术工作台"),
+            ScholarShortcutEntry(group: "命令面板与工作台导航", keys: "⌘B", command: "显示 / 隐藏左侧项目文件与章节大纲导航栏"),
+            ScholarShortcutEntry(group: "命令面板与工作台导航", keys: "⌘J", command: "显示 / 隐藏底部四通道可调高度诊断抽屉"),
+            ScholarShortcutEntry(group: "手稿编辑、快照与撤销", keys: "⌘Z / ⇧⌘Z", command: "撤销 / 重做 SQLite WAL 持久化修改"),
+            ScholarShortcutEntry(group: "手稿编辑、快照与撤销", keys: "⌥⌘S", command: "创建命名手稿修订快照（用于 Myers 词级对比）"),
+            ScholarShortcutEntry(group: "手稿编辑、快照与撤销", keys: "⌥⌘1 / 2 / 3", command: "切换右侧分栏（PDF 预览、修订追踪、引文详情）"),
+            ScholarShortcutEntry(group: "文献筛查与审稿门禁", keys: "⇧⌘E", command: "运行 JavaScriptCore 顶会审稿与 APA 7th 统计核查插件"),
+            ScholarShortcutEntry(group: "文献筛查与审稿门禁", keys: "I / M / E", command: "PRISMA 2020 筛查：快捷键投出纳入 / 待定 / 排除票"),
+            ScholarShortcutEntry(group: "文献筛查与审稿门禁", keys: "⌘, / ⌘/", command: "打开工作站偏好设置 / 查看快捷键手册")
+        ]
+    }
+
     public init(isPresented: Binding<Bool>) {
         self._isPresented = isPresented
     }
 
     private var groupedEntries: [(group: String, items: [ScholarShortcutEntry])] {
-        let groups = ["Command & Studio Navigation", "Manuscript, Snapshots & Undo", "Screening & Editorial Gate"]
+        let entries = Self.localizedShortcuts(for: localizer.language)
+        let groups = localizer.language == .zhHans
+            ? ["命令面板与工作台导航", "手稿编辑、快照与撤销", "文献筛查与审稿门禁"]
+            : ["Command & Studio Navigation", "Manuscript, Snapshots & Undo", "Screening & Editorial Gate"]
         return groups.map { grp in
-            (grp, Self.canonicalShortcuts.filter { $0.group == grp })
+            (grp, entries.filter { $0.group == grp })
         }
     }
 
@@ -807,15 +943,19 @@ public struct ScholarShortcutLegendSheetView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("ScholarOS Keyboard Shortcut Reference")
+                    Text(localizer.L("ScholarOS Keyboard Shortcut Reference", "ScholarOS 全局快捷键参考手册"))
                         .font(CambridgeTypography.scholarlyTitle)
+                        .tracking(0)
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                    Text("Keyboard-first navigation across LaTeX/Typst editing, Citation Firewall, and PRISMA 2020 screening.")
+                    Text(localizer.L(
+                        "Keyboard-first navigation across LaTeX/Typst editing, Citation Firewall, and PRISMA 2020 screening.",
+                        "面向 LaTeX/Typst 写作、五级引文防火墙与 PRISMA 2020 双盲筛查的全键盘操作流。"
+                    ))
                         .font(CambridgeTypography.uiCaption)
                         .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                 }
                 Spacer()
-                Button("Close") {
+                Button(localizer.L("Close", "关闭")) {
                     isPresented = false
                 }
                 .buttonStyle(CambridgePrimaryButtonStyle())
@@ -830,8 +970,9 @@ public struct ScholarShortcutLegendSheetView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(groupedEntries, id: \.group) { section in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(section.group.uppercased())
+                            Text(localizer.language == .zhHans ? section.group : section.group.uppercased())
                                 .font(CambridgeTypography.uiSectionLabel)
+                                .tracking(0)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
 
                             ForEach(section.items) { item in
@@ -852,7 +993,7 @@ public struct ScholarShortcutLegendSheetView: View {
             }
             .background(CambridgeLinenPalette.cambridgeLinen)
         }
-        .frame(width: 620, height: 470)
+        .frame(width: 620, height: 490)
         .preferredColorScheme(.light)
     }
 }
@@ -866,6 +1007,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
     @ObservedObject public var docking: ScholarDockingController
     @ObservedObject public var preferences: ScholarWorkbenchPreferences
     @ObservedObject public var toastCenter: ScholarToastCenter
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public let projectTitle: String
     public let primaryManuscriptPath: String
@@ -1047,7 +1189,8 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
                     canUndo: canUndo,
                     topUndoTitle: topUndoTitle,
                     canRedo: canRedo,
-                    topRedoTitle: topRedoTitle
+                    topRedoTitle: topRedoTitle,
+                    language: localizer.language
                 )
                 ScholarCommandPaletteOverlayView(
                     isPresented: $docking.isCommandPalettePresented,

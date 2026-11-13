@@ -12,11 +12,18 @@ import ScholarWorkbenchShell
 public struct ScholarOSMain {
     @MainActor
     public static func main() {
-        let userArgs = Array(CommandLine.arguments.dropFirst()).filter { arg in
+        let rawUserArgs = Array(CommandLine.arguments.dropFirst()).filter { arg in
             !arg.hasPrefix("-psn_") && arg != "-NSDocumentRevisionsDebugMode" && arg != "YES" && arg != "NO"
         }
 
-        // Mode 1: Headless 2x Retina Screenshot & HTML Dossier Export (`--export-screenshots <dir>`)
+        let explicitCLILanguage = ScholarLocalizer.parseCLIArgument(rawUserArgs)
+            ?? ProcessInfo.processInfo.environment["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse)
+        if let explicitCLILanguage {
+            ScholarLocalizer.shared.setLanguage(explicitCLILanguage)
+        }
+        let userArgs = ScholarLocalizer.strippingLanguageArguments(rawUserArgs)
+
+        // Mode 1: Headless 2x Retina Screenshot & HTML Dossier Export (`--export-screenshots <dir> [--lang zh|en]`)
         if let exportIdx = userArgs.firstIndex(of: "--export-screenshots") {
             let outputDir: String
             if exportIdx + 1 < userArgs.count, !userArgs[exportIdx + 1].hasPrefix("--") {
@@ -30,7 +37,8 @@ public struct ScholarOSMain {
                 _ = NSApplication.shared
                 NSApp?.appearance = NSAppearance(named: .aqua)
                 let written = try ScholarScreenshotExportService.exportAllAssets(
-                    to: URL(fileURLWithPath: outputDir)
+                    to: URL(fileURLWithPath: outputDir),
+                    language: explicitCLILanguage ?? ScholarLocalizer.shared.language
                 )
                 for url in written {
                     print("Exported \(url.path)")
@@ -88,11 +96,17 @@ public struct ScholarOSMain {
 /// Native macOS SwiftUI Application scene hosting `ScholarRootWorkbenchView` in Cambridge Linen & Library Forest Green.
 public struct ScholarOSWorkbenchApp: App {
     @StateObject private var studioViewModel = ScholarStudioViewModel()
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init() {}
 
     public var body: some Scene {
-        WindowGroup("ScholarOS — Academic Research & LaTeX/Typst Workstation") {
+        WindowGroup(
+            localizer.L(
+                "ScholarOS — Academic Research & LaTeX/Typst Workstation",
+                "ScholarOS — 学术研究与 LaTeX/Typst 原生工作台"
+            )
+        ) {
             ScholarRootWorkbenchView(viewModel: studioViewModel)
                 .frame(minWidth: 1180, idealWidth: 1360, minHeight: 760, idealHeight: 840)
                 .background(CambridgeLinenPalette.cambridgeLinen)
@@ -101,22 +115,32 @@ public struct ScholarOSWorkbenchApp: App {
         .windowStyle(.titleBar)
         .commands {
             CommandGroup(replacing: .undoRedo) {
-                Button("Undo \(studioViewModel.undoRedo.topUndoActionTitle ?? "")") {
+                Button(
+                    localizer.L(
+                        "Undo \(studioViewModel.undoRedo.topUndoActionTitle ?? "")",
+                        "撤销 \(studioViewModel.undoRedo.topUndoActionTitle ?? "")"
+                    )
+                ) {
                     studioViewModel.performUndo()
                 }
                 .keyboardShortcut("z", modifiers: [.command])
                 .disabled(!studioViewModel.undoRedo.canUndo)
 
-                Button("Redo \(studioViewModel.undoRedo.topRedoActionTitle ?? "")") {
+                Button(
+                    localizer.L(
+                        "Redo \(studioViewModel.undoRedo.topRedoActionTitle ?? "")",
+                        "重做 \(studioViewModel.undoRedo.topRedoActionTitle ?? "")"
+                    )
+                ) {
                     studioViewModel.performRedo()
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!studioViewModel.undoRedo.canRedo)
             }
 
-            CommandMenu("Studios") {
+            CommandMenu(localizer.L("Studios", "学术工作台")) {
                 ForEach(Array(ScholarStudioTab.allCases.enumerated()), id: \.element.id) { idx, tab in
-                    Button(tab.rawValue) {
+                    Button(tab.localizedTitle(localizer.language)) {
                         studioViewModel.docking.activeStudioTab = tab
                     }
                     .keyboardShortcut(KeyEquivalent(Character("\(idx + 1)")), modifiers: [.command])
@@ -124,16 +148,23 @@ public struct ScholarOSWorkbenchApp: App {
 
                 Divider()
 
-                Button("Command, Section & Citation Palette…") {
+                Button(localizer.L("Command, Section & Citation Palette…", "全局命令、章节与引文面板…")) {
                     studioViewModel.docking.isCommandPalettePresented = true
                 }
                 .keyboardShortcut("k", modifiers: [.command])
 
-                Button("Run JavaScriptCore Editorial Plugins") {
+                Button(localizer.L("Run JavaScriptCore Editorial Plugins", "运行 JavaScriptCore 顶会审稿插件")) {
                     studioViewModel.runEditorialPluginSuite()
                     studioViewModel.docking.activeStudioTab = .editorialAudit
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("切换语言 / Toggle Language (\(localizer.language == .zhHans ? "中文 → EN" : "EN → 中文"))") {
+                    studioViewModel.handleCommandPaletteAction(.toggleLanguage)
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
             }
         }
 

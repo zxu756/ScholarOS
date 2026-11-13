@@ -160,6 +160,7 @@ public struct ScholarSyntaxNSTextViewRepresentable: NSViewRepresentable {
 /// and live CSL citation hover card.
 public struct ManuscriptLSPEditorStudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     @Environment(\.scholarSnapshotRendering) private var isSnapshotRendering
 
     public init(viewModel: ScholarStudioViewModel) {
@@ -241,8 +242,9 @@ public struct ManuscriptLSPEditorStudioView: View {
                 Image(systemName: "sparkles.rectangle.stack")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("\(activeFormat.rawValue) CST")
+                Text(localizer.L("\(activeFormat.rawValue) CST", "\(activeFormat.rawValue) 语法树"))
                     .font(CambridgeTypography.uiSectionLabel)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
             }
             .padding(.horizontal, 7)
@@ -253,10 +255,10 @@ public struct ManuscriptLSPEditorStudioView: View {
             )
             .fixedSize(horizontal: true, vertical: false)
 
-            metricChip(label: "Words", value: "\(words)")
-            metricChip(label: "Eqs", value: "\(eqs)")
-            metricChip(label: "Cites", value: "\(cites)")
-            metricChip(label: "Fog", value: String(format: "%.1f", fog))
+            metricChip(label: localizer.L("Words", "字数"), value: "\(words)")
+            metricChip(label: localizer.L("Eqs", "公式"), value: "\(eqs)")
+            metricChip(label: localizer.L("Cites", "引文"), value: "\(cites)")
+            metricChip(label: localizer.L("Fog", "可读性"), value: String(format: "%.1f", fog))
 
             Spacer(minLength: 4)
 
@@ -266,8 +268,9 @@ public struct ManuscriptLSPEditorStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "text.badge.checkmark")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("\\cite Popover")
+                    Text(localizer.L("\\cite Popover", "\\cite 补全窗"))
                         .font(CambridgeTypography.uiCaption)
+                        .tracking(0)
                 }
             }
             .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.isShowingCompletionPopover))
@@ -279,15 +282,18 @@ public struct ManuscriptLSPEditorStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.right.doc.on.clipboard")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("SyncTeX ⇢")
+                    Text(localizer.L("SyncTeX ⇢", "同步跳转 ⇢"))
                         .font(CambridgeTypography.uiCaption)
+                        .tracking(0)
                 }
             }
             .buttonStyle(CambridgeSecondaryButtonStyle())
             .fixedSize(horizontal: true, vertical: false)
 
             if !isSnapshotRendering {
-                Button(viewModel.useNativeAppKitEditor ? "Token View" : "Raw Edit") {
+                Button(viewModel.useNativeAppKitEditor
+                       ? localizer.L("Token View", "语法视图")
+                       : localizer.L("Raw Edit", "源码编辑")) {
                     viewModel.useNativeAppKitEditor.toggle()
                 }
                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.useNativeAppKitEditor))
@@ -415,7 +421,7 @@ public struct ManuscriptLSPEditorStudioView: View {
                             WavySquiggleLine(color: gutterDotColor(for: topDiag.severity))
                                 .frame(width: 68, height: 4)
 
-                            Text("[\(topDiag.code)] \(topDiag.message)")
+                            Text("[\(topDiag.code)] \(topDiag.localizedMessage(localizer.language))")
                                 .font(CambridgeTypography.uiCaption)
                                 .foregroundStyle(gutterDotColor(for: topDiag.severity))
                                 .fixedSize(horizontal: false, vertical: true)
@@ -514,11 +520,12 @@ public struct ManuscriptLSPEditorStudioView: View {
                 Image(systemName: "quote.closing")
                     .font(.system(size: 10.5, weight: .bold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("LSP \\cite{…} Completion — Firewall-Gated")
+                Text(localizer.L("LSP \\cite{…} Completion — Firewall-Gated", "LSP \\cite{…} 引文自动补全 · 防火墙强受控"))
                     .font(CambridgeTypography.uiControlSemibold)
+                    .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                 Spacer(minLength: 6)
-                ScholarKeycapBadge("↩ Insert")
+                ScholarKeycapBadge(localizer.L("↩ Insert", "↩ 插入"))
             }
 
             Divider()
@@ -583,8 +590,9 @@ public struct ManuscriptLSPEditorStudioView: View {
 
             VStack(alignment: .leading, spacing: 2.5) {
                 HStack(spacing: 6) {
-                    Text("LSP Hover")
+                    Text(localizer.L("LSP Hover", "LSP 悬停卡片"))
                         .font(CambridgeTypography.uiSectionLabel)
+                        .tracking(0)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                         .fixedSize(horizontal: true, vertical: false)
 
@@ -605,7 +613,6 @@ public struct ManuscriptLSPEditorStudioView: View {
                     Text(expanded)
                         .font(CambridgeTypography.uiCaption)
                         .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -646,6 +653,7 @@ private struct WavySquiggleLine: View {
 public struct TwoColumnAcademicPDFCanvasView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
     public let compactToolbar: Bool
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel, compactToolbar: Bool = false) {
         self.viewModel = viewModel
@@ -731,7 +739,7 @@ public struct TwoColumnAcademicPDFCanvasView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    Text("Generating Two-Column Academic PDF…")
+                    Text(localizer.L("Generating Two-Column Academic PDF…", "正在渲染双栏学术 PDF 预览"))
                         .font(CambridgeTypography.uiControl)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -753,10 +761,14 @@ public struct TwoColumnAcademicPDFCanvasView: View {
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
 
-            Text(compactToolbar ? "Two-Column PDF & SyncTeX" : "Academic Two-Column PDF & Bounding-Box Verifier")
-                .font(CambridgeTypography.uiControlSemibold)
-                .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                .fixedSize(horizontal: true, vertical: false)
+            Text(
+                compactToolbar
+                    ? localizer.L("Two-Column PDF & SyncTeX", "双栏 PDF 与 SyncTeX 联动")
+                    : localizer.L("Academic Two-Column PDF & Bounding-Box Verifier", "学术双栏 PDF 与证据边界框核验器")
+            )
+            .font(CambridgeTypography.uiControlSemibold)
+            .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 4)
 
@@ -773,7 +785,7 @@ public struct TwoColumnAcademicPDFCanvasView: View {
 
             HStack(spacing: 3) {
                 ForEach(0..<max(1, pages.count), id: \.self) { pIdx in
-                    Button("p.\(pIdx + 1)") {
+                    Button(localizer.L("p.\(pIdx + 1)", "第\(pIdx + 1)页")) {
                         viewModel.selectedPDFPageIndex = pIdx
                     }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.selectedPDFPageIndex == pIdx))
@@ -863,7 +875,7 @@ public struct TwoColumnAcademicPDFCanvasView: View {
             HStack(spacing: 3) {
                 Image(systemName: "scope")
                     .font(.system(size: 8.5, weight: .bold))
-                Text("SyncTeX Ln \(anchor.line)")
+                Text(localizer.L("SyncTeX Ln \(anchor.line)", "SyncTeX 第\(anchor.line)行"))
                     .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
             }
             .foregroundStyle(CambridgeLinenPalette.archivalPaper)
@@ -874,20 +886,33 @@ public struct TwoColumnAcademicPDFCanvasView: View {
                     .fill(CambridgeLinenPalette.libraryForestGreen)
             )
             .fixedSize(horizontal: true, vertical: false)
-            .position(x: min(pageWidth - 52, max(52, targetX)), y: max(12, targetY - 11))
+            .position(x: min(pageWidth - 56, max(56, targetX)), y: max(12, targetY - 11))
         }
     }
 
     private var pdfLegendFooter: some View {
         HStack(spacing: 8) {
-            legendDot(color: CambridgeLinenPalette.verifiedEmerald, label: compactToolbar ? "Grounded" : "Grounded Claim")
-            legendDot(color: CambridgeLinenPalette.blockedCrimson, label: compactToolbar ? "Mismatch" : "Numeric Mismatch")
-            legendDot(color: CambridgeLinenPalette.libraryForestGreen, label: compactToolbar ? "SyncTeX" : "SyncTeX Anchor")
+            legendDot(
+                color: CambridgeLinenPalette.verifiedEmerald,
+                label: compactToolbar ? localizer.L("Grounded", "证据吻合") : localizer.L("Grounded Claim", "证据吻合断言")
+            )
+            legendDot(
+                color: CambridgeLinenPalette.blockedCrimson,
+                label: compactToolbar ? localizer.L("Mismatch", "数值偏差") : localizer.L("Numeric Mismatch", "数值偏差拦截")
+            )
+            legendDot(
+                color: CambridgeLinenPalette.libraryForestGreen,
+                label: compactToolbar ? localizer.L("SyncTeX", "双向定位") : localizer.L("SyncTeX Anchor", "SyncTeX 锚点")
+            )
             Spacer(minLength: 4)
-            Text(compactToolbar ? "Click PDF → SyncTeX" : "Click PDF region for Inverse SyncTeX")
-                .font(CambridgeTypography.uiCaption)
-                .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
-                .fixedSize(horizontal: true, vertical: false)
+            Text(
+                compactToolbar
+                    ? localizer.L("Click PDF → SyncTeX", "点击 PDF → 反向定位源码")
+                    : localizer.L("Click PDF region for Inverse SyncTeX", "点击 PDF 区域反向定位源码行")
+            )
+            .font(CambridgeTypography.uiCaption)
+            .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5.5)
@@ -917,13 +942,17 @@ public struct TwoColumnAcademicPDFCanvasView: View {
     private func shortVerdictTag(_ claim: ClaimEvidenceProvenance) -> String {
         switch claim.verdict {
         case .groundedEntailment:
-            return String(format: "GROUNDED %.1f", claim.bm25Score)
+            return localizer.language == .zhHans
+                ? String(format: "证据吻合 %.1f", claim.bm25Score)
+                : String(format: "GROUNDED %.1f", claim.bm25Score)
         case .partialEvidence:
-            return String(format: "PARTIAL %.1f", claim.bm25Score)
+            return localizer.language == .zhHans
+                ? String(format: "部分支持 %.1f", claim.bm25Score)
+                : String(format: "PARTIAL %.1f", claim.bm25Score)
         case .numericDiscrepancy:
-            return "MISMATCH 99.4%≠94.2%"
+            return localizer.L("MISMATCH 99.4%≠94.2%", "数值偏差 99.4%≠94.2%")
         case .unsupportedClaim:
-            return "UNSUPPORTED"
+            return localizer.L("UNSUPPORTED", "缺乏证据")
         }
     }
 }
@@ -934,6 +963,7 @@ public struct TwoColumnAcademicPDFCanvasView: View {
 /// FTS5 BM25 Claim-to-Passage Provenance & Numeric Entailment auditing and segmented column chunks.
 public struct PDFAndClaimProvenanceStudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init(viewModel: ScholarStudioViewModel) {
         self.viewModel = viewModel
@@ -949,7 +979,7 @@ public struct PDFAndClaimProvenanceStudioView: View {
                     .overlay(CambridgeLinenPalette.stoneHairline)
 
                 segmentedColumnPassagesStrip
-                    .frame(height: 146)
+                    .frame(height: 158)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -970,11 +1000,16 @@ public struct PDFAndClaimProvenanceStudioView: View {
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("XY-CUT TWO-COLUMN READING SEQUENCE (\(displayChunks.count) PASSAGES)")
-                    .font(CambridgeTypography.uiSectionLabel)
-                    .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                Text(
+                    localizer.L(
+                        "XY-CUT TWO-COLUMN READING SEQUENCE (\(displayChunks.count) PASSAGES)",
+                        "XY-Cut 双栏阅读序列（共 \(displayChunks.count) 段）"
+                    )
+                )
+                .font(CambridgeTypography.uiSectionLabel)
+                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text("FTS5 + Porter Stemmer Indexed")
+                Text(localizer.L("FTS5 + Porter Stemmer Indexed", "FTS5 全文检索索引已就绪"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     .fixedSize(horizontal: true, vertical: false)
@@ -987,12 +1022,17 @@ public struct PDFAndClaimProvenanceStudioView: View {
                     ForEach(displayChunks) { chunk in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
-                                Text("Seq #\(chunk.readingSequence + 1) • Col \(chunk.columnIndex + 1)")
-                                    .font(CambridgeTypography.monoSmall)
-                                    .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                                    .fixedSize(horizontal: true, vertical: false)
+                                Text(
+                                    localizer.L(
+                                        "Seq #\(chunk.readingSequence + 1) • Col \(chunk.columnIndex + 1)",
+                                        "段落 #\(chunk.readingSequence + 1) • 第\(chunk.columnIndex + 1)栏"
+                                    )
+                                )
+                                .font(CambridgeTypography.monoSmall)
+                                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                                .fixedSize(horizontal: true, vertical: false)
                                 Spacer()
-                                Text("p.\(chunk.boundingBox.pageIndex + 1)")
+                                Text(localizer.L("p.\(chunk.boundingBox.pageIndex + 1)", "第\(chunk.boundingBox.pageIndex + 1)页"))
                                     .font(CambridgeTypography.monoSmall)
                                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                     .fixedSize(horizontal: true, vertical: false)
@@ -1005,11 +1045,10 @@ public struct PDFAndClaimProvenanceStudioView: View {
                             Text(chunk.passageText)
                                 .font(CambridgeTypography.uiCaption)
                                 .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                                .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(8)
-                        .frame(width: 248, alignment: .leading)
+                        .frame(width: 268, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
                                 .fill(CambridgeLinenPalette.archivalPaper)
@@ -1038,29 +1077,29 @@ public struct PDFAndClaimProvenanceStudioView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Claim-to-PDF Provenance Matrix")
+                        Text(localizer.L("Claim-to-PDF Provenance Matrix", "手稿断言至 PDF 证据溯源矩阵"))
                             .font(CambridgeTypography.scholarlyHeadline)
                             .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
-                        Text("BM25 lexical grounding & numeric entailment verifier")
+                        Text(localizer.L("BM25 lexical grounding & numeric entailment verifier", "BM25 词法证据对齐与数值一致性核验器"))
                             .font(CambridgeTypography.uiCaption)
                             .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                     }
                     Spacer()
-                    Text("\(groundedCount) OK • \(mismatchCount) Flagged")
+                    Text(localizer.L("\(groundedCount) OK • \(mismatchCount) Flagged", "\(groundedCount) 吻合 • \(mismatchCount) 异常"))
                         .font(CambridgeTypography.monoSmall)
                         .foregroundStyle(mismatchCount > 0 ? CambridgeLinenPalette.blockedCrimson : CambridgeLinenPalette.verifiedEmerald)
                         .fixedSize(horizontal: true, vertical: false)
                 }
 
                 HStack(spacing: 5) {
-                    Button("All (\(viewModel.claimProvenanceLinks.count))") {
+                    Button(localizer.L("All (\(viewModel.claimProvenanceLinks.count))", "全部 (\(viewModel.claimProvenanceLinks.count))")) {
                         viewModel.provenanceVerdictFilter = nil
                     }
                     .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.provenanceVerdictFilter == nil))
                     .fixedSize(horizontal: true, vertical: false)
 
                     ForEach(EvidenceSupportVerdict.allCases, id: \.self) { verdict in
-                        Button(verdict.rawValue) {
+                        Button(verdict.localizedLabel(localizer.language)) {
                             viewModel.provenanceVerdictFilter = verdict
                         }
                         .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: viewModel.provenanceVerdictFilter == verdict))
@@ -1094,7 +1133,7 @@ public struct PDFAndClaimProvenanceStudioView: View {
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Text(link.verdict.rawValue)
+                    Text(link.verdict.localizedLabel(localizer.language))
                         .font(CambridgeTypography.monoSmall)
                         .foregroundStyle(accent)
                         .padding(.horizontal, 6)
@@ -1124,7 +1163,7 @@ public struct PDFAndClaimProvenanceStudioView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("MANUSCRIPT CLAIM")
+                    Text(localizer.L("MANUSCRIPT CLAIM", "手稿正文断言"))
                         .font(CambridgeTypography.uiSectionLabel)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     Text(link.manuscriptClaim)
@@ -1134,7 +1173,7 @@ public struct PDFAndClaimProvenanceStudioView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("SOURCE PDF PASSAGE (p.\(link.boundingBox.pageIndex + 1))")
+                    Text(localizer.L("SOURCE PDF PASSAGE (p.\(link.boundingBox.pageIndex + 1))", "原文献 PDF 段落（第\(link.boundingBox.pageIndex + 1)页）"))
                         .font(CambridgeTypography.uiSectionLabel)
                         .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     Text(link.pdfExcerpt)

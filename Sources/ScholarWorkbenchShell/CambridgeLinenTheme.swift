@@ -249,12 +249,60 @@ public enum CambridgeTypography {
     public static let monoKeycap = Font.system(size: 10.5, weight: .semibold, design: .monospaced).monospacedDigit()
 }
 
-// MARK: - Reusable Archival Components (`FirewallBadgeView`, `EditorialSeverityPill`, `ScholarMetricCard`)
+// MARK: - Reusable Archival Components (`ScholarLanguageTogglePill`, `FirewallBadgeView`, `EditorialSeverityPill`, `ScholarMetricCard`)
+
+/// Crisp Cambridge-Linen (`#F8F6F0`) & Library-Forest-Green (`#1D4D3E`) `中文 | EN` segmented language toggle pill.
+public struct ScholarLanguageTogglePill: View {
+    @ObservedObject public var localizer: ScholarLocalizer
+
+    public init(localizer: ScholarLocalizer = .shared) {
+        self.localizer = localizer
+    }
+
+    public var body: some View {
+        HStack(spacing: 2) {
+            segmentButton(for: .zhHans)
+            segmentButton(for: .en)
+        }
+        .padding(2)
+        .background(
+            RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
+                .fill(CambridgeLinenPalette.cambridgeLinen)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
+                .strokeBorder(CambridgeLinenPalette.stoneHairline, lineWidth: CambridgeMetrics.hairline)
+        )
+        .fixedSize(horizontal: true, vertical: false)
+        .help(localizer.L("Toggle Language: 中文 / EN (⇧⌘L)", "切换界面语言：中文 / EN (⇧⌘L)"))
+    }
+
+    private func segmentButton(for target: ScholarLanguage) -> some View {
+        let isActive = (localizer.language == target)
+        return Button {
+            localizer.setLanguage(target)
+        } label: {
+            Text(target.badge)
+                .font(.system(size: 11.5, weight: isActive ? .semibold : .medium, design: .default))
+                .tracking(0)
+                .foregroundStyle(isActive ? CambridgeLinenPalette.archivalPaper : CambridgeLinenPalette.slateEditorial)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3.5)
+                .background(
+                    RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                        .fill(isActive ? CambridgeLinenPalette.libraryForestGreen : Color.clear)
+                )
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .buttonStyle(.plain)
+    }
+}
 
 /// Crisp 5-class Citation Verification Firewall badge with semantic emerald/ochre/amber/crimson colors.
 public struct FirewallBadgeView: View {
     public let firewallClass: CitationFirewallClass
     public let compact: Bool
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public init(firewallClass: CitationFirewallClass, compact: Bool = false) {
         self.firewallClass = firewallClass
@@ -263,11 +311,18 @@ public struct FirewallBadgeView: View {
 
     private var shortTitle: String {
         switch firewallClass {
-        case .verifiedCanonicalDOI: return "Verified DOI"
-        case .verifiedPreprintRegistry: return "Verified Preprint"
-        case .metadataDriftAdvisory: return "Metadata Drift"
-        case .unverifiedPendingCheck: return "Unverified"
-        case .blockedHallucinatedOrRetracted: return compact ? "Blocked" : "Blocked (Fake/Retracted)"
+        case .verifiedCanonicalDOI:
+            return localizer.L("Verified DOI", "已验证 DOI")
+        case .verifiedPreprintRegistry:
+            return localizer.L("Verified Preprint", "已验证预印本")
+        case .metadataDriftAdvisory:
+            return localizer.L("Metadata Drift", "元数据漂移")
+        case .unverifiedPendingCheck:
+            return localizer.L("Unverified", "待核验")
+        case .blockedHallucinatedOrRetracted:
+            return compact
+                ? localizer.L("Blocked", "已拦截")
+                : localizer.L("Blocked (Fake/Retracted)", "已拦截 (伪造/撤稿)")
         }
     }
 
@@ -278,6 +333,7 @@ public struct FirewallBadgeView: View {
                 .font(.system(size: compact ? 10 : 11, weight: .semibold))
             Text(shortTitle)
                 .font(compact ? CambridgeTypography.uiSectionLabel : CambridgeTypography.uiControlMedium)
+                .tracking(0)
         }
         .foregroundStyle(token.foreground)
         .padding(.horizontal, compact ? 6 : 8)
@@ -298,6 +354,7 @@ public struct FirewallBadgeView: View {
 public struct EditorialSeverityPill: View {
     public let severity: EditorialSeverity
     public let compact: Bool
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public init(severity: EditorialSeverity, compact: Bool = false) {
         self.severity = severity
@@ -306,10 +363,20 @@ public struct EditorialSeverityPill: View {
 
     public var displayLabel: String {
         switch severity {
-        case .note: return "Note"
-        case .styleSuggestion: return compact ? "Style" : "Style Suggestion"
-        case .rigorWarning: return compact ? "Rigor Warn" : "Rigor Warning"
-        case .submissionBlocker: return compact ? "Blocker" : "Submission Blocker"
+        case .note:
+            return localizer.L("Note", "提示")
+        case .styleSuggestion:
+            return compact
+                ? localizer.L("Style", "文风")
+                : localizer.L("Style Suggestion", "文风建议")
+        case .rigorWarning:
+            return compact
+                ? localizer.L("Rigor Warn", "严谨警告")
+                : localizer.L("Rigor Warning", "严谨性警告")
+        case .submissionBlocker:
+            return compact
+                ? localizer.L("Blocker", "投稿阻断")
+                : localizer.L("Submission Blocker", "投稿阻断")
         }
     }
 
@@ -320,6 +387,7 @@ public struct EditorialSeverityPill: View {
                 .font(.system(size: compact ? 10 : 11, weight: .semibold))
             Text(displayLabel)
                 .font(CambridgeTypography.uiSectionLabel)
+                .tracking(0)
         }
         .foregroundStyle(token.foreground)
         .padding(.horizontal, compact ? 6 : 8)
@@ -339,6 +407,7 @@ public struct EditorialSeverityPill: View {
 /// Crisp status badge for `LSPDiagnosticSeverity`.
 public struct LSPDiagnosticSeverityBadge: View {
     public let severity: LSPDiagnosticSeverity
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public init(severity: LSPDiagnosticSeverity) {
         self.severity = severity
@@ -349,8 +418,9 @@ public struct LSPDiagnosticSeverityBadge: View {
         HStack(spacing: 4) {
             Image(systemName: token.sfSymbol)
                 .font(.system(size: 10, weight: .semibold))
-            Text(severity.rawValue)
-                .font(CambridgeTypography.monoKeycap)
+            Text(severity.localizedLabel(localizer.language))
+                .font(localizer.language == .zhHans ? CambridgeTypography.uiSectionLabel : CambridgeTypography.monoKeycap)
+                .tracking(0)
         }
         .foregroundStyle(token.foreground)
         .padding(.horizontal, 6)

@@ -11,6 +11,7 @@ import ScholarWorkbenchShell
 /// chronological year ruler), Kleinberg temporal burst sparkbars, and a Missing Foundational Papers recommender inspector.
 public struct CitationKnowledgeGraphStudioView: View {
     @ObservedObject public var viewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer = ScholarLocalizer.shared
     @State private var dragStartOffset: CGSize?
 
     public init(viewModel: ScholarStudioViewModel) {
@@ -87,16 +88,21 @@ public struct CitationKnowledgeGraphStudioView: View {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                Text("Barnes-Hut O(N log N) Citation Cartography")
+                Text(localizer.L("Barnes-Hut O(N log N) Citation Cartography", "Barnes-Hut O(N log N) 引文知识图谱"))
                     .font(CambridgeTypography.scholarlyHeadline)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                     .fixedSize(horizontal: true, vertical: false)
             }
 
-            graphTelemetryPill(label: "Nodes", value: "\(nodeCount)")
-            graphTelemetryPill(label: "Edges", value: "\(edgeCount)")
-            graphTelemetryPill(label: "Louvain Q", value: String(format: "%.3f (%d clusters)", modularityQ, clusterCount))
-            graphTelemetryPill(label: "Brandes Bridges", value: "\(bridgeCount)")
+            graphTelemetryPill(label: localizer.L("Nodes", "节点"), value: "\(nodeCount)")
+            graphTelemetryPill(label: localizer.L("Edges", "引证边"), value: "\(edgeCount)")
+            graphTelemetryPill(
+                label: localizer.L("Louvain Q", "模块度 Q"),
+                value: localizer.language == .zhHans
+                    ? String(format: "%.3f (%d 簇)", modularityQ, clusterCount)
+                    : String(format: "%.3f (%d clusters)", modularityQ, clusterCount)
+            )
+            graphTelemetryPill(label: localizer.L("Brandes Bridges", "结构洞桥接"), value: "\(bridgeCount)")
 
             Spacer(minLength: 6)
 
@@ -106,7 +112,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.swap")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("SPC Main Path")
+                    Text(localizer.L("SPC Main Path", "SPC 主路径"))
                         .font(CambridgeTypography.uiCaption)
                 }
             }
@@ -119,7 +125,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "link")
                         .font(.system(size: 10.5, weight: .semibold))
-                    Text("Co-Citation")
+                    Text(localizer.L("Co-Citation", "共被引网络"))
                         .font(CambridgeTypography.uiCaption)
                 }
             }
@@ -275,10 +281,26 @@ public struct CitationKnowledgeGraphStudioView: View {
 
     private var graphLegendOverlay: some View {
         HStack(spacing: 10) {
-            legendItem(ringColor: CambridgeLinenPalette.libraryForestGreen, fill: CambridgeLinenPalette.libraryForestGreen, label: "SPC Main Path")
-            legendItem(ringColor: CambridgeLinenPalette.preprintOchre, fill: CambridgeLinenPalette.archivalPaper, label: "Brandes Bridge (Double Halo)")
-            legendItem(ringColor: CambridgeLinenPalette.verifiedEmerald, fill: CambridgeLinenPalette.verifiedEmeraldBg, label: "Verified DOI")
-            legendItem(ringColor: CambridgeLinenPalette.blockedCrimson, fill: CambridgeLinenPalette.blockedCrimsonBg, label: "Quarantined Hallucination")
+            legendItem(
+                ringColor: CambridgeLinenPalette.libraryForestGreen,
+                fill: CambridgeLinenPalette.libraryForestGreen,
+                label: localizer.L("SPC Main Path", "SPC 演进主路径")
+            )
+            legendItem(
+                ringColor: CambridgeLinenPalette.preprintOchre,
+                fill: CambridgeLinenPalette.archivalPaper,
+                label: localizer.L("Brandes Bridge (Double Halo)", "Brandes 结构洞桥接（双环）")
+            )
+            legendItem(
+                ringColor: CambridgeLinenPalette.verifiedEmerald,
+                fill: CambridgeLinenPalette.verifiedEmeraldBg,
+                label: localizer.L("Verified DOI", "已验证 DOI")
+            )
+            legendItem(
+                ringColor: CambridgeLinenPalette.blockedCrimson,
+                fill: CambridgeLinenPalette.blockedCrimsonBg,
+                label: localizer.L("Quarantined Hallucination", "已隔离伪造引文")
+            )
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
@@ -563,7 +585,7 @@ public struct CitationKnowledgeGraphStudioView: View {
     private func shortNodeBadgeLabel(for node: CitationGraphNode, entry: BibliographyEntry?) -> String {
         let family = entry?.firstAuthorFamily ?? node.citeKey
         let cleanFamily = family.count > 13 ? String(family.prefix(12)) : family
-        let dupSuffix = node.citeKey.contains("_dup") ? " (dup)" : ""
+        let dupSuffix = node.citeKey.contains("_dup") ? localizer.L(" (dup)", " (重复)") : ""
         if node.year > 0 {
             return "\(cleanFamily) \(node.year)\(dupSuffix)"
         }
@@ -579,11 +601,16 @@ public struct CitationKnowledgeGraphStudioView: View {
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("KLEINBERG INFINITE-AUTOMATON TEMPORAL CITATION & TOPICAL BURSTS")
-                    .font(CambridgeTypography.uiSectionLabel)
-                    .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                Text(
+                    localizer.L(
+                        "KLEINBERG INFINITE-AUTOMATON TEMPORAL CITATION & TOPICAL BURSTS",
+                        "KLEINBERG 无限状态机引文与主题突现检测"
+                    )
+                )
+                .font(CambridgeTypography.uiSectionLabel)
+                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                 Spacer()
-                Text("Viterbi State Solver (s = 2.0, γ = 1.0)")
+                Text(localizer.L("Viterbi State Solver (s = 2.0, γ = 1.0)", "Viterbi 状态求解器 (s = 2.0, γ = 1.0)"))
                     .font(CambridgeTypography.monoSmall)
                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                     .fixedSize(horizontal: true, vertical: false)
@@ -593,9 +620,24 @@ public struct CitationKnowledgeGraphStudioView: View {
 
             if episodes.isEmpty {
                 HStack(spacing: 12) {
-                    fallbackBurstCard(label: "Transformer & Retrieval Grounding", window: "2017–2024", strength: 4.82, fold: 3.4)
-                    fallbackBurstCard(label: "PRISMA 2020 & Psychometric QC", window: "2019–2025", strength: 3.94, fold: 2.9)
-                    fallbackBurstCard(label: "Citation Verification Firewalls", window: "2023–2025", strength: 5.26, fold: 4.1)
+                    fallbackBurstCard(
+                        label: localizer.L("Transformer & Retrieval Grounding", "Transformer 与检索证据对齐"),
+                        window: "2017–2024",
+                        strength: 4.82,
+                        fold: 3.4
+                    )
+                    fallbackBurstCard(
+                        label: localizer.L("PRISMA 2020 & Psychometric QC", "PRISMA 2020 与信度质控"),
+                        window: "2019–2025",
+                        strength: 3.94,
+                        fold: 2.9
+                    )
+                    fallbackBurstCard(
+                        label: localizer.L("Citation Verification Firewalls", "引文真实性核验防火墙"),
+                        window: "2023–2025",
+                        strength: 5.26,
+                        fold: 4.1
+                    )
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
@@ -631,14 +673,18 @@ public struct CitationKnowledgeGraphStudioView: View {
                             .frame(height: 7)
 
                             HStack {
-                                Text("State q\(ep.peakStateLevel)")
+                                Text(localizer.L("State q\(ep.peakStateLevel)", "状态阶 q\(ep.peakStateLevel)"))
                                     .font(CambridgeTypography.monoSmall)
                                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                 Spacer()
-                                Text(String(format: "Weight %.2f (%.1f×)", ep.burstStrengthWeight, ep.foldElevationRatio))
-                                    .font(CambridgeTypography.monoSmall)
-                                    .foregroundStyle(CambridgeLinenPalette.slateEditorial)
-                                    .fixedSize(horizontal: true, vertical: false)
+                                Text(
+                                    localizer.language == .zhHans
+                                        ? String(format: "权重 %.2f (%.1f×)", ep.burstStrengthWeight, ep.foldElevationRatio)
+                                        : String(format: "Weight %.2f (%.1f×)", ep.burstStrengthWeight, ep.foldElevationRatio)
+                                )
+                                .font(CambridgeTypography.monoSmall)
+                                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                                .fixedSize(horizontal: true, vertical: false)
                             }
                         }
                         .padding(8)
@@ -675,9 +721,13 @@ public struct CitationKnowledgeGraphStudioView: View {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(CambridgeLinenPalette.libraryForestGreen)
                 .frame(height: 6)
-            Text(String(format: "Burst Weight %.2f • %.1f× baseline", strength, fold))
-                .font(CambridgeTypography.monoSmall)
-                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+            Text(
+                localizer.language == .zhHans
+                    ? String(format: "突现权重 %.2f • %.1f× 基线", strength, fold)
+                    : String(format: "Burst Weight %.2f • %.1f× baseline", strength, fold)
+            )
+            .font(CambridgeTypography.monoSmall)
+            .foregroundStyle(CambridgeLinenPalette.slateEditorial)
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -704,7 +754,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                 if let node = selectedNode {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("SELECTED GRAPH NODE")
+                            Text(localizer.L("SELECTED GRAPH NODE", "当前选中图谱节点"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                             Spacer()
@@ -725,9 +775,9 @@ public struct CitationKnowledgeGraphStudioView: View {
 
                         HStack(spacing: 6) {
                             smallKpiBox(title: "PageRank", value: String(format: "%.3f", node.pageRank))
-                            smallKpiBox(title: "Betweenness", value: String(format: "%.3f", node.betweennessScore))
-                            smallKpiBox(title: "In / Out", value: "\(node.inDegree) / \(node.outDegree)")
-                            smallKpiBox(title: "Cluster", value: "C\(node.clusterIndex + 1)")
+                            smallKpiBox(title: localizer.L("Betweenness", "介数中心度"), value: String(format: "%.3f", node.betweennessScore))
+                            smallKpiBox(title: localizer.L("In / Out", "入度 / 出度"), value: "\(node.inDegree) / \(node.outDegree)")
+                            smallKpiBox(title: localizer.L("Cluster", "社团簇"), value: "C\(node.clusterIndex + 1)")
                         }
 
                         HStack(spacing: 8) {
@@ -737,7 +787,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "plus.bubble")
                                         .font(.system(size: 10.5, weight: .semibold))
-                                    Text("Insert \\cite{\(node.citeKey)}")
+                                    Text(localizer.L("Insert \\cite{\(node.citeKey)}", "插入引用 \\cite{\(node.citeKey)}"))
                                 }
                             }
                             .buttonStyle(CambridgePrimaryButtonStyle())
@@ -753,11 +803,11 @@ public struct CitationKnowledgeGraphStudioView: View {
                 if !mainPathOrderedKeys.isEmpty {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack {
-                            Text("HUMMON-DOREIAN SPC MAIN PATH")
+                            Text(localizer.L("HUMMON-DOREIAN SPC MAIN PATH", "HUMMON-DOREIAN SPC 演进主路径"))
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                             Spacer()
-                            Text("\(mainPathOrderedKeys.count) milestones")
+                            Text(localizer.L("\(mainPathOrderedKeys.count) milestones", "\(mainPathOrderedKeys.count) 篇里程碑"))
                                 .font(CambridgeTypography.monoSmall)
                                 .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                 .fixedSize(horizontal: true, vertical: false)
@@ -776,7 +826,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                                         .fixedSize(horizontal: true, vertical: false)
                                     Spacer()
                                     if idx < mainPathOrderedKeys.count - 1 {
-                                        Text("→ diffuses")
+                                        Text(localizer.L("→ diffuses", "→ 演进传递"))
                                             .font(CambridgeTypography.uiCaption)
                                             .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                             .fixedSize(horizontal: true, vertical: false)
@@ -791,15 +841,19 @@ public struct CitationKnowledgeGraphStudioView: View {
                 // Card C: Missing Foundational Citations (Bibliographic Coupling & Co-Citation)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("MISSING FOUNDATIONAL PAPERS")
+                        Text(localizer.L("MISSING FOUNDATIONAL PAPERS", "建议补引的奠基文献"))
                             .font(CambridgeTypography.uiSectionLabel)
                             .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                         Spacer()
                         if let cov = viewModel.missingCitationsReport?.manuscriptCoverageRatio {
-                            Text(String(format: "Coverage %.0f%%", cov * 100.0))
-                                .font(CambridgeTypography.monoSmall)
-                                .foregroundStyle(CambridgeLinenPalette.preprintOchre)
-                                .fixedSize(horizontal: true, vertical: false)
+                            Text(
+                                localizer.language == .zhHans
+                                    ? String(format: "覆盖率 %.0f%%", cov * 100.0)
+                                    : String(format: "Coverage %.0f%%", cov * 100.0)
+                            )
+                            .font(CambridgeTypography.monoSmall)
+                            .foregroundStyle(CambridgeLinenPalette.preprintOchre)
+                            .fixedSize(horizontal: true, vertical: false)
                         }
                     }
 
@@ -810,10 +864,14 @@ public struct CitationKnowledgeGraphStudioView: View {
                                     .font(CambridgeTypography.uiControlSemibold)
                                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                                 Spacer(minLength: 4)
-                                Text(String(format: "Score %.2f", rec.priorityRecommendationScore))
-                                    .font(CambridgeTypography.monoSmall)
-                                    .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
-                                    .fixedSize(horizontal: true, vertical: false)
+                                Text(
+                                    localizer.language == .zhHans
+                                        ? String(format: "推荐分 %.2f", rec.priorityRecommendationScore)
+                                        : String(format: "Score %.2f", rec.priorityRecommendationScore)
+                                )
+                                .font(CambridgeTypography.monoSmall)
+                                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+                                .fixedSize(horizontal: true, vertical: false)
                             }
 
                             Text(rec.title)
@@ -822,19 +880,19 @@ public struct CitationKnowledgeGraphStudioView: View {
                                 .fixedSize(horizontal: false, vertical: true)
 
                             HStack(spacing: 6) {
-                                Text("Co-cited: \(rec.coCitedByManuscriptRefsCount)")
+                                Text(localizer.L("Co-cited: \(rec.coCitedByManuscriptRefsCount)", "共被引: \(rec.coCitedByManuscriptRefsCount) 次"))
                                     .font(CambridgeTypography.monoSmall)
                                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                     .fixedSize(horizontal: true, vertical: false)
 
-                                Text("• §\(rec.suggestedSection.rawValue)")
+                                Text("• §\(localizedSuggestedSection(rec.suggestedSection.rawValue))")
                                     .font(CambridgeTypography.uiCaption)
                                     .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
                                     .fixedSize(horizontal: true, vertical: false)
 
                                 Spacer(minLength: 4)
 
-                                Button("+ Cite") {
+                                Button(localizer.L("+ Cite", "+ 补引")) {
                                     _ = viewModel.attemptInsertCitation(rec.citeKey)
                                 }
                                 .buttonStyle(CambridgeSecondaryButtonStyle(isSelected: true))
@@ -855,6 +913,18 @@ public struct CitationKnowledgeGraphStudioView: View {
                 .cambridgeArchivalCard(padding: 11)
             }
             .padding(12)
+        }
+    }
+
+    private func localizedSuggestedSection(_ raw: String) -> String {
+        guard localizer.language == .zhHans else { return raw }
+        switch raw {
+        case "Introduction": return "引言"
+        case "Related Work": return "相关工作"
+        case "Methodology", "Methods": return "研究方法"
+        case "Experiments", "Evaluation": return "实验评估"
+        case "Discussion": return "讨论与局限"
+        default: return raw
         }
     }
 

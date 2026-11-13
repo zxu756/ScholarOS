@@ -32,6 +32,15 @@ public enum ScholarRightInspectorMode: String, Sendable, Codable, Hashable, Case
         case .citationInspector: return "Cite Split"
         }
     }
+
+    public func localizedShortLabel(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .none: return lang.L("Single Pane", "单栏编辑")
+        case .pdfPreview: return lang.L("PDF Split", "PDF分栏")
+        case .trackChanges: return lang.L("Diff Split", "修订对比")
+        case .citationInspector: return lang.L("Cite Split", "引文详情")
+        }
+    }
 }
 
 /// Active diagnostic or telemetry channel inside the resizable bottom workbench drawer.
@@ -60,6 +69,28 @@ public enum ScholarBottomDrawerChannel: String, Sendable, Codable, Hashable, Cas
         case .syncTeXLog: return "Bidirectional Source-to-PDF Anchors & Sandbox Console Ring"
         }
     }
+
+    public func localizedTitle(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .diagnostics: return lang.L("Diagnostics", "LSP 诊断")
+        case .citationFirewall: return lang.L("Citation Firewall", "引文防火墙")
+        case .editorialAudit: return lang.L("Editorial Audit", "审稿插件审计")
+        case .syncTeXLog: return lang.L("Build & SyncTeX", "构建与 SyncTeX")
+        }
+    }
+
+    public func localizedSubtitle(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .diagnostics:
+            return lang.L("Incremental LaTeX / Typst CST & Macro LSP Diagnostics", "增量式 LaTeX / Typst 语法树与防环宏展开诊断")
+        case .citationFirewall:
+            return lang.L("5-Class Crossref / arXiv / PubMed Verification Ledger", "五级 Crossref / arXiv / PubMed 引文核验台账")
+        case .editorialAudit:
+            return lang.L("Isolated JavaScriptCore Rhetoric, Prose & APA 7th Findings", "隔离沙盒 JavaScriptCore 修辞、文风与 APA 7th 统计核查")
+        case .syncTeXLog:
+            return lang.L("Bidirectional Source-to-PDF Anchors & Sandbox Console Ring", "双向源码至 PDF 坐标锚点与沙盒环形日志")
+        }
+    }
 }
 
 /// Synchronized `(filePath, line, column)` cursor anchor shared across the editor, outline tree, SyncTeX pane, and drawers.
@@ -80,6 +111,10 @@ public struct ScholarCursorLocation: Sendable, Codable, Hashable {
 
     public var lineColumnLabel: String {
         "Ln \(line), Col \(column)"
+    }
+
+    public func localizedLineColumnLabel(_ lang: ScholarLanguage) -> String {
+        lang.L("Ln \(line), Col \(column)", "第 \(line) 行, 第 \(column) 列")
     }
 }
 
