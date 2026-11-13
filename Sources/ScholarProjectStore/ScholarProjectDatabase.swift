@@ -1086,7 +1086,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         }
     }
 
-    /// Hardware-gated Citation Firewall verification: blocks unverified or hallucinated citeKeys.
+    /// Citation Firewall check: blocks unverified, retracted, or not-found citeKeys.
     @discardableResult
     public func validateCitationKeyForInsertion(_ citeKey: String) throws -> BibliographyEntry {
         try withLock {
@@ -1158,7 +1158,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         let kindRaw = try row.string("kind")
         let kind = BibEntryKind(rawValue: kindRaw) ?? .article
         let firewallRaw = try row.string("firewall_class")
-        let firewall = CitationFirewallClass(rawValue: firewallRaw) ?? .unverifiedPendingCheck
+        let firewall = CitationFirewallClass(rawValue: firewallRaw) ?? .unverified
         let authors = try row.jsonDecode([BibAuthor].self, column: "authors_json")
         let citedBy = try row.jsonDecode([String].self, column: "cited_by_json")
         let refs = try row.jsonDecode([String].self, column: "references_json")
@@ -1507,7 +1507,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         } else {
             kappa = (po - pe) / (1.0 - pe)
         }
-        let pabak = 2.0 * po - 1.0
+        let k = max(2, categories.count)
+        let pabak = (Double(k) * po - 1.0) / Double(k - 1)
         return (observedAgreement: po, cohensKappa: kappa, pabak: pabak)
     }
 
@@ -2340,13 +2341,13 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
             let verifiedCount = try connection.scalarInt(
                 """
                 SELECT COUNT(*) FROM bibliography_entries
-                WHERE firewall_class IN ('VERIFIED_DOI', 'VERIFIED_ARXIV_PMID');
+                WHERE firewall_class = 'VERIFIED';
                 """
             )
             let blockedCount = try connection.scalarInt(
                 """
                 SELECT COUNT(*) FROM bibliography_entries
-                WHERE firewall_class = 'BLOCKED_HALLUCINATED';
+                WHERE firewall_class IN ('NOT_FOUND', 'RETRACTED', 'DRIFT');
                 """
             )
             let passageCount = try connection.scalarInt("SELECT COUNT(*) FROM pdf_passages;")
@@ -2493,7 +2494,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     \newcommand{\kappacoef}{\kappa}
 
     % INTERNAL AUTHOR NOTE: Stripped automatically during arXiv/NeurIPS archive flattening.
-    % Rejected hallucinated citation \cite{smith2025hallucinated} (bogus DOI 10.5555/fake-llm-cite.9999) via hardware-gated firewall.
+    % Rejected synthetic citation \cite{smith2025hallucinated} (sentinel DOI 10.9999/fake-llm-cite.9999) via citation firewall.
 
     \title{Verifiable Citation Firewalls and Sub-20ms Sandboxes for Autonomous Research Agents}
     \author{Elena Rostova \and Kenji Takahashi \and Aria Lindholm}
@@ -2503,7 +2504,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     \maketitle
 
     \begin{abstract}
-    Autonomous large language model research pipelines routinely synthesize plausible yet fabricated bibliographic citations when drafting scientific manuscripts. We present \sysname, a deterministic macOS workstation kernel combining a five-class hardware-gated Citation Verification Firewall, sub-20ms isolated editorial sandboxes, and bounding-box PDF provenance grounding. Across 1,420 benchmarked literature synthesis runs, \sysname blocks 99.4\% of fabricated identifiers prior to compilation while maintaining 14.2\,ms median incremental verification latency.
+    Autonomous large language model research pipelines routinely synthesize plausible yet fabricated bibliographic citations when drafting scientific manuscripts. We present \sysname, a deterministic macOS workstation kernel combining a five-class Citation Verification Firewall, sub-20ms isolated editorial sandboxes, and bounding-box PDF provenance grounding. Across 1,420 benchmarked literature synthesis runs, \sysname blocks 99.4\% of fabricated identifiers prior to compilation while maintaining 14.2\,ms median incremental verification latency.
     \end{abstract}
 
     \section{Introduction}\label{sec:intro}
@@ -2519,7 +2520,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     \begin{figure}[t]
       \centering
       \fbox{\parbox{0.88\columnwidth}{\centering \sysname Five-Class Citation Firewall \& WAL Provenance Pipeline}}
-      \caption{Hardware-gated verification flow from \texttt{\textbackslash cite} token resolution to PDF bounding-box entailment.}
+      \caption{Citation verification flow from \texttt{\textbackslash cite} token resolution to PDF bounding-box entailment.}
       \label{fig:architecture}
     \end{figure}
 
@@ -2540,7 +2541,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     \end{table}
 
     \section{Conclusion}\label{sec:conclusion}
-    By unifying verified Crossref/arXiv provenance, PRISMA 2020 dual-blind adjudication \cite{page2021prisma,cohen1960coefficient}, and crash-safe undo journals, \sysname establishes an auditable foundation for human--AI scholarly authorship.
+    By combining structured citation checks, PRISMA 2020 dual-blind adjudication \cite{page2021prisma,cohen1960coefficient}, and crash-safe undo journals, \sysname establishes an auditable foundation for human--AI scholarly authorship.
 
     \bibliographystyle{IEEEtran}
     \bibliography{references}
@@ -2552,7 +2553,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     % Private methodology scratch comment: double-check Reviewer 2's PABAK sensitivity note before camera-ready!
 
     \subsection{Five-Class Citation Firewall}\label{subsec:firewall}
-    Every bibliographic key $k \in \mathcal{K}$ referenced in a manuscript AST is classified into one of five mutually exclusive verification states: \firewalltag{VERIFIED\_DOI}, \firewalltag{VERIFIED\_ARXIV\_PMID}, \firewalltag{METADATA\_DRIFT}, \firewalltag{UNVERIFIED\_OFFLINE}, or \firewalltag{BLOCKED\_HALLUCINATED}. Both archival flattening and MCP agent mutations reject any key $k$ lacking verified registry lineage or carrying a retraction/hallucination signature.
+    Every bibliographic key $k \in \mathcal{K}$ referenced in a manuscript AST is classified into one of five mutually exclusive verification states: \firewalltag{VERIFIED}, \firewalltag{DRIFT}, \firewalltag{NOT\_FOUND}, \firewalltag{RETRACTED}, or \firewalltag{UNVERIFIED}. Both archival flattening and MCP agent mutations reject any key $k$ lacking verified registry lineage or carrying a retraction/not-found signature.
 
     \subsection{Dual-Blind PRISMA Screening and Inter-Rater Reliability}\label{subsec:prisma}
     Following PRISMA 2020 protocol guidelines \cite{page2021prisma}, two blinded reviewers independently assign nominal eligibility decisions across candidate records, and chance-corrected agreement is quantified via Cohen's $\kappacoef$ \cite{cohen1960coefficient}:
@@ -2590,12 +2591,12 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 publisher: "Curran Associates, Inc.",
                 volume: "30",
                 pages: "5998--6008",
-                doi: "10.1145/3295222.3295349",
+                doi: "10.48550/arXiv.1706.03762",
                 arxivID: "1706.03762",
                 url: "https://proceedings.neurips.cc/paper/2017/hash/3f5ee243547dee91fbd053c1c4a845aa-Abstract.html",
                 abstractText: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Canonical DOI and author fingerprint verified against Crossref and NeurIPS proceedings registry.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/vaswani2017attention.pdf",
                 citedByKeys: ["dao2023flashattention2", "chen2024agentdrift"],
                 referencesKeys: []
@@ -2605,15 +2606,15 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 kind: .preprint,
                 title: "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",
                 authors: [
-                    BibAuthor(givenName: "Tri", familyName: "Dao", orcid: "0000-0002-3669-2893")
+                    BibAuthor(givenName: "Tri", familyName: "Dao")
                 ],
                 year: 2023,
                 venue: "arXiv e-prints",
                 arxivID: "2307.08691",
                 url: "https://arxiv.org/abs/2307.08691",
                 abstractText: "Scaling Transformer models to longer sequence lengths has been a major problem. FlashAttention-2 achieves 2x speedup over FlashAttention through improved warp-level work partitioning and reduced non-matmul FLOPs.",
-                firewallClass: .verifiedPreprintRegistry,
-                firewallAuditNote: "Verified against arXiv OAI-PMH v2 metadata feed (arXiv:2307.08691v1).",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/dao2023flashattention2.pdf",
                 citedByKeys: ["chen2024agentdrift"],
                 referencesKeys: ["vaswani2017attention"]
@@ -2632,8 +2633,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 arxivID: "1609.02907",
                 url: "https://openreview.net/forum?id=SJU4ayYgl",
                 abstractText: "We present a scalable approach for semi-supervised learning on graph-structured data that is based on an efficient variant of convolutional neural networks which operate directly on graphs.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified DataCite DOI 10.48550/arXiv.1609.02907 and OpenReview ICLR 2017 acceptance record.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/kipf2017semi.pdf",
                 citedByKeys: ["chen2024agentdrift"],
                 referencesKeys: ["barnes1986hierarchical"]
@@ -2643,7 +2644,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 kind: .article,
                 title: "The PRISMA 2020 statement: an updated guideline for reporting systematic reviews",
                 authors: [
-                    BibAuthor(givenName: "Matthew J.", familyName: "Page", orcid: "0000-0002-4242-7928"),
+                    BibAuthor(givenName: "Matthew J.", familyName: "Page"),
                     BibAuthor(givenName: "Joanne E.", familyName: "McKenzie"),
                     BibAuthor(givenName: "Patrick M.", familyName: "Bossuyt"),
                     BibAuthor(givenName: "Isabelle", familyName: "Boutron"),
@@ -2660,8 +2661,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 pmid: "33782057",
                 url: "https://doi.org/10.1136/bmj.n71",
                 abstractText: "The Preferred Reporting Items for Systematic reviews and Meta-Analyses (PRISMA) statement, published in 2009, has been updated to PRISMA 2020 to reflect advances in methods to identify, select, appraise, and synthesise studies.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified Crossref DOI 10.1136/bmj.n71 and PubMed PMID 33782057.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/page2021prisma.pdf",
                 citedByKeys: ["chen2024agentdrift"],
                 referencesKeys: ["cohen1960coefficient"]
@@ -2682,8 +2683,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 doi: "10.1177/001316446002000104",
                 url: "https://doi.org/10.1177/001316446002000104",
                 abstractText: "Introduces kappa, a coefficient of inter-judge agreement for nominal scales that corrects observed agreement proportion for chance agreement determined by marginal distributions.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified Crossref archival DOI 10.1177/001316446002000104.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/cohen1960coefficient.pdf",
                 citedByKeys: ["page2021prisma"],
                 referencesKeys: []
@@ -2705,8 +2706,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 doi: "10.1038/324446a0",
                 url: "https://doi.org/10.1038/324446a0",
                 abstractText: "Presents a tree-structured hierarchical subdivision of space that reduces N-body gravitational force evaluation complexity from O(N^2) to O(N log N) using opening-angle multipole acceptance criteria.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified Crossref Nature DOI 10.1038/324446a0.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/barnes1986hierarchical.pdf",
                 citedByKeys: ["kipf2017semi"],
                 referencesKeys: []
@@ -2727,8 +2728,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 doi: "10.1007/BF01840446",
                 url: "https://doi.org/10.1007/BF01840446",
                 abstractText: "Develops an O((M+N)D) greedy edit-graph search algorithm for finding longest common subsequences and shortest edit scripts, optimal when edit distance D is small.",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified Crossref Springer DOI 10.1007/BF01840446.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/myers1986ond.pdf",
                 citedByKeys: ["chen2024agentdrift"],
                 referencesKeys: []
@@ -2746,12 +2747,11 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 venue: "USENIX Annual Technical Conference (USENIX ATC 24)",
                 publisher: "USENIX Association",
                 pages: "411--428",
-                doi: "10.5555/usenix-atc24.chen411",
                 arxivID: "2311.09412",
                 url: "https://www.usenix.org/conference/atc24/presentation/chen",
                 abstractText: "Evaluates deterministic sandbox isolation and citation metadata drift between arXiv preprints and peer-reviewed systems proceedings across 480 autonomous research workflows.",
-                firewallClass: .metadataDriftAdvisory,
-                firewallAuditNote: "Advisory: Local BibTeX originally imported 2023 arXiv preprint title; Crossref/DBLP resolves 2024 USENIX ATC camera-ready proceedings (pp. 411-428) with third co-author Marcus Vogt added.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: "pdfs/chen2024agentdrift.pdf",
                 citedByKeys: [],
                 referencesKeys: ["vaswani2017attention", "dao2023flashattention2", "page2021prisma", "myers1986ond"]
@@ -2768,8 +2768,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 venue: "ETH Zurich Systems Group Technical Report ETH-SYS-2025-04",
                 publisher: "ETH Zurich",
                 abstractText: "Describes error-recovering incremental CST reparsing for mixed LaTeX and Typst manuscripts under strict sub-5ms keystroke budgets.",
-                firewallClass: .unverifiedPendingCheck,
-                firewallAuditNote: "Imported while offline in air-gapped session; Crossref DOI and ETH Research Collection checksum verification pending.",
+                firewallClass: .unverified,
+                firewallAuditNote: "Demo data - unverified",
                 attachedPDFPath: nil,
                 citedByKeys: [],
                 referencesKeys: ["myers1986ond"]
@@ -2787,10 +2787,10 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 volume: "99",
                 issue: "12",
                 pages: "1--42",
-                doi: "10.5555/fake-llm-cite.9999",
+                doi: "10.9999/fake-llm-cite.9999",
                 abstractText: "Fabricated placeholder abstract produced by an unguarded LLM agent attempting to justify unsupported zero-latency claims.",
-                firewallClass: .blockedHallucinatedOrRetracted,
-                firewallAuditNote: "HARD BLOCK: DOI '10.5555/fake-llm-cite.9999' returned HTTP 404 in Crossref/DataCite; venue ISSN does not exist; flagged as LLM-fabricated citation signature.",
+                firewallClass: .notFound,
+                firewallAuditNote: "Demo synthetic fabricated citation - placeholder DOI prefix 10.9999 (unverified).",
                 attachedPDFPath: nil,
                 citedByKeys: [],
                 referencesKeys: []
@@ -3286,11 +3286,11 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
             let radius = 180.0
             let cluster: Int
             switch entry.firewallClass {
-            case .verifiedCanonicalDOI, .verifiedPreprintRegistry:
+            case .verified:
                 cluster = index % 2
-            case .metadataDriftAdvisory:
+            case .drift:
                 cluster = 2
-            case .unverifiedPendingCheck, .blockedHallucinatedOrRetracted:
+            case .unverified, .notFound, .retracted:
                 cluster = 3
             }
 
@@ -3385,7 +3385,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 filePath: "main.tex",
                 line: 23,
                 matchedExcerpt: "\\cite{chen2024agentdrift}",
-                explanation: "Entry 'chen2024agentdrift' carries METADATA_DRIFT status: verify page numbers (pp. 411--428) and third co-author against USENIX ATC 24 proceedings.",
+                explanation: "Entry 'chen2024agentdrift' carries DRIFT status in demo dataset.",
                 suggestedRewrite: nil
             )
         ]

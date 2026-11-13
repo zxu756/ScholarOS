@@ -1598,14 +1598,14 @@ public struct EditorialJavaScriptSandbox: Sendable {
               if (seen[c.citeKey]) continue;
               seen[c.citeKey] = true;
               const entry = scholar.getEntry(c.citeKey);
-              if (entry && entry.firewallClass === "METADATA_DRIFT") {
+              if (entry && entry.firewallClass === "DRIFT") {
                 findings.push({
                   severity: "RIGOR_WARN",
                   category: "Citation Metadata Drift",
                   filePath: c.filePath,
                   line: c.line,
                   matchedExcerpt: "\\" + c.command + "{" + c.citeKey + "}",
-                  explanation: "Cited entry '" + c.citeKey + "' carries METADATA_DRIFT status: " + (entry.firewallAuditNote || "reconcile preprint vs. proceedings metadata.")
+                  explanation: "Cited entry '" + c.citeKey + "' carries DRIFT status: " + (entry.firewallAuditNote || "reconcile preprint vs. proceedings metadata.")
                 });
               }
             }

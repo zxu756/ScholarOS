@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Manuscript Languages, Text Spans & Hardware-Gated Errors
+// MARK: - Manuscript Languages, Text Spans & Domain Errors
 
 public enum ManuscriptFormat: String, Sendable, Codable, Hashable, CaseIterable {
     case latex = "LaTeX"
@@ -51,7 +51,7 @@ public enum ScholarOSError: Error, LocalizedError, Sendable, Equatable {
     case fileNotFound(String)
     case markupParseFailure(file: String, line: Int, detail: String)
     case bibliographyParseFailure(format: String, line: Int, detail: String)
-    /// Hardware-gated citation firewall error — blocks unverified/hallucinated citations in CLI & MCP!
+    /// Citation firewall error — blocks unverified, drifted, not-found, or retracted citations in CLI & MCP.
     case unverifiedCitationBlocked(citeKey: String, statusCode: String, reason: String)
     case syncTeXMappingNotFound(String)
     case pdfExtractionFailure(String)

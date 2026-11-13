@@ -166,7 +166,7 @@ struct PluginSDKMCPAndShellTests {
                 authors: [BibAuthor(givenName: "J.", familyName: "Smith")],
                 year: 2025,
                 doi: "10.5555/fake-llm-cite.9999",
-                firewallClass: .blockedHallucinatedOrRetracted
+                firewallClass: .notFound
             )
         ]
 
@@ -304,7 +304,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(md.contains("Audit Benchmark"))
     }
 
-    // MARK: - 3. ScholarCLIRunner Subcommands & Hardware-Gated Citation Enforcement
+    // MARK: - 3. ScholarCLIRunner Subcommands & Citation Firewall Enforcement
 
     @Test("ScholarCLIRunner executes version, help, init --seed-demo, status, outline, and diagnostics on temp .scholarproj")
     func cliRunnerLifecycleStatusOutlineAndDiagnostics() async throws {
@@ -341,77 +341,108 @@ struct PluginSDKMCPAndShellTests {
         #expect(!diagOut.isEmpty)
     }
 
-    @Test("ScholarCLIRunner cite subcommand permits verified DOI keys and hard-blocks smith2025hallucinated with ERR_UNVERIFIED_CITATION")
-    func cliRunnerHardwareGatedCiteBlocksHallucinations() async throws {
+    @Test("ScholarCLIRunner cite subcommand permits explicitly verified records and blocks unverified demo and hallucinated keys with ERR_UNVERIFIED_CITATION")
+    func cliRunnerCiteEnforcesVerifiedStatusAndBlocksHallucinations() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-cli-cite")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let bundleURL = tempDir.appendingPathComponent("CiteStudy.scholarproj")
+        let db = try ScholarProjectDatabase(bundleURL: bundleURL, seedDemoIfEmpty: true)
+        try db.updateCitationFirewallStatus(
+            citeKey: "vaswani2017attention",
+            firewallClass: .verified,
+            auditNote: "Verified against registry"
+        )
+        db.close()
+
         let cli = ScholarCLIRunner()
 
-        // Verified DOI key succeeds and formats APA 7th reference
-        let allowedOut = try await cli.execute(arguments: ["cite", "vaswani2017attention"])
+        // 1. Verified record in project succeeds and formats APA 7th reference
+        let allowedOut = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path])
         #expect(allowedOut.contains("\\cite{vaswani2017attention}"))
         #expect(allowedOut.contains("Attention Is All You Need"))
 
-        // Blocked hallucinated key MUST throw ScholarOSError with ERR_UNVERIFIED_CITATION
+        // 2. Unverified demo entry MUST throw ERR_UNVERIFIED_CITATION
         do {
-            _ = try await cli.execute(arguments: ["cite", "smith2025hallucinated"])
+            _ = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--demo"])
+            Issue.record("Expected unverified demo entry to throw ERR_UNVERIFIED_CITATION")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
+
+        // 3. Blocked hallucinated key MUST throw ScholarOSError with ERR_UNVERIFIED_CITATION
+        do {
+            _ = try await cli.execute(arguments: ["cite", "smith2025hallucinated", "--project", bundleURL.path])
             Issue.record("Expected CLI cite smith2025hallucinated to throw ERR_UNVERIFIED_CITATION")
         } catch let err as ScholarOSError {
             #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
         }
 
-        // Unknown subcommand throws invalidCLIArguments
+        // 4. Unknown subcommand throws invalidCLIArguments
         await #expect(throws: ScholarOSError.self) {
             _ = try await cli.execute(arguments: ["nonexistent-subcommand"])
         }
     }
 
-    @Test("ScholarCLIRunner executes verify-citations, format-bib, prisma-stats, citation-graph, track-changes, audit-editorial, export-bundle, and export-html")
+    @Test("ScholarCLIRunner executes explicit --demo verify-citations, format-bib, prisma-stats, citation-graph, track-changes, audit-editorial, export-bundle, and export-html")
     func cliRunnerAnalyticsAndExportSubcommands() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-cli-exports")
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let cli = ScholarCLIRunner()
 
-        let verifyOut = try await cli.execute(arguments: ["verify-citations"])
-        #expect(verifyOut.contains("Evaluated=10"))
-        #expect(verifyOut.contains("Blocked=1"))
+        let verifyRun = try await cli.run(arguments: ["verify-citations", "--demo"])
+        #expect(verifyRun.exitCode == 1)
+        #expect(verifyRun.stdout.contains("[DEMO]"))
+        #expect(verifyRun.stdout.contains("Evaluated=10"))
+        #expect(verifyRun.stdout.contains("Verified=0"))
+        #expect(verifyRun.stdout.contains("NotFound=1"))
 
-        let ieeeBib = try await cli.execute(arguments: ["format-bib", "--style", "ieee"])
+        let ieeeBib = try await cli.execute(arguments: ["format-bib", "--demo", "--style", "ieee"])
+        #expect(ieeeBib.contains("[DEMO]"))
         #expect(ieeeBib.contains("[1]"))
 
-        let prismaJSON = try await cli.execute(arguments: ["prisma-stats"])
+        let prismaJSON = try await cli.execute(arguments: ["prisma-stats", "--demo"])
         let prismaMetrics = try JSONDecoder().decode(PRISMA2020SummaryMetrics.self, from: Data(prismaJSON.utf8))
         #expect(prismaMetrics.recordsScreenedTitleAbstract == 12)
 
         let svgPath = tempDir.appendingPathComponent("prisma.svg").path
-        _ = try await cli.execute(arguments: ["prisma-svg", "--output", svgPath])
+        let svgMsg = try await cli.execute(arguments: ["prisma-svg", "--demo", "--output", svgPath])
+        #expect(svgMsg.contains("[DEMO]"))
         let svgDisk = try String(contentsOfFile: svgPath, encoding: .utf8)
         #expect(svgDisk.contains("<svg"))
 
-        let graphOut = try await cli.execute(arguments: ["citation-graph"])
+        let graphOut = try await cli.execute(arguments: ["citation-graph", "--demo"])
+        #expect(graphOut.contains("[DEMO]"))
         #expect(graphOut.contains("Nodes=10"))
 
-        let diffOut = try await cli.execute(arguments: ["track-changes"])
+        let diffOut = try await cli.execute(arguments: ["track-changes", "--demo"])
+        #expect(diffOut.contains("[DEMO]"))
         #expect(diffOut.contains("Diff"))
 
-        let editorialOut = try await cli.execute(arguments: ["audit-editorial"])
+        let editorialOut = try await cli.execute(arguments: ["audit-editorial", "--demo"])
+        #expect(editorialOut.contains("[DEMO]"))
         #expect(editorialOut.contains("overclaiming-rhetoric-detector"))
 
         let bundleOutDir = tempDir.appendingPathComponent("arxiv-export").path
-        let bundleMsg = try await cli.execute(arguments: ["export-bundle", "--output", bundleOutDir])
+        let bundleMsg = try await cli.execute(arguments: ["export-bundle", "--demo", "--allow-unverified", "--output", bundleOutDir])
+        #expect(bundleMsg.contains("[DEMO]"))
         #expect(bundleMsg.contains("sha256="))
 
         let htmlPath = tempDir.appendingPathComponent("dossier.html").path
-        _ = try await cli.execute(arguments: ["export-html", "--output", htmlPath])
+        let htmlMsg = try await cli.execute(arguments: ["export-html", "--demo", "--output", htmlPath])
+        #expect(htmlMsg.contains("[DEMO]"))
         let htmlDisk = try String(contentsOfFile: htmlPath, encoding: .utf8)
         #expect(htmlDisk.contains("<!DOCTYPE html>"))
+        #expect(htmlDisk.contains("DEMO"))
         #expect(!htmlDisk.contains("—"))
     }
 
-    // MARK: - 4. ScholarHardwareGatedMCPServer JSON-RPC 2.0 Protocol & Firewall Enforcement
+    // MARK: - 4. ScholarMCPServer JSON-RPC 2.0 Protocol & Firewall Enforcement
 
-    @Test("ScholarHardwareGatedMCPServer handles JSON-RPC 2.0 initialize and tools/list with 8 academic tools")
+    @Test("ScholarMCPServer handles JSON-RPC 2.0 initialize and tools/list with 8 academic tools")
     func mcpServerInitializeAndToolsListJSONRPC() throws {
-        let server = ScholarHardwareGatedMCPServer()
+        let server = ScholarMCPServer()
 
         // 1. initialize handshake
         let initReq = #"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#
@@ -422,7 +453,7 @@ struct PluginSDKMCPAndShellTests {
         let initResult = try #require(initJSON["result"] as? [String: Any])
         #expect(initResult["protocolVersion"] as? String == "2024-11-05")
 
-        // 2. tools/list exposes all 8 hardware-gated tools
+        // 2. tools/list exposes all 8 academic tools
         let listReq = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
         let listRaw = try #require(server.handleJSONRPCLine(listReq))
         let listJSON = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
@@ -438,9 +469,21 @@ struct PluginSDKMCPAndShellTests {
         #expect(server.handleJSONRPCLine(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#) == nil)
     }
 
-    @Test("MCP scholar_cite_key returns isError: true + ERR_UNVERIFIED_CITATION on smith2025hallucinated and succeeds on verified DOI")
-    func mcpServerCiteKeyBlocksHallucinationAndAllowsVerifiedDOI() throws {
-        let server = ScholarHardwareGatedMCPServer()
+    @Test("MCP scholar_cite_key returns isError: true + ERR_UNVERIFIED_CITATION on missing project or hallucinated key and succeeds on verified record")
+    func mcpServerCiteKeyBlocksHallucinationAndAllowsVerifiedRecord() throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-cite")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let bundleURL = tempDir.appendingPathComponent("MCPCite.scholarproj")
+        let db = try ScholarProjectDatabase(bundleURL: bundleURL, seedDemoIfEmpty: true)
+        try db.updateCitationFirewallStatus(
+            citeKey: "vaswani2017attention",
+            firewallClass: .verified,
+            auditNote: "Verified against registry"
+        )
+        db.close()
+
+        let server = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
 
         // 1. Hallucinated key via full JSON-RPC tools/call envelope -> isError: true + ERR_UNVERIFIED_CITATION
         let blockedReq = #"""
@@ -455,7 +498,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(blockedText.contains("ERR_UNVERIFIED_CITATION"))
         #expect(blockedText.contains("smith2025hallucinated"))
 
-        // 2. Verified canonical DOI key via JSON-RPC tools/call -> isError: false + FIREWALL_CLEARED:VERIFIED_DOI
+        // 2. Verified record via JSON-RPC tools/call -> isError: false + CITATION_STATUS:VERIFIED
         let okReq = #"""
         {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention","style":"ieee"}}}
         """#
@@ -465,20 +508,26 @@ struct PluginSDKMCPAndShellTests {
         #expect(okResult["isError"] as? Bool == false)
         let okContent = try #require((okResult["content"] as? [[String: Any]])?.first)
         let okText = try #require(okContent["text"] as? String)
-        #expect(okText.contains("FIREWALL_CLEARED:VERIFIED_DOI"))
+        #expect(okText.contains("CITATION_STATUS:VERIFIED"))
         #expect(okText.contains("Attention Is All You Need"))
     }
 
-    @Test("MCP server executes provenance search, PRISMA agreement, LSP diagnostics, editorial audit, diff, and citation gaps")
+    @Test("MCP server requires explicit project/demo target and executes provenance search, PRISMA agreement, LSP diagnostics, diff, and citation gaps")
     func mcpServerExecutesRemainingDomainTools() {
-        let server = ScholarHardwareGatedMCPServer()
+        // Without default project or allowDemoMode, omitting projectPath fails rather than silently loading demo data
+        let strictServer = ScholarMCPServer()
+        let missingTarget = strictServer.executeToolCall(name: "scholar_prisma_agreement", arguments: [:])
+        #expect(missingTarget["isError"] as? Bool == true)
 
-        let prov = server.executeToolCall(name: "scholar_search_provenance", arguments: ["claim": "FlashAttention speedup"])
+        let server = ScholarMCPServer(allowDemoMode: true)
+
+        let prov = server.executeToolCall(name: "scholar_search_provenance", arguments: ["claim": "FlashAttention speedup", "demo": true])
         #expect(prov["isError"] as? Bool == false)
 
-        let prisma = server.executeToolCall(name: "scholar_prisma_agreement", arguments: [:])
+        let prisma = server.executeToolCall(name: "scholar_prisma_agreement", arguments: ["demo": true])
         #expect(prisma["isError"] as? Bool == false)
         let prismaText = ((prisma["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(prismaText.contains("[DEMO]"))
         #expect(prismaText.contains("Kappa="))
 
         let diff = server.executeToolCall(
@@ -489,19 +538,144 @@ struct PluginSDKMCPAndShellTests {
         let diffText = ((diff["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
         #expect(diffText.contains("\\DIFadd{"))
 
-        let gaps = server.executeToolCall(name: "scholar_citation_gaps", arguments: [:])
+        let gaps = server.executeToolCall(name: "scholar_citation_gaps", arguments: ["demo": true])
         #expect(gaps["isError"] as? Bool == false)
 
-        // LSP diagnostics marks isError: true when inline source cites smith2025hallucinated
+        // LSP diagnostics marks isError: true when inline source cites smith2025hallucinated against demo bib
         let badLSP = server.executeToolCall(
             name: "scholar_lsp_diagnostics",
-            arguments: ["source": "\\section{Test}\nBad \\cite{smith2025hallucinated}.\n"]
+            arguments: ["source": "\\section{Test}\nBad \\cite{smith2025hallucinated}.\n", "demo": true]
         )
         #expect(badLSP["isError"] as? Bool == true)
 
         // Unknown tool returns isError: true
         let unknown = server.executeToolCall(name: "scholar_nonexistent_tool", arguments: [:])
         #expect(unknown["isError"] as? Bool == true)
+    }
+
+    @Test("S20/S23 regression: CLI requires explicit file or --project/--demo, accepts direct .tex/.bib files, and fails non-zero on unverified citations")
+    func s20AndS23CLIDirectFileInputsMissingInputErrorsAndNonZeroVerifyExit() async throws {
+        let cli = ScholarCLIRunner()
+
+        // 1. Missing input (no file, no --project, no --demo) MUST throw invalidCLIArguments (exit 2), NEVER return demo data
+        await #expect(throws: ScholarOSError.self) {
+            _ = try await cli.execute(arguments: ["outline"])
+        }
+        await #expect(throws: ScholarOSError.self) {
+            _ = try await cli.execute(arguments: ["verify-citations"])
+        }
+        // Unknown flag MUST throw invalidCLIArguments (exit 2)
+        await #expect(throws: ScholarOSError.self) {
+            _ = try await cli.execute(arguments: ["outline", "--bogus-flag"])
+        }
+        // Nonexistent --project MUST throw fileNotFound, never create empty project or fall back to demo
+        await #expect(throws: ScholarOSError.self) {
+            _ = try await cli.execute(arguments: ["outline", "--project", "/nonexistent/path/missing.scholarproj"])
+        }
+
+        // 2. Direct .tex and .bib inputs operate on user files and exit 1 on unverified citations
+        let tempDir = try makeTempDirectory(prefix: "scholaros-s20-direct")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let texFile = tempDir.appendingPathComponent("paper.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Real User Section Alpha}
+        \\subsection{Real User Subsection Beta}
+        We cite \\cite{lecun2015deep}.
+        \\end{document}
+        """.write(to: texFile, atomically: true, encoding: .utf8)
+
+        let bibFile = tempDir.appendingPathComponent("refs.bib")
+        try """
+        @article{lecun2015deep,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @article{fake2026nature,
+          author  = {Doe, Alex},
+          title   = {Plausible Fabricated Nature Paper},
+          journal = {Nature},
+          year    = {2026},
+          doi     = {10.1038/fake.2026.99999}
+        }
+        """.write(to: bibFile, atomically: true, encoding: .utf8)
+
+        let outlineOut = try await cli.execute(arguments: ["outline", texFile.path])
+        #expect(outlineOut.contains("Real User Section Alpha"))
+        #expect(outlineOut.contains("Real User Subsection Beta"))
+        #expect(!outlineOut.contains("Methodology and Verification Semantics"))
+
+        let verifyRun = try await cli.run(arguments: ["verify-citations", bibFile.path, "--offline"])
+        #expect(verifyRun.exitCode == 1)
+        #expect(verifyRun.stdout.contains("Verified=0"))
+        #expect(!verifyRun.stdout.contains("VERIFIED_DOI"))
+
+        let formatOut = try await cli.execute(arguments: ["format-bib", bibFile.path, "--style", "ieee"])
+        #expect(formatOut.contains("[1]"))
+        #expect(formatOut.contains("Deep learning"))
+
+        let diagOut = try await cli.execute(arguments: ["diagnostics", texFile.path, "--bib", bibFile.path])
+        #expect(diagOut.contains("lecun2015deep"))
+    }
+
+    @Test("S25 regression: prisma-stats and MCP scholar_prisma_agreement report identical nominal Cohen's kappa matching hand calculation")
+    func s25PrismaStatsAndMCPKappaMatchExactHandCalculation() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-s25-kappa")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let bundleURL = tempDir.appendingPathComponent("KappaStudy.scholarproj")
+        let db = try ScholarProjectDatabase(bundleURL: bundleURL, seedDemoIfEmpty: true)
+        defer { db.close() }
+
+        // Hand calculation on the 12 dual-screened studies over the 5 nominal ScreeningDecision categories
+        // (include, maybe, exclude(E1), exclude(E2), exclude(E3)):
+        // Po = 10 / 12 = 0.8333333333
+        // Pe = (5*5 + 1*2 + 2*2 + 2*2 + 2*1) / 144 = 37 / 144 = 0.2569444444
+        // Cohen's kappa = (10/12 - 37/144) / (1 - 37/144) = 83 / 107 = 0.7757009345794393
+        let expectedKappa = 83.0 / 107.0
+
+        let dbMetrics = try db.computePRISMAMetrics()
+        #expect(abs(dbMetrics.cohensKappa - expectedKappa) < 1e-6)
+
+        let server = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let mcpResp = server.executeToolCall(
+            name: "scholar_prisma_agreement",
+            arguments: ["projectPath": bundleURL.path]
+        )
+        let mcpText = ((mcpResp["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        // Extract Kappa=<num> from MCP output
+        let kappaToken = mcpText
+            .components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { $0.hasPrefix("Kappa=") }
+        let mcpKappa = kappaToken.flatMap { Double($0.replacingOccurrences(of: "Kappa=", with: "")) } ?? -1.0
+        #expect(abs(mcpKappa - expectedKappa) < 1e-4)
+        #expect(abs(mcpKappa - dbMetrics.cohensKappa) < 1e-4)
+    }
+
+    @Test("S27 regression: MCP server returns -32700 Parse error on invalid JSON and -32601 Method not found on unknown method")
+    func s27MCPServerInvalidJSONReturns32700AndUnknownMethodReturns32601() throws {
+        let server = ScholarMCPServer()
+
+        // 1. Invalid JSON -> JSON-RPC 2.0 Parse error (-32700)
+        let parseErrRaw = try #require(server.handleJSONRPCLine("{not valid json"))
+        let parseErrJSON = try #require(JSONSerialization.jsonObject(with: Data(parseErrRaw.utf8)) as? [String: Any])
+        let parseErrObj = try #require(parseErrJSON["error"] as? [String: Any])
+        #expect(parseErrObj["code"] as? Int == -32700)
+
+        // 2. Unknown method -> JSON-RPC 2.0 Method not found (-32601)
+        let methodErrRaw = try #require(server.handleJSONRPCLine(#"{"jsonrpc":"2.0","id":77,"method":"nonexistent/method","params":{}}"#))
+        let methodErrJSON = try #require(JSONSerialization.jsonObject(with: Data(methodErrRaw.utf8)) as? [String: Any])
+        #expect(methodErrJSON["id"] as? Int == 77)
+        let methodErrObj = try #require(methodErrJSON["error"] as? [String: Any])
+        #expect(methodErrObj["code"] as? Int == -32601)
     }
 
     // MARK: - 5. CambridgeLinenHTMLReportExporter Hallmark & Zero Em-Dash Verification
@@ -572,14 +746,14 @@ struct PluginSDKMCPAndShellTests {
                 authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
                 year: 2017,
                 doi: "10.1145/3295222.3295349",
-                firewallClass: .verifiedCanonicalDOI
+                firewallClass: .verified
             ),
             BibliographyEntry(
                 citeKey: "smith2025hallucinated",
                 title: "Attention Hallucinations",
                 authors: [BibAuthor(givenName: "J.", familyName: "Smith")],
                 year: 2025,
-                firewallClass: .blockedHallucinatedOrRetracted
+                firewallClass: .notFound
             )
         ]
         let items = ScholarCommandPaletteCatalog.buildItems(
@@ -820,12 +994,14 @@ struct PluginSDKMCPAndShellTests {
     }
 
     @Test("Bilingual domain labels and Command Palette items localize cleanly across zh-Hans and en")
-    func bilingualDomainLabelsAndCommandPaletteLocalization() {
+    func bilingualDomainLabelsAndCommandPaletteLocalization() async throws {
         #expect(ScholarStudioTab.manuscriptEditor.localizedTitle(.zhHans).contains("手稿"))
         #expect(ScholarStudioTab.citationGraph.localizedTitle(.zhHans) == "引文知识图谱")
         #expect(ScholarStudioTab.prismaScreening.localizedTitle(.zhHans) == "PRISMA 2020 双盲筛查")
-        #expect(CitationFirewallClass.verifiedCanonicalDOI.localizedBadgeTitle(.zhHans) == "已验证 DOI")
-        #expect(CitationFirewallClass.blockedHallucinatedOrRetracted.localizedFilterChip(.zhHans) == "已拦截")
+        #expect(CitationFirewallClass.verified.localizedBadgeTitle(.zhHans) == "已验证")
+        #expect(CitationFirewallClass.verified.localizedBadgeTitle(.en) == "Verified")
+        #expect(CitationFirewallClass.retracted.localizedFilterChip(.zhHans) == "已撤稿")
+        #expect(CitationFirewallClass.unverified.localizedBadgeTitle(.zhHans) == "未核查")
 
         let zhItems = ScholarCommandPaletteCatalog.buildItems(
             manuscriptFiles: [],
@@ -837,5 +1013,53 @@ struct PluginSDKMCPAndShellTests {
         )
         #expect(zhItems.contains { $0.action == .toggleLanguage && $0.shortcutHint == "⇧⌘L" })
         #expect(zhItems.contains { $0.title.contains("引文知识图谱") })
+        #expect(!zhItems.contains { $0.subtitle.contains("已验证 DOI") })
+
+        // Bilingual CLI --lang en vs --lang zh honesty checks
+        let tmpDir = FileManager.default.temporaryDirectory.appendingPathComponent("scholar-bilingual-m0-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let bibURL = tmpDir.appendingPathComponent("refs.bib")
+        try """
+        @article{lecun2015,
+          author = {LeCun, Yann},
+          title = {Deep learning},
+          journal = {Nature},
+          year = {2015},
+          doi = {10.1038/nature14539}
+        }
+        @article{wakefield1998,
+          author = {Wakefield, A. J.},
+          title = {Retracted paper},
+          journal = {The Lancet},
+          year = {1998},
+          doi = {10.1016/S0140-6736(97)11096-0}
+        }
+        """.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let runner = ScholarCLIRunner()
+        let enOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "en"])
+        let zhOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "zh"])
+        #expect(enOut.exitCode == 1)
+        #expect(zhOut.exitCode == 1)
+        #expect(enOut.stdout.contains("Verified=0"))
+        #expect(zhOut.stdout.contains("Verified=0"))
+        #expect(enOut.stdout.contains("内置名单，不完整"))
+        #expect(zhOut.stdout.contains("内置名单，不完整"))
+        #expect(zhOut.stdout.contains("尚未向外部注册库核查"))
+        #expect(!zhOut.stdout.contains("已通过 Crossref"))
+
+        // Bilingual HTML demo dossier contains explicit [DEMO / 演示数据] marker
+        let demoDB = try ScholarProjectDatabase.inMemory(seedDemo: true)
+        defer { demoDB.close() }
+        let html = try CambridgeLinenHTMLReportExporter().exportHTMLDossier(database: demoDB, isDemo: true)
+        #expect(html.contains("[DEMO] Sample Unverified Dataset"))
+        #expect(html.contains("[DEMO / 演示数据]"))
+        #expect(!html.contains("Hardware-Gated"))
+        #expect(!html.contains("硬件级"))
+        #expect(!html.contains("Verified DOI"))
+        #expect(!html.contains("已验证 DOI"))
+        #expect(!html.contains("\u{2014}"))
     }
 }

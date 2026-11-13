@@ -1119,8 +1119,8 @@ public struct SyntheticAcademicPDFFixtureGenerator: Sendable {
                 venue: "SOSP '25",
                 doi: specs[0].doiIdentifier,
                 abstractText: specs[0].abstractText,
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Synthetic canonical DOI fixture",
+                firewallClass: .unverified,
+                firewallAuditNote: "Synthetic test fixture - unverified",
                 attachedPDFPath: specs[0].pdfFileName
             ),
             BibliographyEntry(
@@ -1135,8 +1135,8 @@ public struct SyntheticAcademicPDFFixtureGenerator: Sendable {
                 venue: "ACL '26",
                 doi: specs[1].doiIdentifier,
                 abstractText: specs[1].abstractText,
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Synthetic canonical DOI fixture",
+                firewallClass: .unverified,
+                firewallAuditNote: "Synthetic test fixture - unverified",
                 attachedPDFPath: specs[1].pdfFileName,
                 referencesKeys: ["chen2025aegisvm"]
             )

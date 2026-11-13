@@ -610,7 +610,7 @@ public struct RISParser: Sendable {
                 }
             }
         }
-        return (.unverifiedPendingCheck, "")
+        return (.unverified, "")
     }
 
     private func parseORCIDNotes(_ notes: [String]) -> [String: String] {

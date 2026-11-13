@@ -992,23 +992,23 @@ public enum BuiltInEditorialPluginCatalog: Sendable {
             matchedExcerpt: "\\" + cite.command + "{" + cite.citeKey + "}",
             explanation: "Cited key '" + cite.citeKey + "' is absent from the project bibliography and will render as '[?]' in camera-ready output."
           });
-        } else if (entry.firewallClass === "BLOCKED_HALLUCINATED") {
+        } else if (entry.firewallClass === "NOT_FOUND" || entry.firewallClass === "RETRACTED") {
           scholar.emitFinding({
             severity: "SUBMISSION_BLOCKER",
             category: "Citation Firewall Blocked Key",
             filePath: cite.filePath,
             line: cite.line,
             matchedExcerpt: "\\" + cite.command + "{" + cite.citeKey + "}",
-            explanation: "Cited key '" + cite.citeKey + "' is classified as BLOCKED_HALLUCINATED by Citation Firewall (" + (entry.firewallAuditNote || "fabricated DOI or retracted work") + "). Remove or replace with a verified source."
+            explanation: "Cited key '" + cite.citeKey + "' is classified as " + entry.firewallClass + " by Citation Firewall (" + (entry.firewallAuditNote || "not found or retracted work") + "). Remove or replace with a verified source."
           });
-        } else if (entry.firewallClass === "UNVERIFIED_OFFLINE") {
+        } else if (entry.firewallClass === "UNVERIFIED" || entry.firewallClass === "DRIFT") {
           scholar.emitFinding({
             severity: "RIGOR_WARN",
             category: "Unverified Citation Key",
             filePath: cite.filePath,
             line: cite.line,
             matchedExcerpt: "\\" + cite.command + "{" + cite.citeKey + "}",
-            explanation: "Cited key '" + cite.citeKey + "' has UNVERIFIED_OFFLINE status and has not been validated against Crossref, arXiv, or PubMed."
+            explanation: "Cited key '" + cite.citeKey + "' has " + entry.firewallClass + " status and has not been cleared against external registries."
           });
         }
       }

@@ -156,7 +156,8 @@ let package = Package(
                 "ScholarProjectStore",
                 "ScholarPluginSDK",
                 "ScholarCLIAndMCP",
-                "ScholarWorkbenchShell"
+                "ScholarWorkbenchShell",
+                "ScholarStudioViews"
             ]
         )
     ]

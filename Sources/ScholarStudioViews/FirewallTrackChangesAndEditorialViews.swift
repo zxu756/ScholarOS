@@ -25,7 +25,7 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
             firewallSummaryToolbar
 
             if let rejection = viewModel.lastBlockedInsertionAlert {
-                hardwareFirewallBlockedBanner(rejection)
+                firewallBlockedBanner(rejection)
             }
 
             Divider()
@@ -58,11 +58,11 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
     private var firewallSummaryToolbar: some View {
         let report = viewModel.firewallAuditReport
-        let verifiedDOI = report?.verifiedDOICount ?? 9
-        let verifiedPreprint = report?.verifiedPreprintCount ?? 2
-        let driftCount = report?.metadataDriftCount ?? 2
-        let pendingCount = report?.unverifiedOfflineCount ?? 1
-        let blockedCount = report?.blockedHallucinatedCount ?? 1
+        let verifiedCount = report?.verifiedCount ?? 0
+        let driftCount = report?.driftCount ?? 0
+        let unverifiedCount = report?.unverifiedCount ?? 0
+        let notFoundCount = report?.notFoundCount ?? 0
+        let retractedCount = report?.retractedCount ?? 0
 
         return HStack(spacing: 8) {
             HStack(spacing: 5) {
@@ -81,28 +81,28 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
                 accent: CambridgeLinenPalette.oxfordCharcoal
             )
             firewallTierFilterChip(
-                title: localizer.L("DOI (\(verifiedDOI))", "已验证DOI (\(verifiedDOI))"),
-                target: .verifiedCanonicalDOI,
+                title: localizer.L("Verified (\(verifiedCount))", "已验证 (\(verifiedCount))"),
+                target: .verified,
                 accent: CambridgeLinenPalette.verifiedEmerald
             )
             firewallTierFilterChip(
-                title: localizer.L("Preprint (\(verifiedPreprint))", "预印本 (\(verifiedPreprint))"),
-                target: .verifiedPreprintRegistry,
-                accent: CambridgeLinenPalette.preprintOchre
-            )
-            firewallTierFilterChip(
                 title: localizer.L("Drift (\(driftCount))", "漂移 (\(driftCount))"),
-                target: .metadataDriftAdvisory,
+                target: .drift,
                 accent: CambridgeLinenPalette.driftAmber
             )
             firewallTierFilterChip(
-                title: localizer.L("Pending (\(pendingCount))", "待核验 (\(pendingCount))"),
-                target: .unverifiedPendingCheck,
+                title: localizer.L("Unverified (\(unverifiedCount))", "未核查 (\(unverifiedCount))"),
+                target: .unverified,
                 accent: CambridgeLinenPalette.slateEditorial
             )
             firewallTierFilterChip(
-                title: localizer.L("Blocked (\(blockedCount))", "已拦截 (\(blockedCount))"),
-                target: .blockedHallucinatedOrRetracted,
+                title: localizer.L("Not Found (\(notFoundCount))", "未找到 (\(notFoundCount))"),
+                target: .notFound,
+                accent: CambridgeLinenPalette.blockedCrimson
+            )
+            firewallTierFilterChip(
+                title: localizer.L("Retracted (\(retractedCount))", "已撤稿 (\(retractedCount))"),
+                target: .retracted,
                 accent: CambridgeLinenPalette.blockedCrimson
             )
 
@@ -169,9 +169,9 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: 2. Hardware `ERR_UNVERIFIED_CITATION` Gate Banner
+    // MARK: 2. `ERR_UNVERIFIED_CITATION` Gate Banner
 
-    private func hardwareFirewallBlockedBanner(_ rejection: FirewallGateRejectionRecord) -> some View {
+    private func firewallBlockedBanner(_ rejection: FirewallGateRejectionRecord) -> some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: "xmark.octagon.fill")
                 .font(.system(size: 15, weight: .bold))
@@ -192,8 +192,8 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
                     Text(
                         localizer.L(
-                            "Attempted insertion \(rejection.attemptedCommand) quarantined before AST write",
-                            "尝试插入 \(rejection.attemptedCommand) 已被硬件门禁在写入 AST 前隔离拦截"
+                            "Attempted insertion \(rejection.attemptedCommand) blocked before AST write",
+                            "尝试插入 \(rejection.attemptedCommand) 已在写入 AST 前被防火墙拦截"
                         )
                     )
                     .font(CambridgeTypography.uiControlSemibold)
@@ -221,10 +221,13 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
     private func localizedRejectionReason(_ rejection: FirewallGateRejectionRecord) -> String {
         guard localizer.language == .zhHans else { return rejection.reason }
-        if rejection.citeKey == "smith2025hallucinated" || rejection.reason.contains("10.9999") {
-            return "引文防火墙硬件门禁拒绝合入：DOI 10.9999/fake.2025.001 在 Crossref 与 arXiv 返回 HTTP 404，且期刊 'Journal of Universal AI' 未被权威索引收录。"
+        if rejection.firewallClass == .retracted {
+            return "引文防火墙拒绝合入：文献键 @\(rejection.citeKey) 命中内置离线撤稿名单（内置名单，不完整）。"
         }
-        return "引文防火墙拒绝合入未核验或被标记撤稿的文献键 @\(rejection.citeKey)。"
+        if rejection.firewallClass == .notFound {
+            return "引文防火墙拒绝合入：文献键 @\(rejection.citeKey) 标识符格式非法或未找到 (NOT_FOUND)。"
+        }
+        return "引文防火墙拒绝合入：文献键 @\(rejection.citeKey) 尚未通过外部注册库核查 (ERR_UNVERIFIED_CITATION)。"
     }
 
     // MARK: 3. Left Firewall Ledger + Jaro-Winkler Deduplicator + CSL 5-Style Previewer

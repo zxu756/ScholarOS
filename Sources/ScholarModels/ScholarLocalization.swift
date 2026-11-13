@@ -217,31 +217,31 @@ extension ScholarStudioTab {
 extension CitationFirewallClass {
     public func localizedBadgeTitle(_ lang: ScholarLanguage) -> String {
         switch self {
-        case .verifiedCanonicalDOI:
-            return lang.L("Verified DOI", "已验证 DOI")
-        case .verifiedPreprintRegistry:
-            return lang.L("Verified Preprint", "已验证预印本")
-        case .metadataDriftAdvisory:
-            return lang.L("Metadata Drift", "元数据漂移")
-        case .unverifiedPendingCheck:
-            return lang.L("Unverified", "待核验")
-        case .blockedHallucinatedOrRetracted:
-            return lang.L("Blocked (Fake/Retracted)", "已拦截 (伪造/撤稿)")
+        case .verified:
+            return lang.L("Verified", "已验证")
+        case .drift:
+            return lang.L("Drift", "元数据漂移")
+        case .notFound:
+            return lang.L("Not Found", "未找到")
+        case .retracted:
+            return lang.L("Retracted", "已撤稿")
+        case .unverified:
+            return lang.L("Unverified", "未核查")
         }
     }
 
     public func localizedFilterChip(_ lang: ScholarLanguage) -> String {
         switch self {
-        case .verifiedCanonicalDOI:
-            return lang.L("Verified DOI", "已验证DOI")
-        case .verifiedPreprintRegistry:
-            return lang.L("Preprint", "预印本")
-        case .metadataDriftAdvisory:
+        case .verified:
+            return lang.L("Verified", "已验证")
+        case .drift:
             return lang.L("Drift", "元数据漂移")
-        case .unverifiedPendingCheck:
-            return lang.L("Unverified", "待核验")
-        case .blockedHallucinatedOrRetracted:
-            return lang.L("Blocked", "已拦截")
+        case .notFound:
+            return lang.L("Not Found", "未找到")
+        case .retracted:
+            return lang.L("Retracted", "已撤稿")
+        case .unverified:
+            return lang.L("Unverified", "未核查")
         }
     }
 }
@@ -385,7 +385,7 @@ extension ScholarPluginManifest {
         guard lang == .zhHans else { return summary }
         switch id {
         case "overclaiming-rhetoric-detector":
-            return "检测绝对化实证宣称（如“100% 免疫”“彻底消除幻觉”）、缺乏置信区间的观测性因果推断，并跳过注释与数学公式环境。"
+            return "检测缺乏置信区间的绝对化实证宣称（如“100% 免疫”）、观测性因果推断，并跳过注释与数学公式环境。"
         case "anti-ai-prose-sanitizer":
             return "识别大模型高频修辞套话（如 delve into、rich tapestry、testament to、pivotal role）与浮夸宣传形容词，提供精准学术改写。"
         case "apa-stat-consistency-checker":
@@ -466,7 +466,7 @@ extension EditorialAuditFinding {
             return "双盲投稿模式下检测到非匿名 \\author 署名与机构信息，定稿前须替换为 Anonymous Submission。"
         }
         if explanation.localizedCaseInsensitiveContains("smith2025hallucinated") || explanation.localizedCaseInsensitiveContains("blocked") || explanation.localizedCaseInsensitiveContains("unverified") {
-            return "正文引用了被五级引文防火墙拦截的伪造/未核验文献键，违反顶会定稿门禁要求。"
+            return "正文引用了尚未完成注册库核查、未找到或已撤稿的文献键，定稿前须完成核查。"
         }
         if explanation.localizedCaseInsensitiveContains("2.42") || explanation.localizedCaseInsensitiveContains("p-value") || explanation.localizedCaseInsensitiveContains("two-tailed") {
             return "Lanczos 不完全 Beta 函数重算显示精确双尾 p = .0193，正文报告的 p = .001 夸大了统计显著性。"
@@ -478,16 +478,28 @@ extension EditorialAuditFinding {
 extension LSPDiagnostic {
     public func localizedMessage(_ lang: ScholarLanguage) -> String {
         guard lang == .zhHans else { return message }
-        if code == "ERR_UNVERIFIED_CITATION" || code == "CITE404" || message.contains("smith2025hallucinated") {
-            return "引文防火墙硬件拦截：@smith2025hallucinated 的 DOI (10.9999/fake.2025.001) 在 Crossref 与 arXiv 返回 404，禁止合入定稿。"
+        if code == "CITE404" {
+            if let key = Self.extractCiteKey(from: message) {
+                return "文献键 \(key) 未在当前文献库中找到 (CITE404)。"
+            }
+            return "手稿引用的文献键未在当前文献库中找到 (CITE404)。"
+        }
+        if code == "ERR_UNVERIFIED_CITATION" {
+            let key = Self.extractCiteKey(from: message) ?? "该条目"
+            if message.contains("RETRACTED") {
+                return "引文防火墙拦截：\(key) 命中内置离线撤稿名单（内置名单，不完整）。"
+            }
+            if message.contains("NOT_FOUND") {
+                return "引文防火墙拦截：\(key) 标识符格式非法或未找到 (NOT_FOUND)。"
+            }
+            return "引文防火墙提醒：\(key) 尚未通过外部注册库核查 (ERR_UNVERIFIED_CITATION)。"
         }
         if code.hasPrefix("CITE") && message.localizedCaseInsensitiveContains("drift") {
-            return "引文元数据漂移提醒：建议补全会议录名称并与 Crossref / arXiv 最新版本对齐。"
+            return "引文元数据漂移提醒：建议核对会议录或期刊字段。"
         }
         if code.hasPrefix("LINT") && message.localizedCaseInsensitiveContains("uncited") {
-            if let atRange = message.range(of: "@") {
-                let tail = message[atRange.lowerBound...].prefix(while: { !$0.isWhitespace && $0 != "'" && $0 != "." })
-                return "文献库条目 \(tail) 尚未在手稿正文中被引用。"
+            if let key = Self.extractCiteKey(from: message) {
+                return "文献库条目 \(key) 尚未在手稿正文中被引用。"
             }
             return "文献库中存在尚未在手稿正文引用的参考文献条目。"
         }
@@ -502,47 +514,93 @@ extension LSPDiagnostic {
         }
         return message
     }
+
+    private static func extractCiteKey(from text: String) -> String? {
+        if let atRange = text.range(of: "@") {
+            let token = text[atRange.lowerBound...].prefix { ch in
+                !ch.isWhitespace && ch != "'" && ch != "\"" && ch != "." && ch != "," && ch != ")" && ch != ":"
+            }
+            if token.count > 1 {
+                return String(token)
+            }
+        }
+        for prefix in ["Citation '", "entry '", "key '"] {
+            if let r = text.range(of: prefix) {
+                let tail = text[r.upperBound...]
+                if let end = tail.firstIndex(of: "'") {
+                    let key = String(tail[..<end])
+                    if !key.isEmpty {
+                        return "@\(key)"
+                    }
+                }
+            }
+        }
+        return nil
+    }
 }
 
 extension BibliographyEntry {
     public func localizedFirewallAuditNote(_ lang: ScholarLanguage) -> String {
         guard lang == .zhHans else { return firewallAuditNote }
-        switch citeKey {
-        case "vaswani2017attention":
-            return "已通过 Crossref DOI 与 arXiv 1706.03762v7 权威元数据双重核验。"
-        case "lewis2020rag":
-            return "已核验 NeurIPS 2020 会议录记录与 arXiv 2005.11401 元数据。"
-        case "robertson2009bm25":
-            return "已核验 Crossref 权威 DOI 10.1561/1500000019。"
-        case "lin2004rouge":
-            return "已核验 ACL Anthology 文献库与 Crossref DOI 记录。"
-        case "min2023factscore":
-            return "已核验 arXiv 2305.14251 预印本与 ACL Anthology 会议录匹配。"
-        case "gao2023aclarc":
-            return "元数据漂移：DOI 10.18653/v1/2023.emnlp-main.398 缺失会议录字段，且 arXiv 已更新至 v2。"
-        case "page2021prisma":
-            return "已核验 Crossref DOI 10.1136/bmj.n71 与 PubMed PMID 33782057。"
-        case "cohen1960kappa":
-            return "已核验 Crossref 经典文献 DOI 10.1177/001316446002000104。"
-        case "byrt1993pabak":
-            return "已核验 Crossref DOI 与 PubMed PMID 8501467。"
-        case "gwet2008ac1":
-            return "已核验 Crossref 权威 DOI 10.1348/000711006X126600。"
-        case "dersimonian1986meta":
-            return "已核验 Crossref DOI 10.1016/0197-2456(86)90046-2（推荐补引的高共被引奠基文献）。"
-        case "sterne2019rob2":
-            return "已核验 Crossref DOI 10.1136/bmj.l4898（推荐补引的偏倚风险评估奠基文献）。"
-        case "blondel2008louvain":
-            return "已核验 arXiv 0803.0476v2 (physics.soc-ph) 预印本注册记录。"
-        case "kleinberg2003bursty":
-            return "离线待核验：缺失 DOI/arXiv 标识符，严格定稿导出前需完成注册库核对。"
-        case "vaswani2017neurips_dup":
-            return "元数据漂移与疑似重复：缺失会议名称，且与权威条目 @vaswani2017attention 的 DOI 完全一致。"
-        case "smith2025hallucinated":
-            return "已硬件拦截 (ERR_UNVERIFIED_CITATION)：非法前缀 10.9999，Crossref/arXiv 返回 404，期刊未被索引。"
-        default:
-            return firewallAuditNote
+        if firewallAuditNote.isEmpty {
+            return ""
         }
+        if firewallAuditNote.contains("内置名单，不完整") {
+            if let doi, !doi.isEmpty {
+                return "离线撤稿提示：DOI '\(doi)' 命中内置撤稿名单（内置名单，不完整）。"
+            }
+            return "离线撤稿提示：命中内置撤稿名单（内置名单，不完整）。"
+        }
+        if firewallAuditNote == "Demo data - unverified" {
+            return "演示数据 - 未核查（尚未向外部注册库核对）"
+        }
+        if firewallAuditNote == "Demo synthetic fabricated entry - unverified" {
+            return "演示合成条目 - 未核查（占位或非法 DOI 前缀）"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("valid ISO 26324 syntax")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Valid DOI syntax")
+        {
+            if let doi, !doi.isEmpty {
+                return "DOI '\(doi)' 语法格式合法；离线模式下尚未向外部注册库核查。"
+            }
+            return "DOI 语法格式合法；离线模式下尚未向外部注册库核查。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("valid calendar/sequence syntax")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Valid arXiv")
+        {
+            return "arXiv 标识符格式合法；离线模式下尚未向外部注册库核查。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("valid numeric bounds")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Valid PubMed")
+        {
+            return "PubMed PMID 格式合法；离线模式下尚未向外部注册库核查。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("10.5555/") {
+            return "DOI 使用了 Crossref 非解析测试前缀（10.5555/）；离线模式下尚未核查。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("placeholder")
+            || firewallAuditNote.localizedCaseInsensitiveContains("sentinel")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Invalid DOI")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Malformed DOI")
+        {
+            return "DOI 格式非法或使用了占位前缀（离线结构检查未通过）。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("Invalid arXiv")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Malformed arXiv")
+        {
+            return "arXiv 标识符格式非法（离线结构检查未通过）。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("Invalid PubMed")
+            || firewallAuditNote.localizedCaseInsensitiveContains("Malformed PubMed")
+        {
+            return "PubMed PMID 格式非法（离线结构检查未通过）。"
+        }
+        if firewallAuditNote.localizedCaseInsensitiveContains("No persistent identifier")
+            || firewallAuditNote.localizedCaseInsensitiveContains("No external identifier")
+        {
+            return "缺失外部持久标识符（DOI / arXiv / PMID）；离线模式下尚未向外部注册库核查。"
+        }
+        return firewallAuditNote
     }
 }
 

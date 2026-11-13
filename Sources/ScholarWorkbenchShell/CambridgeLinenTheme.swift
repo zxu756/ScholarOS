@@ -47,7 +47,7 @@ public enum CambridgeLinenPalette {
     public static let libraryForestBorder = Color(red: 0xBD / 255.0, green: 0xD3 / 255.0, blue: 0xC9 / 255.0)
 
     // MARK: Semantic Verification & Firewall Tokens
-    /// Verified DOI / Grounded Entailment foreground — Verified Emerald `#1F6E4A`
+    /// Verified / Grounded Entailment foreground — Verified Emerald `#1F6E4A`
     public static let verifiedEmerald = Color(red: 0x1F / 255.0, green: 0x6E / 255.0, blue: 0x4A / 255.0)
     /// Verified Emerald pill fill — `#E8F5EE`
     public static let verifiedEmeraldBg = Color(red: 0xE8 / 255.0, green: 0xF5 / 255.0, blue: 0xEE / 255.0)
@@ -101,40 +101,40 @@ public enum CambridgeLinenPalette {
 
     public static func style(for firewallClass: CitationFirewallClass) -> SemanticBadgeStyle {
         switch firewallClass {
-        case .verifiedCanonicalDOI:
+        case .verified:
             return SemanticBadgeStyle(
                 foreground: verifiedEmerald,
                 background: verifiedEmeraldBg,
                 border: verifiedEmeraldBorder,
                 sfSymbol: "checkmark.seal.fill"
             )
-        case .verifiedPreprintRegistry:
-            return SemanticBadgeStyle(
-                foreground: preprintOchre,
-                background: preprintOchreBg,
-                border: preprintOchreBorder,
-                sfSymbol: "doc.badge.clock"
-            )
-        case .metadataDriftAdvisory:
+        case .drift:
             return SemanticBadgeStyle(
                 foreground: driftAmber,
                 background: driftAmberBg,
                 border: driftAmberBorder,
                 sfSymbol: "exclamationmark.triangle.fill"
             )
-        case .unverifiedPendingCheck:
+        case .unverified:
             return SemanticBadgeStyle(
                 foreground: slateEditorial,
                 background: warmVellum,
                 border: stoneHairline,
                 sfSymbol: "questionmark.circle"
             )
-        case .blockedHallucinatedOrRetracted:
+        case .notFound:
             return SemanticBadgeStyle(
                 foreground: blockedCrimson,
                 background: blockedCrimsonBg,
                 border: blockedCrimsonBorder,
                 sfSymbol: "xmark.octagon.fill"
+            )
+        case .retracted:
+            return SemanticBadgeStyle(
+                foreground: blockedCrimson,
+                background: blockedCrimsonBg,
+                border: blockedCrimsonBorder,
+                sfSymbol: "exclamationmark.octagon.fill"
             )
         }
     }
@@ -310,20 +310,7 @@ public struct FirewallBadgeView: View {
     }
 
     private var shortTitle: String {
-        switch firewallClass {
-        case .verifiedCanonicalDOI:
-            return localizer.L("Verified DOI", "已验证 DOI")
-        case .verifiedPreprintRegistry:
-            return localizer.L("Verified Preprint", "已验证预印本")
-        case .metadataDriftAdvisory:
-            return localizer.L("Metadata Drift", "元数据漂移")
-        case .unverifiedPendingCheck:
-            return localizer.L("Unverified", "待核验")
-        case .blockedHallucinatedOrRetracted:
-            return compact
-                ? localizer.L("Blocked", "已拦截")
-                : localizer.L("Blocked (Fake/Retracted)", "已拦截 (伪造/撤稿)")
-        }
+        firewallClass.localizedBadgeTitle(localizer.language)
     }
 
     public var body: some View {

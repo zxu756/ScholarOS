@@ -162,7 +162,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         diagnostics.append(contentsOf: workspace.diagnostics)
         actions.append(contentsOf: buildSymbolDiagnosticQuickFixes(workspace: workspace, sourcesByFile: resolvedSources))
 
-        // 2. Hardware-Gated Citation Verification Firewall Diagnostics (`CITE404`, `ERR_UNVERIFIED_CITATION`, advisories)
+        // 2. Citation Verification Firewall Diagnostics (`CITE404`, `ERR_UNVERIFIED_CITATION`, advisories)
         let (fwDiags, fwActions) = analyzeCitationFirewallGates(
             workspace: workspace,
             bibliography: bibliography,
@@ -375,39 +375,28 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             let (effectiveClass, verdictNote) = resolveEffectiveFirewall(for: entry)
 
             switch effectiveClass {
-            case .verifiedCanonicalDOI:
+            case .verified:
                 break
 
-            case .verifiedPreprintRegistry:
-                diagnostics.append(
-                    LSPDiagnostic(
-                        code: "FW_PREPRINT_ADVISORY",
-                        severity: .info,
-                        message: "Cited entry '\(occ.citeKey)' is a preprint (\(entry.arxivID ?? "registry preprint")); verify if a peer-reviewed journal/proceedings version exists.",
-                        span: occ.span,
-                        suggestedFix: "Keep preprint citation or update DOI if formally published."
-                    )
-                )
-
-            case .metadataDriftAdvisory:
+            case .drift:
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "FW_METADATA_DRIFT",
                         severity: .warning,
-                        message: "Citation '\(occ.citeKey)' has metadata drift advisory: \(verdictNote)",
+                        message: "Citation '\(occ.citeKey)' has metadata drift (`DRIFT`): \(verdictNote)",
                         span: occ.span,
-                        suggestedFix: "Reconcile title/year/author fields against Crossref/PubMed."
+                        suggestedFix: "Reconcile title/year/author fields against registry metadata."
                     )
                 )
 
-            case .unverifiedPendingCheck:
+            case .unverified:
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "ERR_UNVERIFIED_CITATION",
                         severity: .error,
-                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is UNVERIFIED (\(verdictNote)). Hardware Citation Firewall blocks manuscript export until verified.",
+                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is UNVERIFIED (\(verdictNote)). Citation Firewall blocks manuscript export until verified.",
                         span: occ.span,
-                        suggestedFix: "Verify DOI/arXiv/PMID via Citation Firewall or remove unverified citation."
+                        suggestedFix: "Verify citation against external registries or remove unverified citation."
                     )
                 )
                 if let removeAction = buildRemoveCitedKeyCodeAction(
@@ -419,19 +408,20 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                     actions.append(removeAction)
                 }
 
-            case .blockedHallucinatedOrRetracted:
+            case .notFound, .retracted:
+                let statusLabel = effectiveClass.rawValue
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "ERR_UNVERIFIED_CITATION",
                         severity: .error,
-                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is BLOCKED by Citation Firewall (hallucinated/sentinel/retracted): \(verdictNote)",
+                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is \(statusLabel) (\(verdictNote)).",
                         span: occ.span,
-                        suggestedFix: "Remove blocked citation '\(occ.citeKey)' immediately."
+                        suggestedFix: "Remove \(statusLabel.lowercased()) citation '\(occ.citeKey)' immediately."
                     )
                 )
                 if let removeAction = buildRemoveCitedKeyCodeAction(
                     occurrence: occ,
-                    reasonLabel: "blocked/retracted citation",
+                    reasonLabel: "\(statusLabel.lowercased()) citation",
                     workspace: workspace,
                     sourcesByFile: sourcesByFile
                 ) {
@@ -445,11 +435,13 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
 
     private func resolveEffectiveFirewall(for entry: BibliographyEntry) -> (CitationFirewallClass, String) {
         let verdict = firewall.evaluate(entry)
-        if entry.firewallClass == .blockedHallucinatedOrRetracted || verdict.firewallClass == .blockedHallucinatedOrRetracted {
-            let note = entry.firewallAuditNote.isEmpty ? verdict.auditNote : entry.firewallAuditNote
-            return (.blockedHallucinatedOrRetracted, note)
+        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
+            let note = (entry.firewallClass == verdict.firewallClass && !entry.firewallAuditNote.isEmpty)
+                ? entry.firewallAuditNote
+                : verdict.auditNote
+            return (verdict.firewallClass, note)
         }
-        if entry.firewallClass == .verifiedCanonicalDOI || entry.firewallClass == .verifiedPreprintRegistry || entry.firewallClass == .metadataDriftAdvisory {
+        if entry.firewallClass != .unverified {
             let note = entry.firewallAuditNote.isEmpty ? verdict.auditNote : entry.firewallAuditNote
             return (entry.firewallClass, note)
         }

@@ -46,10 +46,10 @@ public struct ScholarContextualRightInspectorView: View {
 
     private var compactReadabilityAndVenueFooter: some View {
         let m = viewModel.manuscriptMetrics
-        let flesch = m?.readability.fleschReadingEase ?? 38.4
-        let grade = m?.readability.fleschKincaidGradeLevel ?? 13.6
-        let citeDensity = m?.citationDensityPerThousandWords ?? 16.9
-        let readMin = m?.estimatedReadingTimeMinutes ?? 2.1
+        let flesch = m?.readability.fleschReadingEase ?? 0.0
+        let grade = m?.readability.fleschKincaidGradeLevel ?? 0.0
+        let citeDensity = m?.citationDensityPerThousandWords ?? 0.0
+        let readMin = m?.estimatedReadingTimeMinutes ?? 0.0
 
         return VStack(alignment: .leading, spacing: 5) {
             HStack {
@@ -209,6 +209,7 @@ public struct ScholarContextualRightInspectorView: View {
 public struct ScholarRootWorkbenchView: View {
     @StateObject private var ownedViewModel: ScholarStudioViewModel
     @ObservedObject private var externalViewModel: ScholarStudioViewModel
+    @ObservedObject private var localizer: ScholarLocalizer = .shared
     private let usesExternalViewModel: Bool
 
     public init(viewModel: ScholarStudioViewModel? = nil) {
@@ -236,6 +237,7 @@ public struct ScholarRootWorkbenchView: View {
             preferences: vm.preferences,
             toastCenter: vm.toastCenter,
             projectTitle: vm.projectTitle,
+            isDemoMode: vm.isDemoMode,
             primaryManuscriptPath: vm.primaryManuscriptPath,
             activeSectionTitle: vm.activeSectionTitle,
             manuscriptFiles: vm.manuscriptFiles,
@@ -274,20 +276,62 @@ public struct ScholarRootWorkbenchView: View {
 
     @ViewBuilder
     private func activeStudioCanvas(for vm: ScholarStudioViewModel) -> some View {
-        switch vm.docking.activeStudioTab {
-        case .manuscriptEditor:
-            ManuscriptLSPEditorStudioView(viewModel: vm)
-        case .pdfProvenance:
-            PDFAndClaimProvenanceStudioView(viewModel: vm)
-        case .citationGraph:
-            CitationKnowledgeGraphStudioView(viewModel: vm)
-        case .prismaScreening:
-            PRISMAScreeningAndRoB2StudioView(viewModel: vm)
-        case .citationFirewall:
-            CitationFirewallAndTrackChangesStudioView(viewModel: vm)
-        case .editorialAudit:
-            EditorialJavaScriptAuditStudioView(viewModel: vm)
+        if !vm.isDemoMode && vm.manuscriptFiles.isEmpty && vm.bibliographyEntries.isEmpty && vm.screeningStudies.isEmpty {
+            emptyWorkspaceCanvas(for: vm)
+        } else {
+            switch vm.docking.activeStudioTab {
+            case .manuscriptEditor:
+                ManuscriptLSPEditorStudioView(viewModel: vm)
+            case .pdfProvenance:
+                PDFAndClaimProvenanceStudioView(viewModel: vm)
+            case .citationGraph:
+                CitationKnowledgeGraphStudioView(viewModel: vm)
+            case .prismaScreening:
+                PRISMAScreeningAndRoB2StudioView(viewModel: vm)
+            case .citationFirewall:
+                CitationFirewallAndTrackChangesStudioView(viewModel: vm)
+            case .editorialAudit:
+                EditorialJavaScriptAuditStudioView(viewModel: vm)
+            }
         }
+    }
+
+    private func emptyWorkspaceCanvas(for vm: ScholarStudioViewModel) -> some View {
+        VStack(spacing: 14) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 32, weight: .medium))
+                .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
+
+            Text(localizer.L("No Project or Manuscript Loaded", "未打开工程或手稿"))
+                .font(CambridgeTypography.scholarlyTitle)
+                .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
+
+            Text(
+                localizer.L(
+                    "0 manuscripts, 0 bibliography entries. Direct file inspection (outline, diagnostics, verify-citations, format-bib) runs via the scholaros CLI. This desktop window currently displays sample data only when explicitly requested.",
+                    "当前为 0 份手稿、0 条参考文献。直接文件检查（outline、diagnostics、verify-citations、format-bib）请通过 scholaros 命令行运行；当前桌面窗口仅在显式请求时展示未核查示例数据。"
+                )
+            )
+                .font(CambridgeTypography.uiControl)
+                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)
+
+            Button {
+                vm.loadDemoWorkspace()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.rectangle")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(localizer.L("Load Demo", "载入演示数据"))
+                }
+            }
+            .buttonStyle(CambridgePrimaryButtonStyle())
+        }
+        .padding(28)
+        .cambridgeArchivalCard(padding: 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(CambridgeLinenPalette.cambridgeLinen)
     }
 }
 
@@ -354,7 +398,7 @@ public enum ScholarScreenshotExportService {
         let resolvedLanguage = language ?? ScholarLocalizer.shared.language
         ScholarLocalizer.shared.setLanguage(resolvedLanguage)
 
-        let viewModel = ScholarStudioViewModel()
+        let viewModel = ScholarStudioViewModel(seedDemo: true)
         var writtenURLs: [URL] = []
 
         let windowRect = NSRect(origin: .zero, size: viewportSize)
@@ -424,7 +468,10 @@ public enum ScholarScreenshotExportService {
         offscreenWindow.orderOut(nil)
 
         // Also export the standalone bilingual Cambridge Linen HTML Audit Dossier (Hallmark sloplint 0/0/0)
-        let htmlString = try CambridgeLinenHTMLReportExporter().exportHTMLDossier(database: viewModel.database)
+        let htmlString = try CambridgeLinenHTMLReportExporter().exportHTMLDossier(
+            database: viewModel.database,
+            isDemo: true
+        )
         let htmlURL = directoryURL.appendingPathComponent("demo-scholar-dossier.html")
         try htmlString.write(to: htmlURL, atomically: true, encoding: .utf8)
         writtenURLs.append(htmlURL)

@@ -262,13 +262,19 @@ public final class ScholarDockingController: ObservableObject {
         bottomDrawerHeight: CGFloat = 208,
         zoomScale: Double = 1.0,
         synchronizedCursor: ScholarCursorLocation? = nil,
-        selectedCiteKey: String? = nil
+        selectedCiteKey: String? = nil,
+        allowEmptyTabs: Bool = false
     ) {
-        let nonEmptyTabs = initialTabs.isEmpty
-            ? [OpenManuscriptTab(filePath: activeManuscriptFilePath, isPinned: true)]
-            : initialTabs
+        let resolvedTabs: [OpenManuscriptTab]
+        if allowEmptyTabs && initialTabs.isEmpty {
+            resolvedTabs = []
+        } else if initialTabs.isEmpty {
+            resolvedTabs = [OpenManuscriptTab(filePath: activeManuscriptFilePath.isEmpty ? "main.tex" : activeManuscriptFilePath, isPinned: true)]
+        } else {
+            resolvedTabs = initialTabs
+        }
         self.activeStudioTab = activeStudioTab
-        self.openManuscriptTabs = nonEmptyTabs
+        self.openManuscriptTabs = resolvedTabs
         self.activeManuscriptFilePath = activeManuscriptFilePath
         self.rightInspectorMode = rightInspectorMode
         self.isLeftSidebarVisible = isLeftSidebarVisible
@@ -299,7 +305,11 @@ public final class ScholarDockingController: ObservableObject {
         _ records: [ManuscriptFileRecord],
         primaryFile: String = "main.tex"
     ) {
-        guard !records.isEmpty else { return }
+        guard !records.isEmpty else {
+            openManuscriptTabs = []
+            activeManuscriptFilePath = ""
+            return
+        }
         let byPath = Dictionary(uniqueKeysWithValues: records.map { ($0.path, $0) })
 
         var updatedTabs: [OpenManuscriptTab] = []

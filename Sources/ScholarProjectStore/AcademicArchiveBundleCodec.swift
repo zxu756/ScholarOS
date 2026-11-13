@@ -315,7 +315,7 @@ public struct AcademicArchiveBundleCodec: Sendable {
             citedKeys = citationScan.orderedKeys
         }
 
-        // 3. Enforce hardware-gated 5-class Citation Verification Firewall
+        // 3. Enforce 5-class Citation Verification Firewall
         var selectedEntriesInCitationOrder: [BibliographyEntry] = []
         var driftAdvisoryKeys: [String] = []
         var overriddenKeys: [String] = []
@@ -346,7 +346,7 @@ public struct AcademicArchiveBundleCodec: Sendable {
                 overriddenKeys.append(entry.citeKey)
             }
 
-            if entry.firewallClass == .metadataDriftAdvisory {
+            if entry.firewallClass == .drift {
                 driftAdvisoryKeys.append(entry.citeKey)
             }
             selectedEntriesInCitationOrder.append(entry)

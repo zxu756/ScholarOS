@@ -168,10 +168,10 @@ public struct ManuscriptLSPEditorStudioView: View {
     }
 
     private var sourceLines: [String] {
-        let raw = viewModel.activeSourceBuffer.isEmpty
-            ? ScholarStudioViewModel.canonicalMainTeXSource
-            : viewModel.activeSourceBuffer
-        return raw.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        guard !viewModel.activeSourceBuffer.isEmpty else {
+            return []
+        }
+        return viewModel.activeSourceBuffer.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
     }
 
     private var diagnosticsByLine: [Int: [LSPDiagnostic]] {
@@ -231,10 +231,10 @@ public struct ManuscriptLSPEditorStudioView: View {
 
     private var editorMetricsAndModeStrip: some View {
         let metrics = viewModel.manuscriptMetrics
-        let words = metrics?.totalCountedWords ?? 412
-        let eqs = metrics?.totalEquationCount ?? 2
-        let cites = metrics?.totalCitationOccurrences ?? 7
-        let fog = metrics?.readability.gunningFogIndex ?? 14.2
+        let words = metrics?.totalCountedWords ?? 0
+        let eqs = metrics?.totalEquationCount ?? 0
+        let cites = metrics?.totalCitationOccurrences ?? 0
+        let fog = metrics?.readability.gunningFogIndex ?? 0.0
         let activeFormat = ManuscriptFormat.detect(fromPath: viewModel.docking.activeManuscriptFilePath)
 
         return HStack(spacing: 8) {

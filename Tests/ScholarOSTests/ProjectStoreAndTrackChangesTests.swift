@@ -20,8 +20,8 @@ struct ProjectStoreAndTrackChangesTests {
         title: String,
         year: Int = 2024,
         doi: String? = "10.1145/3000.1",
-        firewallClass: CitationFirewallClass = .verifiedCanonicalDOI,
-        note: String = "Verified DOI"
+        firewallClass: CitationFirewallClass = .verified,
+        note: String = "Verified registry record"
     ) -> BibliographyEntry {
         BibliographyEntry(
             citeKey: key,
@@ -158,8 +158,8 @@ struct ProjectStoreAndTrackChangesTests {
         #expect(stats.schemaVersion == 4)
         #expect(stats.manuscriptWordCount > 150)
         #expect(stats.bibliographyCount >= 8)
-        #expect(stats.verifiedCitationCount >= 5)
-        #expect(stats.blockedCitationCount >= 1)
+        #expect(stats.verifiedCitationCount == 0)
+        #expect(stats.blockedCitationCount == 1)
         #expect(stats.indexedPDFPassageCount >= 6)
         #expect(stats.prismaStudyCount >= 10)
         #expect(FileManager.default.fileExists(atPath: bundleURL.appendingPathComponent("manuscripts/main.tex").path))
@@ -207,18 +207,27 @@ struct ProjectStoreAndTrackChangesTests {
         #expect(try db.listManuscriptFiles().count == 1)
     }
 
-    @Test("Hardware-gated validateCitationKeyForInsertion blocks smith2025hallucinated, unverified, and missing keys with ERR_UNVERIFIED_CITATION")
-    func hardwareGatedValidateCitationKeyForInsertionEnforcesFirewall() throws {
+    @Test("validateCitationKeyForInsertion blocks unverified demo entries, smith2025hallucinated, and missing keys, and permits verified records")
+    func validateCitationKeyForInsertionEnforcesFirewall() throws {
         let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
         defer { db.close() }
 
-        // 1. Verified DOI succeeds
-        let verified = try db.validateCitationKeyForInsertion("vaswani2017attention")
-        #expect(verified.firewallClass == .verifiedCanonicalDOI)
+        // 1. Demo-seeded entries start UNVERIFIED ("Demo data - unverified") and MUST be blocked until verified
+        do {
+            _ = try db.validateCitationKeyForInsertion("vaswani2017attention")
+            Issue.record("Expected unverified demo entry vaswani2017attention to be blocked until verified")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
 
-        // 2. Verified arXiv preprint succeeds
-        let preprint = try db.validateCitationKeyForInsertion("dao2023flashattention2")
-        #expect(preprint.firewallClass == .verifiedPreprintRegistry)
+        // 2. Once marked VERIFIED (e.g. after registry verification), insertion succeeds
+        try db.updateCitationFirewallStatus(
+            citeKey: "vaswani2017attention",
+            firewallClass: .verified,
+            auditNote: "Verified against registry"
+        )
+        let verified = try db.validateCitationKeyForInsertion("vaswani2017attention")
+        #expect(verified.firewallClass == .verified)
 
         // 3. Blocked hallucination (smith2025hallucinated) MUST throw ERR_UNVERIFIED_CITATION
         do {
@@ -234,7 +243,7 @@ struct ProjectStoreAndTrackChangesTests {
                 key: "offline2025draft",
                 title: "Unverified Local Draft",
                 doi: nil,
-                firewallClass: .unverifiedPendingCheck,
+                firewallClass: .unverified,
                 note: "Pending online check"
             )
         )
@@ -264,14 +273,14 @@ struct ProjectStoreAndTrackChangesTests {
             title: "Deep Learning",
             year: 2015,
             doi: "10.1038/nature14539",
-            firewallClass: .verifiedCanonicalDOI
+            firewallClass: .verified
         )
         let nearDup = makeBibEntry(
             key: "lecun2015deep_copy",
             title: "Deep learning",
             year: 2015,
             doi: "10.1038/nature14539",
-            firewallClass: .unverifiedPendingCheck
+            firewallClass: .unverified
         )
         try db.upsertBibliographyEntries([primary, nearDup])
 
@@ -281,10 +290,10 @@ struct ProjectStoreAndTrackChangesTests {
 
         try db.updateCitationFirewallStatus(
             citeKey: "lecun2015deep_copy",
-            firewallClass: .blockedHallucinatedOrRetracted,
+            firewallClass: .notFound,
             auditNote: "Duplicate suppressed"
         )
-        let blockedOnly = try db.listBibliographyEntries(firewallFilter: .blockedHallucinatedOrRetracted)
+        let blockedOnly = try db.listBibliographyEntries(firewallFilter: .notFound)
         #expect(blockedOnly.map(\.citeKey) == ["lecun2015deep_copy"])
     }
 
@@ -594,7 +603,7 @@ struct ProjectStoreAndTrackChangesTests {
                 title: "FlashAttention-2",
                 year: 2023,
                 doi: nil,
-                firewallClass: .verifiedPreprintRegistry
+                firewallClass: .verified
             ),
             "unused2020": makeBibEntry(key: "unused2020", title: "Uncited Paper", year: 2020)
         ]
@@ -637,7 +646,7 @@ struct ProjectStoreAndTrackChangesTests {
                 title: "Fabricated Paper",
                 year: 2025,
                 doi: "10.5555/fake-llm-cite.9999",
-                firewallClass: .blockedHallucinatedOrRetracted,
+                firewallClass: .notFound,
                 note: "Hallucinated DOI"
             )
         ]
@@ -671,14 +680,20 @@ struct ProjectStoreAndTrackChangesTests {
         #expect(overriddenBundle.manifest.overriddenUnverifiedKeys == ["smith2025hallucinated"])
     }
 
-    @Test("AcademicArchiveBundleCodec exports deterministic seeded DB cleanly because commented-out smith2025hallucinated is stripped first")
+    @Test("AcademicArchiveBundleCodec blocks unverified demo database by default and strips commented-out smith2025hallucinated when overridden")
     func archiveBundleExportsSeededDatabaseAfterCommentStripping() throws {
         let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
         defer { db.close() }
 
-        // Note: In flagshipMainTexSource, \cite{smith2025hallucinated} appears ONLY inside a % comment,
-        // so stripping comments first leaves only verified/drift keys!
-        let bundle = try AcademicArchiveBundleCodec().buildSubmissionBundle(from: db, options: .arxivDefault)
+        // Demo entries are UNVERIFIED in M0, so strict default export blocks until verified or explicitly overridden
+        #expect(throws: ScholarOSError.self) {
+            _ = try AcademicArchiveBundleCodec().buildSubmissionBundle(from: db, options: .arxivDefault)
+        }
+
+        // With allowUnverifiedCitationsOverride, commented-out \cite{smith2025hallucinated} is stripped first
+        var opts = SubmissionArchiveOptions.arxivDefault
+        opts.allowUnverifiedCitationsOverride = true
+        let bundle = try AcademicArchiveBundleCodec().buildSubmissionBundle(from: db, options: opts)
         #expect(!bundle.manifest.citedKeysInAppearanceOrder.contains("smith2025hallucinated"))
         #expect(bundle.manifest.citedKeysInAppearanceOrder.contains("vaswani2017attention"))
         #expect(bundle.manifest.inlinedFiles.contains("sections/methodology.tex"))
@@ -693,7 +708,9 @@ struct ProjectStoreAndTrackChangesTests {
         defer { db.close() }
 
         let codec = AcademicArchiveBundleCodec()
-        let bundle = try codec.buildSubmissionBundle(from: db, options: .arxivDefault)
+        var opts = SubmissionArchiveOptions.arxivDefault
+        opts.allowUnverifiedCitationsOverride = true
+        let bundle = try codec.buildSubmissionBundle(from: db, options: opts)
 
         // 1. POSIX USTAR tarball round-trip in memory
         let tarData = codec.encodeSubmissionTarball(from: bundle, options: .arxivDefault)

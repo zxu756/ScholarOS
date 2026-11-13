@@ -49,28 +49,28 @@ public struct BibAuthor: Sendable, Codable, Hashable, CustomStringConvertible {
 
 /// 5-Class Citation Verification Firewall Status
 public enum CitationFirewallClass: String, Sendable, Codable, Hashable, CaseIterable {
-    case verifiedCanonicalDOI = "VERIFIED_DOI"
-    case verifiedPreprintRegistry = "VERIFIED_ARXIV_PMID"
-    case metadataDriftAdvisory = "METADATA_DRIFT"
-    case unverifiedPendingCheck = "UNVERIFIED_OFFLINE"
-    case blockedHallucinatedOrRetracted = "BLOCKED_HALLUCINATED"
+    case verified = "VERIFIED"
+    case drift = "DRIFT"
+    case notFound = "NOT_FOUND"
+    case retracted = "RETRACTED"
+    case unverified = "UNVERIFIED"
 
     public var allowsManuscriptInsertion: Bool {
         switch self {
-        case .verifiedCanonicalDOI, .verifiedPreprintRegistry, .metadataDriftAdvisory:
+        case .verified:
             return true
-        case .unverifiedPendingCheck, .blockedHallucinatedOrRetracted:
+        case .drift, .notFound, .retracted, .unverified:
             return false
         }
     }
 
     public var badgeTitle: String {
         switch self {
-        case .verifiedCanonicalDOI: return "Verified DOI"
-        case .verifiedPreprintRegistry: return "Verified Preprint"
-        case .metadataDriftAdvisory: return "Metadata Drift"
-        case .unverifiedPendingCheck: return "Unverified"
-        case .blockedHallucinatedOrRetracted: return "Blocked (Fake/Retracted)"
+        case .verified: return "Verified"
+        case .drift: return "Metadata Drift"
+        case .notFound: return "Not Found"
+        case .retracted: return "Retracted"
+        case .unverified: return "Unverified"
         }
     }
 }
@@ -114,7 +114,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         pmid: String? = nil,
         url: String? = nil,
         abstractText: String? = nil,
-        firewallClass: CitationFirewallClass = .unverifiedPendingCheck,
+        firewallClass: CitationFirewallClass = .unverified,
         firewallAuditNote: String = "",
         attachedPDFPath: String? = nil,
         citedByKeys: [String] = [],

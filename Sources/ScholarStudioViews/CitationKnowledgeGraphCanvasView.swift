@@ -232,7 +232,8 @@ public struct CitationKnowledgeGraphStudioView: View {
                 ForEach(viewModel.graphSnapshot.nodes) { node in
                     if let pt = positions[node.citeKey] {
                         let isSelected = (viewModel.selectedGraphCiteKey == node.citeKey)
-                        let isBlocked = (bibByKey[node.citeKey]?.firewallClass == .blockedHallucinatedOrRetracted)
+                        let fw = bibByKey[node.citeKey]?.firewallClass
+                        let isBlocked = (fw == .notFound || fw == .retracted)
                         let r = nodeRadius(for: node)
 
                         Button {
@@ -294,12 +295,12 @@ public struct CitationKnowledgeGraphStudioView: View {
             legendItem(
                 ringColor: CambridgeLinenPalette.verifiedEmerald,
                 fill: CambridgeLinenPalette.verifiedEmeraldBg,
-                label: localizer.L("Verified DOI", "已验证 DOI")
+                label: localizer.L("Verified", "已验证")
             )
             legendItem(
                 ringColor: CambridgeLinenPalette.blockedCrimson,
                 fill: CambridgeLinenPalette.blockedCrimsonBg,
-                label: localizer.L("Quarantined Hallucination", "已隔离伪造引文")
+                label: localizer.L("Not Found / Retracted", "未找到 / 已撤稿")
             )
         }
         .padding(.horizontal, 9)
@@ -497,7 +498,7 @@ public struct CitationKnowledgeGraphStudioView: View {
             let isSelected = (viewModel.selectedGraphCiteKey == node.citeKey)
             let isBridge = node.isBridgePaper || bridges.contains(node.citeKey)
             let isSPC = viewModel.graphHighlightMainPath && spcKeys.contains(node.citeKey)
-            let fwClass = bibByKey[node.citeKey]?.firewallClass ?? .verifiedCanonicalDOI
+            let fwClass = bibByKey[node.citeKey]?.firewallClass ?? .unverified
 
             // Brandes structural-hole bridge outer concentric halo
             if isBridge {
@@ -523,13 +524,13 @@ public struct CitationKnowledgeGraphStudioView: View {
             let fillColor: Color
             let strokeColor: Color
             switch fwClass {
-            case .blockedHallucinatedOrRetracted:
+            case .notFound, .retracted:
                 fillColor = CambridgeLinenPalette.blockedCrimsonBg
                 strokeColor = CambridgeLinenPalette.blockedCrimson
-            case .metadataDriftAdvisory, .unverifiedPendingCheck:
+            case .drift, .unverified:
                 fillColor = CambridgeLinenPalette.preprintOchreBg
                 strokeColor = CambridgeLinenPalette.preprintOchre
-            default:
+            case .verified:
                 fillColor = isSPC ? CambridgeLinenPalette.libraryForestGreen : CambridgeLinenPalette.verifiedEmeraldBg
                 strokeColor = isSPC ? CambridgeLinenPalette.libraryForestGreen : CambridgeLinenPalette.verifiedEmerald
             }

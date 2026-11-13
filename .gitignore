@@ -6,7 +6,6 @@ xcuserdata/
 DerivedData/
 .swiftpm/
 *.xcodeproj
-reports/
 *.scholarproj
 /.build-*
 *-wal

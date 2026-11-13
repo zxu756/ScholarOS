@@ -108,7 +108,7 @@ public struct FirewallGateRejectionRecord: Identifiable, Sendable, Hashable {
         id: UUID = UUID(),
         citeKey: String,
         errorCode: String = "ERR_UNVERIFIED_CITATION",
-        firewallClass: CitationFirewallClass = .blockedHallucinatedOrRetracted,
+        firewallClass: CitationFirewallClass = .notFound,
         attemptedCommand: String,
         reason: String
     ) {
@@ -186,8 +186,9 @@ public final class ScholarStudioViewModel: ObservableObject {
     public private(set) var lspService: ScholarLSPWorkspaceService
 
     // MARK: 1. Manuscript & LSP State
-    @Published public var projectTitle: String = "Verifiable Citation Firewalls & Sandboxes"
-    @Published public var primaryManuscriptPath: String = "main.tex"
+    @Published public var isDemoMode: Bool = false
+    @Published public var projectTitle: String = "ScholarOS"
+    @Published public var primaryManuscriptPath: String = ""
     @Published public var manuscriptFiles: [ManuscriptFileRecord] = []
     @Published public var activeSourceBuffer: String = ""
     @Published public var activeTokens: [MarkupToken] = []
@@ -195,8 +196,8 @@ public final class ScholarStudioViewModel: ObservableObject {
     @Published public var diagnostics: [LSPDiagnostic] = []
     @Published public var codeActions: [LSPCodeAction] = []
     @Published public var completionCandidates: [LSPCompletionItem] = []
-    @Published public var isShowingCompletionPopover: Bool = true
-    @Published public var completionAnchorLine: Int = 18
+    @Published public var isShowingCompletionPopover: Bool = false
+    @Published public var completionAnchorLine: Int = 1
     @Published public var completionQueryPrefix: String = "\\cite{"
     @Published public var activeHoverCard: LSPHoverCard?
     @Published public var manuscriptMetrics: ManuscriptMetricsReport?
@@ -204,7 +205,7 @@ public final class ScholarStudioViewModel: ObservableObject {
 
     // MARK: 2. Two-Column Academic PDF, SyncTeX & Claim Provenance State
     @Published public var renderedPDFFixtures: [RenderedAcademicPDFFixture] = []
-    @Published public var selectedPDFFixtureCiteKey: String = "vaswani2017attention"
+    @Published public var selectedPDFFixtureCiteKey: String = ""
     @Published public var selectedPDFPageIndex: Int = 0
     @Published public var pdfPageBitmapsByKey: [String: [RenderedPDFPageBitmap]] = [:]
     @Published public var pdfPassages: [PDFPassageChunk] = []
@@ -226,7 +227,7 @@ public final class ScholarStudioViewModel: ObservableObject {
     @Published public var mainPathReport: MainPathAnalysisReport?
     @Published public var kleinbergBurstReport: KleinbergBurstAnalysisReport?
     @Published public var missingCitationsReport: LiteratureCoverageGapReport?
-    @Published public var selectedGraphCiteKey: String? = "vaswani2017attention"
+    @Published public var selectedGraphCiteKey: String? = nil
     @Published public var graphShowCoCitationEdges: Bool = true
     @Published public var graphHighlightMainPath: Bool = true
     @Published public var graphZoomScale: CGFloat = 1.0
@@ -257,21 +258,21 @@ public final class ScholarStudioViewModel: ObservableObject {
     @Published public var prismaConflictsOnly: Bool = false
     @Published public var selectedScreeningStudyID: String?
     @Published public var selectedExclusionReasonCode: String = "E1"
-    @Published public var adjudicationRationaleDraft: String = "Full-text methods confirm deterministic Crossref + arXiv registry verification benchmark."
+    @Published public var adjudicationRationaleDraft: String = ""
     @Published public var prismaMetrics: PRISMA2020SummaryMetrics = PRISMA2020SummaryMetrics(
-        databaseRecordsIdentified: 412,
-        registerRecordsIdentified: 38,
-        duplicateRecordsRemoved: 64,
-        recordsScreenedTitleAbstract: 386,
-        recordsExcludedTitleAbstract: 342,
-        reportsSoughtForRetrieval: 44,
-        reportsNotRetrieved: 2,
-        fullTextAssessed: 42,
-        fullTextExcludedByReason: ["E1": 14, "E2": 9, "E3": 6, "E5": 3],
-        finalIncludedStudies: 10,
-        observedAgreementRate: 0.90,
-        cohensKappa: 0.81,
-        pabakScore: 0.80
+        databaseRecordsIdentified: 0,
+        registerRecordsIdentified: 0,
+        duplicateRecordsRemoved: 0,
+        recordsScreenedTitleAbstract: 0,
+        recordsExcludedTitleAbstract: 0,
+        reportsSoughtForRetrieval: 0,
+        reportsNotRetrieved: 0,
+        fullTextAssessed: 0,
+        fullTextExcludedByReason: [:],
+        finalIncludedStudies: 0,
+        observedAgreementRate: 0.0,
+        cohensKappa: 0.0,
+        pabakScore: 0.0
     )
     @Published public var agreementReport: DualRaterAgreementReport?
     @Published public var seedRecallReport: SeedRecallValidationReport?
@@ -327,7 +328,8 @@ public final class ScholarStudioViewModel: ObservableObject {
         database: ScholarProjectDatabase? = nil,
         docking: ScholarDockingController? = nil,
         preferences: ScholarWorkbenchPreferences? = nil,
-        toastCenter: ScholarToastCenter? = nil
+        toastCenter: ScholarToastCenter? = nil,
+        seedDemo: Bool = false
     ) {
         let resolvedDB: ScholarProjectDatabase
         if let database {
@@ -346,34 +348,86 @@ public final class ScholarStudioViewModel: ObservableObject {
         let resolvedToast = toastCenter ?? ScholarToastCenter()
         self.toastCenter = resolvedToast
 
-        let resolvedDocking = docking ?? ScholarDockingController(
-            activeStudioTab: .manuscriptEditor,
-            initialTabs: [
-                OpenManuscriptTab(filePath: "main.tex", format: .latex, isPinned: true, wordCount: 410, lastCursorLine: 18, lastCursorColumn: 14),
-                OpenManuscriptTab(filePath: "sections/methodology.tex", format: .latex, isPinned: false, wordCount: 225, lastCursorLine: 9, lastCursorColumn: 1),
-                OpenManuscriptTab(filePath: "notes/protocol.typ", format: .typst, isPinned: false, wordCount: 140, lastCursorLine: 6, lastCursorColumn: 1)
-            ],
-            activeManuscriptFilePath: "main.tex",
-            rightInspectorMode: .pdfPreview,
-            isLeftSidebarVisible: true,
-            leftSidebarWidth: 236,
-            rightInspectorWidth: 488,
-            isBottomDrawerVisible: true,
-            activeDrawerChannel: .diagnostics,
-            bottomDrawerHeight: 174,
-            zoomScale: 1.0,
-            synchronizedCursor: ScholarCursorLocation(filePath: "main.tex", line: 18, column: 14),
-            selectedCiteKey: "vaswani2017attention"
-        )
+        let existingHasContent = !((try? resolvedDB.listManuscriptFiles()) ?? []).isEmpty
+            || !((try? resolvedDB.listBibliographyEntries()) ?? []).isEmpty
+
+        let resolvedDocking: ScholarDockingController
+        if let docking {
+            resolvedDocking = docking
+        } else if seedDemo {
+            resolvedDocking = ScholarDockingController(
+                activeStudioTab: .manuscriptEditor,
+                initialTabs: [
+                    OpenManuscriptTab(filePath: "main.tex", format: .latex, isPinned: true, wordCount: 410, lastCursorLine: 18, lastCursorColumn: 14),
+                    OpenManuscriptTab(filePath: "sections/methodology.tex", format: .latex, isPinned: false, wordCount: 225, lastCursorLine: 9, lastCursorColumn: 1),
+                    OpenManuscriptTab(filePath: "notes/protocol.typ", format: .typst, isPinned: false, wordCount: 140, lastCursorLine: 6, lastCursorColumn: 1)
+                ],
+                activeManuscriptFilePath: "main.tex",
+                rightInspectorMode: .pdfPreview,
+                isLeftSidebarVisible: true,
+                leftSidebarWidth: 236,
+                rightInspectorWidth: 488,
+                isBottomDrawerVisible: true,
+                activeDrawerChannel: .diagnostics,
+                bottomDrawerHeight: 174,
+                zoomScale: 1.0,
+                synchronizedCursor: ScholarCursorLocation(filePath: "main.tex", line: 18, column: 14),
+                selectedCiteKey: "vaswani2017attention"
+            )
+        } else {
+            resolvedDocking = ScholarDockingController(
+                activeStudioTab: .manuscriptEditor,
+                initialTabs: [],
+                activeManuscriptFilePath: "",
+                rightInspectorMode: .none,
+                isLeftSidebarVisible: existingHasContent,
+                leftSidebarWidth: 236,
+                rightInspectorWidth: 488,
+                isBottomDrawerVisible: false,
+                activeDrawerChannel: .diagnostics,
+                bottomDrawerHeight: 174,
+                zoomScale: 1.0,
+                synchronizedCursor: ScholarCursorLocation(filePath: "", line: 1, column: 1),
+                selectedCiteKey: nil,
+                allowEmptyTabs: true
+            )
+        }
         self.docking = resolvedDocking
 
         self.lspService = ScholarLSPWorkspaceService(
             rootFilePath: "main.tex",
-            files: ["main.tex": ""],
+            files: [:],
             bibliography: [],
             citationStyle: .apa7
         )
 
+        if seedDemo {
+            loadDemoWorkspace()
+        } else if existingHasContent {
+            rebuildAllSubsystems()
+        } else {
+            self.isDemoMode = false
+            self.lastBlockedInsertionAlert = nil
+        }
+    }
+
+    /// Explicitly loads the built-in sample study and enables the window-wide `DEMO` indicator.
+    public func loadDemoWorkspace() {
+        isDemoMode = true
+        isShowingCompletionPopover = true
+        completionAnchorLine = 18
+        adjudicationRationaleDraft = "Demo protocol adjudication note (unverified sample)."
+        docking.isLeftSidebarVisible = true
+        docking.isBottomDrawerVisible = true
+        docking.rightInspectorMode = .pdfPreview
+        docking.openManuscriptTabs = [
+            OpenManuscriptTab(filePath: "main.tex", format: .latex, isPinned: true, wordCount: 410, lastCursorLine: 18, lastCursorColumn: 14),
+            OpenManuscriptTab(filePath: "sections/methodology.tex", format: .latex, isPinned: false, wordCount: 225, lastCursorLine: 9, lastCursorColumn: 1),
+            OpenManuscriptTab(filePath: "notes/protocol.typ", format: .typst, isPinned: false, wordCount: 140, lastCursorLine: 6, lastCursorColumn: 1)
+        ]
+        docking.activeManuscriptFilePath = "main.tex"
+        docking.synchronizedCursor = ScholarCursorLocation(filePath: "main.tex", line: 18, column: 14)
+        docking.selectedCiteKey = "vaswani2017attention"
         seedRichAcademicStudyIfNeeded()
         rebuildAllSubsystems()
 
@@ -389,17 +443,14 @@ public final class ScholarStudioViewModel: ObservableObject {
     // MARK: - Deterministic Rich Academic Corpus Seeding
 
     private func seedRichAcademicStudyIfNeeded() {
-        // Keep project title <= 48 chars so Top Breadcrumb NEVER triggers ellipsis truncation!
-        try? database.setProjectTitle("Verifiable Citation Firewalls & Sandboxes")
+        try? database.setProjectTitle("[DEMO] Citation Audit & Academic Sample")
 
-        // Replace legacy demo plugin IDs with the 4 canonical BuiltInEditorialPluginCatalog JS plugins
         _ = try? database.connection.execute("DELETE FROM plugin_states;")
         for plugin in BuiltInEditorialPluginCatalog.allPlugins {
             try? database.upsertPluginManifest(plugin)
         }
         preferences.pluginManifests = BuiltInEditorialPluginCatalog.allPlugins
 
-        // Upsert 3 multi-file LaTeX + Typst buffers showcasing macros, equations, citations, stat tuples & editorial targets
         let mainTex = Self.canonicalMainTeXSource
         let methodologyTex = Self.canonicalMethodologyTeXSource
         let protocolTyp = Self.canonicalProtocolTypstSource
@@ -411,12 +462,10 @@ public final class ScholarStudioViewModel: ObservableObject {
         _ = try? database.upsertManuscriptFile(path: "sections/methodology.tex", content: methodologyTex, format: .latex)
         _ = try? database.upsertManuscriptFile(path: "notes/protocol.typ", content: protocolTyp, format: .typst)
 
-        // Seed 14 interconnected bibliography records spanning all 5 Firewall classes + duplicate candidate + missing seminal refs
         for entry in Self.canonicalBibliographyCorpus {
             try? database.upsertBibliographyEntry(entry)
         }
 
-        // Seed PRISMA 2020 protocol & 10 dual-rater screening studies
         try? database.savePRISMAProtocol(
             picoProtocol,
             protocolID: "default",
@@ -428,45 +477,26 @@ public final class ScholarStudioViewModel: ObservableObject {
             try? database.upsertScreeningStudy(study)
         }
 
-        // Seed named revision snapshots for Myers O(ND) word-level Track Changes diffing
         let existingSnapshots = (try? database.listSnapshots(filePath: "main.tex")) ?? []
         if existingSnapshots.count < 2 {
             _ = try? database.createSnapshot(
                 label: "v1.0 Initial Submission Draft",
-                authorName: "E. Vance",
+                authorName: "E. Vance (Demo)",
                 filePath: "main.tex",
                 sourceContent: Self.baselineSnapshotMainTeX,
                 createdAt: Date(timeIntervalSince1970: 1_762_992_000)
             )
             _ = try? database.createSnapshot(
-                label: "v1.2 Camera-Ready Calibration",
-                authorName: "E. Vance & K. Takahashi",
+                label: "v1.2 Revised Sample Draft",
+                authorName: "E. Vance & K. Takahashi (Demo)",
                 filePath: "main.tex",
                 sourceContent: mainTex,
                 createdAt: Date(timeIntervalSince1970: 1_762_995_600)
             )
         }
 
-        // Pre-populate authentic PDF fixtures, rasterized 2x CGImages, passages & BM25 Claim-to-PDF Provenance links
         hydratePDFFixturesAndProvenance()
-
-        // Record an initial undoable manuscript refinement so Undo badge is live in the toolbar
-        if undoRedo.undoDepth == 0 {
-            try? database.recordAuditEvent(
-                category: "CITATION_FIREWALL",
-                action: "blockedInsertion",
-                targetKey: "smith2025hallucinated",
-                details: ["code": "ERR_UNVERIFIED_CITATION", "reason": "Crossref & arXiv 404; fabricated venue"]
-            )
-        }
-
-        lastBlockedInsertionAlert = FirewallGateRejectionRecord(
-            citeKey: "smith2025hallucinated",
-            errorCode: "ERR_UNVERIFIED_CITATION",
-            firewallClass: .blockedHallucinatedOrRetracted,
-            attemptedCommand: "\\cite{smith2025hallucinated}",
-            reason: "Hardware Firewall Gate rejected insertion: DOI 10.9999/fake.2025.001 returned HTTP 404 on Crossref & arXiv; venue 'Journal of Universal AI' is unindexed."
-        )
+        lastBlockedInsertionAlert = nil
     }
 
     private func hydratePDFFixturesAndProvenance() {
@@ -524,7 +554,7 @@ public final class ScholarStudioViewModel: ObservableObject {
                 id: UUID(uuidString: "11111111-2222-4333-8444-555555555502")!,
                 manuscriptFile: "main.tex",
                 manuscriptLine: 22,
-                manuscriptClaim: "Hardware citation firewall gates eliminate 99.4% of hallucinated BibTeX keys prior to compilation.",
+                manuscriptClaim: "Citation audit checks reduce 99.4% of hallucinated BibTeX keys prior to compilation.",
                 citeKey: primaryKey,
                 passageID: primaryChunks.dropFirst().first?.id ?? "chunk-02",
                 pdfExcerpt: "Empirical audit across 1,240 LLM-assisted drafts reported a 94.2% reduction (not 99.4%) in unresolved DOI insertions under offline lexicon checks.",
@@ -563,7 +593,7 @@ public final class ScholarStudioViewModel: ObservableObject {
                 manuscriptClaim: "Zero-shot neural theorem synthesis resolves every undecidable macro expansion cycle in O(1) time.",
                 citeKey: "smith2025hallucinated",
                 passageID: "unindexed-hallucinated",
-                pdfExcerpt: "No indexed PDF passage exists: target key @smith2025hallucinated is blocked by CitationFirewallClass.blockedHallucinatedOrRetracted.",
+                pdfExcerpt: "No indexed PDF passage exists: target key @smith2025hallucinated is marked NOT_FOUND.",
                 boundingBox: PDFPageRegionBox(pageIndex: 0, x: 318, y: 190, width: 236, height: 74),
                 bm25Score: 0.42,
                 verdict: .unsupportedClaim
@@ -578,24 +608,27 @@ public final class ScholarStudioViewModel: ObservableObject {
     // MARK: - Full Subsystem Recomputation Pipeline
 
     public func rebuildAllSubsystems() {
-        projectTitle = (try? database.projectTitle()) ?? "Verifiable Citation Firewalls & Sandboxes"
-        primaryManuscriptPath = (try? database.primaryManuscriptFile()) ?? "main.tex"
         manuscriptFiles = (try? database.listManuscriptFiles()) ?? []
         bibliographyEntries = (try? database.listBibliographyEntries()) ?? []
+        let hasWorkspaceData = !manuscriptFiles.isEmpty || !bibliographyEntries.isEmpty || isDemoMode
 
-        docking.syncWithManuscriptRecords(manuscriptFiles, primaryFile: primaryManuscriptPath)
+        let rawTitle = (try? database.projectTitle()) ?? (isDemoMode ? "[DEMO] Citation Audit & Academic Sample" : "ScholarOS")
+        projectTitle = hasWorkspaceData ? rawTitle : "ScholarOS"
+        primaryManuscriptPath = manuscriptFiles.isEmpty ? "" : ((try? database.primaryManuscriptFile()) ?? manuscriptFiles[0].path)
 
-        // 1. Rebuild Incremental LSP Workspace
+        docking.syncWithManuscriptRecords(
+            manuscriptFiles,
+            primaryFile: primaryManuscriptPath.isEmpty ? "main.tex" : primaryManuscriptPath
+        )
+
+        // 1. Rebuild Incremental LSP Workspace (never inject synthetic demo TeX when empty)
         var fileMap: [String: String] = [:]
         for record in manuscriptFiles {
             fileMap[record.path] = record.content
         }
-        if fileMap.isEmpty {
-            fileMap["main.tex"] = Self.canonicalMainTeXSource
-        }
 
         let lsp = ScholarLSPWorkspaceService(
-            rootFilePath: primaryManuscriptPath,
+            rootFilePath: primaryManuscriptPath.isEmpty ? "main.tex" : primaryManuscriptPath,
             files: fileMap,
             bibliography: bibliographyEntries,
             citationStyle: selectedCSLStyle
@@ -735,20 +768,24 @@ public final class ScholarStudioViewModel: ObservableObject {
         let baseSnap = snapshots.first(where: { $0.id == selectedBaselineSnapshotID }) ?? snapshots.first
         let revSnap = snapshots.first(where: { $0.id == selectedRevisedSnapshotID }) ?? snapshots.last
 
-        let report: TrackChangesDiffReport
         if let baseSnap, let revSnap, baseSnap.id != revSnap.id {
-            report = diffEngine.diffSnapshots(baseline: baseSnap, revised: revSnap)
-        } else {
-            report = diffEngine.diff(
-                original: Self.baselineSnapshotMainTeX,
-                revised: activeSourceBuffer.isEmpty ? Self.canonicalMainTeXSource : activeSourceBuffer,
-                filePath: primaryManuscriptPath,
-                baselineLabel: "v1.0 Submission Baseline",
+            let report = diffEngine.diffSnapshots(baseline: baseSnap, revised: revSnap)
+            self.trackChangesReport = report
+            self.trackChangesHunks = report.extractHunks(contextCharacterLimit: 48)
+        } else if !activeSourceBuffer.isEmpty {
+            let report = diffEngine.diff(
+                original: baseSnap?.sourceContent ?? activeSourceBuffer,
+                revised: activeSourceBuffer,
+                filePath: primaryManuscriptPath.isEmpty ? "main.tex" : primaryManuscriptPath,
+                baselineLabel: baseSnap?.label ?? "Baseline",
                 revisedLabel: "Working Buffer"
             )
+            self.trackChangesReport = report
+            self.trackChangesHunks = report.extractHunks(contextCharacterLimit: 48)
+        } else {
+            self.trackChangesReport = nil
+            self.trackChangesHunks = []
         }
-        self.trackChangesReport = report
-        self.trackChangesHunks = report.extractHunks(contextCharacterLimit: 48)
     }
 
     public func refreshCitationKnowledgeGraph() {
@@ -800,6 +837,15 @@ public final class ScholarStudioViewModel: ObservableObject {
             prismaMetrics = computedMetrics
         }
 
+        guard !fullDeck.isEmpty else {
+            agreementReport = nil
+            seedRecallReport = nil
+            rob2Matrix = nil
+            effectEstimates = []
+            metaSynthesisPlan = nil
+            return
+        }
+
         agreementReport = reliabilityEngine.evaluateDualRaterAgreement(
             studies: fullDeck,
             protocolSpec: picoProtocol
@@ -825,7 +871,7 @@ public final class ScholarStudioViewModel: ObservableObject {
             GoldStandardSeedStudy(
                 seedID: "seed-vaswani2017",
                 expectedCiteKey: "vaswani2017attention",
-                expectedDOI: "10.5555/3295222.3295349",
+                expectedDOI: "10.48550/arXiv.1706.03762",
                 canonicalTitle: "Attention Is All You Need",
                 publicationYear: 2017,
                 inclusionRationale: "Benchmark transformer baseline evaluated in citation grounding experiments."
@@ -868,15 +914,25 @@ public final class ScholarStudioViewModel: ObservableObject {
         for file in manuscriptFiles {
             filesMap[file.path] = file.content
         }
-        if filesMap.isEmpty {
-            filesMap[primaryManuscriptPath] = activeSourceBuffer
+        if filesMap.isEmpty && !activeSourceBuffer.isEmpty {
+            filesMap[primaryManuscriptPath.isEmpty ? "main.tex" : primaryManuscriptPath] = activeSourceBuffer
+        }
+        guard !filesMap.isEmpty else {
+            editorialRunSummary = nil
+            editorialFindings = []
+            perPluginTimingsMs = [:]
+            pluginLogs = []
+            apaStatRows = []
+            jsScratchpadOutput = nil
+            projectStats = try? database.computeProjectStats()
+            return
         }
         let safeFilesMap = Self.sanitizeFilesForEditorialWorkspace(filesMap)
 
         let runner = EditorialPluginAuditRunner(options: preferences.buildAuditRunOptions())
         if let summary = try? runner.run(
             files: safeFilesMap,
-            primaryFilePath: primaryManuscriptPath,
+            primaryFilePath: primaryManuscriptPath.isEmpty ? "main.tex" : primaryManuscriptPath,
             bibliography: bibliographyEntries,
             plugins: preferences.pluginManifests
         ) {
@@ -944,7 +1000,7 @@ public final class ScholarStudioViewModel: ObservableObject {
             return true
         } catch let error as ScholarOSError {
             let lang = ScholarLocalizer.shared.language
-            let entryClass = bibliographyEntries.first(where: { $0.citeKey == citeKey })?.firewallClass ?? .blockedHallucinatedOrRetracted
+            let entryClass = bibliographyEntries.first(where: { $0.citeKey == citeKey })?.firewallClass ?? .notFound
             let rejection = FirewallGateRejectionRecord(
                 citeKey: citeKey,
                 errorCode: error.errorCodeIdentifier,
@@ -1475,6 +1531,7 @@ public final class ScholarStudioViewModel: ObservableObject {
     }
 
     private func computeAPAStatVerificationTable() -> [APAStatVerificationRow] {
+        guard !manuscriptFiles.isEmpty else { return [] }
         let pT1 = ScholarStatisticalDistributions.computeTwoTailedTPValue(tStat: 2.42, df: 48)
         let pF1 = ScholarStatisticalDistributions.computeFPValue(fStat: 6.84, df1: 2, df2: 87)
         let pChi = ScholarStatisticalDistributions.computeChiSquarePValue(chiSq: 11.34, df: 3)
@@ -1633,8 +1690,8 @@ extension ScholarStudioViewModel {
     Transformer sequence models \cite{vaswani2017attention,lewis2020rag} accelerate synthesis,
     while transparent systematic reviews follow PRISMA 2020 standards \cite{page2021prisma}.
     Multi-head attention achieves 28.4 BLEU on WMT 2014 EN-DE without recurrence \cite{vaswani2017attention}.
-    \section{Hardware Citation Firewall}\label{sec:firewall}
-    Every insertion via \firewallgate{k} checks Crossref, arXiv, and PubMed registries \cite{cohen1960kappa}:
+    \section{Citation Verification Rules}\label{sec:firewall}
+    Every insertion via \firewallgate{k} evaluates syntax and bibliography status \cite{cohen1960kappa}:
     \begin{equation}\label{eq:firewall}
       \mathcal{G}(k) = \mathbb{I}\!\left[\mathrm{DOI}(k) \lor \mathrm{arXiv}(k)\right] \cdot (1 - \mathrm{Retracted}(k))
     \end{equation}
@@ -1664,7 +1721,7 @@ extension ScholarStudioViewModel {
     = Typst Protocol & Evidence Ledger <sec:typst-proto>
 
     ScholarOS parses LaTeX and Typst CSTs into a unified cross-file outline.
-     Verified references like @vaswani2017attention and @page2021prisma resolve across both formats.
+     Sample references like @vaswani2017attention and @page2021prisma resolve across both formats.
 
     $ kappa = (p_o - p_e) / (1 - p_e) $
 
@@ -1681,11 +1738,11 @@ extension ScholarStudioViewModel {
             venue: "Advances in Neural Information Processing Systems (NeurIPS)",
             volume: "30",
             pages: "5998-6008",
-            doi: "10.5555/3295222.3295349",
+            doi: "10.48550/arXiv.1706.03762",
             arxivID: "1706.03762",
             abstractText: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks; we propose the Transformer based solely on attention mechanisms.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI & arXiv 1706.03762v7 canonical metadata match.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["lewis2020rag", "gao2023aclarc", "min2023factscore"],
             referencesKeys: ["lin2004rouge"]
         ),
@@ -1698,11 +1755,11 @@ extension ScholarStudioViewModel {
             venue: "Advances in Neural Information Processing Systems (NeurIPS)",
             volume: "33",
             pages: "9459-9474",
-            doi: "10.5555/3495724.3496517",
+            doi: "10.48550/arXiv.2005.11401",
             arxivID: "2005.11401",
             abstractText: "Combines parametric sequence-to-sequence memory with non-parametric dense retrieval indexes for grounded generation.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified NeurIPS 2020 proceedings record & arXiv 2005.11401.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["gao2023aclarc", "min2023factscore"],
             referencesKeys: ["vaswani2017attention", "robertson2009bm25"]
         ),
@@ -1718,8 +1775,8 @@ extension ScholarStudioViewModel {
             pages: "333-389",
             doi: "10.1561/1500000019",
             abstractText: "Derives Okapi BM25 term-saturation and document-length normalization for passage-level lexical retrieval.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI 10.1561/1500000019.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["lewis2020rag", "gao2023aclarc"],
             referencesKeys: []
         ),
@@ -1733,8 +1790,8 @@ extension ScholarStudioViewModel {
             pages: "74-81",
             doi: "10.3115/1218955.1219032",
             abstractText: "Introduces n-gram recall and longest-common-subsequence lexical overlap metrics for summary attribution.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified ACL Anthology & Crossref DOI.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["vaswani2017attention", "min2023factscore"],
             referencesKeys: []
         ),
@@ -1748,9 +1805,9 @@ extension ScholarStudioViewModel {
             pages: "12076-12100",
             doi: "10.18653/v1/2023.emnlp-main.741",
             arxivID: "2305.14251",
-            abstractText: "Decomposes generated prose into atomic claims verified against retrieved knowledge sources.",
-            firewallClass: .verifiedPreprintRegistry,
-            firewallAuditNote: "Verified arXiv 2305.14251 & ACL Anthology proceedings match.",
+            abstractText: "Decomposes generated prose into atomic claims compared against retrieved knowledge sources.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["gao2023aclarc"],
             referencesKeys: ["vaswani2017attention", "lewis2020rag", "lin2004rouge"]
         ),
@@ -1765,8 +1822,8 @@ extension ScholarStudioViewModel {
             doi: "10.18653/v1/2023.emnlp-main.398",
             arxivID: "2305.14627",
             abstractText: "Introduces ALCE benchmark measuring citation recall and NLI entailment precision across multi-passage retrieval.",
-            firewallClass: .metadataDriftAdvisory,
-            firewallAuditNote: "Metadata Drift: DOI 10.18653/v1/2023.emnlp-main.398 missing proceedings venue string; arXiv 2305.14627v2 updated.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: [],
             referencesKeys: ["vaswani2017attention", "lewis2020rag", "robertson2009bm25", "min2023factscore", "page2021prisma"]
         ),
@@ -1782,8 +1839,8 @@ extension ScholarStudioViewModel {
             doi: "10.1136/bmj.n71",
             pmid: "33782057",
             abstractText: "Defines the 27-item PRISMA 2020 checklist and four-phase flow diagram for database and register syntheses.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI 10.1136/bmj.n71 & PubMed PMID 33782057.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["gao2023aclarc"],
             referencesKeys: ["cohen1960kappa", "dersimonian1986meta", "sterne2019rob2"]
         ),
@@ -1799,8 +1856,8 @@ extension ScholarStudioViewModel {
             pages: "37-46",
             doi: "10.1177/001316446002000104",
             abstractText: "Establishes chance-corrected nominal agreement kappa and asymptotic variance.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref archival DOI 10.1177/001316446002000104.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["byrt1993pabak", "gwet2008ac1", "page2021prisma"],
             referencesKeys: []
         ),
@@ -1817,8 +1874,8 @@ extension ScholarStudioViewModel {
             doi: "10.1016/0895-4356(93)90018-V",
             pmid: "8501467",
             abstractText: "Formulates Prevalence-Adjusted Bias-Adjusted Kappa (PABAK) to diagnose marginal skew paradoxes.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI & PubMed PMID 8501467.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["gwet2008ac1"],
             referencesKeys: ["cohen1960kappa"]
         ),
@@ -1835,8 +1892,8 @@ extension ScholarStudioViewModel {
             doi: "10.1348/000711006X126600",
             pmid: "18482474",
             abstractText: "Derives the paradox-resistant first-order agreement coefficient AC1 and finite-sample variance.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI 10.1348/000711006X126600.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: [],
             referencesKeys: ["cohen1960kappa", "byrt1993pabak"]
         ),
@@ -1853,8 +1910,8 @@ extension ScholarStudioViewModel {
             doi: "10.1016/0197-2456(86)90046-2",
             pmid: "3802833",
             abstractText: "Introduces method-of-moments between-study variance tau-squared for random-effects meta-analysis.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI 10.1016/0197-2456(86)90046-2 (Uncited Seminal Candidate).",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["page2021prisma", "sterne2019rob2"],
             referencesKeys: ["cohen1960kappa"]
         ),
@@ -1870,8 +1927,8 @@ extension ScholarStudioViewModel {
             doi: "10.1136/bmj.l4898",
             pmid: "31462531",
             abstractText: "Specifies five domain-level signaling algorithms for randomized trial risk-of-bias appraisal.",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified Crossref DOI 10.1136/bmj.l4898 (Uncited Seminal Candidate).",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["page2021prisma"],
             referencesKeys: ["dersimonian1986meta", "cohen1960kappa"]
         ),
@@ -1886,8 +1943,8 @@ extension ScholarStudioViewModel {
             pages: "P10008",
             arxivID: "0803.0476",
             abstractText: "Hierarchical modularity optimization algorithm for community structure detection in weighted graphs.",
-            firewallClass: .verifiedPreprintRegistry,
-            firewallAuditNote: "Verified arXiv 0803.0476v2 physics.soc-ph registry.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: [],
             referencesKeys: ["kleinberg2003bursty"]
         ),
@@ -1902,8 +1959,8 @@ extension ScholarStudioViewModel {
             issue: "4",
             pages: "373-397",
             abstractText: "Infinite-state automaton modeling temporal citation and topical keyword bursts in document streams.",
-            firewallClass: .unverifiedPendingCheck,
-            firewallAuditNote: "Offline Pending Check: Missing DOI/arXiv identifier; requires registry lookup before strict camera-ready export.",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: ["blondel2008louvain"],
             referencesKeys: []
         ),
@@ -1914,9 +1971,9 @@ extension ScholarStudioViewModel {
             authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani"), BibAuthor(givenName: "Noam", familyName: "Shazeer")],
             year: 2017,
             venue: "",
-            doi: "10.5555/3295222.3295349",
-            firewallClass: .metadataDriftAdvisory,
-            firewallAuditNote: "Metadata Drift & Duplicate Candidate: Missing venue and matches canonical DOI 10.5555/3295222.3295349 (@vaswani2017attention).",
+            doi: "10.48550/arXiv.1706.03762",
+            firewallClass: .unverified,
+            firewallAuditNote: "Demo data - unverified",
             citedByKeys: [],
             referencesKeys: []
         ),
@@ -1928,9 +1985,9 @@ extension ScholarStudioViewModel {
             year: 2025,
             venue: "Journal of Universal AI Hallucinations",
             doi: "10.9999/fake.2025.001",
-            abstractText: "Fabricated synthetic reference seeded to demonstrate hardware ERR_UNVERIFIED_CITATION firewall blocking.",
-            firewallClass: .blockedHallucinatedOrRetracted,
-            firewallAuditNote: "BLOCKED (ERR_UNVERIFIED_CITATION): Invalid prefix 10.9999, HTTP 404 on Crossref/arXiv, unindexed venue.",
+            abstractText: "Synthetic sample entry with sentinel DOI prefix 10.9999.",
+            firewallClass: .notFound,
+            firewallAuditNote: "Demo synthetic fabricated entry - unverified",
             citedByKeys: [],
             referencesKeys: []
         )

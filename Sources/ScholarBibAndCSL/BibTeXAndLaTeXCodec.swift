@@ -1631,7 +1631,7 @@ public struct BibTeXCodec: Sendable {
             venue: decodedVenue
         )
 
-        var firewallClass: CitationFirewallClass = .unverifiedPendingCheck
+        var firewallClass: CitationFirewallClass = .unverified
         if let rawFW = take("x-firewall-class") {
             let decodedFW = latexCodec.decode(rawFW)
             if let matched = CitationFirewallClass(rawValue: decodedFW) {
@@ -1643,7 +1643,7 @@ public struct BibTeXCodec: Sendable {
                         column: 1,
                         severity: .warning,
                         citeKey: citeKey,
-                        message: "Unrecognized x-firewall-class '\(decodedFW)'; defaulting to UNVERIFIED_OFFLINE."
+                        message: "Unrecognized x-firewall-class '\(decodedFW)'; defaulting to UNVERIFIED."
                     )
                 )
             }

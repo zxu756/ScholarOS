@@ -507,7 +507,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         }
     }
 
-    // MARK: - Bibliography & Hardware-Gated Citation Firewall Management
+    // MARK: - Bibliography & Citation Firewall Management
 
     public var bibliographyEntries: [BibliographyEntry] {
         withLock { st in
@@ -575,8 +575,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         return citationFirewall.auditLibrary(entries)
     }
 
-    /// Hardware-gated assertion throwing `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`)
-    /// if ANY cited key in the manuscript is missing, unverified, or blocked/retracted!
+    /// Assertion throwing `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`)
+    /// if ANY cited key in the manuscript is missing or not `VERIFIED`.
     public func assertAllCitedEntriesPassFirewall() throws {
         let (ws, bibMap) = withLock { st -> (MergedManuscriptWorkspaceAST, [String: BibliographyEntry]) in
             (ensureWorkspaceAST(&st), st.bibliographyByKey)
@@ -586,22 +586,22 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         _ = try citationFirewall.assertAllCitationsAllowed(citeKeys: uniqueCited, in: bibMap)
     }
 
-    /// Runs live/mocked online registry verification (Crossref, arXiv, PubMed) across all bibliography entries
+    /// Runs live/mocked online registry verification (Crossref, OpenAlex, arXiv) across all bibliography entries
     /// and updates the workspace bibliography index atomically.
     public func verifyCitationsOnline(
         using session: any CitationRegistrySession = LiveURLSessionRegistryClient()
     ) async -> CitationFirewallAuditReport {
         let snapshotEntries = bibliographyEntries
-        var updatedEntries: [BibliographyEntry] = []
-        updatedEntries.reserveCapacity(snapshotEntries.count)
+        var verdicts: [CitationFirewallEntryVerdict] = []
+        verdicts.reserveCapacity(snapshotEntries.count)
 
         for entry in snapshotEntries {
             let verdict = await citationFirewall.verifyAgainstPublicRegistries(entry: entry, session: session)
-            updatedEntries.append(verdict.auditedEntry)
+            verdicts.append(verdict)
         }
 
-        setBibliography(updatedEntries)
-        return citationFirewall.auditLibrary(updatedEntries)
+        setBibliography(verdicts.map(\.auditedEntry))
+        return citationFirewall.summarizeVerdicts(verdicts)
     }
 
     // MARK: - Workspace AST, Document Outline, Symbol Table & Metrics

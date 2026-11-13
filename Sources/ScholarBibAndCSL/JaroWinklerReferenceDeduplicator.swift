@@ -854,11 +854,10 @@ public struct ReferenceDeduplicator: Sendable {
     private func completenessScore(for entry: BibliographyEntry) -> Int {
         var score = 0
         switch entry.firewallClass {
-        case .verifiedCanonicalDOI: score += 50
-        case .verifiedPreprintRegistry: score += 35
-        case .metadataDriftAdvisory: score += 20
-        case .unverifiedPendingCheck: score += 5
-        case .blockedHallucinatedOrRetracted: score -= 100
+        case .verified: score += 50
+        case .drift: score += 20
+        case .unverified: score += 5
+        case .notFound, .retracted: score -= 100
         }
         switch entry.kind {
         case .article, .inproceedings, .book, .incollection:
@@ -948,20 +947,26 @@ public struct ReferenceDeduplicator: Sendable {
         duplicateNote: String,
         duplicateKey: String
     ) -> (CitationFirewallClass, String) {
-        if primaryClass == .blockedHallucinatedOrRetracted || duplicateClass == .blockedHallucinatedOrRetracted {
+        if primaryClass == .retracted || duplicateClass == .retracted {
             let combined = [primaryNote, duplicateNote]
                 .filter { !$0.isEmpty }
                 .joined(separator: " | ")
-            return (.blockedHallucinatedOrRetracted, combined)
+            return (.retracted, combined)
+        }
+        if primaryClass == .notFound || duplicateClass == .notFound {
+            let combined = [primaryNote, duplicateNote]
+                .filter { !$0.isEmpty }
+                .joined(separator: " | ")
+            return (.notFound, combined)
         }
 
         func trustRank(_ cls: CitationFirewallClass) -> Int {
             switch cls {
-            case .verifiedCanonicalDOI: return 4
-            case .verifiedPreprintRegistry: return 3
-            case .metadataDriftAdvisory: return 2
-            case .unverifiedPendingCheck: return 1
-            case .blockedHallucinatedOrRetracted: return 0
+            case .verified: return 4
+            case .drift: return 3
+            case .unverified: return 2
+            case .notFound: return 1
+            case .retracted: return 0
             }
         }
 

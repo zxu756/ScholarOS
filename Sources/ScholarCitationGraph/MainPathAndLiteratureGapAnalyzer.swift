@@ -652,7 +652,7 @@ public struct MainPathAndLiteratureGapAnalyzer: Sendable {
             if citedKeysInManuscript.contains(candidate.citeKey) {
                 continue
             }
-            if candidate.firewallClass == .blockedHallucinatedOrRetracted {
+            if candidate.firewallClass == .notFound || candidate.firewallClass == .retracted {
                 continue
             }
 
@@ -739,7 +739,7 @@ public struct MainPathAndLiteratureGapAnalyzer: Sendable {
             if sharedRefsWithBib > 0 {
                 reasons.append("shares \(sharedRefsWithBib) bibliographic coupling reference(s)")
             }
-            if candidate.firewallClass == .unverifiedPendingCheck {
+            if candidate.firewallClass == .unverified {
                 reasons.append("verify DOI before insertion")
             }
             let explanation = reasons.isEmpty

@@ -803,4 +803,47 @@ struct PRISMAAndPsychometricsTests {
         let threeRaterBallot = MultiRaterScreeningBallot(from: record, includeAdjudicatorAsThirdRater: true)
         #expect(threeRaterBallot.votesByReviewerID.count == 3)
     }
+
+    @Test("S25 regression: 5-category nominal Cohen's kappa and Brennan-Prediger PABAK match exact closed-form hand calculation (83/107 and 19/24)")
+    func s25FiveCategoryNominalKappaAndMulticlassPABAKMatchHandCalculation() {
+        let spec = PRISMAScreeningEngine.defaultPICOProtocol()
+        // Construct exact 12-study 5-category rater contingency table:
+        // Categories: INCLUDE (I), MAYBE (M), E1_OFF_TOPIC (E1), E2_NO_EMPIRICAL_EVAL (E2), E3_CONTAINER_ONLY (E3)
+        // Agreements (10/12): 4 (I,I), 1 (M,M), 2 (E1,E1), 2 (E2,E2), 1 (E3,E3) -> Po = 10/12
+        // Disagreements (2/12): 1 (I,M), 1 (E3,I)
+        // Marginals:
+        //   A: I=5, M=1, E1=2, E2=2, E3=2
+        //   B: I=5, M=2, E1=2, E2=2, E3=1
+        // Pe = (5*5 + 1*2 + 2*2 + 2*2 + 2*1) / 144 = 37 / 144
+        // Cohen's kappa = (10/12 - 37/144) / (1 - 37/144) = (83/144) / (107/144) = 83 / 107
+        // Brennan-Prediger 5-category PABAK = (5 * (10/12) - 1) / (5 - 1) = (19/6) / 4 = 19 / 24
+        let studies: [ScreeningStudyRecord] = [
+            makeStudy(id: "sr1", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "sr2", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "sr3", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "sr4", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "sr5", stage: .titleAbstract, revA: .maybe, revB: .maybe),
+            makeStudy(id: "sr6", stage: .titleAbstract, revA: .exclude(reasonCode: "E1_OFF_TOPIC"), revB: .exclude(reasonCode: "E1_OFF_TOPIC")),
+            makeStudy(id: "sr7", stage: .titleAbstract, revA: .exclude(reasonCode: "E1_OFF_TOPIC"), revB: .exclude(reasonCode: "E1_OFF_TOPIC")),
+            makeStudy(id: "sr8", stage: .titleAbstract, revA: .exclude(reasonCode: "E2_NO_EMPIRICAL_EVAL"), revB: .exclude(reasonCode: "E2_NO_EMPIRICAL_EVAL")),
+            makeStudy(id: "sr9", stage: .titleAbstract, revA: .exclude(reasonCode: "E2_NO_EMPIRICAL_EVAL"), revB: .exclude(reasonCode: "E2_NO_EMPIRICAL_EVAL")),
+            makeStudy(id: "sr10", stage: .titleAbstract, revA: .exclude(reasonCode: "E3_CONTAINER_ONLY"), revB: .exclude(reasonCode: "E3_CONTAINER_ONLY")),
+            makeStudy(id: "sr11", stage: .titleAbstract, revA: .include, revB: .maybe),
+            makeStudy(id: "sr12", stage: .titleAbstract, revA: .exclude(reasonCode: "E3_CONTAINER_ONLY"), revB: .include)
+        ]
+
+        let engine = PRISMAScreeningEngine(studies: studies)
+        let prismaMetrics = engine.computePRISMA2020Metrics()
+        let confusion = InterRaterReliabilityAndSeedQCEngine().buildExclusionConfusionMatrix(
+            studies: studies,
+            protocolSpec: spec
+        )
+
+        let expectedKappa = 83.0 / 107.0
+        let expectedPABAK = 19.0 / 24.0
+        #expect(abs(prismaMetrics.cohensKappa - expectedKappa) < 1e-9)
+        #expect(abs(confusion.nominalMulticlassKappa.pointEstimate - expectedKappa) < 1e-9)
+        #expect(abs(prismaMetrics.cohensKappa - confusion.nominalMulticlassKappa.pointEstimate) < 1e-12)
+        #expect(abs(prismaMetrics.pabakScore - expectedPABAK) < 1e-9)
+    }
 }

@@ -432,35 +432,36 @@ public struct AcademicCompletionEngine: Sendable {
             let baseMatchScore = scoreBibliographyMatch(entry: entry, query: query)
             guard baseMatchScore > 0.0 else { continue }
 
-            // Apply hardware-gate Citation Firewall boost / demotion
+            // Apply Citation Firewall boost / demotion
             let firewallDelta: Double
             let statusPrefix: String
             let firewallWarningMarkdown: String
 
             switch effectiveFirewallClass {
-            case .verifiedCanonicalDOI:
+            case .verified:
                 firewallDelta = 0.20
-                statusPrefix = "[✓ Verified DOI]"
-                firewallWarningMarkdown = "**Firewall Status:** `VERIFIED_DOI` — Canonical DOI verified; cleared for submission."
-            case .verifiedPreprintRegistry:
-                firewallDelta = 0.12
-                statusPrefix = "[✓ Verified Preprint]"
-                firewallWarningMarkdown = "**Firewall Status:** `VERIFIED_ARXIV_PMID` — Verified preprint/registry record."
-            case .metadataDriftAdvisory:
-                firewallDelta = 0.02
+                statusPrefix = "[✓ Verified]"
+                firewallWarningMarkdown = "**Firewall Status:** `VERIFIED` — Registry metadata verified; cleared for submission."
+            case .drift:
+                firewallDelta = -0.15
                 statusPrefix = "[⚠ Metadata Drift]"
-                let note = entry.firewallAuditNote.isEmpty ? "Minor metadata discrepancy vs registry." : entry.firewallAuditNote
-                firewallWarningMarkdown = "**Firewall Advisory:** `METADATA_DRIFT` — \(note)"
-            case .unverifiedPendingCheck:
+                let note = entry.firewallAuditNote.isEmpty ? "Metadata discrepancy vs external registry." : entry.firewallAuditNote
+                firewallWarningMarkdown = "**Firewall Status:** `DRIFT` — \(note)"
+            case .unverified:
                 firewallDelta = -0.25
                 statusPrefix = "[⚠ UNVERIFIED]"
-                let note = entry.firewallAuditNote.isEmpty ? "Entry has not been verified against DOI/arXiv/PubMed registries." : entry.firewallAuditNote
-                firewallWarningMarkdown = "> **WARNING (`ERR_UNVERIFIED_CITATION`):** Unverified reference! Citation Firewall will block manuscript export until verified. \(note)"
-            case .blockedHallucinatedOrRetracted:
+                let note = entry.firewallAuditNote.isEmpty ? "Entry has not been verified against external registries." : entry.firewallAuditNote
+                firewallWarningMarkdown = "> **WARNING (`ERR_UNVERIFIED_CITATION`):** Unverified reference (`UNVERIFIED`). \(note)"
+            case .notFound:
                 firewallDelta = -0.55
-                statusPrefix = "[⛔ BLOCKED: Retracted/Hallucinated]"
-                let note = entry.firewallAuditNote.isEmpty ? "Flagged as fabricated, sentinel DOI, or retracted work." : entry.firewallAuditNote
-                firewallWarningMarkdown = "> **BLOCKED (`ERR_UNVERIFIED_CITATION`):** Hardware-gated Citation Firewall blocks this entry! \(note)"
+                statusPrefix = "[⛔ NOT FOUND]"
+                let note = entry.firewallAuditNote.isEmpty ? "Identifier not found or failed structural check." : entry.firewallAuditNote
+                firewallWarningMarkdown = "> **BLOCKED (`ERR_UNVERIFIED_CITATION`):** Citation Firewall marks this entry `NOT_FOUND`. \(note)"
+            case .retracted:
+                firewallDelta = -0.60
+                statusPrefix = "[⛔ RETRACTED]"
+                let note = entry.firewallAuditNote.isEmpty ? "Marked as retracted work." : entry.firewallAuditNote
+                firewallWarningMarkdown = "> **BLOCKED (`ERR_UNVERIFIED_CITATION`):** Citation Firewall marks this entry `RETRACTED`. \(note)"
             }
 
             // Slight popularity boost if already cited elsewhere in the manuscript
@@ -515,15 +516,11 @@ public struct AcademicCompletionEngine: Sendable {
     }
 
     private func resolveEffectiveFirewallClass(for entry: BibliographyEntry) -> CitationFirewallClass {
-        if entry.firewallClass == .blockedHallucinatedOrRetracted {
-            return .blockedHallucinatedOrRetracted
-        }
         let verdict = firewall.evaluate(entry)
-        if verdict.firewallClass == .blockedHallucinatedOrRetracted {
-            return .blockedHallucinatedOrRetracted
+        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
+            return verdict.firewallClass
         }
-        // Respect explicit verified class on entry unless static firewall caught a fatal retraction/checksum error
-        if entry.firewallClass == .verifiedCanonicalDOI || entry.firewallClass == .verifiedPreprintRegistry || entry.firewallClass == .metadataDriftAdvisory {
+        if entry.firewallClass != .unverified {
             return entry.firewallClass
         }
         return verdict.firewallClass

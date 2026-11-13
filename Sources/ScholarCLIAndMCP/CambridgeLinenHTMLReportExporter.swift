@@ -14,10 +14,13 @@ import ScholarProjectStore
 public struct CambridgeLinenHTMLReportExporter: Sendable {
     public init() {}
 
-    public func exportHTMLDossier(database: ScholarProjectDatabase) throws -> String {
+    public func exportHTMLDossier(database: ScholarProjectDatabase, isDemo: Bool = false) throws -> String {
         let stats = try database.computeProjectStats()
-        let title = sanitizeCopy(stats.projectTitle)
-        let titleZh = localizedProjectTitleZh(stats.projectTitle)
+        let rawTitle = isDemo && !stats.projectTitle.hasPrefix("[DEMO]")
+            ? "[DEMO] \(stats.projectTitle)"
+            : stats.projectTitle
+        let title = sanitizeCopy(rawTitle)
+        let titleZh = localizedProjectTitleZh(rawTitle, isDemo: isDemo)
         let entries = try database.listBibliographyEntries()
         let prismaMetrics = try database.computePRISMAMetrics()
         let studies = try database.listScreeningStudies()
@@ -86,11 +89,11 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
         let bibRows = entries.map { entry in
             let badgeClass: String
             switch entry.firewallClass {
-            case .verifiedCanonicalDOI, .verifiedPreprintRegistry:
+            case .verified:
                 badgeClass = "pill-ok"
-            case .metadataDriftAdvisory:
+            case .drift, .unverified:
                 badgeClass = "pill-warn"
-            case .unverifiedPendingCheck, .blockedHallucinatedOrRetracted:
+            case .notFound, .retracted:
                 badgeClass = "pill-block"
             }
             let pidText: String
@@ -430,6 +433,7 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
         <body>
           <div class="container">
             <header class="masthead">
+              \(isDemo ? "<p><span class=\"pill pill-warn\" data-en=\"[DEMO] Sample Unverified Dataset\" data-zh=\"[DEMO / 演示数据] 示例未核查数据集\">[DEMO] Sample Unverified Dataset</span></p>" : "")
               <div class="masthead-row">
                 <div>
                   <p class="eyebrow" data-en="ScholarOS v1.1.0, Reproducible Academic Audit Dossier" data-zh="ScholarOS v1.1.0，可复现学术手稿与引文核验档案">ScholarOS v1.1.0, Reproducible Academic Audit Dossier</p>
@@ -548,8 +552,8 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
               </table>
             </section>
 
-            <footer data-en="Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall" data-zh="由 ScholarOS 1.1.0 本地离线生成，剑桥亚麻学术排版引擎与硬件级五级引文真实性防火墙">
-              Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall
+            <footer data-en="Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Citation Verification Firewall" data-zh="由 ScholarOS 1.1.0 本地离线生成，剑桥亚麻学术排版引擎与五级引文真实性防火墙">
+              Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Citation Verification Firewall
             </footer>
           </div>
           <script>
@@ -643,17 +647,31 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
         return svg
     }
 
-    private func localizedProjectTitleZh(_ enTitle: String) -> String {
-        if enTitle == "Verifiable Citation Firewalls & Sandboxes" {
-            return "可验证引文真实性防火墙与隔离审稿沙盒"
+    private func localizedProjectTitleZh(_ enTitle: String, isDemo: Bool) -> String {
+        let stripped: String
+        let hasDemoPrefix: Bool
+        if enTitle.hasPrefix("[DEMO] ") {
+            stripped = String(enTitle.dropFirst("[DEMO] ".count))
+            hasDemoPrefix = true
+        } else {
+            stripped = enTitle
+            hasDemoPrefix = isDemo
         }
-        return sanitizeCopy(enTitle)
+        let baseZh: String
+        if stripped == "Verifiable Citation Firewalls & Sandboxes" {
+            baseZh = "可验证引文真实性防火墙与隔离审稿沙盒"
+        } else if stripped == "Citation Audit & Academic Sample" {
+            baseZh = "引文核查与学术手稿示例"
+        } else {
+            baseZh = sanitizeCopy(stripped)
+        }
+        return hasDemoPrefix ? "[DEMO / 演示数据] \(baseZh)" : baseZh
     }
 
     private func localizedOutlineHeadingZh(_ enHeading: String) -> String {
         switch enHeading {
         case "Introduction": return "引言"
-        case "Hardware Citation Firewall": return "硬件级引文真实性防火墙"
+        case "Citation Verification Firewall", "Citation Verification Rules": return "引文真实性核验规则"
         case "Provenance & Psychometrics": return "PDF 证据溯源与心理测量信度"
         case "Methodology": return "研究方法"
         default: return enHeading

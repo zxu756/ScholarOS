@@ -26,8 +26,8 @@ struct BibCSLAndFirewallTests {
             pages: "5998-6008",
             doi: "10.5555/3295222.3295349",
             arxivID: "1706.03762",
-            firewallClass: .verifiedCanonicalDOI,
-            firewallAuditNote: "Verified canonical DOI"
+            firewallClass: .verified,
+            firewallAuditNote: "Verified registry record"
         )
     }
 
@@ -40,7 +40,7 @@ struct BibCSLAndFirewallTests {
             year: 2025,
             venue: "Journal of Synthetic Hallucinations",
             doi: "10.9999/hallucinated.2025.0001",
-            firewallClass: .blockedHallucinatedOrRetracted,
+            firewallClass: .notFound,
             firewallAuditNote: "Sentinel fabricated DOI prefix 10.9999"
         )
     }
@@ -281,7 +281,7 @@ struct BibCSLAndFirewallTests {
             year: 2022,
             venue: "arXiv preprint",
             arxivID: "2205.14135v1",
-            firewallClass: .verifiedPreprintRegistry,
+            firewallClass: .unverified,
             citedByKeys: ["paperA"]
         )
         let published = BibliographyEntry(
@@ -294,7 +294,7 @@ struct BibCSLAndFirewallTests {
             volume: "35",
             pages: "16344-16359",
             doi: "10.5555/3540261.3541505",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["paperB"]
         )
         // Distinct sequel paper with a DIFFERENT canonical DOI must NEVER be falsely collapsed!
@@ -306,7 +306,7 @@ struct BibCSLAndFirewallTests {
             year: 2023,
             venue: "ICLR",
             doi: "10.48550/arXiv.2307.08691",
-            firewallClass: .verifiedCanonicalDOI
+            firewallClass: .verified
         )
 
         let dedup = ReferenceDeduplicator()
@@ -315,7 +315,7 @@ struct BibCSLAndFirewallTests {
         #expect(result.canonicalEntries.count == 2)
         let mergedCluster = try! #require(result.clusters.first { $0.memberCiteKeys.count == 2 })
         let merged = mergedCluster.mergedEntry
-        #expect(merged.firewallClass == .verifiedCanonicalDOI)
+        #expect(merged.firewallClass == .verified)
         #expect(merged.doi == "10.5555/3540261.3541505")
         #expect(merged.arxivID != nil)
         #expect(Set(merged.citedByKeys) == Set(["paperA", "paperB"]))
@@ -349,7 +349,7 @@ struct BibCSLAndFirewallTests {
             year: 2017,
             venue: "AMTA",
             doi: "10.18653/v1/W18-1819",
-            firewallClass: .verifiedCanonicalDOI
+            firewallClass: .verified
         )
         let bib = engine.formatBibliography(entries: [vaswani, sibling], style: .apa7)
         let suffixes = Set(bib.yearSuffixesByCiteKey.values)
@@ -377,7 +377,7 @@ struct BibCSLAndFirewallTests {
             volume: "372",
             pages: "n71",
             doi: "10.1136/bmj.n71",
-            firewallClass: .verifiedCanonicalDOI
+            firewallClass: .verified
         )
         let library = [e1.citeKey: e1, e2.citeKey: e2]
         let cluster = engine.formatInTextCluster(
@@ -419,7 +419,7 @@ struct BibCSLAndFirewallTests {
             issue: "7553",
             pages: "436-444",
             doi: "10.1038/nature14539",
-            firewallClass: .verifiedCanonicalDOI
+            firewallClass: .verified
         )
 
         let acm = engine.formatEntry(entry, style: .acm, citationNumber: 4)
@@ -484,18 +484,18 @@ struct BibCSLAndFirewallTests {
         #expect(!ScholarlyIdentifierValidator.validateISSN("0028-0837").isValid)
     }
 
-    @Test("CitationVerificationFirewall deterministically assigns all 5 CitationFirewallClass tiers")
-    func firewallEvaluatesAllFiveClassesDeterministically() {
+    @Test("CitationVerificationFirewall offline evaluate assigns UNVERIFIED, RETRACTED, and NOT_FOUND honestly without claiming VERIFIED")
+    func firewallEvaluatesOfflineClassesHonestly() {
         let firewall = CitationVerificationFirewall()
 
-        // 1. VERIFIED_DOI
-        let verifiedDOI = makeVaswaniEntry()
-        let v1 = firewall.evaluate(verifiedDOI)
-        #expect(v1.firewallClass == .verifiedCanonicalDOI)
-        #expect(v1.allowsManuscriptInsertion)
+        // 1. Syntactically valid DOI offline -> UNVERIFIED (never VERIFIED without registry query)
+        let validDOI = makeVaswaniEntry()
+        let v1 = firewall.evaluate(validDOI)
+        #expect(v1.firewallClass == .unverified)
+        #expect(!v1.allowsManuscriptInsertion)
 
-        // 2. VERIFIED_ARXIV_PMID
-        let verifiedPreprint = BibliographyEntry(
+        // 2. Syntactically valid arXiv ID offline -> UNVERIFIED
+        let validPreprint = BibliographyEntry(
             citeKey: "kaplan2020scaling",
             kind: .preprint,
             title: "Scaling Laws for Neural Language Models",
@@ -504,26 +504,26 @@ struct BibCSLAndFirewallTests {
             venue: "arXiv",
             arxivID: "2001.08361"
         )
-        let v2 = firewall.evaluate(verifiedPreprint)
-        #expect(v2.firewallClass == .verifiedPreprintRegistry)
-        #expect(v2.allowsManuscriptInsertion)
+        let v2 = firewall.evaluate(validPreprint)
+        #expect(v2.firewallClass == .unverified)
+        #expect(!v2.allowsManuscriptInsertion)
 
-        // 3. METADATA_DRIFT (valid arXiv from 2020 but BibTeX year claims 2012 -> >2yr discrepancy)
-        let drifted = BibliographyEntry(
-            citeKey: "kaplan2012drift",
-            kind: .preprint,
-            title: "Scaling Laws for Neural Language Models",
-            authors: [BibAuthor(givenName: "Jared", familyName: "Kaplan")],
-            year: 2012,
-            venue: "arXiv",
-            arxivID: "2001.08361"
+        // 3. Built-in retracted DOI offline -> RETRACTED (with incomplete built-in list notice)
+        let retracted = BibliographyEntry(
+            citeKey: "wakefield1998",
+            kind: .article,
+            title: "Ileal-lymphoid-nodular hyperplasia",
+            authors: [BibAuthor(givenName: "Andrew", familyName: "Wakefield")],
+            year: 1998,
+            venue: "The Lancet",
+            doi: "10.1016/S0140-6736(97)11096-0"
         )
-        let v3 = firewall.evaluate(drifted)
-        #expect(v3.firewallClass == .metadataDriftAdvisory)
-        #expect(v3.allowsManuscriptInsertion)
+        let v3 = firewall.evaluate(retracted)
+        #expect(v3.firewallClass == .retracted)
+        #expect(!v3.allowsManuscriptInsertion)
 
-        // 4. UNVERIFIED_OFFLINE (no DOI, no arXiv, no PMID)
-        let unverified = BibliographyEntry(
+        // 4. Missing identifier offline -> UNVERIFIED
+        let missingPID = BibliographyEntry(
             citeKey: "knuth1997taocp",
             kind: .book,
             title: "The Art of Computer Programming, Volume 1: Fundamental Algorithms",
@@ -531,14 +531,14 @@ struct BibCSLAndFirewallTests {
             year: 1997,
             publisher: "Addison-Wesley"
         )
-        let v4 = firewall.evaluate(unverified)
-        #expect(v4.firewallClass == .unverifiedPendingCheck)
+        let v4 = firewall.evaluate(missingPID)
+        #expect(v4.firewallClass == .unverified)
         #expect(!v4.allowsManuscriptInsertion)
 
-        // 5. BLOCKED_HALLUCINATED
+        // 5. Sentinel / malformed DOI offline -> NOT_FOUND
         let blocked = makeHallucinatedSmithEntry()
         let v5 = firewall.evaluate(blocked)
-        #expect(v5.firewallClass == .blockedHallucinatedOrRetracted)
+        #expect(v5.firewallClass == .notFound)
         #expect(!v5.allowsManuscriptInsertion)
     }
 
@@ -611,78 +611,123 @@ struct BibCSLAndFirewallTests {
 
         let report = firewall.auditLibrary(entries)
         #expect(report.totalEvaluated == 4)
-        #expect(report.verifiedDOICount == 1)
-        #expect(report.verifiedPreprintCount == 1)
-        #expect(report.unverifiedOfflineCount == 1)
-        #expect(report.blockedHallucinatedCount == 1)
-        #expect(report.manuscriptInsertionAllowedCount == 2)
-        #expect(abs(report.insertionPassRate - 0.5) < 1e-9)
+        #expect(report.verifiedCount == 0)
+        #expect(report.driftCount == 0)
+        #expect(report.retractedCount == 0)
+        #expect(report.unverifiedCount == 3)
+        #expect(report.notFoundCount == 1)
+        #expect(report.manuscriptInsertionAllowedCount == 0)
+        #expect(abs(report.insertionPassRate - 0.0) < 1e-9)
         #expect(report.blockedCiteKeys == ["smith2025hallucinated"])
-        #expect(report.unverifiedCiteKeys == ["offline2022tech"])
+        #expect(report.unverifiedCiteKeys == ["vaswani2017attention", "arxiv2023valid", "offline2022tech"])
     }
 
-    @Test("Offline DeterministicMockRegistrySession verifies Crossref 200 match, metadata drift, and 404 hallucinated DOI")
-    func firewallOfflineMockRegistryCrossref200MatchDriftAnd404Block() async {
-        let crossrefMatchJSON = """
-        {
-          "status": "ok",
-          "message": {
-            "DOI": "10.1136/bmj.n71",
-            "title": ["The PRISMA 2020 statement: an updated guideline for reporting systematic reviews"],
-            "author": [{"given": "Matthew J", "family": "Page"}],
-            "issued": {"date-parts": [[2021, 3, 29]]},
-            "is-referenced-by-count": 18400
-          }
-        }
-        """
-        let session = DeterministicMockRegistrySession(
-            responsesByURLSubstring: [
-                "10.1136%2Fbmj.n71": .json(statusCode: 200, crossrefMatchJSON),
-                "10.1136/bmj.n71": .json(statusCode: 200, crossrefMatchJSON)
-            ],
-            defaultNotFoundStatusCode: 404
-        )
+    @Test("S2 regression: offline evaluate never returns VERIFIED even when DOI or arXiv syntax is valid")
+    func firewallOfflineNeverReturnsVerifiedForValidOrFabricatedDOI() {
         let firewall = CitationVerificationFirewall()
 
-        // 1. Exact Crossref 200 match -> VERIFIED_DOI
-        let accurateEntry = BibliographyEntry(
-            citeKey: "page2021prisma",
+        // 1. Syntactically valid but fabricated DOI (`10.1038/fake.2026.99999`)
+        let fabricatedNatureDOI = BibliographyEntry(
+            citeKey: "fake2026nature",
             kind: .article,
-            title: "The PRISMA 2020 statement: an updated guideline for reporting systematic reviews",
-            authors: [BibAuthor(givenName: "Matthew J", familyName: "Page")],
-            year: 2021,
-            venue: "BMJ",
-            doi: "10.1136/bmj.n71"
+            title: "Plausible Sounding Paper with Syntactically Valid Nature DOI",
+            authors: [BibAuthor(givenName: "Alice", familyName: "Example")],
+            year: 2026,
+            venue: "Nature",
+            doi: "10.1038/fake.2026.99999"
         )
-        let matchVerdict = await firewall.verifyAgainstPublicRegistries(entry: accurateEntry, session: session)
-        #expect(matchVerdict.firewallClass == .verifiedCanonicalDOI)
-        #expect(matchVerdict.findings.contains { $0.code == .registryVerifiedMatch })
+        let vFabricated = firewall.evaluate(fabricatedNatureDOI)
+        #expect(vFabricated.firewallClass.rawValue == "UNVERIFIED")
+        #expect(!vFabricated.allowsManuscriptInsertion)
 
-        // 2. Crossref 200 but wrong author & wrong title -> METADATA_DRIFT
-        let driftedEntry = BibliographyEntry(
-            citeKey: "wrongmeta2021",
+        // 2. Syntactically valid real DOI (`10.1038/nature14539`, LeCun 2015) checked offline without registry query
+        let realUnqueriedDOI = BibliographyEntry(
+            citeKey: "lecun2015deep",
             kind: .article,
-            title: "Completely Different Paper Title Claiming BMJ PRISMA DOI",
-            authors: [BibAuthor(givenName: "Xavier", familyName: "Zeta")],
-            year: 2016,
-            venue: "Unknown",
-            doi: "10.1136/bmj.n71"
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
         )
-        let driftVerdict = await firewall.verifyAgainstPublicRegistries(entry: driftedEntry, session: session)
-        #expect(driftVerdict.firewallClass == .metadataDriftAdvisory || driftVerdict.findings.contains { $0.code == .metadataDriftDetected })
+        let vRealOffline = firewall.evaluate(realUnqueriedDOI)
+        #expect(vRealOffline.firewallClass.rawValue == "UNVERIFIED")
+        #expect(!vRealOffline.allowsManuscriptInsertion)
+    }
 
-        // 3. Crossref 404 Not Found -> BLOCKED_HALLUCINATED
-        let nonexistentDOIEntry = BibliographyEntry(
-            citeKey: "nonexistent2024",
+    @Test("S6 regression: built-in retracted DOI list yields RETRACTED and explicitly notes incomplete built-in list")
+    func firewallOfflineBuiltInRetractedDOIReportsIncompleteListNotice() {
+        let firewall = CitationVerificationFirewall()
+        let wakefield = BibliographyEntry(
+            citeKey: "wakefield1998retracted",
             kind: .article,
-            title: "Plausible Sounding Paper with Nonexistent Registered DOI",
-            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
-            year: 2024,
-            venue: "JACM",
-            doi: "10.1145/9999999.8888888"
+            title: "Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+            authors: [BibAuthor(givenName: "A. J.", familyName: "Wakefield")],
+            year: 1998,
+            venue: "The Lancet",
+            doi: "10.1016/S0140-6736(97)11096-0"
         )
-        let notFoundVerdict = await firewall.verifyAgainstPublicRegistries(entry: nonexistentDOIEntry, session: session)
-        #expect(notFoundVerdict.firewallClass == .blockedHallucinatedOrRetracted)
+        let verdict = firewall.evaluate(wakefield)
+        #expect(verdict.firewallClass.rawValue == "RETRACTED")
+        #expect(!verdict.allowsManuscriptInsertion)
+        #expect(verdict.auditNote.contains("内置名单，不完整"))
+    }
+
+    @Test("S19 regression: transport error, HTTP 429, and HTTP 500 in verifyAgainstPublicRegistries all return UNVERIFIED")
+    func firewallOnlineRegistryTransport429And500FailuresReturnUnverified() async {
+        struct FailingRegistrySession: CitationRegistrySession {
+            enum Mode: Sendable {
+                case transportError
+                case status(Int)
+            }
+            let mode: Mode
+            func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
+                switch mode {
+                case .transportError:
+                    throw URLError(.notConnectedToInternet)
+                case .status(let code):
+                    return RegistryHTTPResponse(statusCode: code, body: Data("{\"error\":\"unavailable\"}".utf8))
+                }
+            }
+        }
+
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "lecun2015deep",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+
+        let transportVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: entry,
+            session: FailingRegistrySession(mode: .transportError)
+        )
+        #expect(transportVerdict.firewallClass.rawValue == "UNVERIFIED")
+        #expect(!transportVerdict.allowsManuscriptInsertion)
+
+        let rateLimitedVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: entry,
+            session: FailingRegistrySession(mode: .status(429))
+        )
+        #expect(rateLimitedVerdict.firewallClass.rawValue == "UNVERIFIED")
+        #expect(!rateLimitedVerdict.allowsManuscriptInsertion)
+
+        let serverErrorVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: entry,
+            session: FailingRegistrySession(mode: .status(500))
+        )
+        #expect(serverErrorVerdict.firewallClass.rawValue == "UNVERIFIED")
+        #expect(!serverErrorVerdict.allowsManuscriptInsertion)
+
+        let notFoundVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: entry,
+            session: FailingRegistrySession(mode: .status(404))
+        )
+        #expect(notFoundVerdict.firewallClass.rawValue == "NOT_FOUND")
         #expect(!notFoundVerdict.allowsManuscriptInsertion)
     }
 
@@ -733,9 +778,9 @@ struct BibCSLAndFirewallTests {
         let imported = try bridge.importEntries(databasePath: dbPath, options: importOpts)
 
         #expect(imported.count == 3)
-        #expect(imported.contains { $0.doi == "10.5555/3295222.3295349" && $0.firewallClass == .verifiedCanonicalDOI })
-        #expect(imported.contains { $0.arxivID == "2305.18290" && $0.firewallClass == .verifiedPreprintRegistry })
-        #expect(imported.contains { $0.firewallClass == .blockedHallucinatedOrRetracted })
+        #expect(imported.contains { $0.doi == "10.5555/3295222.3295349" && $0.firewallClass == .unverified })
+        #expect(imported.contains { $0.arxivID == "2305.18290" && $0.firewallClass == .unverified })
+        #expect(imported.contains { $0.firewallClass == .notFound })
 
         let dpoHits = try bridge.searchEntries(databasePath: dbPath, query: "Preference Optimization", options: importOpts)
         #expect(dpoHits.count == 1)

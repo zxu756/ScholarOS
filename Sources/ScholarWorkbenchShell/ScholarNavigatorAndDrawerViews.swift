@@ -12,6 +12,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
     @ObservedObject public var docking: ScholarDockingController
     @ObservedObject private var localizer: ScholarLocalizer = .shared
     public let projectTitle: String
+    public let isDemoMode: Bool
     public let activeSectionTitle: String?
     public let canUndo: Bool
     public let canRedo: Bool
@@ -26,6 +27,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
     public init(
         docking: ScholarDockingController,
         projectTitle: String,
+        isDemoMode: Bool = false,
         activeSectionTitle: String? = nil,
         canUndo: Bool = false,
         canRedo: Bool = false,
@@ -39,6 +41,7 @@ public struct ScholarTopWorkbenchToolbarView: View {
     ) {
         self.docking = docking
         self.projectTitle = projectTitle
+        self.isDemoMode = isDemoMode
         self.activeSectionTitle = activeSectionTitle
         self.canUndo = canUndo
         self.canRedo = canRedo
@@ -81,6 +84,27 @@ public struct ScholarTopWorkbenchToolbarView: View {
                 studioTabStrip
 
                 Spacer(minLength: 6)
+
+                if isDemoMode {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                        Text(localizer.L("DEMO — Unverified Sample Data", "DEMO / 演示数据 — 未核查示例"))
+                            .font(CambridgeTypography.uiSectionLabel)
+                    }
+                    .foregroundStyle(CambridgeLinenPalette.driftAmber)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
+                            .fill(CambridgeLinenPalette.driftAmberBg)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: CambridgeMetrics.cornerRadiusSmall, style: .continuous)
+                            .strokeBorder(CambridgeLinenPalette.driftAmberBorder, lineWidth: CambridgeMetrics.hairline)
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                }
 
                 commandPaletteTriggerButton
 
@@ -725,10 +749,14 @@ public struct ScholarLeftNavigatorSidebarView: View {
                                         .fill(CambridgeLinenPalette.blockedCrimsonBg)
                                 )
                                 .fixedSize(horizontal: true, vertical: false)
-                        } else {
-                            Text(localizer.L("Zero Hallucinations", "零幻觉引文"))
+                        } else if totalBib == 0 {
+                            Text(localizer.L("No entries loaded", "未载入文献"))
                                 .font(CambridgeTypography.uiCaption)
-                                .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
+                                .foregroundStyle(CambridgeLinenPalette.mutedMetadata)
+                        } else {
+                            Text(localizer.L("\(totalBib - verifiedCount) Unverified", "\(totalBib - verifiedCount) 篇未核查"))
+                                .font(CambridgeTypography.uiCaption)
+                                .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                         }
                         Spacer()
                     }
@@ -999,7 +1027,7 @@ public struct ScholarBottomDrawerView: View {
         case .diagnostics:
             return diagnostics.count
         case .citationFirewall:
-            return bibliographyEntries.filter { !$0.firewallClass.allowsManuscriptInsertion || $0.firewallClass == .metadataDriftAdvisory }.count
+            return bibliographyEntries.filter { !$0.firewallClass.allowsManuscriptInsertion || $0.firewallClass == .drift }.count
         case .editorialAudit:
             return editorialFindings.count
         case .syncTeXLog:
@@ -1073,7 +1101,7 @@ public struct ScholarBottomDrawerView: View {
     private var citationFirewallChannelContent: some View {
         let filtered = bibliographyEntries.filter { entry in
             if !firewallFilterOnlyIssues { return true }
-            return entry.firewallClass != .verifiedCanonicalDOI && entry.firewallClass != .verifiedPreprintRegistry
+            return entry.firewallClass != .verified
         }
         return ScrollView {
             if filtered.isEmpty {

@@ -20,7 +20,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2017,
             venue: "NeurIPS",
             doi: "10.5555/3295222.3295349",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["devlin2019", "brown2020", "dao2022", "bridge2023", "burstTarget2020"],
             referencesKeys: []
         )
@@ -32,7 +32,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2019,
             venue: "NAACL",
             doi: "10.18653/v1/N19-1423",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["brown2020", "dao2022"],
             referencesKeys: ["vaswani2017"]
         )
@@ -44,7 +44,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2020,
             venue: "NeurIPS",
             arxivID: "2005.14165",
-            firewallClass: .verifiedPreprintRegistry,
+            firewallClass: .verified,
             citedByKeys: ["dao2022", "bridge2023"],
             referencesKeys: ["vaswani2017", "devlin2019"]
         )
@@ -56,7 +56,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2022,
             venue: "NeurIPS",
             arxivID: "2205.14135",
-            firewallClass: .verifiedPreprintRegistry,
+            firewallClass: .verified,
             citedByKeys: ["bridge2023"],
             referencesKeys: ["vaswani2017", "devlin2019", "brown2020"]
         )
@@ -70,7 +70,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2009,
             venue: "PLOS Medicine",
             doi: "10.1371/journal.pmed.1000097",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["sterne2019", "page2021", "higgins2022", "bridge2023"],
             referencesKeys: []
         )
@@ -82,7 +82,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2019,
             venue: "BMJ",
             doi: "10.1136/bmj.l4898",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["page2021", "higgins2022"],
             referencesKeys: ["moher2009"]
         )
@@ -94,7 +94,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2021,
             venue: "BMJ",
             doi: "10.1136/bmj.n71",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["higgins2022", "bridge2023"],
             referencesKeys: ["moher2009", "sterne2019"]
         )
@@ -106,7 +106,7 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2022,
             venue: "Cochrane",
             doi: "10.1002/9781119536604",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["bridge2023"],
             referencesKeys: ["moher2009", "sterne2019", "page2021"]
         )
@@ -120,19 +120,19 @@ struct PDFProvenanceAndCitationGraphTests {
             year: 2023,
             venue: "JMLR",
             doi: "10.5555/jmlr.2023.bridge",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: ["frontier2025"],
             referencesKeys: ["vaswani2017", "brown2020", "dao2022", "moher2009", "page2021", "higgins2022"]
         )
         let frontier = BibliographyEntry(
             citeKey: "frontier2025",
             kind: .inproceedings,
-            title: "Hardware-Gated Citation Firewalls for Reproducible Evidence Synthesis",
+            title: "Deterministic Citation Firewalls for Reproducible Evidence Synthesis",
             authors: [BibAuthor(givenName: "Lin", familyName: "Chen")],
             year: 2025,
             venue: "ACL",
             doi: "10.18653/v1/2025.acl-long.42",
-            firewallClass: .verifiedCanonicalDOI,
+            firewallClass: .verified,
             citedByKeys: [],
             referencesKeys: ["bridge2023", "dao2022", "page2021"]
         )
@@ -592,7 +592,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 year: 2016,
                 venue: "CVPR",
                 doi: "10.1109/CVPR.2016.90",
-                firewallClass: .verifiedCanonicalDOI
+                firewallClass: .verified
             ),
             BibliographyEntry(
                 citeKey: "steady2016",
@@ -602,7 +602,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 year: 2016,
                 venue: "SIAM",
                 doi: "10.1137/1600001",
-                firewallClass: .verifiedCanonicalDOI
+                firewallClass: .verified
             )
         ]
 
@@ -618,7 +618,7 @@ struct PDFProvenanceAndCitationGraphTests {
                         year: yr,
                         venue: "SIAM",
                         doi: "10.1137/\(yr).\(idx)",
-                        firewallClass: .verifiedCanonicalDOI,
+                        firewallClass: .verified,
                         referencesKeys: idx == 1 ? ["steady2016"] : []
                     )
                 )
@@ -637,7 +637,7 @@ struct PDFProvenanceAndCitationGraphTests {
                         year: yr,
                         venue: "NeurIPS",
                         doi: "10.5555/\(yr).\(idx)",
-                        firewallClass: .verifiedCanonicalDOI,
+                        firewallClass: .verified,
                         referencesKeys: ["seminal2016"]
                     )
                 )
@@ -692,7 +692,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 year: 2025,
                 venue: "Fake Venue",
                 doi: "10.9999/fake.999",
-                firewallClass: .blockedHallucinatedOrRetracted,
+                firewallClass: .notFound,
                 citedByKeys: ["dao2022", "bridge2023"],
                 referencesKeys: ["vaswani2017", "page2021"]
             )
@@ -791,7 +791,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 authors: [BibAuthor(givenName: "A", familyName: "Origin")],
                 year: 2018,
                 doi: "10.1000/origin",
-                firewallClass: .verifiedCanonicalDOI,
+                firewallClass: .verified,
                 citedByKeys: ["cycleA2021"]
             ),
             BibliographyEntry(
@@ -800,7 +800,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 authors: [BibAuthor(givenName: "B", familyName: "Alpha")],
                 year: 2021,
                 doi: "10.1000/cycleA",
-                firewallClass: .verifiedCanonicalDOI,
+                firewallClass: .verified,
                 citedByKeys: ["cycleB2021", "sink2024"],
                 referencesKeys: ["origin2018", "cycleB2021"]
             ),
@@ -810,7 +810,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 authors: [BibAuthor(givenName: "C", familyName: "Beta")],
                 year: 2021,
                 doi: "10.1000/cycleB",
-                firewallClass: .verifiedCanonicalDOI,
+                firewallClass: .verified,
                 citedByKeys: ["cycleA2021", "sink2024"],
                 referencesKeys: ["cycleA2021"]
             ),
@@ -820,7 +820,7 @@ struct PDFProvenanceAndCitationGraphTests {
                 authors: [BibAuthor(givenName: "D", familyName: "Sink")],
                 year: 2024,
                 doi: "10.1000/sink",
-                firewallClass: .verifiedCanonicalDOI,
+                firewallClass: .verified,
                 referencesKeys: ["cycleA2021", "cycleB2021"]
             )
         ]

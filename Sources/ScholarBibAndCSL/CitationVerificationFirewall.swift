@@ -84,11 +84,11 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
 public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     public let generatedAtISO8601: String
     public let totalEvaluated: Int
-    public let verifiedDOICount: Int
-    public let verifiedPreprintCount: Int
-    public let metadataDriftCount: Int
-    public let unverifiedOfflineCount: Int
-    public let blockedHallucinatedCount: Int
+    public let verifiedCount: Int
+    public let driftCount: Int
+    public let notFoundCount: Int
+    public let retractedCount: Int
+    public let unverifiedCount: Int
     public let manuscriptInsertionAllowedCount: Int
     public let insertionPassRate: Double
     public let verdicts: [CitationFirewallEntryVerdict]
@@ -99,11 +99,11 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     public init(
         generatedAtISO8601: String,
         totalEvaluated: Int,
-        verifiedDOICount: Int,
-        verifiedPreprintCount: Int,
-        metadataDriftCount: Int,
-        unverifiedOfflineCount: Int,
-        blockedHallucinatedCount: Int,
+        verifiedCount: Int,
+        driftCount: Int,
+        notFoundCount: Int,
+        retractedCount: Int,
+        unverifiedCount: Int,
         manuscriptInsertionAllowedCount: Int,
         insertionPassRate: Double,
         verdicts: [CitationFirewallEntryVerdict],
@@ -113,11 +113,11 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     ) {
         self.generatedAtISO8601 = generatedAtISO8601
         self.totalEvaluated = totalEvaluated
-        self.verifiedDOICount = verifiedDOICount
-        self.verifiedPreprintCount = verifiedPreprintCount
-        self.metadataDriftCount = metadataDriftCount
-        self.unverifiedOfflineCount = unverifiedOfflineCount
-        self.blockedHallucinatedCount = blockedHallucinatedCount
+        self.verifiedCount = verifiedCount
+        self.driftCount = driftCount
+        self.notFoundCount = notFoundCount
+        self.retractedCount = retractedCount
+        self.unverifiedCount = unverifiedCount
         self.manuscriptInsertionAllowedCount = manuscriptInsertionAllowedCount
         self.insertionPassRate = insertionPassRate
         self.verdicts = verdicts
@@ -127,7 +127,7 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     }
 }
 
-// MARK: - Protocol-Injected Public Registry HTTP Session & Deterministic Offline Mock
+// MARK: - Protocol-Injected Public Registry HTTP Session
 
 public struct RegistryHTTPResponse: Sendable, Codable, Hashable {
     public let statusCode: Int
@@ -184,30 +184,6 @@ public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
         let (data, response) = try await URLSession.shared.data(for: configured)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 200
         return RegistryHTTPResponse(statusCode: status, body: data)
-    }
-}
-
-/// Deterministic offline mock session so unit and CI tests never touch external network sockets.
-public struct DeterministicMockRegistrySession: CitationRegistrySession, Sendable {
-    public let responsesByURLSubstring: [String: RegistryHTTPResponse]
-    public let defaultNotFoundStatusCode: Int
-
-    public init(
-        responsesByURLSubstring: [String: RegistryHTTPResponse] = [:],
-        defaultNotFoundStatusCode: Int = 404
-    ) {
-        self.responsesByURLSubstring = responsesByURLSubstring
-        self.defaultNotFoundStatusCode = defaultNotFoundStatusCode
-    }
-
-    public func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
-        let urlString = request.url?.absoluteString ?? ""
-        for key in responsesByURLSubstring.keys.sorted(by: { $0.count > $1.count }) {
-            if urlString.localizedCaseInsensitiveContains(key), let resp = responsesByURLSubstring[key] {
-                return resp
-            }
-        }
-        return RegistryHTTPResponse(statusCode: defaultNotFoundStatusCode, body: Data())
     }
 }
 
@@ -569,11 +545,11 @@ public enum ScholarlyIdentifierValidator: Sendable {
     }
 }
 
-// MARK: - 5-Class Citation Verification Firewall & Hardware-Gating Assertion Engine
+// MARK: - 5-Class Citation Verification Firewall Engine
 
 public struct CitationVerificationFirewall: Sendable {
 
-    /// Built-in registry of high-profile retracted DOIs (Retraction Watch landmark cases + extensible).
+    /// Built-in offline hint list of retracted DOIs (内置名单，不完整 — does NOT substitute for online retraction checks).
     public static let defaultRetractedDOIs: Set<String> = [
         "10.1016/s0140-6736(97)11096-0", // Wakefield et al. 1998 (Lancet retracted)
         "10.1016/s0140-6736(20)31180-6", // Mehra et al. 2020 Surgisphere Lancet (retracted)
@@ -652,21 +628,22 @@ public struct CitationVerificationFirewall: Sendable {
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
     }
 
-    // MARK: - Offline Deterministic 5-Class Evaluation
+    // MARK: - Offline Deterministic Structural & Built-in Retraction Hint Evaluation
 
+    /// Evaluates `entry` offline without querying external registries.
+    /// Offline evaluation NEVER returns `.verified`; syntactically valid identifiers receive `.unverified`.
     public func evaluate(_ entry: BibliographyEntry) -> CitationFirewallEntryVerdict {
         var findings: [FirewallFinding] = []
-        var hasCriticalBlock = false
-        var hasMetadataDrift = false
-        var hasVerifiedCanonicalDOI = false
-        var hasVerifiedArXivOrPMID = false
+        var hasRetractedMatch = false
+        var hasStructuralOrSentinelBlock = false
+        var hasSyntacticallyValidPID = false
 
-        // 1. Title sentinel & retraction notice check
+        // 1. Title sentinel & explicit retraction prefix check
         let trimmedTitle = entry.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerTitle = trimmedTitle.lowercased()
 
         if trimmedTitle.isEmpty || lowerTitle == "untitled" || lowerTitle == "tbd" || lowerTitle == "todo" {
-            hasCriticalBlock = true
+            hasStructuralOrSentinelBlock = true
             findings.append(
                 FirewallFinding(
                     code: .blockedPlaceholderSentinel,
@@ -676,7 +653,7 @@ public struct CitationVerificationFirewall: Sendable {
                 )
             )
         } else if Self.sentinelTitlePhrases.contains(where: { lowerTitle.contains($0) }) {
-            hasCriticalBlock = true
+            hasStructuralOrSentinelBlock = true
             findings.append(
                 FirewallFinding(
                     code: .blockedPlaceholderSentinel,
@@ -686,20 +663,19 @@ public struct CitationVerificationFirewall: Sendable {
                 )
             )
         } else if lowerTitle.hasPrefix("retracted:") || lowerTitle.contains("[retracted]") || lowerTitle.hasPrefix("retraction:") {
-            hasCriticalBlock = true
+            hasRetractedMatch = true
             findings.append(
                 FirewallFinding(
                     code: .blockedRetractedWork,
                     severity: .criticalBlock,
                     field: "title",
-                    detail: "Title indicates a retracted publication ('\(trimmedTitle)')."
+                    detail: "Title indicates a retracted publication ('\(trimmedTitle)') (内置名单，不完整)."
                 )
             )
         }
 
         // 2. Author plausibility & ORCID ISO 7064 Mod 11-2 check-digit validation
         if entry.authors.isEmpty {
-            hasMetadataDrift = true
             findings.append(
                 FirewallFinding(
                     code: .suspiciousAuthorList,
@@ -714,7 +690,7 @@ public struct CitationVerificationFirewall: Sendable {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                     .lowercased()
                 if Self.suspiciousFakeAuthorFullNames.contains(fullName) {
-                    hasCriticalBlock = true
+                    hasStructuralOrSentinelBlock = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedPlaceholderSentinel,
@@ -732,11 +708,11 @@ public struct CitationVerificationFirewall: Sendable {
                                 code: .validORCIDChecksum,
                                 severity: .pass,
                                 field: "authors.orcid",
-                                detail: "Verified ORCID ISO 7064 Mod 11-2 checksum (\(orcidCheck.formatted))."
+                                detail: "ORCID ISO 7064 Mod 11-2 checksum valid (\(orcidCheck.formatted))."
                             )
                         )
                     } else {
-                        hasCriticalBlock = true
+                        hasStructuralOrSentinelBlock = true
                         findings.append(
                             FirewallFinding(
                                 code: .invalidORCIDChecksum,
@@ -753,7 +729,7 @@ public struct CitationVerificationFirewall: Sendable {
         // 3. Publication year plausibility check
         if let year = entry.year {
             if year < minAllowedPublicationYear || year > maxAllowedPublicationYear {
-                hasCriticalBlock = true
+                hasStructuralOrSentinelBlock = true
                 findings.append(
                     FirewallFinding(
                         code: .implausiblePublicationYear,
@@ -764,7 +740,6 @@ public struct CitationVerificationFirewall: Sendable {
                 )
             }
         } else {
-            hasMetadataDrift = true
             findings.append(
                 FirewallFinding(
                     code: .metadataDriftDetected,
@@ -775,11 +750,11 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        // 4. DOI validation, sentinel check & retraction registry lookup
+        // 4. DOI validation, sentinel check & built-in offline retraction hint list lookup
         if let rawDOI = nonEmpty(entry.doi) {
             let doiCheck = ScholarlyIdentifierValidator.validateDOISyntax(rawDOI)
             if !doiCheck.isValid {
-                hasCriticalBlock = true
+                hasStructuralOrSentinelBlock = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidDOISyntax,
@@ -791,17 +766,17 @@ public struct CitationVerificationFirewall: Sendable {
             } else {
                 let normDOI = doiCheck.normalized
                 if retractedDOIs.contains(normDOI) {
-                    hasCriticalBlock = true
+                    hasRetractedMatch = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedRetractedWork,
                             severity: .criticalBlock,
                             field: "doi",
-                            detail: "DOI '\(normDOI)' is listed in the ScholarOS retracted publication registry."
+                            detail: "DOI '\(normDOI)' matched built-in offline retracted list (内置名单，不完整)."
                         )
                     )
                 } else if isPlaceholderSentinelDOI(normDOI) {
-                    hasCriticalBlock = true
+                    hasStructuralOrSentinelBlock = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedPlaceholderSentinel,
@@ -811,24 +786,23 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     )
                 } else if normDOI.hasPrefix("10.48550/arxiv.") {
-                    // DataCite arXiv DOI: validate embedded arXiv identifier!
                     let embeddedArXiv = String(normDOI.dropFirst("10.48550/arxiv.".count))
                     let arxivCheck = ScholarlyIdentifierValidator.validateArXivID(
                         embeddedArXiv,
                         maxYear: maxAllowedPublicationYear
                     )
                     if arxivCheck.isValid {
-                        hasVerifiedArXivOrPMID = true
+                        hasSyntacticallyValidPID = true
                         findings.append(
                             FirewallFinding(
                                 code: .validArXivIdentifier,
                                 severity: .pass,
                                 field: "doi",
-                                detail: "DataCite arXiv DOI '\(normDOI)' carries valid calendar-verified arXiv ID."
+                                detail: "DataCite arXiv DOI '\(normDOI)' has valid syntax; not checked against external registry (offline)."
                             )
                         )
                     } else {
-                        hasCriticalBlock = true
+                        hasStructuralOrSentinelBlock = true
                         findings.append(
                             FirewallFinding(
                                 code: .invalidArXivCalendarBounds,
@@ -838,28 +812,37 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     }
+                } else if normDOI.hasPrefix("10.5555/") {
+                    findings.append(
+                        FirewallFinding(
+                            code: .validCanonicalDOI,
+                            severity: .warning,
+                            field: "doi",
+                            detail: "DOI '\(normDOI)' uses Crossref test/non-resolvable prefix '10.5555/'; unverified offline."
+                        )
+                    )
                 } else {
-                    hasVerifiedCanonicalDOI = true
+                    hasSyntacticallyValidPID = true
                     findings.append(
                         FirewallFinding(
                             code: .validCanonicalDOI,
                             severity: .pass,
                             field: "doi",
-                            detail: "Structurally valid ISO 26324 DOI (\(normDOI))."
+                            detail: "DOI '\(normDOI)' has valid ISO 26324 syntax; not checked against external registry (offline)."
                         )
                     )
                 }
             }
         }
 
-        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> BLOCKED!)
+        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> NOT_FOUND!)
         if let rawArXiv = nonEmpty(entry.arxivID) {
             let arxivCheck = ScholarlyIdentifierValidator.validateArXivID(
                 rawArXiv,
                 maxYear: maxAllowedPublicationYear
             )
             if !arxivCheck.isValid {
-                hasCriticalBlock = true
+                hasStructuralOrSentinelBlock = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidArXivCalendarBounds,
@@ -869,27 +852,24 @@ public struct CitationVerificationFirewall: Sendable {
                     )
                 )
             } else {
-                hasVerifiedArXivOrPMID = true
+                hasSyntacticallyValidPID = true
                 findings.append(
                     FirewallFinding(
                         code: .validArXivIdentifier,
                         severity: .pass,
                         field: "arxivID",
-                        detail: "Verified arXiv identifier calendar & sequence bounds (arXiv:\(arxivCheck.canonicalBaseID))."
+                        detail: "arXiv:\(arxivCheck.canonicalBaseID) has valid calendar/sequence syntax; not checked against external registry (offline)."
                     )
                 )
 
-                // Check year consistency between arXiv YYMM submission year and entry.year
                 if let inferredYear = arxivCheck.inferredSubmissionYear, let entryYear = entry.year {
-                    // Published version can appear 0..4 years after preprint (or 1 year prior if post-hoc upload), large negative drift is suspicious
                     if entryYear < inferredYear - 1 || entryYear > inferredYear + 5 {
-                        hasMetadataDrift = true
                         findings.append(
                             FirewallFinding(
                                 code: .metadataDriftDetected,
                                 severity: .warning,
                                 field: "year",
-                                detail: "Entry year (\(entryYear)) drifts from arXiv:\(arxivCheck.canonicalBaseID) submission year (\(inferredYear))."
+                                detail: "Entry year (\(entryYear)) differs from arXiv:\(arxivCheck.canonicalBaseID) prefix year (\(inferredYear)); unverified offline."
                             )
                         )
                     }
@@ -901,7 +881,7 @@ public struct CitationVerificationFirewall: Sendable {
         if let rawPMID = nonEmpty(entry.pmid) {
             let pmidCheck = ScholarlyIdentifierValidator.validatePMID(rawPMID)
             if !pmidCheck.isValid {
-                hasCriticalBlock = true
+                hasStructuralOrSentinelBlock = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidPMIDBounds,
@@ -911,67 +891,55 @@ public struct CitationVerificationFirewall: Sendable {
                     )
                 )
             } else {
-                hasVerifiedArXivOrPMID = true
+                hasSyntacticallyValidPID = true
                 findings.append(
                     FirewallFinding(
                         code: .validPubMedIdentifier,
                         severity: .pass,
                         field: "pmid",
-                        detail: "Verified PubMed PMID numeric bounds (PMID:\(pmidCheck.normalized))."
+                        detail: "PMID:\(pmidCheck.normalized) has valid numeric bounds; not checked against external registry (offline)."
                     )
                 )
             }
         }
 
-        // 7. Missing venue drift check for journal/conference papers claiming a canonical DOI
-        if hasVerifiedCanonicalDOI
+        // 7. Missing venue note for journal/conference papers with a DOI
+        if hasSyntacticallyValidPID
             && (entry.kind == .article || entry.kind == .inproceedings)
             && entry.venue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            hasMetadataDrift = true
             findings.append(
                 FirewallFinding(
                     code: .metadataDriftDetected,
                     severity: .advisory,
                     field: "venue",
-                    detail: "Peer-reviewed \(entry.kind.rawValue) has a DOI but is missing journal/proceedings venue."
+                    detail: "Peer-reviewed \(entry.kind.rawValue) has an identifier but is missing journal/proceedings venue."
                 )
             )
         }
 
-        // 8. Determine 5-Class Firewall Verdict
+        // 8. Determine Offline Verdict (NEVER `.verified` or `.drift`)
         let finalClass: CitationFirewallClass
         let confidence: Double
 
-        if hasCriticalBlock {
-            finalClass = .blockedHallucinatedOrRetracted
-            confidence = 0.99
-        } else if hasVerifiedCanonicalDOI {
-            if hasMetadataDrift {
-                finalClass = .metadataDriftAdvisory
-                confidence = 0.72
-            } else {
-                finalClass = .verifiedCanonicalDOI
-                confidence = 0.94
-            }
-        } else if hasVerifiedArXivOrPMID {
-            if hasMetadataDrift {
-                finalClass = .metadataDriftAdvisory
-                confidence = 0.70
-            } else {
-                finalClass = .verifiedPreprintRegistry
-                confidence = 0.90
-            }
+        if hasRetractedMatch {
+            finalClass = .retracted
+            confidence = 0.95
+        } else if hasStructuralOrSentinelBlock {
+            finalClass = .notFound
+            confidence = 0.98
         } else {
-            finalClass = .unverifiedPendingCheck
-            confidence = 0.35
-            findings.append(
-                FirewallFinding(
-                    code: .missingPersistentIdentifier,
-                    severity: .warning,
-                    field: "doi/arxivID/pmid",
-                    detail: "No verifiable persistent identifier (DOI, arXiv ID, or PubMed PMID); blocked from manuscript insertion until verified."
+            finalClass = .unverified
+            confidence = hasSyntacticallyValidPID ? 0.40 : 0.25
+            if !hasSyntacticallyValidPID && nonEmpty(entry.doi) == nil {
+                findings.append(
+                    FirewallFinding(
+                        code: .missingPersistentIdentifier,
+                        severity: .warning,
+                        field: "doi/arxivID/pmid",
+                        detail: "No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry."
+                    )
                 )
-            )
+            }
         }
 
         let summaryNote = summarizeFindings(findings, assignedClass: finalClass)
@@ -993,14 +961,17 @@ public struct CitationVerificationFirewall: Sendable {
     // MARK: - Batch Library Audit
 
     public func auditLibrary(_ entries: [BibliographyEntry]) -> CitationFirewallAuditReport {
-        let verdicts = entries.map { evaluate($0) }
+        summarizeVerdicts(entries.map { evaluate($0) })
+    }
+
+    public func summarizeVerdicts(_ verdicts: [CitationFirewallEntryVerdict]) -> CitationFirewallAuditReport {
         let auditedEntries = verdicts.map(\.auditedEntry)
 
-        var doiCount = 0
-        var preprintCount = 0
+        var verifiedCount = 0
         var driftCount = 0
+        var notFoundCount = 0
+        var retractedCount = 0
         var unverifiedCount = 0
-        var blockedCount = 0
         var allowedCount = 0
         var blockedKeys: [String] = []
         var unverifiedKeys: [String] = []
@@ -1010,32 +981,34 @@ public struct CitationVerificationFirewall: Sendable {
                 allowedCount += 1
             }
             switch v.firewallClass {
-            case .verifiedCanonicalDOI:
-                doiCount += 1
-            case .verifiedPreprintRegistry:
-                preprintCount += 1
-            case .metadataDriftAdvisory:
+            case .verified:
+                verifiedCount += 1
+            case .drift:
                 driftCount += 1
-            case .unverifiedPendingCheck:
+                blockedKeys.append(v.citeKey)
+            case .notFound:
+                notFoundCount += 1
+                blockedKeys.append(v.citeKey)
+            case .retracted:
+                retractedCount += 1
+                blockedKeys.append(v.citeKey)
+            case .unverified:
                 unverifiedCount += 1
                 unverifiedKeys.append(v.citeKey)
-            case .blockedHallucinatedOrRetracted:
-                blockedCount += 1
-                blockedKeys.append(v.citeKey)
             }
         }
 
-        let passRate = verdicts.isEmpty ? 1.0 : Double(allowedCount) / Double(verdicts.count)
+        let passRate = verdicts.isEmpty ? 0.0 : Double(allowedCount) / Double(verdicts.count)
         let timestamp = ISO8601DateFormatter().string(from: Date())
 
         return CitationFirewallAuditReport(
             generatedAtISO8601: timestamp,
             totalEvaluated: verdicts.count,
-            verifiedDOICount: doiCount,
-            verifiedPreprintCount: preprintCount,
-            metadataDriftCount: driftCount,
-            unverifiedOfflineCount: unverifiedCount,
-            blockedHallucinatedCount: blockedCount,
+            verifiedCount: verifiedCount,
+            driftCount: driftCount,
+            notFoundCount: notFoundCount,
+            retractedCount: retractedCount,
+            unverifiedCount: unverifiedCount,
             manuscriptInsertionAllowedCount: allowedCount,
             insertionPassRate: passRate,
             verdicts: verdicts,
@@ -1045,10 +1018,10 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
-    // MARK: - Hardware-Gated Citation Insertion Assertion (`ERR_UNVERIFIED_CITATION`)
+    // MARK: - Citation Insertion Assertion (`ERR_UNVERIFIED_CITATION`)
 
-    /// Enforces ScholarOS's hardware-gated citation policy for CLI, MCP, and manuscript exporters.
-    /// Throws `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`) whenever `citeKey` is missing, `.unverifiedPendingCheck`, or `.blockedHallucinatedOrRetracted`.
+    /// Enforces ScholarOS's citation firewall policy for CLI, MCP, and manuscript exporters.
+    /// Throws `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`) whenever `citeKey` is missing or not `.verified`.
     @discardableResult
     public func assertCitationAllowed(
         citeKey: String,
@@ -1058,20 +1031,18 @@ public struct CitationVerificationFirewall: Sendable {
         guard let entry = library[trimmedKey] else {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: trimmedKey,
-                statusCode: CitationFirewallClass.unverifiedPendingCheck.rawValue,
+                statusCode: CitationFirewallClass.unverified.rawValue,
                 reason: "Citation key '\(trimmedKey)' is missing from the project bibliography."
             )
         }
 
-        // Gate 1: Stored firewall classification must permit manuscript insertion
+        // Gate 1: Stored firewall classification must permit manuscript insertion (`.verified` only)
         guard entry.firewallClass.allowsManuscriptInsertion else {
             let reasonDetail: String
             if !entry.firewallAuditNote.isEmpty {
                 reasonDetail = entry.firewallAuditNote
-            } else if entry.firewallClass == .blockedHallucinatedOrRetracted {
-                reasonDetail = "Entry is flagged as hallucinated, sentinel, or retracted."
             } else {
-                reasonDetail = "Entry is unverified offline and lacks verified persistent identifier clearance."
+                reasonDetail = "Entry status is \(entry.firewallClass.rawValue) and has not been verified against external registries."
             }
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
@@ -1080,12 +1051,12 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        // Gate 2: Re-verify deterministic structural & sentinel invariants so tampered `x-firewall-class` tags cannot smuggle invalid/sentinel IDs
+        // Gate 2: Re-verify deterministic structural & retraction invariants so tampered `x-firewall-class` tags cannot smuggle invalid/retracted IDs
         let liveVerdict = evaluate(entry)
-        if liveVerdict.firewallClass == .blockedHallucinatedOrRetracted {
+        if liveVerdict.firewallClass == .notFound || liveVerdict.firewallClass == .retracted {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
-                statusCode: CitationFirewallClass.blockedHallucinatedOrRetracted.rawValue,
+                statusCode: liveVerdict.firewallClass.rawValue,
                 reason: liveVerdict.auditNote
             )
         }
@@ -1105,14 +1076,14 @@ public struct CitationVerificationFirewall: Sendable {
 
     // MARK: - Async Live Public Registry Verification (Crossref / OpenAlex / arXiv)
 
-    /// Resolves `entry` against Crossref, OpenAlex, or arXiv APIs via an injectable `CitationRegistrySession` (defaults to live HTTPS, mockable offline).
+    /// Resolves `entry` against Crossref, OpenAlex, or arXiv APIs via an injectable `CitationRegistrySession`.
+    /// Transport errors, rate limits (429), and server errors (5xx) ALWAYS yield `.unverified` — NEVER `.verified`.
     public func verifyAgainstPublicRegistries(
         entry: BibliographyEntry,
         session: any CitationRegistrySession = LiveURLSessionRegistryClient()
     ) async -> CitationFirewallEntryVerdict {
         let offlineVerdict = evaluate(entry)
-        // If already structurally blocked (e.g. `arXiv:2319.99999`, broken ORCID, sentinel DOI), never waste network calls
-        if offlineVerdict.firewallClass == .blockedHallucinatedOrRetracted {
+        if offlineVerdict.firewallClass == .retracted || offlineVerdict.firewallClass == .notFound {
             return offlineVerdict
         }
 
@@ -1121,39 +1092,46 @@ public struct CitationVerificationFirewall: Sendable {
         // Path A: Resolve DOI via Crossref -> fallback to OpenAlex
         if let normDOI = ReferenceIdentifierNormalizer.normalizeDOI(entry.doi),
            !normDOI.hasPrefix("10.48550/arxiv.") {
+            var crossrefReturned404 = false
+            var openAlexReturned404 = false
+
             if let encodedDOI = normDOI.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
                let crossrefURL = URL(string: "https://api.crossref.org/works/\(encodedDOI)") {
                 do {
                     let response = try await session.send(URLRequest(url: crossrefURL))
                     if response.statusCode == 404 {
+                        crossrefReturned404 = true
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
-                                severity: .criticalBlock,
+                                severity: .warning,
                                 field: "doi",
-                                detail: "Crossref returned HTTP 404 for DOI '\(normDOI)' — likely hallucinated DOI."
+                                detail: "Crossref returned 404 for DOI '\(normDOI)'; checking OpenAlex."
                             )
-                        )
-                        return buildUpdatedVerdict(
-                            for: entry,
-                            assignedClass: .blockedHallucinatedOrRetracted,
-                            confidence: 0.98,
-                            findings: findings
                         )
                     } else if response.statusCode == 200,
                               let remote = parseCrossrefWorkPayload(response.body) {
                         return reconcileRemoteRegistryMetadata(
                             entry: entry,
                             remote: remote,
-                            baseClass: .verifiedCanonicalDOI,
+                            baseClass: .verified,
                             existingFindings: findings
+                        )
+                    } else {
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "Crossref returned HTTP \(response.statusCode) or unparseable body for DOI '\(normDOI)'."
+                            )
                         )
                     }
                 } catch {
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
-                            severity: .advisory,
+                            severity: .warning,
                             field: "network",
                             detail: "Crossref unreachable (\(error.localizedDescription)); attempting OpenAlex fallback."
                         )
@@ -1165,40 +1143,60 @@ public struct CitationVerificationFirewall: Sendable {
                 do {
                     let response = try await session.send(URLRequest(url: openAlexURL))
                     if response.statusCode == 404 {
+                        openAlexReturned404 = true
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
                                 severity: .criticalBlock,
                                 field: "doi",
-                                detail: "OpenAlex returned HTTP 404 for DOI '\(normDOI)' — nonexistent DOI."
+                                detail: "OpenAlex confirmed 404 not found for DOI '\(normDOI)'."
                             )
-                        )
-                        return buildUpdatedVerdict(
-                            for: entry,
-                            assignedClass: .blockedHallucinatedOrRetracted,
-                            confidence: 0.97,
-                            findings: findings
                         )
                     } else if response.statusCode == 200,
                               let remote = parseOpenAlexWorkPayload(response.body) {
                         return reconcileRemoteRegistryMetadata(
                             entry: entry,
                             remote: remote,
-                            baseClass: .verifiedCanonicalDOI,
+                            baseClass: .verified,
                             existingFindings: findings
+                        )
+                    } else {
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "OpenAlex returned HTTP \(response.statusCode) or unparseable body for DOI '\(normDOI)'."
+                            )
                         )
                     }
                 } catch {
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
-                            severity: .advisory,
+                            severity: .warning,
                             field: "network",
-                            detail: "OpenAlex unreachable (\(error.localizedDescription)); retaining offline firewall verdict."
+                            detail: "OpenAlex unreachable (\(error.localizedDescription)); marking UNVERIFIED."
                         )
                     )
                 }
             }
+
+            if crossrefReturned404 && openAlexReturned404 {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .notFound,
+                    confidence: 0.98,
+                    findings: findings
+                )
+            }
+
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                confidence: 0.25,
+                findings: findings
+            )
         }
 
         // Path B: Resolve arXiv preprint via arXiv Atom API
@@ -1221,10 +1219,10 @@ public struct CitationVerificationFirewall: Sendable {
                         return reconcileRemoteRegistryMetadata(
                             entry: entry,
                             remote: remote,
-                            baseClass: .verifiedPreprintRegistry,
+                            baseClass: .verified,
                             existingFindings: findings
                         )
-                    } else {
+                    } else if let xml = String(data: response.body, encoding: .utf8), xml.contains("<feed") {
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
@@ -1235,19 +1233,52 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                         return buildUpdatedVerdict(
                             for: entry,
-                            assignedClass: .blockedHallucinatedOrRetracted,
+                            assignedClass: .notFound,
                             confidence: 0.96,
                             findings: findings
                         )
+                    } else {
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "arXiv API returned unparseable HTTP 200 payload for 'arXiv:\(arxivID)'."
+                            )
+                        )
                     }
+                } else if response.statusCode == 404 {
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryLookupNotFound,
+                            severity: .criticalBlock,
+                            field: "arxivID",
+                            detail: "arXiv API returned 404 for 'arXiv:\(arxivID)'."
+                        )
+                    )
+                    return buildUpdatedVerdict(
+                        for: entry,
+                        assignedClass: .notFound,
+                        confidence: 0.96,
+                        findings: findings
+                    )
+                } else {
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .warning,
+                            field: "network",
+                            detail: "arXiv API returned HTTP \(response.statusCode) for 'arXiv:\(arxivID)'."
+                        )
+                    )
                 }
             } catch {
                 findings.append(
                     FirewallFinding(
                         code: .registryTransportUnavailable,
-                        severity: .advisory,
+                        severity: .warning,
                         field: "network",
-                        detail: "arXiv API unreachable (\(error.localizedDescription)); retaining offline firewall verdict."
+                        detail: "arXiv API unreachable (\(error.localizedDescription)); marking UNVERIFIED."
                     )
                 )
             }
@@ -1255,8 +1286,8 @@ public struct CitationVerificationFirewall: Sendable {
 
         return buildUpdatedVerdict(
             for: entry,
-            assignedClass: offlineVerdict.firewallClass,
-            confidence: offlineVerdict.confidenceScore,
+            assignedClass: .unverified,
+            confidence: 0.25,
             findings: findings
         )
     }
@@ -1290,7 +1321,7 @@ public struct CitationVerificationFirewall: Sendable {
             )
             return buildUpdatedVerdict(
                 for: entry,
-                assignedClass: .blockedHallucinatedOrRetracted,
+                assignedClass: .retracted,
                 confidence: 0.99,
                 findings: findings
             )
@@ -1300,27 +1331,9 @@ public struct CitationVerificationFirewall: Sendable {
         let remoteNormTitle = ReferenceIdentifierNormalizer.normalizeTitle(remote.title)
         let titleSimilarity = ReferenceDeduplicator.jaroWinklerSimilarity(localNormTitle, remoteNormTitle)
 
-        // Severe title mismatch (< 0.52) indicates an LLM stitched a real DOI onto a completely fabricated paper!
-        if !localNormTitle.isEmpty && !remoteNormTitle.isEmpty && titleSimilarity < 0.52 {
-            findings.append(
-                FirewallFinding(
-                    code: .blockedHallucinatedMetadata,
-                    severity: .criticalBlock,
-                    field: "title",
-                    detail: "\(remote.sourceName) title mismatch (Jaro-Winkler \(String(format: "%.2f", titleSimilarity))): identifier resolves to '\(remote.title)', not '\(entry.title)'."
-                )
-            )
-            return buildUpdatedVerdict(
-                for: entry,
-                assignedClass: .blockedHallucinatedOrRetracted,
-                confidence: 0.97,
-                findings: findings
-            )
-        }
-
         var driftReasons: [String] = []
-        if titleSimilarity < 0.86 {
-            driftReasons.append("title similarity \(String(format: "%.2f", titleSimilarity)) vs '\(remote.title)'")
+        if !localNormTitle.isEmpty && !remoteNormTitle.isEmpty && titleSimilarity < 0.86 {
+            driftReasons.append("title '\(entry.title)' differs from \(remote.sourceName) '\(remote.title)' (similarity \(String(format: "%.2f", titleSimilarity)))")
         }
         if let localFirst = entry.authors.first.map({ ReferenceIdentifierNormalizer.normalizeSurname($0.familyName) }),
            let remoteFirst = remote.firstAuthorSurname.map({ ReferenceIdentifierNormalizer.normalizeSurname($0) }),
@@ -1328,7 +1341,7 @@ public struct CitationVerificationFirewall: Sendable {
            ReferenceDeduplicator.jaroWinklerSimilarity(localFirst, remoteFirst) < 0.80 {
             driftReasons.append("first author '\(entry.firstAuthorFamily)' differs from \(remote.sourceName) '\(remote.firstAuthorSurname ?? "")'")
         }
-        if let localYear = entry.year, let remoteYear = remote.year, abs(localYear - remoteYear) > 2 {
+        if let localYear = entry.year, let remoteYear = remote.year, abs(localYear - remoteYear) > 0 {
             driftReasons.append("year \(localYear) differs from \(remote.sourceName) year \(remoteYear)")
         }
 
@@ -1343,8 +1356,8 @@ public struct CitationVerificationFirewall: Sendable {
             )
             return buildUpdatedVerdict(
                 for: entry,
-                assignedClass: .metadataDriftAdvisory,
-                confidence: 0.80,
+                assignedClass: .drift,
+                confidence: 0.85,
                 findings: findings
             )
         }
@@ -1551,13 +1564,17 @@ public struct CitationVerificationFirewall: Sendable {
         if !criticals.isEmpty {
             return "[\(assignedClass.rawValue)] \(criticals.joined(separator: " "))"
         }
-        let warnings = findings.filter { $0.severity == .warning || $0.severity == .advisory }.map(\.detail)
-        if !warnings.isEmpty && assignedClass != .verifiedCanonicalDOI && assignedClass != .verifiedPreprintRegistry {
+        let warnings = findings.filter { $0.severity == .warning }.map(\.detail)
+        if !warnings.isEmpty && assignedClass != .verified {
             return "[\(assignedClass.rawValue)] \(warnings.joined(separator: " "))"
         }
         let passes = findings.filter { $0.severity == .pass }.map(\.detail)
         if !passes.isEmpty {
             return "[\(assignedClass.rawValue)] \(passes.joined(separator: " "))"
+        }
+        let advisories = findings.filter { $0.severity == .advisory }.map(\.detail)
+        if !advisories.isEmpty {
+            return "[\(assignedClass.rawValue)] \(advisories.joined(separator: " "))"
         }
         return "[\(assignedClass.rawValue)] Evaluated by ScholarOS Citation Firewall."
     }

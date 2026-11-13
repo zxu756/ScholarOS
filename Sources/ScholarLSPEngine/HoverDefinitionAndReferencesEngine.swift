@@ -517,12 +517,16 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
 
         let verdict = firewall.evaluate(entry)
         let effectiveFirewallClass: CitationFirewallClass
-        if entry.firewallClass == .blockedHallucinatedOrRetracted || verdict.firewallClass == .blockedHallucinatedOrRetracted {
-            effectiveFirewallClass = .blockedHallucinatedOrRetracted
-        } else if entry.firewallClass == .verifiedCanonicalDOI || entry.firewallClass == .verifiedPreprintRegistry || entry.firewallClass == .metadataDriftAdvisory {
+        let overriddenByOfflineCheck: Bool
+        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
+            effectiveFirewallClass = verdict.firewallClass
+            overriddenByOfflineCheck = (entry.firewallClass != verdict.firewallClass)
+        } else if entry.firewallClass != .unverified {
             effectiveFirewallClass = entry.firewallClass
+            overriddenByOfflineCheck = false
         } else {
             effectiveFirewallClass = verdict.firewallClass
+            overriddenByOfflineCheck = false
         }
 
         let apaFormatted = cslFormatter.formatEntry(entry, style: .apa7)
@@ -531,8 +535,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         var lines: [String] = []
         lines.append("**Firewall Status:** `\(effectiveFirewallClass.badgeTitle)` (`\(effectiveFirewallClass.rawValue)`)")
         if !effectiveFirewallClass.allowsManuscriptInsertion {
-            let reason = entry.firewallAuditNote.isEmpty ? verdict.auditNote : entry.firewallAuditNote
-            lines.append("> **Hardware Firewall Gate (`ERR_UNVERIFIED_CITATION`):** \(reason)")
+            let reason = (overriddenByOfflineCheck || entry.firewallAuditNote.isEmpty) ? verdict.auditNote : entry.firewallAuditNote
+            lines.append("> **Citation Firewall (`ERR_UNVERIFIED_CITATION`):** \(reason)")
         } else if !entry.firewallAuditNote.isEmpty {
             lines.append("_\(entry.firewallAuditNote)_")
         }

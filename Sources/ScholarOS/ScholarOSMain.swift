@@ -6,10 +6,13 @@ import ScholarModels
 import ScholarStudioViews
 import ScholarWorkbenchShell
 
-// MARK: - Dual-Mode Headless CLI / Retina Exporter + Native macOS SwiftUI Workstation Entry (`ScholarOSMain`)
+// MARK: - Dual-Mode Headless CLI + Native macOS SwiftUI Workstation Entry (`ScholarOSMain`)
 
 @main
 public struct ScholarOSMain {
+    @MainActor
+    public static var launchInExplicitDemoMode: Bool = false
+
     @MainActor
     public static func main() {
         let rawUserArgs = Array(CommandLine.arguments.dropFirst()).filter { arg in
@@ -33,7 +36,6 @@ public struct ScholarOSMain {
             }
 
             do {
-                // Ensure AppKit font & graphics tables are initialized for headless ImageRenderer rasterization
                 _ = NSApplication.shared
                 NSApp?.appearance = NSAppearance(named: .aqua)
                 let written = try ScholarScreenshotExportService.exportAllAssets(
@@ -50,17 +52,18 @@ public struct ScholarOSMain {
             }
         }
 
-        // Mode 2: Headless 15-Subcommand CLI & Hardware-Gated MCP Server
-        if !userArgs.isEmpty {
+        // Mode 2: Headless CLI & JSON-RPC 2.0 MCP Server (unless `--demo` is passed alone to open GUI demo)
+        if !userArgs.isEmpty && userArgs != ["--demo"] {
+            let cliLang = explicitCLILanguage ?? .en
             final class CLIResultBox: @unchecked Sendable {
-                var result: Result<String, Error>?
+                var result: Result<CLIExecutionOutput, Error>?
             }
             let box = CLIResultBox()
             let semaphore = DispatchSemaphore(value: 0)
 
             Task.detached {
                 do {
-                    let output = try await ScholarCLIRunner().execute(arguments: userArgs)
+                    let output = try await ScholarCLIRunner().run(arguments: rawUserArgs)
                     box.result = .success(output)
                 } catch {
                     box.result = .failure(error)
@@ -71,12 +74,21 @@ public struct ScholarOSMain {
 
             switch box.result {
             case .success(let output):
-                if !output.isEmpty {
-                    print(output)
+                if !output.stdout.isEmpty {
+                    print(output.stdout)
                 }
-                Foundation.exit(0)
+                Foundation.exit(output.exitCode)
             case .failure(let error as ScholarOSError):
-                fputs("[\(error.errorCodeIdentifier)] \(error.localizedDescription)\n", stderr)
+                let desc: String
+                switch error {
+                case .invalidCLIArguments(let detail) where cliLang == .zhHans:
+                    desc = "命令行参数错误：\(detail)"
+                case .fileNotFound(let path) where cliLang == .zhHans:
+                    desc = "未找到文件或工程路径：\(path)"
+                default:
+                    desc = error.localizedDescription
+                }
+                fputs("[\(error.errorCodeIdentifier)] \(desc)\n", stderr)
                 Foundation.exit(2)
             case .failure(let error):
                 fputs("[ERR_RUNTIME] \(error.localizedDescription)\n", stderr)
@@ -86,7 +98,8 @@ public struct ScholarOSMain {
             }
         }
 
-        // Mode 3: Interactive Native macOS SwiftUI Academic Workstation
+        // Mode 3: Interactive Native macOS SwiftUI Workstation (empty state by default; demo ONLY with `--demo`)
+        Self.launchInExplicitDemoMode = (userArgs == ["--demo"])
         NSApplication.shared.setActivationPolicy(.regular)
         NSApplication.shared.appearance = NSAppearance(named: .aqua)
         ScholarOSWorkbenchApp.main()
@@ -95,17 +108,24 @@ public struct ScholarOSMain {
 
 /// Native macOS SwiftUI Application scene hosting `ScholarRootWorkbenchView` in Cambridge Linen & Library Forest Green.
 public struct ScholarOSWorkbenchApp: App {
-    @StateObject private var studioViewModel = ScholarStudioViewModel()
+    @StateObject private var studioViewModel = ScholarStudioViewModel(
+        seedDemo: ScholarOSMain.launchInExplicitDemoMode
+    )
     @ObservedObject private var localizer = ScholarLocalizer.shared
 
     public init() {}
 
     public var body: some Scene {
         WindowGroup(
-            localizer.L(
-                "ScholarOS — Academic Research & LaTeX/Typst Workstation",
-                "ScholarOS — 学术研究与 LaTeX/Typst 原生工作台"
-            )
+            studioViewModel.isDemoMode
+                ? localizer.L(
+                    "ScholarOS [DEMO] — Academic Research Workstation",
+                    "ScholarOS [DEMO / 演示数据] — 学术研究工作台"
+                )
+                : localizer.L(
+                    "ScholarOS — Academic Research Workstation",
+                    "ScholarOS — 学术研究工作台"
+                )
         ) {
             ScholarRootWorkbenchView(viewModel: studioViewModel)
                 .frame(minWidth: 1180, idealWidth: 1360, minHeight: 760, idealHeight: 840)

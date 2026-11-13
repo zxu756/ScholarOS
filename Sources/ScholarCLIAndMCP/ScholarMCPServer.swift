@@ -9,22 +9,34 @@ import ScholarPluginSDK
 import ScholarPRISMAEngine
 import ScholarProjectStore
 
-// MARK: - Hardware-Gated JSON-RPC 2.0 MCP Server (Enforces ERR_UNVERIFIED_CITATION)
+// MARK: - JSON-RPC 2.0 MCP Server (`ScholarMCPServer`)
 
-public struct ScholarHardwareGatedMCPServer: Sendable {
+public struct ScholarMCPServer: Sendable {
     public let defaultProjectBundlePath: String?
+    public let allowDemoMode: Bool
 
-    public init(defaultProjectBundlePath: String? = nil) {
+    public init(defaultProjectBundlePath: String? = nil, allowDemoMode: Bool = false) {
         self.defaultProjectBundlePath = defaultProjectBundlePath
+        self.allowDemoMode = allowDemoMode
     }
 
     public func handleJSONRPCLine(_ rawLine: String) -> String? {
-        guard let data = rawLine.data(using: .utf8),
-              let req = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let method = req["method"] as? String else {
+        let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             return nil
         }
+        guard let data = trimmed.data(using: .utf8),
+              let rawObj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return errorEnvelope(id: NSNull(), code: -32700, message: "Parse error")
+        }
+        guard let req = rawObj as? [String: Any] else {
+            return errorEnvelope(id: NSNull(), code: -32600, message: "Invalid Request")
+        }
+
         let idVal = req["id"]
+        guard let method = req["method"] as? String, !method.isEmpty else {
+            return errorEnvelope(id: idVal ?? NSNull(), code: -32600, message: "Invalid Request")
+        }
 
         let resultPayload: Any
         switch method {
@@ -48,8 +60,11 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
             resultPayload = executeToolCall(name: toolName, arguments: arguments)
 
         default:
-            if idVal == nil { return nil }
-            resultPayload = [String: Any]()
+            // JSON-RPC 2.0 notifications omit `id` and expect no response.
+            if idVal == nil && method.hasPrefix("notifications/") {
+                return nil
+            }
+            return errorEnvelope(id: idVal ?? NSNull(), code: -32601, message: "Method not found: \(method)")
         }
 
         guard let idVal else { return nil }
@@ -57,6 +72,21 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
             "jsonrpc": "2.0",
             "id": idVal,
             "result": resultPayload
+        ]
+        guard let outData = try? JSONSerialization.data(withJSONObject: envelope) else {
+            return nil
+        }
+        return String(decoding: outData, as: UTF8.self)
+    }
+
+    private func errorEnvelope(id: Any, code: Int, message: String) -> String? {
+        let envelope: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": [
+                "code": code,
+                "message": message
+            ]
         ]
         guard let outData = try? JSONSerialization.data(withJSONObject: envelope) else {
             return nil
@@ -82,16 +112,15 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
                 let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
 
-                let entries = try db.listBibliographyEntries()
+                let entries = try opened.db.listBibliographyEntries()
                 var byKey: [String: BibliographyEntry] = [:]
                 for entry in entries {
                     byKey[entry.citeKey] = entry
                 }
 
-                // Hardware-gated Citation Verification Firewall: throws ERR_UNVERIFIED_CITATION if missing, unverified, or hallucinated!
                 let verifiedEntry = try CitationVerificationFirewall().assertCitationAllowed(
                     citeKey: citeKey,
                     in: byKey
@@ -106,40 +135,59 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 }
                 let formatted = CSLCitationFormatterEngine().formatEntry(verifiedEntry, style: style)
                 let snippet = formatRaw == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
+                let demoPrefix = opened.isDemo ? "[DEMO]\n" : ""
                 let payloadText = """
-                [FIREWALL_CLEARED:\(verifiedEntry.firewallClass.rawValue)]
+                \(demoPrefix)[CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)]
                 Snippet: \(snippet)
                 Reference (\(style.rawValue)): \(formatted.bibliographyPlainText)
                 """
                 return textResult(payloadText, isError: false)
 
             case "scholar_verify_bibliography":
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let entries: [BibliographyEntry]
                 if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
-                    entries = try BibTeXCodec().parse(rawBib)
-                } else {
-                    entries = try db.listBibliographyEntries()
+                    let entries = try BibTeXCodec().parse(rawBib)
+                    let report = CitationVerificationFirewall().auditLibrary(entries)
+                    let data = try JSONEncoder().encode(report)
+                    return textResult(String(decoding: data, as: UTF8.self), isError: false)
                 }
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let entries = try opened.db.listBibliographyEntries()
                 let report = CitationVerificationFirewall().auditLibrary(entries)
                 let data = try JSONEncoder().encode(report)
                 return textResult(String(decoding: data, as: UTF8.self), isError: false)
 
             case "scholar_lsp_diagnostics":
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let entries = try db.listBibliographyEntries()
-                var files: [String: String] = [:]
                 if let inlineSource = arguments["source"] as? String {
                     let path = arguments["filePath"] as? String ?? "main.tex"
-                    files[path] = inlineSource
-                } else {
-                    for rec in try db.listManuscriptFiles() {
-                        files[rec.path] = rec.content
+                    var entries: [BibliographyEntry] = []
+                    if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
+                        entries = try BibTeXCodec().parse(rawBib)
+                    } else if hasExplicitDatabaseTarget(in: arguments) {
+                        let opened = try openDatabase(from: arguments)
+                        defer { opened.db.close() }
+                        entries = try opened.db.listBibliographyEntries()
                     }
+                    let lsp = ScholarLSPWorkspaceService(
+                        rootFilePath: path,
+                        files: [path: inlineSource],
+                        bibliography: entries
+                    )
+                    let diagReport = lsp.diagnosticsReport()
+                    let data = try JSONEncoder().encode(diagReport.diagnostics)
+                    return textResult(
+                        String(decoding: data, as: UTF8.self),
+                        isError: diagReport.firewallViolationCount > 0 || diagReport.errorCount > 0
+                    )
                 }
-                let primary = arguments["filePath"] as? String ?? ((try? db.primaryManuscriptFile()) ?? "main.tex")
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let entries = try opened.db.listBibliographyEntries()
+                var files: [String: String] = [:]
+                for rec in try opened.db.listManuscriptFiles() {
+                    files[rec.path] = rec.content
+                }
+                let primary = arguments["filePath"] as? String ?? ((try? opened.db.primaryManuscriptFile()) ?? "main.tex")
                 let lsp = ScholarLSPWorkspaceService(
                     rootFilePath: primary,
                     files: files,
@@ -154,9 +202,9 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
 
             case "scholar_search_provenance":
                 let claim = arguments["claim"] as? String ?? ""
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let passages = try db.listPDFPassages()
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let passages = try opened.db.listPDFPassages()
                 let fts = try FTS5ProvenanceIndex()
                 try fts.indexPassages(passages)
                 let hits = try fts.searchPassages(
@@ -168,10 +216,10 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 return textResult(String(decoding: data, as: UTF8.self), isError: false)
 
             case "scholar_prisma_agreement":
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let studies = try db.listScreeningStudies()
-                let spec = try db.loadPRISMAProtocol() ?? PICOProtocolSpec(
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let studies = try opened.db.listScreeningStudies()
+                let spec = try opened.db.loadPRISMAProtocol() ?? PICOProtocolSpec(
                     reviewTitle: "Systematic Review",
                     population: "Agent benchmarks",
                     intervention: "Sandboxed tool verification",
@@ -184,32 +232,49 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                     studies: studies,
                     protocolSpec: spec
                 )
-                let summary = try db.computePRISMAMetrics()
+                let confusion = InterRaterReliabilityAndSeedQCEngine().buildExclusionConfusionMatrix(
+                    studies: studies,
+                    protocolSpec: spec
+                )
+                let summary = try opened.db.computePRISMAMetrics()
+                let demoPrefix = opened.isDemo ? "[DEMO] " : ""
                 let text = String(
-                    format: "Studies=%d | Included=%d | Kappa=%.4f | PABAK=%.4f | GwetAC1=%.4f",
+                    format: "%@Studies=%d | Included=%d | Kappa=%.4f | PABAK=%.4f | GwetAC1=%.4f",
+                    demoPrefix,
                     studies.count,
                     summary.finalIncludedStudies,
-                    qc.cohensKappa.pointEstimate,
-                    qc.byrtsPABAK.pointEstimate,
+                    confusion.nominalMulticlassKappa.pointEstimate,
+                    summary.pabakScore,
                     qc.gwetsAC1.pointEstimate
                 )
                 return textResult(text, isError: false)
 
             case "scholar_editorial_audit":
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let entries = try db.listBibliographyEntries()
-                var files: [String: String] = [:]
                 if let inlineSource = arguments["source"] as? String {
-                    files["main.tex"] = inlineSource
-                } else {
-                    for rec in try db.listManuscriptFiles() {
-                        files[rec.path] = rec.content
+                    var entries: [BibliographyEntry] = []
+                    if hasExplicitDatabaseTarget(in: arguments) {
+                        let opened = try openDatabase(from: arguments)
+                        defer { opened.db.close() }
+                        entries = try opened.db.listBibliographyEntries()
                     }
+                    let runSummary = try EditorialPluginAuditRunner().run(
+                        files: ["main.tex": inlineSource],
+                        primaryFilePath: "main.tex",
+                        bibliography: entries
+                    )
+                    let data = try JSONEncoder().encode(runSummary.findings)
+                    return textResult(String(decoding: data, as: UTF8.self), isError: false)
+                }
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let entries = try opened.db.listBibliographyEntries()
+                var files: [String: String] = [:]
+                for rec in try opened.db.listManuscriptFiles() {
+                    files[rec.path] = rec.content
                 }
                 let runSummary = try EditorialPluginAuditRunner().run(
                     files: files,
-                    primaryFilePath: (try? db.primaryManuscriptFile()) ?? "main.tex",
+                    primaryFilePath: (try? opened.db.primaryManuscriptFile()) ?? "main.tex",
                     bibliography: entries
                 )
                 let data = try JSONEncoder().encode(runSummary.findings)
@@ -224,11 +289,11 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 return textResult(latexdiff, isError: false)
 
             case "scholar_citation_gaps":
-                let db = try openDatabase(from: arguments)
-                defer { db.close() }
-                let entries = try db.listBibliographyEntries()
-                let primary = (try? db.primaryManuscriptFile()) ?? "main.tex"
-                let manuscript = (try? db.manuscriptContent(path: primary)) ?? ""
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let entries = try opened.db.listBibliographyEntries()
+                let primary = (try? opened.db.primaryManuscriptFile()) ?? "main.tex"
+                let manuscript = (try? opened.db.manuscriptContent(path: primary)) ?? ""
                 let gaps = MainPathAndLiteratureGapAnalyzer().recommendMissingCitationsForManuscript(
                     manuscriptSource: manuscript,
                     corpus: entries,
@@ -250,20 +315,47 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
         }
     }
 
-    private func openDatabase(from arguments: [String: Any]) throws -> ScholarProjectDatabase {
+    private func hasExplicitDatabaseTarget(in arguments: [String: Any]) -> Bool {
         if let projectPath = arguments["projectPath"] as? String, !projectPath.isEmpty {
-            return try ScholarProjectDatabase(
+            return true
+        }
+        if let defaultProjectBundlePath, !defaultProjectBundlePath.isEmpty {
+            return true
+        }
+        if (arguments["demo"] as? Bool == true) || allowDemoMode {
+            return true
+        }
+        return false
+    }
+
+    private func openDatabase(from arguments: [String: Any]) throws -> (db: ScholarProjectDatabase, isDemo: Bool) {
+        if let projectPath = arguments["projectPath"] as? String, !projectPath.isEmpty {
+            guard FileManager.default.fileExists(atPath: projectPath) else {
+                throw ScholarOSError.fileNotFound(projectPath)
+            }
+            let db = try ScholarProjectDatabase(
                 bundleURL: URL(fileURLWithPath: projectPath),
                 seedDemoIfEmpty: false
             )
+            return (db, false)
         }
         if let defaultProjectBundlePath, !defaultProjectBundlePath.isEmpty {
-            return try ScholarProjectDatabase(
+            guard FileManager.default.fileExists(atPath: defaultProjectBundlePath) else {
+                throw ScholarOSError.fileNotFound(defaultProjectBundlePath)
+            }
+            let db = try ScholarProjectDatabase(
                 bundleURL: URL(fileURLWithPath: defaultProjectBundlePath),
-                seedDemoIfEmpty: true
+                seedDemoIfEmpty: false
             )
+            return (db, false)
         }
-        return try ScholarProjectDatabase.inMemory(seedDemo: true)
+        if (arguments["demo"] as? Bool == true) || allowDemoMode {
+            let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
+            return (db, true)
+        }
+        throw ScholarOSError.invalidCLIArguments(
+            "Missing required 'projectPath' argument (or pass 'demo: true' / start server with 'scholaros mcp --demo')."
+        )
     }
 
     private func textResult(_ text: String, isError: Bool) -> [String: Any] {
@@ -279,26 +371,28 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
         [
         [
             "name": "scholar_cite_key",
-            "description": "Hardware-gated citation insertion check. Returns formatted \\cite{key} or #cite(<key>) ONLY if the Citation Verification Firewall clears the entry; otherwise returns ERR_UNVERIFIED_CITATION.",
+            "description": "Citation insertion check. Returns formatted \\cite{key} or #cite(<key>) ONLY if the entry has status VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "citeKey": ["type": "string"],
                     "style": ["type": "string"],
                     "manuscriptFormat": ["type": "string"],
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ],
                 "required": ["citeKey"]
             ]
         ],
         [
             "name": "scholar_verify_bibliography",
-            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall.",
+            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (offline format and built-in retraction hint check in M0).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bibtex": ["type": "string"],
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ]
             ]
         ],
@@ -309,14 +403,16 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 "type": "object",
                 "properties": [
                     "source": ["type": "string"],
+                    "bibtex": ["type": "string"],
                     "filePath": ["type": "string"],
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ]
             ]
         ],
         [
             "name": "scholar_search_provenance",
-            "description": "Search indexed PDF passages via SQLite FTS5 BM25 to verify manuscript claims against bounding-box evidence.",
+            "description": "Search indexed PDF passages via SQLite FTS5 BM25 to compare manuscript claims against bounding-box passages.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -324,18 +420,20 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                     "filePath": ["type": "string"],
                     "line": ["type": "integer"],
                     "topK": ["type": "integer"],
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ],
                 "required": ["claim"]
             ]
         ],
         [
             "name": "scholar_prisma_agreement",
-            "description": "Compute PRISMA 2020 flow counts and dual-rater Cohen's kappa, Byrt's PABAK, and Gwet's AC1.",
+            "description": "Compute PRISMA 2020 flow counts and nominal Cohen's kappa, PABAK, and Gwet's AC1.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ]
             ]
         ],
@@ -346,7 +444,8 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
                 "type": "object",
                 "properties": [
                     "source": ["type": "string"],
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ]
             ]
         ],
@@ -364,11 +463,12 @@ public struct ScholarHardwareGatedMCPServer: Sendable {
         ],
         [
             "name": "scholar_citation_gaps",
-            "description": "Analyze citation network main paths and structural bridges to recommend missing verified foundational papers.",
+            "description": "Analyze citation network main paths and structural bridges on a .scholarproj bibliography.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
-                    "projectPath": ["type": "string"]
+                    "projectPath": ["type": "string"],
+                    "demo": ["type": "boolean"]
                 ]
             ]
         ]

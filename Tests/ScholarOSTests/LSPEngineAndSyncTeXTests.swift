@@ -20,8 +20,8 @@ struct LSPEngineAndSyncTeXTests {
                 year: 2017,
                 venue: "NeurIPS",
                 doi: "10.5555/3295222.3295349",
-                firewallClass: .verifiedCanonicalDOI,
-                firewallAuditNote: "Verified canonical DOI"
+                firewallClass: .verified,
+                firewallAuditNote: "Verified registry record"
             ),
             BibliographyEntry(
                 citeKey: "dao2022",
@@ -31,7 +31,7 @@ struct LSPEngineAndSyncTeXTests {
                 year: 2022,
                 venue: "NeurIPS",
                 arxivID: "2205.14135",
-                firewallClass: .verifiedPreprintRegistry,
+                firewallClass: .verified,
                 firewallAuditNote: "Verified arXiv preprint"
             ),
             BibliographyEntry(
@@ -40,7 +40,7 @@ struct LSPEngineAndSyncTeXTests {
                 title: "Unpublished Workshop Notes on Attention Kernels",
                 authors: [BibAuthor(givenName: "Pat", familyName: "Taylor")],
                 year: 2024,
-                firewallClass: .unverifiedPendingCheck,
+                firewallClass: .unverified,
                 firewallAuditNote: "Missing DOI/arXiv/PMID"
             ),
             BibliographyEntry(
@@ -51,8 +51,8 @@ struct LSPEngineAndSyncTeXTests {
                 year: 2025,
                 venue: "Fabricated Letters",
                 doi: "10.9999/fake.2025.999",
-                firewallClass: .blockedHallucinatedOrRetracted,
-                firewallAuditNote: "Blocked sentinel fabricated DOI"
+                firewallClass: .notFound,
+                firewallAuditNote: "Sentinel fabricated DOI"
             )
         ]
     }
@@ -94,12 +94,12 @@ struct LSPEngineAndSyncTeXTests {
         let unverifiedItem = try #require(items.first { $0.insertText == "draft2024unverified" })
         let blockedSmithItem = try #require(items.first { $0.insertText == "smith2025hallucinated" })
 
-        #expect(blockedSmithItem.subtitle.contains("BLOCKED"))
+        #expect(blockedSmithItem.subtitle.contains("NOT FOUND"))
         #expect(blockedSmithItem.detailMarkdown.contains("ERR_UNVERIFIED_CITATION"))
         #expect(unverifiedItem.subtitle.contains("UNVERIFIED"))
         #expect(unverifiedItem.detailMarkdown.contains("ERR_UNVERIFIED_CITATION"))
 
-        // Verified DOI item must strictly outrank both unverified and blocked items!
+        // Verified item must strictly outrank both unverified and not-found items!
         #expect(vaswaniItem.relevanceScore > unverifiedItem.relevanceScore)
         #expect(unverifiedItem.relevanceScore > blockedSmithItem.relevanceScore)
     }
@@ -216,8 +216,9 @@ struct LSPEngineAndSyncTeXTests {
             sourcesByFile: files,
             bibliography: bib
         ))
-        #expect(verifiedHover.firewallClass == .verifiedCanonicalDOI)
+        #expect(verifiedHover.firewallClass == .verified)
         #expect(verifiedHover.markdownBody.contains("Attention Is All You Need"))
+        #expect(!verifiedHover.markdownBody.contains("Verified DOI"))
 
         let blockedHover = try #require(nav.hover(
             at: TextPosition(line: 2, column: 58),
@@ -226,8 +227,8 @@ struct LSPEngineAndSyncTeXTests {
             sourcesByFile: files,
             bibliography: bib
         ))
-        #expect(blockedHover.firewallClass == .blockedHallucinatedOrRetracted)
-        #expect(blockedHover.markdownBody.contains("BLOCKED") || blockedHover.categoryBadge.contains("Blocked"))
+        #expect(blockedHover.firewallClass == .notFound)
+        #expect(blockedHover.markdownBody.contains("NOT_FOUND") || blockedHover.categoryBadge.contains("Not Found"))
     }
 
     @Test("Hover card previews cross-referenced equation context, user macro expansion, and math Unicode")
@@ -737,7 +738,8 @@ struct LSPEngineAndSyncTeXTests {
         #expect(status.outlineSectionCount == 2)
         #expect(status.declaredLabelCount == 2)
         #expect(status.declaredMacroCount == 1)
-        #expect(status.firewallViolationCount == 0)
+        // Unqueried refs.bib loaded offline is UNVERIFIED in M0 (S2 fix), producing 1 unverified citation diagnostic until verified online
+        #expect(status.firewallViolationCount == 1)
 
         let syncData = try service.exportSyntheticSyncTeXData(compressed: true)
         #expect(SyncTeXZlibCodec.isCompressedGzipOrZlib(syncData))

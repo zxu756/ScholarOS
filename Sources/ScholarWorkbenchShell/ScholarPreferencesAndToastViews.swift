@@ -47,7 +47,7 @@ public final class ScholarWorkbenchPreferences: ObservableObject {
 
     // 2. Citation & Zotero Firewall
     @Published public var defaultCitationStyle: CitationFormatStyle = .apa7
-    @Published public var enforceStrictHardwareFirewallGate: Bool = true
+    @Published public var enforceStrictFirewallGate: Bool = true
     @Published public var blockUnverifiedOfflineCitations: Bool = true
     @Published public var crossrefPolitePoolEmail: String = "editorial-lab@university.edu"
     @Published public var zoteroSQLiteDatabasePath: String = "~/Zotero/zotero.sqlite"
@@ -94,7 +94,7 @@ public final class ScholarWorkbenchPreferences: ObservableObject {
         enableLiveLSPDiagnostics = true
         showLineNumbersAndCodeFolding = true
         defaultCitationStyle = .apa7
-        enforceStrictHardwareFirewallGate = true
+        enforceStrictFirewallGate = true
         blockUnverifiedOfflineCitations = true
         jaroWinklerDeduplicationThreshold = 0.92
         blindReviewerBUntilCommitted = true
@@ -183,8 +183,8 @@ public struct ScholarPreferencesSheetView: View {
                     .tracking(0)
                     .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                 Text(localizer.L(
-                    "Configure interface language, archival typography, hardware-gated Citation Firewall rules, PRISMA 2020 blinding, and JavaScriptCore sandboxes.",
-                    "配置界面语言、古典纸感排版、五级引文硬件防火墙、PRISMA 2020 双盲筛查及 JavaScriptCore 审稿沙盒。"
+                    "Configure interface language, archival typography, Citation Verification Firewall rules, PRISMA 2020 blinding, and JavaScriptCore sandboxes.",
+                    "配置界面语言、古典纸感排版、五级引文核验防火墙、PRISMA 2020 双盲筛查及 JavaScriptCore 审稿沙盒。"
                 ))
                     .font(CambridgeTypography.uiCaption)
                     .foregroundStyle(CambridgeLinenPalette.slateEditorial)
@@ -362,10 +362,10 @@ public struct ScholarPreferencesSheetView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 12) {
                 CambridgeSectionHeader(
-                    title: localizer.L("Hardware-Gated 5-Class Citation Verification Firewall", "硬件门控五级引文验证防火墙"),
+                    title: localizer.L("5-Class Citation Verification Firewall", "五级引文真实性核验防火墙"),
                     subtitle: localizer.L(
-                        "Prevents unverified, hallucinated, or retracted citeKeys from entering manuscripts via UI, CLI, or MCP",
-                        "在界面、CLI 与 MCP 通道全面阻断未核验、幻觉伪造或已撤稿引文写入手稿"
+                        "Blocks NOT_FOUND, RETRACTED, DRIFT, and UNVERIFIED citeKeys from entering manuscripts until verified",
+                        "阻断未找到、已撤稿、元数据漂移与未核查文献键写入手稿"
                     )
                 )
 
@@ -383,16 +383,16 @@ public struct ScholarPreferencesSheetView: View {
 
                 Toggle(
                     localizer.L(
-                        "Enforce ERR_UNVERIFIED_CITATION block on BLOCKED_HALLUCINATED entries",
-                        "对伪造/撤稿文献强制触发 ERR_UNVERIFIED_CITATION 硬件拦截"
+                        "Enforce ERR_UNVERIFIED_CITATION block on NOT_FOUND and RETRACTED entries",
+                        "对未找到 (NOT_FOUND) 与已撤稿 (RETRACTED) 文献强制触发 ERR_UNVERIFIED_CITATION 拦截"
                     ),
-                    isOn: $preferences.enforceStrictHardwareFirewallGate
+                    isOn: $preferences.enforceStrictFirewallGate
                 )
                     .font(CambridgeTypography.uiControl)
                 Toggle(
                     localizer.L(
-                        "Require DOI / arXiv / PubMed verification before inserting UNVERIFIED_OFFLINE keys",
-                        "离线待核验文献须完成 DOI / arXiv / PubMed 校验后方允许引用"
+                        "Require external registry verification before inserting UNVERIFIED keys",
+                        "插入未核查 (UNVERIFIED) 文献前须完成外部文献注册库核对"
                     ),
                     isOn: $preferences.blockUnverifiedOfflineCitations
                 )
@@ -1010,6 +1010,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
     @ObservedObject private var localizer: ScholarLocalizer = .shared
 
     public let projectTitle: String
+    public let isDemoMode: Bool
     public let primaryManuscriptPath: String
     public let activeSectionTitle: String?
     public let manuscriptFiles: [ManuscriptFileRecord]
@@ -1045,6 +1046,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
         preferences: ScholarWorkbenchPreferences,
         toastCenter: ScholarToastCenter,
         projectTitle: String,
+        isDemoMode: Bool = false,
         primaryManuscriptPath: String = "main.tex",
         activeSectionTitle: String? = nil,
         manuscriptFiles: [ManuscriptFileRecord] = [],
@@ -1077,6 +1079,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
         self.preferences = preferences
         self.toastCenter = toastCenter
         self.projectTitle = projectTitle
+        self.isDemoMode = isDemoMode
         self.primaryManuscriptPath = primaryManuscriptPath
         self.activeSectionTitle = activeSectionTitle
         self.manuscriptFiles = manuscriptFiles
@@ -1112,6 +1115,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
                 ScholarTopWorkbenchToolbarView(
                     docking: docking,
                     projectTitle: projectTitle,
+                    isDemoMode: isDemoMode,
                     activeSectionTitle: activeSectionTitle,
                     canUndo: canUndo,
                     canRedo: canRedo,

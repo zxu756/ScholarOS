@@ -512,8 +512,8 @@ public enum ScholarCommandPaletteCatalog {
                 id: "action.drawer-firewall",
                 title: language.L("Reveal Bottom Drawer: Citation Firewall Ledger", "展开底部抽屉：五级引文防火墙台账"),
                 subtitle: language.L(
-                    "Audit Verified DOI, Metadata Drift, Unverified, and Blocked citations",
-                    "审计已验证 DOI、元数据漂移、待核验及已拦截引文"
+                    "Audit Verified, Drift, Not Found, Retracted, and Unverified citations",
+                    "审计已验证、元数据漂移、未找到、已撤稿与未核查引文"
                 ),
                 category: .actions,
                 sfSymbolName: "lock.shield",

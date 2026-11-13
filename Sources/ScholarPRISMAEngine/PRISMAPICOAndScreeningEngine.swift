@@ -144,7 +144,7 @@ public final class PRISMAScreeningEngine: @unchecked Sendable {
         allStudies().filter(\.hasReviewerConflict)
     }
 
-    /// Computes complete PRISMA 2020 flow counts alongside Cohen's $\kappa$ and PABAK ($2p_o - 1$).
+    /// Computes complete PRISMA 2020 flow counts alongside nominal Cohen's $\kappa$ and Brennan-Prediger PABAK over `ScreeningDecision` categories.
     public func computePRISMA2020Metrics() -> PRISMA2020SummaryMetrics {
         let studies = allStudies()
         let screened = studies.count
@@ -154,22 +154,22 @@ public final class PRISMAScreeningEngine: @unchecked Sendable {
         var ftExcludedByCode: [String: Int] = [:]
         var finalIncluded = 0
 
-        // Inter-rater binary agreement (Include/Maybe vs Exclude) across dual-screened records
-        var bothInclude = 0
-        var aIncBExc = 0
-        var aExcBInc = 0
-        var bothExclude = 0
+        var pairedCount = 0
+        var agreements = 0
+        var countsA: [ScreeningDecision: Int] = [:]
+        var countsB: [ScreeningDecision: Int] = [:]
+        var categories = Set<ScreeningDecision>()
 
         for study in studies {
             if let a = study.reviewerADecision, let b = study.reviewerBDecision {
-                let aPos = (a == .include || a == .maybe)
-                let bPos = (b == .include || b == .maybe)
-                switch (aPos, bPos) {
-                case (true, true): bothInclude += 1
-                case (true, false): aIncBExc += 1
-                case (false, true): aExcBInc += 1
-                case (false, false): bothExclude += 1
+                pairedCount += 1
+                if a == b {
+                    agreements += 1
                 }
+                countsA[a, default: 0] += 1
+                countsB[b, default: 0] += 1
+                categories.insert(a)
+                categories.insert(b)
             }
 
             let effectiveDecision = study.adjudicatedDecision ?? consensusDecision(study)
@@ -191,24 +191,26 @@ public final class PRISMAScreeningEngine: @unchecked Sendable {
         let soughtForRetrieval = max(0, screened - taExcluded)
         let ftAssessed = max(0, soughtForRetrieval - reportsNotRetrievedCount)
 
-        let totalPaired = bothInclude + aIncBExc + aExcBInc + bothExclude
         let po: Double
         let kappa: Double
         let pabak: Double
-        if totalPaired > 0 {
-            let n = Double(totalPaired)
-            po = Double(bothInclude + bothExclude) / n
-            let pAYes = Double(bothInclude + aIncBExc) / n
-            let pBYes = Double(bothInclude + aExcBInc) / n
-            let pANo = Double(aExcBInc + bothExclude) / n
-            let pBNo = Double(aIncBExc + bothExclude) / n
-            let pe = (pAYes * pBYes) + (pANo * pBNo)
-            if abs(1.0 - pe) < 1e-9 {
+        if pairedCount > 0 {
+            let n = Double(pairedCount)
+            po = Double(agreements) / n
+            var peNumerator = 0.0
+            for cat in categories {
+                let fa = Double(countsA[cat] ?? 0)
+                let fb = Double(countsB[cat] ?? 0)
+                peNumerator += fa * fb
+            }
+            let pe = peNumerator / (n * n)
+            if abs(1.0 - pe) < 1e-12 {
                 kappa = 1.0
             } else {
                 kappa = (po - pe) / (1.0 - pe)
             }
-            pabak = 2.0 * po - 1.0
+            let k = max(2, categories.count)
+            pabak = (Double(k) * po - 1.0) / Double(k - 1)
         } else {
             po = 1.0
             kappa = 1.0
