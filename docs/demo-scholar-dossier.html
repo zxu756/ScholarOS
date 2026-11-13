@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ScholarOS reproducible academic manuscript, Citation Verification Firewall, PDF provenance, and PRISMA 2020 screening audit dossier.">
+  <title>ScholarOS Audit Dossier: Verifiable Citation Firewalls &amp; Sandboxes</title>
+  <style>
+  /* Hallmark, v2.0.0, scope: app, genre: editorial-archival, posture: restrained, shape: app screen, surface: absolute */
+  :root {
+    --bg-linen: #F8F6F0;
+    --bg-paper: #FDFCF8;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --bg-vellum: #F1EEE6;
+    --border-stone: #DEDAD0;
+    --ink-primary: #191B1A;
+    --ink-secondary: #5A605D;
+    --ink-muted: #727874;
+    --accent-forest: #1D4D3E;
+    --status-ok-fg: #1F6E4A;
+    --status-ok-bg: #E8F5EE;
+    --status-warn-fg: #9A6700;
+    --status-warn-bg: #FEF6E4;
+    --status-block-fg: #B42318;
+    --status-block-bg: #FEECEB;
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: clip; }
+  body {
+    margin: 0;
+    padding: 32px 24px 56px;
+    background: var(--bg-linen);
+    color: var(--ink-primary);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    font-size: 14px;
+  }
+  .container {
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+  header.masthead {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-stone);
+    border-top: 4px solid var(--accent-forest);
+    border-radius: 6px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-forest);
+    margin: 0 0 8px;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-serif);
+    text-wrap: balance;
+    color: var(--ink-primary);
+    margin: 0;
+  }
+  h1 {
+    font-size: 26px;
+    line-height: 1.25;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-size: 18px;
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: 13px;
+  }
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-stone);
+    border-radius: 6px;
+    padding: 12px 16px;
+  }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    margin-bottom: 4px;
+  }
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-forest);
+  }
+  .kpi-note {
+    font-size: 12px;
+    color: var(--ink-muted);
+    margin-top: 4px;
+  }
+  section.panel {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-stone);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--bg-vellum);
+    border-bottom: 1px solid var(--border-stone);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-secondary);
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-stone);
+    vertical-align: top;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+  .num {
+    text-align: right;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .pill-ok {
+    background: var(--status-ok-bg);
+    color: var(--status-ok-fg);
+  }
+  .pill-warn {
+    background: var(--status-warn-bg);
+    color: var(--status-warn-fg);
+  }
+  .pill-block {
+    background: var(--status-block-bg);
+    color: var(--status-block-fg);
+  }
+  .pill-neutral {
+    background: var(--bg-vellum);
+    color: var(--ink-secondary);
+  }
+  .svg-frame {
+    overflow-x: auto;
+    padding: 8px 0;
+  }
+  .bib-preview {
+    background: var(--bg-vellum);
+    border: 1px solid var(--border-stone);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    font-size: 12.5px;
+    white-space: pre-wrap;
+  }
+  footer {
+    text-align: center;
+    color: var(--ink-muted);
+    font-size: 12px;
+    margin-top: 28px;
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="masthead">
+      <p class="eyebrow">ScholarOS v1.0.0, Reproducible Academic Audit Dossier</p>
+      <h1>Verifiable Citation Firewalls &amp; Sandboxes</h1>
+      <p class="subtitle">Primary Manuscript: <span class="mono">main.tex</span>, Schema v4, LSP Errors: 1, Firewall Violations: 1</p>
+    </header>
+
+    <div class="kpi-strip">
+      <div class="kpi-card">
+        <div class="kpi-label">Manuscript Words</div>
+        <div class="kpi-value">228</div>
+        <div class="kpi-note">3 source file(s)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Verified References</div>
+        <div class="kpi-value">12 / 16</div>
+        <div class="kpi-note">1 blocked by firewall</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">PRISMA Cohen Kappa</div>
+        <div class="kpi-value">0.600</div>
+        <div class="kpi-note">10 dual-blind studies</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">PDF Provenance</div>
+        <div class="kpi-value">14</div>
+        <div class="kpi-note">5 linked claims</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Editorial JS Audit</div>
+        <div class="kpi-value">8</div>
+        <div class="kpi-note">3 submission blocker(s)</div>
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2>1. Numbered Manuscript Outline &amp; Section Telemetry</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Section</th>
+            <th>Heading Title</th>
+            <th>Source Span</th>
+            <th class="num">Words</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+  <td class="mono">1</td>
+  <td style="padding-left:12px">Introduction</td>
+  <td class="mono">main.tex:12</td>
+  <td class="mono num">32</td>
+</tr>
+<tr>
+  <td class="mono">2</td>
+  <td style="padding-left:12px">Hardware Citation Firewall</td>
+  <td class="mono">main.tex:17</td>
+  <td class="mono num">42</td>
+</tr>
+<tr>
+  <td class="mono">3</td>
+  <td style="padding-left:12px">Provenance &amp; Psychometrics</td>
+  <td class="mono">main.tex:25</td>
+  <td class="mono num">17</td>
+</tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>2. 5-Class Citation Verification Firewall Ledger</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Cite Key</th>
+            <th>Firewall Class</th>
+            <th>Persistent ID</th>
+            <th>Formatted APA 7th Entry</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+  <td class="mono">blondel2008louvain</td>
+  <td><span class="pill pill-ok">Verified Preprint</span></td>
+  <td class="mono">arXiv:0803.0476</td>
+  <td>Blondel, V. D., &amp; Guillaume, J. L. (2008). Fast unfolding of communities in large networks. Journal of Statistical Mechanics: Theory and Experiment, 2008, P10008.</td>
+</tr>
+<tr>
+  <td class="mono">byrt1993pabak</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1016/0895-4356(93)90018-V</td>
+  <td>Byrt, T., Bishop, J., &amp; Carlin, J. B. (1993). Bias, prevalence and kappa. Journal of Clinical Epidemiology, 46(5), 423 to 429. https://doi.org/10.1016/0895-4356(93)90018-v</td>
+</tr>
+<tr>
+  <td class="mono">cohen1960kappa</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1177/001316446002000104</td>
+  <td>Cohen, J. (1960). A Coefficient of Agreement for Nominal Scales. Educational and Psychological Measurement, 20(1), 37 to 46. https://doi.org/10.1177/001316446002000104</td>
+</tr>
+<tr>
+  <td class="mono">dersimonian1986meta</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1016/0197-2456(86)90046-2</td>
+  <td>DerSimonian, R., &amp; Laird, N. (1986). Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), 177 to 188. https://doi.org/10.1016/0197-2456(86)90046-2</td>
+</tr>
+<tr>
+  <td class="mono">gao2023aclarc</td>
+  <td><span class="pill pill-warn">Metadata Drift</span></td>
+  <td class="mono">doi:10.18653/v1/2023.emnlp-main.398</td>
+  <td>Gao, T., Yen, H., &amp; Chen, D. (2023). Enabling Large Language Models to Generate Text with Citations.  https://doi.org/10.18653/v1/2023.emnlp-main.398</td>
+</tr>
+<tr>
+  <td class="mono">gwet2008ac1</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1348/000711006X126600</td>
+  <td>Gwet, K. L. (2008). Computing inter-rater reliability and its variance in the presence of high agreement. British Journal of Mathematical and Statistical Psychology, 61(1), 29 to 48. https://doi.org/10.1348/000711006x126600</td>
+</tr>
+<tr>
+  <td class="mono">kleinberg2003bursty</td>
+  <td><span class="pill pill-block">Unverified</span></td>
+  <td class="mono">none</td>
+  <td>Kleinberg, J. (2003). Bursty and Hierarchical Structure in Streams. Data Mining and Knowledge Discovery, 7(4), 373 to 397.</td>
+</tr>
+<tr>
+  <td class="mono">lewis2020rag</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.5555/3495724.3496517</td>
+  <td>Lewis, P., &amp; Perez, E. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 9459 to 9474). https://doi.org/10.5555/3495724.3496517</td>
+</tr>
+<tr>
+  <td class="mono">lin2004rouge</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.3115/1218955.1219032</td>
+  <td>Lin, C. Y. (2004). ROUGE: A Package for Automatic Evaluation of Summaries. In ACL Workshop on Text Summarization Branches Out (pp. 74 to 81). https://doi.org/10.3115/1218955.1219032</td>
+</tr>
+<tr>
+  <td class="mono">min2023factscore</td>
+  <td><span class="pill pill-ok">Verified Preprint</span></td>
+  <td class="mono">doi:10.18653/v1/2023.emnlp-main.741</td>
+  <td>Min, S., &amp; Krishna, K. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. In Proceedings of EMNLP 2023 (pp. 12076 to 12100). https://doi.org/10.18653/v1/2023.emnlp-main.741</td>
+</tr>
+<tr>
+  <td class="mono">page2021prisma</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1136/bmj.n71</td>
+  <td>Page, M. J., McKenzie, J. E., &amp; Moher, D. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. BMJ, 372, n71. https://doi.org/10.1136/bmj.n71</td>
+</tr>
+<tr>
+  <td class="mono">robertson2009bm25</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1561/1500000019</td>
+  <td>Robertson, S., &amp; Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval, 3(4), 333 to 389. https://doi.org/10.1561/1500000019</td>
+</tr>
+<tr>
+  <td class="mono">smith2025hallucinated</td>
+  <td><span class="pill pill-block">Blocked (Fake/Retracted)</span></td>
+  <td class="mono">doi:10.9999/fake.2025.001</td>
+  <td>Smith, J., &amp; Doe, A. (2025). Zero-Shot Autonomous Neural Proof of Undecidable LaTeX Grammars. Journal of Universal AI Hallucinations. https://doi.org/10.9999/fake.2025.001</td>
+</tr>
+<tr>
+  <td class="mono">sterne2019rob2</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.1136/bmj.l4898</td>
+  <td>Sterne, J. A. C., Savovic, J., &amp; Higgins, J. P. T. (2019). RoB 2: a revised tool for assessing risk of bias in randomised trials. BMJ, 366, l4898. https://doi.org/10.1136/bmj.l4898</td>
+</tr>
+<tr>
+  <td class="mono">vaswani2017attention</td>
+  <td><span class="pill pill-ok">Verified DOI</span></td>
+  <td class="mono">doi:10.5555/3295222.3295349</td>
+  <td>Vaswani, A., &amp; Shazeer, N. (2017). Attention Is All You Need. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 5998 to 6008). https://doi.org/10.5555/3295222.3295349</td>
+</tr>
+<tr>
+  <td class="mono">vaswani2017neurips_dup</td>
+  <td><span class="pill pill-warn">Metadata Drift</span></td>
+  <td class="mono">doi:10.5555/3295222.3295349</td>
+  <td>Vaswani, A., &amp; Shazeer, N. (2017). Attention is all you need (NeurIPS Proceedings Copy).  https://doi.org/10.5555/3295222.3295349</td>
+</tr>
+        </tbody>
+      </table>
+      <div class="bib-preview">Blondel, V. D., &amp; Guillaume, J. L. (2008). Fast unfolding of communities in large networks. Journal of Statistical Mechanics: Theory and Experiment, 2008, P10008.
+
+Byrt, T., Bishop, J., &amp; Carlin, J. B. (1993). Bias, prevalence and kappa. Journal of Clinical Epidemiology, 46(5), 423 to 429. https://doi.org/10.1016/0895-4356(93)90018-v
+
+Cohen, J. (1960). A Coefficient of Agreement for Nominal Scales. Educational and Psychological Measurement, 20(1), 37 to 46. https://doi.org/10.1177/001316446002000104
+
+DerSimonian, R., &amp; Laird, N. (1986). Meta-analysis in clinical trials. Controlled Clinical Trials, 7(3), 177 to 188. https://doi.org/10.1016/0197-2456(86)90046-2
+
+Gao, T., Yen, H., &amp; Chen, D. (2023). Enabling Large Language Models to Generate Text with Citations.  https://doi.org/10.18653/v1/2023.emnlp-main.398
+
+Gwet, K. L. (2008). Computing inter-rater reliability and its variance in the presence of high agreement. British Journal of Mathematical and Statistical Psychology, 61(1), 29 to 48. https://doi.org/10.1348/000711006x126600
+
+Lewis, P., &amp; Perez, E. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 9459 to 9474). https://doi.org/10.5555/3495724.3496517
+
+Lin, C. Y. (2004). ROUGE: A Package for Automatic Evaluation of Summaries. In ACL Workshop on Text Summarization Branches Out (pp. 74 to 81). https://doi.org/10.3115/1218955.1219032
+
+Min, S., &amp; Krishna, K. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation. In Proceedings of EMNLP 2023 (pp. 12076 to 12100). https://doi.org/10.18653/v1/2023.emnlp-main.741
+
+Page, M. J., McKenzie, J. E., &amp; Moher, D. (2021). The PRISMA 2020 statement: an updated guideline for reporting systematic reviews. BMJ, 372, n71. https://doi.org/10.1136/bmj.n71
+
+Robertson, S., &amp; Zaragoza, H. (2009). The Probabilistic Relevance Framework: BM25 and Beyond. Foundations and Trends in Information Retrieval, 3(4), 333 to 389. https://doi.org/10.1561/1500000019
+
+Sterne, J. A. C., Savovic, J., &amp; Higgins, J. P. T. (2019). RoB 2: a revised tool for assessing risk of bias in randomised trials. BMJ, 366, l4898. https://doi.org/10.1136/bmj.l4898
+
+Vaswani, A., &amp; Shazeer, N. (2017a). Attention Is All You Need. In Advances in Neural Information Processing Systems (NeurIPS) (pp. 5998 to 6008). https://doi.org/10.5555/3295222.3295349
+
+Vaswani, A., &amp; Shazeer, N. (2017b). Attention is all you need (NeurIPS Proceedings Copy).  https://doi.org/10.5555/3295222.3295349</div>
+    </section>
+
+    <section class="panel">
+      <h2>3. Claim-to-PDF Bounding-Box Provenance &amp; Entailment</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Manuscript Line</th>
+            <th>Source Passage</th>
+            <th>Entailment Verdict</th>
+            <th class="num">BM25</th>
+            <th>Claim Excerpt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+  <td class="mono">main.tex:16</td>
+  <td class="mono">chen2025aegisvm, p.1</td>
+  <td><span class="pill pill-ok">Grounded</span></td>
+  <td class="mono num">14.82</td>
+  <td>Multi-head scaled dot-product attention achieves 28.4 BLEU on WMT 2014 EN-DE without recurrence.</td>
+</tr>
+<tr>
+  <td class="mono">main.tex:22</td>
+  <td class="mono">chen2025aegisvm, p.1</td>
+  <td><span class="pill pill-block">Numeric mismatch</span></td>
+  <td class="mono num">11.36</td>
+  <td>Hardware citation firewall gates eliminate 99.4% of hallucinated BibTeX keys prior to compilation.</td>
+</tr>
+<tr>
+  <td class="mono">main.tex:27</td>
+  <td class="mono">smith2025hallucinated, p.1</td>
+  <td><span class="pill pill-block">Unsupported</span></td>
+  <td class="mono num">0.42</td>
+  <td>Zero-shot neural theorem synthesis resolves every undecidable macro expansion cycle in O(1) time.</td>
+</tr>
+<tr>
+  <td class="mono">sections/methodology.tex:11</td>
+  <td class="mono">patel2026vericite, p.1</td>
+  <td><span class="pill pill-ok">Grounded</span></td>
+  <td class="mono num">13.15</td>
+  <td>PRISMA 2020 flow reporting separates database records (n = 412) from trial registry records (n = 38).</td>
+</tr>
+<tr>
+  <td class="mono">sections/methodology.tex:19</td>
+  <td class="mono">chen2025aegisvm, p.1</td>
+  <td><span class="pill pill-warn">Partial</span></td>
+  <td class="mono num">9.74</td>
+  <td>Byrt’s PABAK mitigates high-prevalence kappa attenuation when inclusion rates fall below 12%.</td>
+</tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>4. PRISMA 2020 Dual-Blind Screening Flow</h2>
+      <div class="svg-frame">
+        <svg aria-label="PRISMA 2020 systematic review flow diagram" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 560" width="860" height="560" font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif">
+  <rect width="860" height="560" fill="#F8F6F0" rx="8"/>
+  <defs>
+    <marker id="prisma-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#1D4D3E"/>
+    </marker>
+  </defs>
+  <!-- Left Spine Boxes -->
+  <rect x="44" y="32" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
+  <text x="60" y="56" font-size="13" font-weight="700" fill="#1D4D3E">1. Identification</text>
+  <text x="60" y="77" font-size="12" fill="#2A2E2B">Databases: n = 36, Registers: n = 38</text>
+
+  <rect x="44" y="140" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
+  <text x="60" y="164" font-size="13" font-weight="700" fill="#1D4D3E">2. Dual-Blind Screening</text>
+  <text x="60" y="185" font-size="12" fill="#2A2E2B">Screened: n = 10 (κ = 0.60, PABAK = 0.60)</text>
+
+  <rect x="44" y="248" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
+  <text x="60" y="272" font-size="13" font-weight="700" fill="#1D4D3E">3. Report Retrieval</text>
+  <text x="60" y="293" font-size="12" fill="#2A2E2B">Reports sought for retrieval: n = 10</text>
+
+  <rect x="44" y="356" width="330" height="74" rx="6" fill="#FFFFFF" stroke="#1D4D3E" stroke-width="1.5"/>
+  <text x="60" y="380" font-size="13" font-weight="700" fill="#1D4D3E">4. Full-Text Eligibility</text>
+  <text x="60" y="401" font-size="12" fill="#2A2E2B">Full-text reports assessed: n = 8</text>
+
+  <rect x="44" y="464" width="330" height="68" rx="6" fill="#E6F0EC" stroke="#1D4D3E" stroke-width="2"/>
+  <text x="60" y="490" font-size="13" font-weight="700" fill="#1D4D3E">5. Included Cohort</text>
+  <text x="60" y="512" font-size="13" font-weight="600" fill="#13352B">Studies included in synthesis: n = 6</text>
+
+  <!-- Right Exclusion Boxes -->
+  <rect x="454" y="32" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
+  <text x="470" y="56" font-size="12" font-weight="600" fill="#4A463F">Pre-Screening Deduplication</text>
+  <text x="470" y="77" font-size="12" fill="#5C574F">Duplicates removed: n = 64</text>
+
+  <rect x="454" y="140" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
+  <text x="470" y="164" font-size="12" font-weight="600" fill="#4A463F">Title &amp; Abstract Exclusions</text>
+  <text x="470" y="185" font-size="12" fill="#5C574F">Excluded records: n = 2</text>
+
+  <rect x="454" y="248" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
+  <text x="470" y="272" font-size="12" font-weight="600" fill="#4A463F">Unretrieved Reports</text>
+  <text x="470" y="293" font-size="12" fill="#5C574F">Reports not retrieved: n = 2</text>
+
+  <rect x="454" y="356" width="362" height="74" rx="6" fill="#F2EFE7" stroke="#8C8577" stroke-width="1.2"/>
+  <text x="470" y="380" font-size="12" font-weight="600" fill="#4A463F">Full-Text Exclusions (n = 0)</text>
+  <text x="470" y="401" font-size="11" fill="#5C574F">None</text>
+
+  <!-- Connectors -->
+  <line x1="209" y1="106" x2="209" y2="138" stroke="#1D4D3E" stroke-width="1.6" marker-end="url(#prisma-arrow)"/>
+  <line x1="209" y1="214" x2="209" y2="246" stroke="#1D4D3E" stroke-width="1.6" marker-end="url(#prisma-arrow)"/>
+  <line x1="209" y1="322" x2="209" y2="354" stroke="#1D4D3E" stroke-width="1.6" marker-end="url(#prisma-arrow)"/>
+  <line x1="209" y1="430" x2="209" y2="462" stroke="#1D4D3E" stroke-width="1.6" marker-end="url(#prisma-arrow)"/>
+
+  <line x1="374" y1="69" x2="452" y2="69" stroke="#1D4D3E" stroke-width="1.4" marker-end="url(#prisma-arrow)"/>
+  <line x1="374" y1="177" x2="452" y2="177" stroke="#1D4D3E" stroke-width="1.4" marker-end="url(#prisma-arrow)"/>
+  <line x1="374" y1="285" x2="452" y2="285" stroke="#1D4D3E" stroke-width="1.4" marker-end="url(#prisma-arrow)"/>
+  <line x1="374" y1="393" x2="452" y2="393" stroke="#1D4D3E" stroke-width="1.4" marker-end="url(#prisma-arrow)"/>
+</svg>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>5. JavaScriptCore Editorial Plugin Findings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Location</th>
+            <th>Plugin</th>
+            <th>Editorial Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td class="mono">main.tex:4</td>
+  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
+  <td>Explicit author identity ('Dr. Eleanor Vance, Cambridge Computing Lab') breaks double-blind peer review anonymity.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td class="mono">main.tex:22</td>
+  <td>Overclaiming &amp; Causal Rhetoric Auditor</td>
+  <td>Claiming 100% immunity or zero error rate without confidence intervals violates falsifiability and invites immediate reviewer rejection. Matched phrase: '100% immune'.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-block">Submission blocker</span></td>
+  <td class="mono">main.tex:24</td>
+  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
+  <td>Cited key 'smith2025hallucinated' is classified as BLOCKED_HALLUCINATED by Citation Firewall (BLOCKED (ERR_UNVERIFIED_CITATION): Invalid prefix 10.9999, HTTP 404 on Crossref/arXiv, unindexed venue.). Remove or replace with a verified source.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td class="mono">main.tex:13</td>
+  <td>Anti-AI Academic Prose Sanitizer</td>
+  <td>Figurative 'tapestry' metaphors obscure technical specificity in empirical writing.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td class="mono">main.tex:22</td>
+  <td>Overclaiming &amp; Causal Rhetoric Auditor</td>
+  <td>Rhetorical intensifiers ('undeniably', 'indisputably', 'without exception') substitute epistemic force for statistical uncertainty quantification. Matched phrase: 'undeniably guarantees'.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td class="mono">main.tex:23</td>
+  <td>APA 7th Statistical &amp; p-Value Consistency Verifier</td>
+  <td>Reported p-value (p = .001) for t(48) = 2.42 deviates by 0.018 from exact recomputed p = .019 (0.0194). Verify degrees of freedom or rounding.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-warn">Rigor warning</span></td>
+  <td class="mono">sections/methodology.tex:10</td>
+  <td>Double-Blind &amp; Camera-Ready Venue Gate</td>
+  <td>Cited key 'kleinberg2003bursty' has UNVERIFIED_OFFLINE status and has not been validated against Crossref, arXiv, or PubMed.</td>
+</tr>
+<tr>
+  <td><span class="pill pill-neutral">STYLE</span></td>
+  <td class="mono">main.tex:13</td>
+  <td>Anti-AI Academic Prose Sanitizer</td>
+  <td>'delve into' exhibits &gt;10x post-2023 LLM frequency inflation in scientific prose; prefer direct analytical verbs ('examine', 'analyze', 'investigate').</td>
+</tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      Generated locally by ScholarOS 1.0.0, Cambridge Linen Archival Engine, Hardware-Gated Citation Verification Firewall
+    </footer>
+  </div>
+</body>
+</html>
