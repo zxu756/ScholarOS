@@ -436,7 +436,7 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
               \(isDemo ? "<p><span class=\"pill pill-warn\" data-en=\"[DEMO] Sample Unverified Dataset\" data-zh=\"[DEMO / 演示数据] 示例未核查数据集\">[DEMO] Sample Unverified Dataset</span></p>" : "")
               <div class="masthead-row">
                 <div>
-                  <p class="eyebrow" data-en="ScholarOS v1.1.0, Reproducible Academic Audit Dossier" data-zh="ScholarOS v1.1.0，可复现学术手稿与引文核验档案">ScholarOS v1.1.0, Reproducible Academic Audit Dossier</p>
+                  <p class="eyebrow" data-en="ScholarOS v1.2.0, Reproducible Academic Audit Dossier" data-zh="ScholarOS v1.2.0，可复现学术手稿与引文核验档案">ScholarOS v1.2.0, Reproducible Academic Audit Dossier</p>
                   <h1 data-en="\(escapeAttr(title))" data-zh="\(escapeAttr(titleZh))">\(escapeHTML(title))</h1>
                   <p class="subtitle" data-en="\(escapeAttr(subtitleEn))" data-zh="\(escapeAttr(subtitleZh))">\(escapeHTML(subtitleEn))</p>
                 </div>
@@ -552,8 +552,8 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
               </table>
             </section>
 
-            <footer data-en="Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Citation Verification Firewall" data-zh="由 ScholarOS 1.1.0 本地离线生成，剑桥亚麻学术排版引擎与五级引文真实性防火墙">
-              Generated locally by ScholarOS 1.1.0, Cambridge Linen Archival Engine, Citation Verification Firewall
+            <footer data-en="Generated locally by ScholarOS 1.2.0, Cambridge Linen Archival Engine, Citation Verification Firewall" data-zh="由 ScholarOS 1.2.0 本地离线生成，剑桥亚麻学术排版引擎与五级引文真实性防火墙">
+              Generated locally by ScholarOS 1.2.0, Cambridge Linen Archival Engine, Citation Verification Firewall
             </footer>
           </div>
           <script>
