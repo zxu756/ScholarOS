@@ -825,9 +825,152 @@ public struct ScholarLeftNavigatorSidebarView: View {
 // MARK: - 4-Channel Resizable Bottom Drawer (`ScholarBottomDrawerView`)
 
 /// Resizable 4-channel bottom inspection drawer (`Diagnostics`, `Citation Firewall`, `Editorial Audit`, `Build & SyncTeX`).
+/// Title and detail text for a bottom-drawer channel that has nothing to list.
+///
+/// An empty list is not a result. The copy returned here may say that a check came back clean only
+/// when the inputs show that the check actually ran on loaded data; with nothing loaded (or nothing
+/// run) it says so instead. Pure functions, so the rule is unit-tested without rendering a view.
+public enum ScholarDrawerEmptyStateCopy {
+    public struct Copy: Sendable, Hashable {
+        public let title: String
+        public let detail: String
+        /// True only when the copy reports the clean outcome of a check that ran on loaded data.
+        public let reportsCleanResult: Bool
+
+        public init(title: String, detail: String, reportsCleanResult: Bool) {
+            self.title = title
+            self.detail = detail
+            self.reportsCleanResult = reportsCleanResult
+        }
+    }
+
+    /// Diagnostics channel. `shownCount` is always 0 when this is called; `totalDiagnosticCount` is the
+    /// number before the severity filter.
+    public static func diagnostics(
+        manuscriptFileCount: Int,
+        totalDiagnosticCount: Int,
+        language: ScholarLanguage
+    ) -> Copy {
+        if manuscriptFileCount == 0 {
+            return Copy(
+                title: language.L("No Manuscript Loaded", "未载入手稿"),
+                detail: language.L(
+                    "Nothing has been parsed, so there are no diagnostics to show.",
+                    "没有解析过任何文件，所以没有诊断结果。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        if totalDiagnosticCount > 0 {
+            return Copy(
+                title: language.L("No Diagnostics Match the Current Filter", "当前筛选条件下没有诊断"),
+                detail: language.L(
+                    "\(totalDiagnosticCount) diagnostics are hidden by the severity filter.",
+                    "有 \(totalDiagnosticCount) 条诊断被严重级别筛选隐藏。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        return Copy(
+            title: language.L("Zero Markup or Macro Diagnostics", "零语法或宏展开异常"),
+            detail: language.L(
+                "The LaTeX/Typst parser and macro symbol table reported no diagnostics for \(manuscriptFileCount) loaded file(s).",
+                "LaTeX/Typst 解析器与宏符号表对已载入的 \(manuscriptFileCount) 个文件没有报出诊断。"
+            ),
+            reportsCleanResult: true
+        )
+    }
+
+    /// Citation channel. `verifiedCount` is the number of loaded entries whose class is `VERIFIED`.
+    public static func citationFirewall(
+        bibliographyEntryCount: Int,
+        verifiedCount: Int,
+        language: ScholarLanguage
+    ) -> Copy {
+        if bibliographyEntryCount == 0 {
+            return Copy(
+                title: language.L("No Bibliography Loaded", "未载入文献"),
+                detail: language.L(
+                    "No entries have been checked.",
+                    "没有任何条目被检查过。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        if verifiedCount == bibliographyEntryCount {
+            return Copy(
+                title: language.L("All \(bibliographyEntryCount) Entries Are VERIFIED", "全部 \(bibliographyEntryCount) 条文献均为 VERIFIED"),
+                detail: language.L(
+                    "No retracted, not-found, drifted, or unverified bibliography keys match the current filter.",
+                    "当前筛选条件下没有撤稿、未找到、元数据漂移或未核查的文献键。"
+                ),
+                reportsCleanResult: true
+            )
+        }
+        return Copy(
+            title: language.L("No Entries Match the Current Filter", "当前筛选条件下没有条目"),
+            detail: language.L(
+                "\(verifiedCount) of \(bibliographyEntryCount) entries are VERIFIED.",
+                "\(bibliographyEntryCount) 条文献中有 \(verifiedCount) 条为 VERIFIED。"
+            ),
+            reportsCleanResult: false
+        )
+    }
+
+    /// Editorial channel. `pluginsRunCount` is the number of plugins that have reported a timing,
+    /// i.e. that actually ran; `totalFindingCount` is the number before the severity filter.
+    public static func editorialAudit(
+        manuscriptFileCount: Int,
+        pluginsRunCount: Int,
+        totalFindingCount: Int,
+        language: ScholarLanguage
+    ) -> Copy {
+        if manuscriptFileCount == 0 {
+            return Copy(
+                title: language.L("No Manuscript Loaded", "未载入手稿"),
+                detail: language.L(
+                    "No editorial check has been run.",
+                    "没有运行过任何审稿检查。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        if pluginsRunCount == 0 {
+            return Copy(
+                title: language.L("Editorial Checks Have Not Been Run", "尚未运行审稿检查"),
+                detail: language.L(
+                    "Run the editorial plugins to check the loaded manuscript.",
+                    "运行审稿插件后才会有检查结果。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        if totalFindingCount > 0 {
+            return Copy(
+                title: language.L("No Findings Match the Current Filter", "当前筛选条件下没有发现项"),
+                detail: language.L(
+                    "\(totalFindingCount) findings are hidden by the severity filter.",
+                    "有 \(totalFindingCount) 条发现项被严重级别筛选隐藏。"
+                ),
+                reportsCleanResult: false
+            )
+        }
+        return Copy(
+            title: language.L("No Editorial Findings", "审稿检查没有发现问题"),
+            detail: language.L(
+                "\(pluginsRunCount) editorial plugin(s) ran on the loaded manuscript and reported nothing.",
+                "\(pluginsRunCount) 个审稿插件已在载入的手稿上运行，没有报出问题。"
+            ),
+            reportsCleanResult: true
+        )
+    }
+}
+
 public struct ScholarBottomDrawerView: View {
     @ObservedObject public var docking: ScholarDockingController
     @ObservedObject private var localizer: ScholarLocalizer = .shared
+    /// Number of manuscript files loaded in the workspace (0 in the default empty state).
+    public let manuscriptFileCount: Int
     public let diagnostics: [LSPDiagnostic]
     public let bibliographyEntries: [BibliographyEntry]
     public let editorialFindings: [EditorialAuditFinding]
@@ -844,6 +987,7 @@ public struct ScholarBottomDrawerView: View {
 
     public init(
         docking: ScholarDockingController,
+        manuscriptFileCount: Int = 0,
         diagnostics: [LSPDiagnostic] = [],
         bibliographyEntries: [BibliographyEntry] = [],
         editorialFindings: [EditorialAuditFinding] = [],
@@ -855,6 +999,7 @@ public struct ScholarBottomDrawerView: View {
         onRunEditorialAudit: @escaping () -> Void = {}
     ) {
         self.docking = docking
+        self.manuscriptFileCount = manuscriptFileCount
         self.diagnostics = diagnostics
         self.bibliographyEntries = bibliographyEntries
         self.editorialFindings = editorialFindings
@@ -1044,13 +1189,16 @@ public struct ScholarBottomDrawerView: View {
         }
         return ScrollView {
             if filtered.isEmpty {
+                let copy = ScholarDrawerEmptyStateCopy.diagnostics(
+                    manuscriptFileCount: manuscriptFileCount,
+                    totalDiagnosticCount: diagnostics.count,
+                    language: localizer.language
+                )
                 emptyDrawerPlaceholder(
-                    symbol: "checkmark.seal",
-                    title: localizer.L("Zero Markup or Macro Diagnostics", "零语法或宏展开异常"),
-                    detail: localizer.L(
-                        "Incremental LaTeX/Typst CST parser and cycle-safe macro symbol table reported clean syntax.",
-                        "增量式 LaTeX/Typst 语法树解析器与防环宏符号表核查全部通过。"
-                    )
+                    symbol: copy.reportsCleanResult ? "checkmark.seal" : "tray",
+                    title: copy.title,
+                    detail: copy.detail,
+                    reportsCleanResult: copy.reportsCleanResult
                 )
             } else {
                 LazyVStack(alignment: .leading, spacing: 6) {
@@ -1105,13 +1253,16 @@ public struct ScholarBottomDrawerView: View {
         }
         return ScrollView {
             if filtered.isEmpty {
+                let copy = ScholarDrawerEmptyStateCopy.citationFirewall(
+                    bibliographyEntryCount: bibliographyEntries.count,
+                    verifiedCount: bibliographyEntries.filter { $0.firewallClass == .verified }.count,
+                    language: localizer.language
+                )
                 emptyDrawerPlaceholder(
-                    symbol: "lock.shield",
-                    title: localizer.L("All Cited Entries Verified", "全部引用文献均已通过核验"),
-                    detail: localizer.L(
-                        "No blocked, hallucinated, retracted, or drifted bibliography keys match the current filter.",
-                        "当前筛选条件下无被拦截、伪造、撤稿或元数据漂移的文献键。"
-                    )
+                    symbol: copy.reportsCleanResult ? "lock.shield" : "tray",
+                    title: copy.title,
+                    detail: copy.detail,
+                    reportsCleanResult: copy.reportsCleanResult
                 )
             } else {
                 LazyVStack(alignment: .leading, spacing: 6) {
@@ -1190,13 +1341,17 @@ public struct ScholarBottomDrawerView: View {
                 }
 
                 if filtered.isEmpty {
+                    let copy = ScholarDrawerEmptyStateCopy.editorialAudit(
+                        manuscriptFileCount: manuscriptFileCount,
+                        pluginsRunCount: perPluginTimingsMs.count,
+                        totalFindingCount: editorialFindings.count,
+                        language: localizer.language
+                    )
                     emptyDrawerPlaceholder(
-                        symbol: "highlighter",
-                        title: localizer.L("Manuscript Passed Editorial & Statistical Rigor Checks", "手稿已通过全部审稿与统计严谨性核查"),
-                        detail: localizer.L(
-                            "No overclaiming rhetoric, AI prose tropes, APA 7th p-value discrepancies, or venue leaks matched.",
-                            "未检测到过度宣称、AI 套话修辞、APA 7th p 值不一致或双盲匿名泄漏。"
-                        )
+                        symbol: copy.reportsCleanResult ? "highlighter" : "tray",
+                        title: copy.title,
+                        detail: copy.detail,
+                        reportsCleanResult: copy.reportsCleanResult
                     )
                 } else {
                     LazyVStack(alignment: .leading, spacing: 8) {
@@ -1354,11 +1509,17 @@ public struct ScholarBottomDrawerView: View {
         }
     }
 
-    private func emptyDrawerPlaceholder(symbol: String, title: String, detail: String) -> some View {
+    private func emptyDrawerPlaceholder(
+        symbol: String,
+        title: String,
+        detail: String,
+        reportsCleanResult: Bool
+    ) -> some View {
         VStack(spacing: 6) {
             Image(systemName: CambridgeLinenPalette.resolvedSymbolName(for: symbol))
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(CambridgeLinenPalette.verifiedEmerald)
+                // The "verified" green is reserved for a check that ran and came back clean.
+                .foregroundStyle(reportsCleanResult ? CambridgeLinenPalette.verifiedEmerald : CambridgeLinenPalette.mutedMetadata)
             Text(title)
                 .font(CambridgeTypography.uiControlSemibold)
                 .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ScholarModels
 import ScholarPRISMAEngine
+import ScholarProjectStore
 
 @Suite("PRISMA 2020 Screening, Psychometrics, RoB 2.0 & Meta-Analysis")
 struct PRISMAAndPsychometricsTests {
@@ -845,5 +846,74 @@ struct PRISMAAndPsychometricsTests {
         #expect(abs(confusion.nominalMulticlassKappa.pointEstimate - expectedKappa) < 1e-9)
         #expect(abs(prismaMetrics.cohensKappa - confusion.nominalMulticlassKappa.pointEstimate) < 1e-12)
         #expect(abs(prismaMetrics.pabakScore - expectedPABAK) < 1e-9)
+    }
+
+    @Test("S34: every entry point that reports nominal Cohen's kappa gives the same value for the same ratings, equal to the hand calculation")
+    func s34ProjectDatabaseAndScreeningEngineAgreeOnKappaForTheSameRatings() throws {
+        // Twelve records. Ten carry a vote from both raters; two carry a single vote and must be ignored.
+        // Categories: I = include, M = maybe, E = exclude(E1_OFF_TOPIC).
+        //
+        //   pair (A, B):  (I,I) (I,I) (I,I) (I,M) (M,M) (M,E) (E,E) (E,E) (E,I) (E,E)
+        //   agreements:     1     1     1     0     1     0     1     1     0     1    -> 7 of 10, Po = 7/10
+        //   marginals A:  I = 4, M = 2, E = 4
+        //   marginals B:  I = 4, M = 2, E = 4
+        //   Pe    = (4*4 + 2*2 + 4*4) / 10^2 = 36/100
+        //   kappa = (7/10 - 36/100) / (1 - 36/100) = 34/64 = 17/32 = 0.53125
+        //   PABAK (Brennan-Prediger, k = 3 categories) = (3 * 7/10 - 1) / (3 - 1) = 11/20 = 0.55
+        let excludeE1 = ScreeningDecision.exclude(reasonCode: "E1_OFF_TOPIC")
+        let studies: [ScreeningStudyRecord] = [
+            makeStudy(id: "k01", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "k02", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "k03", stage: .fullText, revA: .include, revB: .include),
+            makeStudy(id: "k04", stage: .titleAbstract, revA: .include, revB: .maybe),
+            makeStudy(id: "k05", stage: .titleAbstract, revA: .maybe, revB: .maybe),
+            makeStudy(id: "k06", stage: .titleAbstract, revA: .maybe, revB: excludeE1),
+            makeStudy(id: "k07", stage: .titleAbstract, revA: excludeE1, revB: excludeE1),
+            makeStudy(id: "k08", stage: .titleAbstract, revA: excludeE1, revB: excludeE1),
+            makeStudy(id: "k09", stage: .titleAbstract, revA: excludeE1, revB: .include),
+            makeStudy(id: "k10", stage: .titleAbstract, revA: excludeE1, revB: excludeE1),
+            makeStudy(id: "k11", stage: .titleAbstract, revA: .include, revB: nil),
+            makeStudy(id: "k12", stage: .titleAbstract, revA: nil, revB: excludeE1)
+        ]
+        let handObservedAgreement = 7.0 / 10.0
+        let handKappa = 17.0 / 32.0
+        let handPABAK = 11.0 / 20.0
+
+        // Implementation 1: the project database (what `prisma-stats` and the MCP tool read).
+        let db = try ScholarProjectDatabase.inMemory(seedDemo: false)
+        defer { db.close() }
+        for study in studies {
+            try db.upsertScreeningStudy(study)
+        }
+        let dbAgreement = try db.computeInterRaterAgreement()
+        let dbMetrics = try db.computePRISMAMetrics()
+        let dbStats = try db.computeProjectStats()
+
+        // Implementation 2: the in-memory screening engine.
+        let engineMetrics = PRISMAScreeningEngine(studies: studies).computePRISMA2020Metrics()
+
+        // Each equals the hand calculation ...
+        #expect(abs(dbAgreement.cohensKappa - handKappa) < 1e-12)
+        #expect(abs(dbMetrics.cohensKappa - handKappa) < 1e-12)
+        #expect(abs(dbStats.cohensKappa - handKappa) < 1e-12)
+        #expect(abs(engineMetrics.cohensKappa - handKappa) < 1e-12)
+        #expect(abs(dbAgreement.observedAgreement - handObservedAgreement) < 1e-12)
+        #expect(abs(engineMetrics.observedAgreementRate - handObservedAgreement) < 1e-12)
+        #expect(abs(dbAgreement.pabak - handPABAK) < 1e-12)
+        #expect(abs(engineMetrics.pabakScore - handPABAK) < 1e-12)
+
+        // ... and they equal each other exactly, so a change to one that is not made to the other is caught
+        // here even if it happened to stay within a tolerance of some other reference value.
+        #expect(dbMetrics.cohensKappa == engineMetrics.cohensKappa)
+        #expect(dbAgreement.cohensKappa == engineMetrics.cohensKappa)
+        #expect(dbMetrics.observedAgreementRate == engineMetrics.observedAgreementRate)
+        #expect(dbMetrics.pabakScore == engineMetrics.pabakScore)
+
+        // The confusion-matrix route of the QC engine reports the same nominal kappa.
+        let confusion = InterRaterReliabilityAndSeedQCEngine().buildExclusionConfusionMatrix(
+            studies: studies,
+            protocolSpec: PRISMAScreeningEngine.defaultPICOProtocol()
+        )
+        #expect(abs(confusion.nominalMulticlassKappa.pointEstimate - handKappa) < 1e-9)
     }
 }

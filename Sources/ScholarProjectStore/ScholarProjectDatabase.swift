@@ -1465,51 +1465,19 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         studies: [ScreeningStudyRecord]? = nil
     ) throws -> (observedAgreement: Double, cohensKappa: Double, pabak: Double) {
         let allStudies = try (studies ?? listScreeningStudies())
-        let dualCoded = allStudies.compactMap { study -> (ScreeningDecision, ScreeningDecision)? in
+        let dualCoded = allStudies.compactMap { study -> (raterA: ScreeningDecision, raterB: ScreeningDecision)? in
             guard let a = study.reviewerADecision, let b = study.reviewerBDecision else {
                 return nil
             }
-            return (a, b)
+            return (raterA: a, raterB: b)
         }
-
-        let n = dualCoded.count
-        guard n > 0 else {
-            return (observedAgreement: 1.0, cohensKappa: 1.0, pabak: 1.0)
-        }
-
-        var agreements = 0
-        var countsA: [ScreeningDecision: Int] = [:]
-        var countsB: [ScreeningDecision: Int] = [:]
-        var categories = Set<ScreeningDecision>()
-
-        for (voteA, voteB) in dualCoded {
-            if voteA == voteB {
-                agreements += 1
-            }
-            countsA[voteA, default: 0] += 1
-            countsB[voteB, default: 0] += 1
-            categories.insert(voteA)
-            categories.insert(voteB)
-        }
-
-        let nDouble = Double(n)
-        let po = Double(agreements) / nDouble
-        var peNumerator = 0.0
-        for category in categories {
-            let aFreq = Double(countsA[category] ?? 0)
-            let bFreq = Double(countsB[category] ?? 0)
-            peNumerator += aFreq * bFreq
-        }
-        let pe = peNumerator / (nDouble * nDouble)
-        let kappa: Double
-        if abs(1.0 - pe) < 1e-12 {
-            kappa = 1.0
-        } else {
-            kappa = (po - pe) / (1.0 - pe)
-        }
-        let k = max(2, categories.count)
-        let pabak = (Double(k) * po - 1.0) / Double(k - 1)
-        return (observedAgreement: po, cohensKappa: kappa, pabak: pabak)
+        // The statistics themselves live in one place (ScholarModels) and are shared with PRISMAScreeningEngine.
+        let agreement = NominalDualRaterAgreement.compute(votes: dualCoded)
+        return (
+            observedAgreement: agreement.observedAgreement,
+            cohensKappa: agreement.cohensKappa,
+            pabak: agreement.pabak
+        )
     }
 
     public func computePRISMAMetrics(protocolID: String = "default") throws -> PRISMA2020SummaryMetrics {

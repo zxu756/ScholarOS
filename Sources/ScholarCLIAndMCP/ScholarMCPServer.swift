@@ -386,7 +386,7 @@ public struct ScholarMCPServer: Sendable {
         ],
         [
             "name": "scholar_verify_bibliography",
-            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (offline format and built-in retraction hint check in M0).",
+            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall. This version performs no online registry lookups: it checks identifier syntax and a built-in, incomplete retraction hint list, so no entry is ever VERIFIED.",
             "inputSchema": [
                 "type": "object",
                 "properties": [

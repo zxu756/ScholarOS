@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+#
+# Single test entry point.
+#
+#   Scripts/test.sh scope <ModuleOrFilter...>     unit tests of the named modules only
+#   Scripts/test.sh milestone <N> [--record]      scoped unit tests + the milestone's acceptance scripts
+#   Scripts/test.sh release                       everything (only before a release)
+#
+# `milestone` and `release` write their acceptance reports to a temporary directory and leave the
+# working tree untouched. Pass --record to overwrite the committed files under reports/ instead
+# (do this only when the README numbers that cite those files are being regenerated).
+#
+# Nothing here starts the graphical interface, and nothing here may leave files in
+# ~/Library/Preferences: `milestone` fails if either the working tree or the set of
+# io.github.zxu756.ScholarOS.* preference files changed while it ran.
+#
+# SCHOLAR_BUILD_JOBS=<n> caps build parallelism (`swift build -j n`, `swift test -j n`).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,8 +24,8 @@ usage() {
     cat >&2 <<'EOF'
 Usage:
   Scripts/test.sh scope <ModuleOrFilter...>
-  Scripts/test.sh milestone <N>
-  Scripts/test.sh release
+  Scripts/test.sh milestone <N> [--record]
+  Scripts/test.sh release [--record]
 EOF
     exit 2
 }
@@ -49,6 +65,57 @@ map_module_to_filter() {
     esac
 }
 
+# `swift test` with the optional parallelism cap.
+swift_test() {
+    if [[ -n "${SCHOLAR_BUILD_JOBS:-}" ]]; then
+        swift test -j "$SCHOLAR_BUILD_JOBS" "$@"
+    else
+        swift test "$@"
+    fi
+}
+
+# Number of ScholarOS preference files in the caller's real ~/Library/Preferences (names only are read).
+count_scholaros_preference_files() {
+    local prefs_dir="$HOME/Library/Preferences"
+    if [[ ! -d "$prefs_dir" ]]; then
+        echo 0
+        return
+    fi
+    find "$prefs_dir" -maxdepth 1 -name 'io.github.zxu756.ScholarOS.*' | wc -l | tr -d ' '
+}
+
+working_tree_state() {
+    if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        git -C "$REPO_ROOT" status --short
+    fi
+}
+
+# Picks the report directory: reports/ with --record, a fresh temporary directory otherwise.
+select_report_dir() {
+    local record="$1"
+    if [[ "$record" -eq 1 ]]; then
+        echo "$REPO_ROOT/reports"
+    else
+        mktemp -d "${TMPDIR:-/tmp}/scholaros-reports.XXXXXX"
+    fi
+}
+
+require_executable() {
+    if [[ ! -x "$1" ]]; then
+        echo "ERROR: Missing executable ${1#"$REPO_ROOT"/}" >&2
+        exit 1
+    fi
+}
+
+run_m0_acceptance_scripts() {
+    require_executable "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh"
+    require_executable "$REPO_ROOT/Scripts/acceptance/readme-commands.sh"
+    echo "[test.sh] Running M0 acceptance script..."
+    "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh"
+    echo "[test.sh] Running README command replay..."
+    "$REPO_ROOT/Scripts/acceptance/readme-commands.sh"
+}
+
 if [[ $# -lt 1 ]]; then
     usage
 fi
@@ -68,30 +135,57 @@ case "$MODE" in
         done
         JOINED="$(IFS='|'; echo "${FILTERS[*]}")"
         echo "[test.sh] Running scoped tests: --filter ($JOINED)"
-        swift test --no-parallel --filter "($JOINED)"
+        swift_test --no-parallel --filter "($JOINED)"
         ;;
 
     milestone)
-        if [[ $# -ne 1 ]]; then
+        MS=""
+        RECORD=0
+        for arg in "$@"; do
+            case "$arg" in
+                --record) RECORD=1 ;;
+                -*) usage ;;
+                *)
+                    if [[ -n "$MS" ]]; then
+                        usage
+                    fi
+                    MS="$arg"
+                    ;;
+            esac
+        done
+        if [[ -z "$MS" ]]; then
             usage
         fi
-        MS="$1"
         case "$MS" in
             0)
+                TREE_BEFORE="$(working_tree_state)"
+                PREFS_BEFORE="$(count_scholaros_preference_files)"
+                SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                export SCHOLAR_REPORT_DIR
+
                 echo "[test.sh] Running M0 scoped unit tests..."
-                swift test --no-parallel --filter "(BibCSLAndFirewallTests|LSPEngineAndSyncTeXTests|PRISMAAndPsychometricsTests|ProjectStoreAndTrackChangesTests|PluginSDKMCPAndShellTests|ScholarStudioViewsTests)"
-                if [[ ! -x "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh" ]]; then
-                    echo "ERROR: Missing executable Scripts/acceptance/m0-acceptance.sh" >&2
+                swift_test --no-parallel --filter "(BibCSLAndFirewallTests|LSPEngineAndSyncTeXTests|PRISMAAndPsychometricsTests|ProjectStoreAndTrackChangesTests|PluginSDKMCPAndShellTests|ScholarStudioViewsTests)"
+                run_m0_acceptance_scripts
+
+                PREFS_AFTER="$(count_scholaros_preference_files)"
+                echo "[test.sh] ScholarOS preference files in ~/Library/Preferences: before=$PREFS_BEFORE after=$PREFS_AFTER"
+                if [[ "$PREFS_BEFORE" != "$PREFS_AFTER" ]]; then
+                    echo "ERROR: the run changed the number of io.github.zxu756.ScholarOS.* files in ~/Library/Preferences ($PREFS_BEFORE -> $PREFS_AFTER)." >&2
                     exit 1
                 fi
-                if [[ ! -x "$REPO_ROOT/Scripts/acceptance/readme-commands.sh" ]]; then
-                    echo "ERROR: Missing executable Scripts/acceptance/readme-commands.sh" >&2
-                    exit 1
+                if [[ "$RECORD" -eq 1 ]]; then
+                    echo "[test.sh] --record: reports/ was updated; review and commit the change."
+                else
+                    TREE_AFTER="$(working_tree_state)"
+                    if [[ "$TREE_BEFORE" != "$TREE_AFTER" ]]; then
+                        echo "ERROR: the run modified the working tree (git status --short before/after differ):" >&2
+                        echo "$TREE_AFTER" >&2
+                        exit 1
+                    fi
+                    echo "[test.sh] Working tree unchanged by the run."
                 fi
-                echo "[test.sh] Running M0 acceptance script..."
-                "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh"
-                echo "[test.sh] Running README command replay..."
-                "$REPO_ROOT/Scripts/acceptance/readme-commands.sh"
+                echo "[test.sh] Reports: $SCHOLAR_REPORT_DIR"
+                echo "[test.sh] MILESTONE 0 PASSED."
                 ;;
             *)
                 echo "ERROR: Milestone M${MS} acceptance script is not implemented yet." >&2
@@ -101,24 +195,20 @@ case "$MODE" in
         ;;
 
     release)
+        RECORD=0
+        for arg in "$@"; do
+            case "$arg" in
+                --record) RECORD=1 ;;
+                *) usage ;;
+            esac
+        done
+        SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+        export SCHOLAR_REPORT_DIR
+
         echo "[test.sh] Running full unit test suite (--no-parallel)..."
-        swift test --no-parallel
+        swift_test --no-parallel
 
-        if [[ -x "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh" ]]; then
-            echo "[test.sh] Running M0 acceptance script..."
-            "$REPO_ROOT/Scripts/acceptance/m0-acceptance.sh"
-        else
-            echo "ERROR: Missing executable Scripts/acceptance/m0-acceptance.sh" >&2
-            exit 1
-        fi
-
-        if [[ -x "$REPO_ROOT/Scripts/acceptance/readme-commands.sh" ]]; then
-            echo "[test.sh] Running README command replay..."
-            "$REPO_ROOT/Scripts/acceptance/readme-commands.sh"
-        else
-            echo "ERROR: Missing executable Scripts/acceptance/readme-commands.sh" >&2
-            exit 1
-        fi
+        run_m0_acceptance_scripts
 
         if [[ "${SCHOLAR_ONLINE:-0}" == "1" ]]; then
             if [[ -f "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py" ]]; then
@@ -129,6 +219,7 @@ case "$MODE" in
         else
             echo "SKIPPED (SCHOLAR_ONLINE!=1)"
         fi
+        echo "[test.sh] Reports: $SCHOLAR_REPORT_DIR"
         ;;
 
     *)

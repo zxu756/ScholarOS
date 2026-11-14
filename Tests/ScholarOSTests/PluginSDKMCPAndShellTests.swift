@@ -6,10 +6,67 @@ import ScholarPluginSDK
 import ScholarCLIAndMCP
 import ScholarWorkbenchShell
 
+/// In-memory stand-in for `UserDefaults`, so that tests of language persistence never create a
+/// preferences domain on disk. (A temporary `UserDefaults(suiteName:)` followed by
+/// `removePersistentDomain(forName:)` still leaves one `<suite>.plist` per run in
+/// `~/Library/Preferences`; that is how the earlier version of these tests leaked files.)
+/// Only the calls `ScholarLocalizer` makes are overridden; nothing is forwarded to `super`.
+private final class InMemoryUserDefaults: UserDefaults, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String: Any] = [:]
+
+    init() {
+        // The designated initializer needs a suite name; nothing is ever written to that suite
+        // because every accessor used by the code under test is overridden below.
+        super.init(suiteName: "io.github.zxu756.ScholarOS.tests.in-memory-never-written")!
+    }
+
+    override func object(forKey defaultName: String) -> Any? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage[defaultName]
+    }
+
+    override func string(forKey defaultName: String) -> String? {
+        object(forKey: defaultName) as? String
+    }
+
+    override func set(_ value: Any?, forKey defaultName: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage[defaultName] = value
+    }
+
+    override func removeObject(forKey defaultName: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage[defaultName] = nil
+    }
+}
+
 @Suite("Editorial Plugin SDK, Statistical Numerics, CLI/MCP Firewall & Workbench Shell")
 struct PluginSDKMCPAndShellTests {
 
     // MARK: - Helpers
+
+    /// Repository root, derived from this source file's location (Tests/ScholarOSTests/<file>).
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    /// True when `text` contains CJK ideographs, CJK punctuation, or full-width forms.
+    private func containsChineseCharacters(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            let v = scalar.value
+            return (0x3000...0x303F).contains(v)
+                || (0x3400...0x4DBF).contains(v)
+                || (0x4E00...0x9FFF).contains(v)
+                || (0xFF00...0xFFEF).contains(v)
+        }
+    }
 
     private func makeTempDirectory(prefix: String = "scholaros-cli") throws -> URL {
         let dir = FileManager.default.temporaryDirectory
@@ -888,9 +945,7 @@ struct PluginSDKMCPAndShellTests {
     @Test("ScholarLocalizer toggles zh-Hans <-> en live and persists to UserDefaults (io.github.zxu756.ScholarOS.language)")
     @MainActor
     func scholarLocalizerLiveToggleAndUserDefaultsPersistence() throws {
-        let suiteName = "io.github.zxu756.ScholarOS.tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = InMemoryUserDefaults()
 
         let localizer = ScholarLocalizer(
             arguments: ["ScholarOS"],
@@ -917,9 +972,7 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("ScholarLocalizer resolves --lang CLI > SCHOLAROS_LANG > UserDefaults > Chinese Locale auto-detection")
     func scholarLocalizerResolutionOrderAndCLIArgumentStripping() throws {
-        let suiteName = "io.github.zxu756.ScholarOS.resolve.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let defaults = InMemoryUserDefaults()
 
         // 1. Locale auto-detection: preferredLanguages starting with "zh" defaults to .zhHans; English defaults to .en
         #expect(
@@ -1045,7 +1098,9 @@ struct PluginSDKMCPAndShellTests {
         #expect(zhOut.exitCode == 1)
         #expect(enOut.stdout.contains("Verified=0"))
         #expect(zhOut.stdout.contains("Verified=0"))
-        #expect(enOut.stdout.contains("内置名单，不完整"))
+        // S32: the English output states the incomplete built-in list in English; Chinese only under --lang zh.
+        #expect(enOut.stdout.contains("built-in list, incomplete"))
+        #expect(!containsChineseCharacters(enOut.stdout))
         #expect(zhOut.stdout.contains("内置名单，不完整"))
         #expect(zhOut.stdout.contains("尚未向外部注册库核查"))
         #expect(!zhOut.stdout.contains("已通过 Crossref"))
@@ -1061,5 +1116,69 @@ struct PluginSDKMCPAndShellTests {
         #expect(!html.contains("Verified DOI"))
         #expect(!html.contains("已验证 DOI"))
         #expect(!html.contains("\u{2014}"))
+    }
+
+    @Test("S32/S33 regression: verify-citations prints one class tag per entry, no Chinese in English output, and states that this version performs no online lookups")
+    func s32AndS33VerifyCitationsOutputHasSingleTagNoChineseInEnglishAndHonestNoLookupNotice() async throws {
+        // 12-entry recheck bibliography (3 real, 2 fabricated DOIs, 3 real DOIs with wrong title/year,
+        // 2 without DOI, 2 retracted), copied into the repository from the acceptance harness.
+        let bibPath = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib").path
+        #expect(FileManager.default.fileExists(atPath: bibPath))
+
+        let runner = ScholarCLIRunner()
+        let enPlain = try await runner.run(arguments: ["verify-citations", bibPath, "--lang", "en"])
+        let enOffline = try await runner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "en"])
+        let zhPlain = try await runner.run(arguments: ["verify-citations", bibPath, "--lang", "zh"])
+        let zhOffline = try await runner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "zh"])
+
+        // The original M0 rows still hold: nothing is VERIFIED and the exit code is non-zero.
+        for out in [enPlain, enOffline, zhPlain, zhOffline] {
+            #expect(out.exitCode == 1)
+            #expect(out.stdout.contains("Evaluated=12 Verified=0 Drift=0 NotFound=1 Retracted=1 Unverified=10"))
+            #expect(!out.stdout.contains("[VERIFIED]"))
+        }
+
+        // S33: --offline changes nothing, and the output says why instead of labelling entries "(offline)".
+        #expect(enPlain.stdout == enOffline.stdout)
+        #expect(zhPlain.stdout == zhOffline.stdout)
+        #expect(enPlain.stdout.contains("this version performs no online registry lookups (online verification is planned for M1)"))
+        #expect(zhPlain.stdout.contains("本版本不联网核查（联网核查排在 M1）"))
+        #expect(!enPlain.stdout.lowercased().contains("(offline)"))
+        #expect(!enPlain.stdout.lowercased().contains("unverified offline"))
+        #expect(!zhPlain.stdout.contains("离线模式"))
+
+        // S32: exactly one class tag per entry line, at the start of the line, in both languages.
+        let classTags = CitationFirewallClass.allCases.map { "[\($0.rawValue)]" }
+        for out in [enPlain, zhPlain] {
+            let entryLines = out.stdout
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .map(String.init)
+                .filter { line in classTags.contains { line.contains($0) } }
+            #expect(entryLines.count == 12)
+            for line in entryLines {
+                let tagOccurrences = classTags.reduce(0) { $0 + line.components(separatedBy: $1).count - 1 }
+                #expect(tagOccurrences == 1, "duplicate class tag: \(line)")
+                #expect(classTags.contains { line.hasPrefix($0 + " ") }, "class tag not at line start: \(line)")
+            }
+        }
+        // S32: no Chinese anywhere in the English output.
+        #expect(!containsChineseCharacters(enPlain.stdout), "\(enPlain.stdout)")
+
+        // Expected lines for three representative entries, in both languages.
+        #expect(enPlain.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry."))
+        #expect(enPlain.stdout.contains("[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax. Not checked against any external registry."))
+        #expect(enPlain.stdout.contains("[RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete)."))
+        #expect(zhPlain.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' 语法格式合法；尚未向外部注册库核查。"))
+        #expect(zhPlain.stdout.contains("[RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。"))
+
+        // The MCP tool returns the same library notes: no "(offline)" label and no Chinese in them either.
+        let rawBib = try String(contentsOfFile: bibPath, encoding: .utf8)
+        let mcpResult = ScholarMCPServer().executeToolCall(name: "scholar_verify_bibliography", arguments: ["bibtex": rawBib])
+        let mcpContent = try #require(mcpResult["content"] as? [[String: Any]])
+        let mcpText = try #require(mcpContent.first?["text"] as? String)
+        #expect(mcpText.contains("Not checked against any external registry."))
+        #expect(!mcpText.lowercased().contains("(offline)"))
+        #expect(!mcpText.lowercased().contains("unverified offline"))
+        #expect(!containsChineseCharacters(mcpText))
     }
 }

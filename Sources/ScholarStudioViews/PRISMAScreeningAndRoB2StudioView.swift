@@ -4,6 +4,52 @@ import ScholarModels
 import ScholarPRISMAEngine
 import ScholarWorkbenchShell
 
+// MARK: - Seed-recall wording derived from the engine report
+
+/// Text for gold-standard seed recall, derived from `SeedRecallValidationReport`.
+///
+/// There is no fixed wording here: every number comes from the report that
+/// `InterRaterReliabilityAndSeedQCEngine.validateGoldStandardSeedRecall` computed, and when there is
+/// no report (or it covers zero seed studies) the text says that there is no data.
+public enum SeedRecallDisplay {
+    /// True when `report` describes at least one seed study.
+    public static func hasData(_ report: SeedRecallValidationReport?) -> Bool {
+        guard let report else { return false }
+        return report.totalSeedCount > 0
+    }
+
+    /// Compact value for the QC pill, e.g. `67% (2/3)`; nil when there is no data.
+    public static func pillValue(_ report: SeedRecallValidationReport?) -> String? {
+        guard let report, report.totalSeedCount > 0 else { return nil }
+        return String(
+            format: "%.0f%% (%d/%d)",
+            report.endToEndSeedRecall * 100.0,
+            report.retainedInSynthesisCount,
+            report.totalSeedCount
+        )
+    }
+
+    /// One-sentence summary for the "included in synthesis" card.
+    public static func summaryLine(_ report: SeedRecallValidationReport?, language: ScholarLanguage) -> String {
+        guard let report, report.totalSeedCount > 0 else {
+            return language.L("No seed-recall data.", "没有种子文献召回数据。")
+        }
+        let percent = String(format: "%.0f%%", report.endToEndSeedRecall * 100.0)
+        let retained = report.retainedInSynthesisCount
+        let total = report.totalSeedCount
+        if report.passesStrictPRISMASeedGate {
+            return language.L(
+                "Seed recall \(percent): \(retained) of \(total) seed studies retained; strict seed check passed.",
+                "种子文献召回 \(percent)：\(total) 篇种子文献中保留 \(retained) 篇；通过严格种子检查。"
+            )
+        }
+        return language.L(
+            "Seed recall \(percent): \(retained) of \(total) seed studies retained; strict seed check NOT passed.",
+            "种子文献召回 \(percent)：\(total) 篇种子文献中保留 \(retained) 篇；未通过严格种子检查。"
+        )
+    }
+}
+
 // MARK: - Studio 4: PRISMA 2020 Dual-Blind Screening, Psychometrics, RoB 2.0 & Forest Synthesis (`PRISMAScreeningAndRoB2StudioView`)
 
 /// Full-width `.prismaScreening` studio uniting psychometric inter-rater calibration (`Cohen's κ`, `Byrt's PABAK`,
@@ -60,9 +106,10 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
         let kappa = agreement?.cohensKappa.pointEstimate ?? viewModel.prismaMetrics.cohensKappa
         let pabak = agreement?.byrtsPABAK.pointEstimate ?? viewModel.prismaMetrics.pabakScore
         let ac1 = agreement?.gwetsAC1.pointEstimate ?? 0.83
-        let seedRecall = (viewModel.seedRecallReport?.endToEndSeedRecall ?? 1.0) * 100.0
-        let retainedSeeds = viewModel.seedRecallReport?.retainedInSynthesisCount ?? 3
-        let totalSeeds = viewModel.seedRecallReport?.totalSeedCount ?? 3
+        // Seed recall comes from the engine report only; without a report the pill says "no data".
+        let seedRecallPillValue = SeedRecallDisplay.pillValue(viewModel.seedRecallReport)
+        let seedRecallIsHealthy = SeedRecallDisplay.hasData(viewModel.seedRecallReport)
+            && (viewModel.seedRecallReport?.passesStrictPRISMASeedGate ?? false)
         let conflictCount = viewModel.screeningStudies.filter(\.hasReviewerConflict).count
 
         return HStack(spacing: 8) {
@@ -81,8 +128,8 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
             qcMetricPill(label: "Gwet's AC1", value: String(format: "%.2f", ac1), isHealthy: ac1 >= 0.61)
             qcMetricPill(
                 label: localizer.L("Seed Recall", "种子召回"),
-                value: String(format: "%.0f%% (%d/%d)", seedRecall, retainedSeeds, totalSeeds),
-                isHealthy: seedRecall >= 99.0
+                value: seedRecallPillValue ?? localizer.L("no data", "无数据"),
+                isHealthy: seedRecallIsHealthy
             )
 
             Spacer(minLength: 4)
@@ -251,7 +298,7 @@ public struct PRISMAScreeningAndRoB2StudioView: View {
                         .foregroundStyle(CambridgeLinenPalette.oxfordCharcoal)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(localizer.L("100% Gold-Standard Seed Recall verified.", "100% 金标准种子文献召回核验通过。"))
+                    Text(SeedRecallDisplay.summaryLine(viewModel.seedRecallReport, language: localizer.language))
                         .font(CambridgeTypography.uiCaption)
                         .foregroundStyle(CambridgeLinenPalette.slateEditorial)
                 }

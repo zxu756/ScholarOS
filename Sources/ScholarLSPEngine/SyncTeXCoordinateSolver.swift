@@ -1110,7 +1110,7 @@ public struct SyncTeXCoordinateSolver: Sendable, Codable, Hashable {
         if anchorsByNormalizedFile[normReq] != nil {
             return normReq
         }
-        // Suffix match (e.g. `sections/methods.tex` matching `/Users/x/proj/sections/methods.tex`)
+        // Suffix match (e.g. `sections/methods.tex` matching `<project root>/sections/methods.tex`)
         for candidate in anchorsByNormalizedFile.keys.sorted() {
             if candidate.hasSuffix("/" + normReq) || normReq.hasSuffix("/" + candidate) {
                 return candidate

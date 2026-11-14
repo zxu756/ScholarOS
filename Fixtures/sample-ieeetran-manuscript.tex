@@ -1,0 +1,449 @@
+% =============================================================================
+% Fixtures/sample-ieeetran-manuscript.tex
+%
+% FICTIONAL SAMPLE MANUSCRIPT written for the ScholarOS test suite.
+% Every system, dataset, experiment, number, person, affiliation and reference
+% named in this file is invented. Nothing here reports real research, and no
+% text was copied from any real manuscript.
+% The .bib file named at the end is intentionally not shipped; `outline` does not need it.
+% Purpose: an IEEEtran-style input of realistic size and structure for
+% `scholaros outline` (Scripts/acceptance/m0-acceptance.sh, row 1). It contains
+% numbered and starred \section / \subsection headings only, so the heading
+% count can be cross-checked with
+%     grep -c -E '\\(section|subsection)\*?\{' Fixtures/sample-ieeetran-manuscript.tex
+% =============================================================================
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{cite}
+
+\newcommand{\sysname}{\textsc{Lanternfish}}
+\newcommand{\dataset}{\textsc{TidePool-9}}
+\newcommand{\ms}{\,\mathrm{ms}}
+\newcommand{\kb}{\,\mathrm{kB}}
+
+\begin{document}
+
+\title{Lanternfish: Scheduling Tidal Sensor Buoys With Drifting Clocks\\
+{\large A Fictional Sample Manuscript for Parser Tests}}
+
+\author{\IEEEauthorblockN{Mira Okonkwo-Lindqvist}
+\IEEEauthorblockA{Department of Imaginary Systems\\
+Saltmarsh Institute of Technology\\
+Port Averill, Nowhere\\
+mira@saltmarsh.example}
+\and
+\IEEEauthorblockN{Teodor Vashti}
+\IEEEauthorblockA{Coastal Computing Laboratory\\
+University of Greywater\\
+Greywater, Nowhere\\
+teodor@greywater.example}
+\and
+\IEEEauthorblockN{Anselm Ruiz-Harcourt}
+\IEEEauthorblockA{Buoy Networks Group\\
+Saltmarsh Institute of Technology\\
+Port Averill, Nowhere\\
+anselm@saltmarsh.example}}
+
+\maketitle
+
+\begin{abstract}
+Low-power sensor buoys wake on a schedule, sample the water column, and go back
+to sleep. When their clocks drift apart, two buoys that should take turns on a
+shared radio channel start talking over each other. This invented paper
+describes \sysname, a scheduler that tolerates clock drift without a global time
+source. \sysname\ lets each buoy keep a small table of its neighbours' observed
+wake times and shifts its own slot by a bounded amount each cycle. On the
+made-up \dataset\ trace we report fewer collisions and a longer battery life
+than two imaginary baselines. All results in this document are fabricated for
+the purpose of exercising a LaTeX parser.
+\end{abstract}
+
+\begin{IEEEkeywords}
+sensor networks, clock drift, duty cycling, scheduling, fictional example
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:intro}
+
+A tidal buoy spends most of its life asleep. Each wake-up costs energy, and each
+radio transmission costs more. Operators therefore assign every buoy a short
+slot in a repeating cycle, and the buoys are expected to stay inside their
+slots for months at a time~\cite{okonkwo2031slots}.
+
+The assumption behind slotted schedules is that all buoys agree on what time it
+is. In practice they do not. A crystal oscillator on a cold buoy runs slower
+than the same part on a warm one, and the difference accumulates. After a few
+weeks, two neighbouring buoys may wake at the same moment and corrupt each
+other's packets~\cite{vashti2030drift,harcourt2029coldwater}.
+
+\subsection{Motivating Scenario}
+\label{sec:intro-scenario}
+
+Consider twelve buoys moored along an estuary. The upstream buoys sit in fresh,
+cold water, while the downstream ones are warmed by a shallow mudflat every
+afternoon. Their clocks diverge by a few seconds per week. A shore station can
+correct them, but only two buoys are within range of it.
+
+\subsection{Why Existing Approaches Fall Short}
+\label{sec:intro-gap}
+
+A buoy could carry a satellite receiver and read the time directly, but the
+receiver draws more current than the rest of the board combined. Alternatively
+the shore station could flood time beacons through the network, but beacons are
+themselves radio traffic and collide like any other packet~\cite{ruiz2030beacon}.
+
+\subsection{Contributions}
+\label{sec:intro-contrib}
+
+This fictional paper makes three contributions.
+\begin{itemize}
+  \item A neighbour table that records when each nearby buoy was last heard,
+        using only packets the buoy would have received anyway.
+  \item A slot-shifting rule with a provable bound on how far a buoy may move
+        in one cycle (Section~\ref{sec:design-shift}).
+  \item An evaluation on the invented \dataset\ trace
+        (Section~\ref{sec:eval}).
+\end{itemize}
+
+\subsection{Paper Organization}
+\label{sec:intro-org}
+
+Section~\ref{sec:background} reviews duty cycling and clock drift.
+Section~\ref{sec:design} presents the design of \sysname.
+Section~\ref{sec:impl} describes the prototype.
+Section~\ref{sec:eval} reports the evaluation, Section~\ref{sec:discussion}
+discusses limitations, and Section~\ref{sec:conclusion} concludes.
+
+\section{Background and Related Work}
+\label{sec:background}
+
+\subsection{Duty-Cycled Radios}
+\label{sec:bg-duty}
+
+A duty-cycled radio is on for a fraction $\delta$ of each cycle of length $T$.
+The energy spent per cycle is approximately
+\begin{equation}
+  E_{\mathrm{cycle}} = \delta T P_{\mathrm{on}} + (1 - \delta) T P_{\mathrm{sleep}},
+  \label{eq:energy}
+\end{equation}
+where $P_{\mathrm{on}}$ and $P_{\mathrm{sleep}}$ are the power draw in each
+state. Shrinking $\delta$ saves energy only as long as the buoys still manage
+to hear one another.
+
+\subsection{Clock Drift in Marine Deployments}
+\label{sec:bg-drift}
+
+Drift is usually quoted in parts per million. A drift of $40$\,ppm amounts to
+roughly $3.5$ seconds per day. Temperature is the dominant cause in the
+deployments imagined here~\cite{harcourt2029coldwater}, followed by supply
+voltage sag as the battery ages.
+
+\subsection{Reference-Broadcast Synchronization}
+\label{sec:bg-rbs}
+
+Reference-broadcast schemes have a designated node transmit a beacon, and all
+receivers timestamp its arrival. The receivers then compare timestamps among
+themselves. The approach removes sender-side uncertainty but still requires
+extra packets~\cite{ruiz2030beacon,pemberton2028pairwise}.
+
+\subsection{Schedule Repair Without Synchronization}
+\label{sec:bg-repair}
+
+A different line of invented work abandons synchronization altogether and
+repairs the schedule after collisions are detected~\cite{abara2031repair}.
+\sysname\ sits between the two camps: it never computes a shared clock, yet it
+acts before collisions occur.
+
+\subsection*{A Note on Terminology}
+
+We use \emph{slot} for the interval in which one buoy may transmit, \emph{cycle}
+for one full rotation through all slots, and \emph{guard} for the idle time
+between adjacent slots.
+
+\section{System Design}
+\label{sec:design}
+
+\subsection{Design Goals}
+\label{sec:design-goals}
+
+\sysname\ was designed around four goals.
+\begin{enumerate}
+  \item \textbf{No extra packets.} Timing information must be derived from
+        traffic that already exists.
+  \item \textbf{Bounded movement.} A buoy may not shift its slot by more than a
+        fixed fraction of the guard interval per cycle.
+  \item \textbf{Local state only.} Each buoy stores information about its
+        one-hop neighbours and nothing else.
+  \item \textbf{Graceful failure.} If a neighbour disappears, the remaining
+        buoys must not chase its last known position forever.
+\end{enumerate}
+
+\subsection{Neighbour Table}
+\label{sec:design-table}
+
+Every buoy keeps a table with one row per neighbour. A row stores the
+neighbour's identifier, the local time at which its most recent packet started,
+and a confidence counter that decays when the neighbour is silent. The table
+occupies $11$ bytes per row in our imagined implementation.
+
+\subsection{Slot Shifting Rule}
+\label{sec:design-shift}
+
+Let $s_i$ be the start of buoy $i$'s slot in its own local time, and let
+$p_i$ and $n_i$ be the observed start times of the slots immediately before and
+after it. The buoy computes the midpoint
+\begin{equation}
+  m_i = \frac{p_i + n_i}{2}
+  \label{eq:midpoint}
+\end{equation}
+and moves towards it by a bounded step:
+\begin{equation}
+  s_i \leftarrow s_i + \operatorname{clip}\bigl(\alpha (m_i - s_i),\, -g/4,\, g/4\bigr),
+  \label{eq:shift}
+\end{equation}
+where $g$ is the guard interval and $0 < \alpha \le 1$ is a damping factor.
+
+\subsection{Convergence Argument}
+\label{sec:design-converge}
+
+If every buoy applies (\ref{eq:shift}) once per cycle and drift per cycle is
+smaller than $g/4$, the spacing between adjacent slots cannot shrink below
+$g/2$. A sketch of the argument is given in the appendix. The full proof is
+omitted because this manuscript is fictional.
+
+\subsection{Handling Departures and Arrivals}
+\label{sec:design-churn}
+
+When the confidence counter of a neighbour reaches zero, its row is deleted and
+the buoy treats the next surviving neighbour as adjacent. A newly deployed buoy
+listens for two full cycles, picks the widest gap it observed, and starts in
+the middle of that gap.
+
+\subsection{Interaction With the Shore Station}
+\label{sec:design-shore}
+
+The shore station is treated as an ordinary neighbour whose slot never moves.
+Buoys within range of it are thereby anchored, and the anchoring propagates
+outward one hop per cycle.
+
+\section{Implementation}
+\label{sec:impl}
+
+\subsection{Hardware Platform}
+\label{sec:impl-hw}
+
+The imagined prototype runs on a buoy controller with a $16$\,MHz
+microcontroller, $32\kb$ of RAM, and a sub-gigahertz radio. Timekeeping uses a
+$32.768$\,kHz watch crystal with a stated tolerance of $\pm 20$\,ppm at room
+temperature.
+
+\subsection{Firmware Structure}
+\label{sec:impl-fw}
+
+The scheduler is a single interrupt handler of about three hundred lines. It
+runs at the end of each receive window, updates the neighbour table, and
+programs the wake-up timer for the next cycle. Table~\ref{tab:footprint}
+summarizes the made-up memory footprint.
+
+\begin{table}[t]
+  \caption{Firmware footprint of the fictional prototype.}
+  \label{tab:footprint}
+  \centering
+  \begin{tabular}{lrr}
+    \toprule
+    Component & Flash (kB) & RAM (bytes) \\
+    \midrule
+    Radio driver & 6.2 & 148 \\
+    Neighbour table & 0.9 & 176 \\
+    Slot scheduler & 1.4 & 52 \\
+    Sensor sampling & 3.8 & 96 \\
+    \midrule
+    Total & 12.3 & 472 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Timestamp Capture}
+\label{sec:impl-ts}
+
+Packet start times are captured by the radio's start-of-frame interrupt, which
+latches the timer value in hardware. Software latency therefore does not enter
+the measurement.
+
+\subsection*{Build and Flash Procedure}
+
+The firmware is built with a standard cross-compiler and written to the buoy
+over a two-wire debug port. No step in the procedure requires network access.
+
+\section{Evaluation}
+\label{sec:eval}
+
+\subsection{Experimental Setup}
+\label{sec:eval-setup}
+
+We replay the invented \dataset\ trace, which describes twelve buoys over
+ninety simulated days. Water temperature at each mooring follows a daily
+sinusoid with a mooring-specific offset. Each configuration is run with ten
+random seeds.
+
+\subsection{Baselines}
+\label{sec:eval-baselines}
+
+We compare against two imaginary baselines. \textsc{Fixed} assigns slots once
+and never changes them. \textsc{Beacon} floods a time beacon from the shore
+station every hour and resets all clocks to it.
+
+\subsection{Collision Rate}
+\label{sec:eval-collisions}
+
+Table~\ref{tab:collisions} lists the fraction of slots in which two or more
+buoys transmitted at once. \textsc{Fixed} degrades steadily as drift
+accumulates. \textsc{Beacon} stays low but pays for it in beacon traffic.
+\sysname\ remains below both after the first week.
+
+\begin{table}[t]
+  \caption{Collision rate on the fictional \dataset\ trace (per cent of slots).}
+  \label{tab:collisions}
+  \centering
+  \begin{tabular}{lrrr}
+    \toprule
+    Day range & \textsc{Fixed} & \textsc{Beacon} & \sysname \\
+    \midrule
+    1--7 & 0.4 & 0.6 & 0.7 \\
+    8--30 & 3.9 & 0.8 & 0.5 \\
+    31--60 & 11.2 & 0.9 & 0.5 \\
+    61--90 & 19.6 & 1.1 & 0.6 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Energy Consumption}
+\label{sec:eval-energy}
+
+Using (\ref{eq:energy}) with the duty cycles observed in simulation, the
+projected battery life is $212$ days for \textsc{Fixed}, $171$ days for
+\textsc{Beacon}, and $205$ days for \sysname. The gap between \textsc{Fixed}
+and \sysname\ comes from the slightly longer receive window that \sysname\
+needs in order to hear both neighbours.
+
+\subsection{Convergence After Deployment}
+\label{sec:eval-converge}
+
+A buoy added on day $45$ settles into a stable slot after a median of six
+cycles. The slowest of the ten seeds needed fourteen cycles.
+
+\subsection{Sensitivity to the Damping Factor}
+\label{sec:eval-alpha}
+
+We sweep $\alpha$ from $0.1$ to $1.0$. Small values converge slowly; values
+above $0.8$ oscillate when two adjacent buoys correct towards each other in
+the same cycle. We use $\alpha = 0.5$ elsewhere in this section.
+
+\subsection{Scalability}
+\label{sec:eval-scale}
+
+Repeating the experiment with $48$ and $96$ simulated buoys leaves the
+collision rate within $0.2$ percentage points of the twelve-buoy result, because
+each buoy only ever reasons about two neighbours.
+
+\subsection*{Threats to Validity}
+
+Every number above comes from a simulation of an invented trace. Real moorings
+experience fouling, storms, and vandalism, none of which are modelled.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Limitations}
+\label{sec:disc-limits}
+
+The slot-shifting rule assumes that a buoy can hear both of its schedule
+neighbours. In a sparse line topology the slot before and the slot after may
+belong to buoys that are out of radio range, in which case the rule has nothing
+to work with.
+
+\subsection{Security Considerations}
+\label{sec:disc-security}
+
+A malicious transmitter could pull its neighbours' slots by sending packets at
+misleading times. Authenticating packets prevents impersonation but not replay
+of a genuine packet at a later moment.
+
+\subsection{Deployment Lessons}
+\label{sec:disc-lessons}
+
+Because the deployment is imaginary, the lessons are too. We would expect the
+confidence counter to need tuning per site, since a buoy that is submerged at
+high tide is silent for hours without having failed.
+
+\subsection{Future Work}
+\label{sec:disc-future}
+
+We plan to extend the neighbour table to two hops, to study schedules with
+unequal slot lengths, and to test the damping rule on drifting ice floes, which
+do not exist in this paper's universe either.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+This fictional paper presented \sysname, a scheduler that keeps duty-cycled
+buoys from colliding as their clocks drift, using only timing information taken
+from ordinary traffic. On an invented trace it kept collisions under one per
+cent for ninety days at a small cost in receive time.
+
+\section*{Acknowledgment}
+
+The authors thank the nonexistent harbour master of Port Averill for access to
+moorings that were never installed.
+
+\section*{Data Availability}
+
+There is no data. The \dataset\ trace is a name used in this sample manuscript
+and does not correspond to any file.
+
+\appendices
+
+\section{Sketch of the Spacing Bound}
+\label{app:proof}
+
+\subsection{Setup}
+\label{app:proof-setup}
+
+Order the buoys by slot start and write $d_i = s_{i+1} - s_i$ for the spacing
+between consecutive slots. Initially $d_i = g$ for all $i$.
+
+\subsection{One-Cycle Step}
+\label{app:proof-step}
+
+In one cycle each of $s_i$ and $s_{i+1}$ moves by at most $g/4$ because of the
+clip in (\ref{eq:shift}). If drift contributed nothing, $d_i$ could therefore
+shrink by at most $g/2$. The midpoint rule in (\ref{eq:midpoint}) moves a buoy
+away from whichever neighbour is closer, so two adjacent buoys never both move
+towards each other by the full step unless their outer neighbours are far away,
+in which case the outer gaps absorb the movement in the next cycle.
+
+\section{Simulation Parameters}
+\label{app:params}
+
+\subsection{Radio Model}
+\label{app:params-radio}
+
+Packets are lost independently with probability $0.02$. Two packets that
+overlap in time by more than one symbol are both lost.
+
+\subsection{Temperature Model}
+\label{app:params-temp}
+
+Mooring $k$ has temperature
+$\theta_k(t) = \bar{\theta}_k + A_k \sin(2 \pi t / 24\,\mathrm{h})$,
+with $\bar{\theta}_k$ between $4$ and $17$ degrees and $A_k$ between $0.5$ and
+$6$ degrees. Drift is a quadratic function of the distance from $25$ degrees.
+
+\bibliographystyle{IEEEtran}
+\bibliography{sample-ieeetran-references}
+
+\end{document}

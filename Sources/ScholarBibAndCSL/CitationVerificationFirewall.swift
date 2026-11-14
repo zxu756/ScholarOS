@@ -549,7 +549,7 @@ public enum ScholarlyIdentifierValidator: Sendable {
 
 public struct CitationVerificationFirewall: Sendable {
 
-    /// Built-in offline hint list of retracted DOIs (内置名单，不完整 — does NOT substitute for online retraction checks).
+    /// Built-in hint list of retracted DOIs (built-in list, incomplete; it does NOT substitute for an online retraction check).
     public static let defaultRetractedDOIs: Set<String> = [
         "10.1016/s0140-6736(97)11096-0", // Wakefield et al. 1998 (Lancet retracted)
         "10.1016/s0140-6736(20)31180-6", // Mehra et al. 2020 Surgisphere Lancet (retracted)
@@ -669,7 +669,7 @@ public struct CitationVerificationFirewall: Sendable {
                     code: .blockedRetractedWork,
                     severity: .criticalBlock,
                     field: "title",
-                    detail: "Title indicates a retracted publication ('\(trimmedTitle)') (内置名单，不完整)."
+                    detail: "Title indicates a retracted publication ('\(trimmedTitle)') (\(CitationAuditWording.titleRetractionMarkerNotice))."
                 )
             )
         }
@@ -772,7 +772,7 @@ public struct CitationVerificationFirewall: Sendable {
                             code: .blockedRetractedWork,
                             severity: .criticalBlock,
                             field: "doi",
-                            detail: "DOI '\(normDOI)' matched built-in offline retracted list (内置名单，不完整)."
+                            detail: "DOI '\(normDOI)' matched the built-in retraction hint list (\(CitationAuditWording.builtInRetractionListNotice))."
                         )
                     )
                 } else if isPlaceholderSentinelDOI(normDOI) {
@@ -798,7 +798,7 @@ public struct CitationVerificationFirewall: Sendable {
                                 code: .validArXivIdentifier,
                                 severity: .pass,
                                 field: "doi",
-                                detail: "DataCite arXiv DOI '\(normDOI)' has valid syntax; not checked against external registry (offline)."
+                                detail: "DataCite arXiv DOI '\(normDOI)' has valid syntax."
                             )
                         )
                     } else {
@@ -818,7 +818,7 @@ public struct CitationVerificationFirewall: Sendable {
                             code: .validCanonicalDOI,
                             severity: .warning,
                             field: "doi",
-                            detail: "DOI '\(normDOI)' uses Crossref test/non-resolvable prefix '10.5555/'; unverified offline."
+                            detail: "DOI '\(normDOI)' uses the Crossref test prefix '10.5555/', which does not resolve."
                         )
                     )
                 } else {
@@ -828,7 +828,7 @@ public struct CitationVerificationFirewall: Sendable {
                             code: .validCanonicalDOI,
                             severity: .pass,
                             field: "doi",
-                            detail: "DOI '\(normDOI)' has valid ISO 26324 syntax; not checked against external registry (offline)."
+                            detail: "DOI '\(normDOI)' has valid ISO 26324 syntax."
                         )
                     )
                 }
@@ -858,7 +858,7 @@ public struct CitationVerificationFirewall: Sendable {
                         code: .validArXivIdentifier,
                         severity: .pass,
                         field: "arxivID",
-                        detail: "arXiv:\(arxivCheck.canonicalBaseID) has valid calendar/sequence syntax; not checked against external registry (offline)."
+                        detail: "arXiv:\(arxivCheck.canonicalBaseID) has valid calendar/sequence syntax."
                     )
                 )
 
@@ -869,7 +869,7 @@ public struct CitationVerificationFirewall: Sendable {
                                 code: .metadataDriftDetected,
                                 severity: .warning,
                                 field: "year",
-                                detail: "Entry year (\(entryYear)) differs from arXiv:\(arxivCheck.canonicalBaseID) prefix year (\(inferredYear)); unverified offline."
+                                detail: "Entry year (\(entryYear)) differs from arXiv:\(arxivCheck.canonicalBaseID) prefix year (\(inferredYear))."
                             )
                         )
                     }
@@ -897,7 +897,7 @@ public struct CitationVerificationFirewall: Sendable {
                         code: .validPubMedIdentifier,
                         severity: .pass,
                         field: "pmid",
-                        detail: "PMID:\(pmidCheck.normalized) has valid numeric bounds; not checked against external registry (offline)."
+                        detail: "PMID:\(pmidCheck.normalized) has valid numeric bounds."
                     )
                 )
             }
@@ -936,13 +936,19 @@ public struct CitationVerificationFirewall: Sendable {
                         code: .missingPersistentIdentifier,
                         severity: .warning,
                         field: "doi/arxivID/pmid",
-                        detail: "No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry."
+                        detail: "No persistent identifier (DOI, arXiv ID, or PubMed PMID)."
                     )
                 )
             }
         }
 
-        let summaryNote = summarizeFindings(findings, assignedClass: finalClass)
+        // Finding details state facts about the entry only. The statement that no registry was consulted
+        // belongs to this no-lookup verdict as a whole, so it is appended here and nowhere else: the online
+        // path reuses the findings above and must not inherit a "not checked" sentence.
+        var summaryNote = summarizeFindings(findings, assignedClass: finalClass)
+        if finalClass == .unverified {
+            summaryNote += " " + CitationAuditWording.notCheckedAgainstRegistry
+        }
         var updatedEntry = entry
         updatedEntry.firewallClass = finalClass
         updatedEntry.firewallAuditNote = summaryNote
@@ -1556,7 +1562,9 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
-    private func summarizeFindings(
+    /// Composes the one-line audit note for a verdict from its findings.
+    /// Internal (not private) so that the wording rules can be unit-tested directly.
+    func summarizeFindings(
         _ findings: [FirewallFinding],
         assignedClass: CitationFirewallClass
     ) -> String {

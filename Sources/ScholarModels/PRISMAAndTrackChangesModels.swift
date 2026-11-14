@@ -118,6 +118,97 @@ public struct ScreeningStudyRecord: Sendable, Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Nominal Dual-Rater Agreement (the one implementation)
+
+/// Observed agreement, nominal (unweighted) Cohen's kappa, and Brennan-Prediger PABAK for two raters
+/// voting over arbitrary categories.
+///
+/// This is the only implementation of these three statistics for screening votes.
+/// `ScholarProjectDatabase.computeInterRaterAgreement` (read by `prisma-stats` and the MCP tool) and
+/// `PRISMAScreeningEngine.computePRISMA2020Metrics` both call it, so the two cannot disagree.
+///
+///     Po    = agreements / n
+///     Pe    = sum over categories of (count by rater A * count by rater B) / n^2
+///     kappa = (Po - Pe) / (1 - Pe)            (1 when Pe is 1)
+///     PABAK = (k * Po - 1) / (k - 1)          with k = max(2, number of categories that were used)
+public struct NominalDualRaterAgreement: Sendable, Hashable {
+    /// Number of records that carry a vote from both raters.
+    public let pairedCount: Int
+    public let observedAgreement: Double
+    public let chanceAgreement: Double
+    public let cohensKappa: Double
+    public let pabak: Double
+
+    public init(
+        pairedCount: Int,
+        observedAgreement: Double,
+        chanceAgreement: Double,
+        cohensKappa: Double,
+        pabak: Double
+    ) {
+        self.pairedCount = pairedCount
+        self.observedAgreement = observedAgreement
+        self.chanceAgreement = chanceAgreement
+        self.cohensKappa = cohensKappa
+        self.pabak = pabak
+    }
+
+    /// - Parameter votes: one element per record rated by both raters.
+    /// - Returns: with no such record, all three statistics are reported as 1.0 (the convention both
+    ///   former implementations used).
+    public static func compute<Category: Hashable>(
+        votes: [(raterA: Category, raterB: Category)]
+    ) -> NominalDualRaterAgreement {
+        let n = votes.count
+        guard n > 0 else {
+            return NominalDualRaterAgreement(
+                pairedCount: 0,
+                observedAgreement: 1.0,
+                chanceAgreement: 1.0,
+                cohensKappa: 1.0,
+                pabak: 1.0
+            )
+        }
+
+        var agreements = 0
+        var countsA: [Category: Int] = [:]
+        var countsB: [Category: Int] = [:]
+        var categories = Set<Category>()
+        for vote in votes {
+            if vote.raterA == vote.raterB {
+                agreements += 1
+            }
+            countsA[vote.raterA, default: 0] += 1
+            countsB[vote.raterB, default: 0] += 1
+            categories.insert(vote.raterA)
+            categories.insert(vote.raterB)
+        }
+
+        let nDouble = Double(n)
+        let po = Double(agreements) / nDouble
+        var peNumerator = 0.0
+        for category in categories {
+            peNumerator += Double(countsA[category] ?? 0) * Double(countsB[category] ?? 0)
+        }
+        let pe = peNumerator / (nDouble * nDouble)
+        let kappa: Double
+        if abs(1.0 - pe) < 1e-12 {
+            kappa = 1.0
+        } else {
+            kappa = (po - pe) / (1.0 - pe)
+        }
+        let k = max(2, categories.count)
+        let pabak = (Double(k) * po - 1.0) / Double(k - 1)
+        return NominalDualRaterAgreement(
+            pairedCount: n,
+            observedAgreement: po,
+            chanceAgreement: pe,
+            cohensKappa: kappa,
+            pabak: pabak
+        )
+    }
+}
+
 public struct PRISMA2020SummaryMetrics: Sendable, Codable, Hashable {
     public let databaseRecordsIdentified: Int
     public let registerRecordsIdentified: Int

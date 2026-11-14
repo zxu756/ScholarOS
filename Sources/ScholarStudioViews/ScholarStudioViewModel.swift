@@ -1531,7 +1531,10 @@ public final class ScholarStudioViewModel: ObservableObject {
     }
 
     private func computeAPAStatVerificationTable() -> [APAStatVerificationRow] {
-        guard !manuscriptFiles.isEmpty else { return [] }
+        // These four rows are sample content that belongs to the demo manuscript: the reported tuples and
+        // the consistent / mismatch labels are written out below, not extracted from a file. They are
+        // therefore shown only in explicit demo mode (under the DEMO banner) and never for user data.
+        guard isDemoMode, !manuscriptFiles.isEmpty else { return [] }
         let pT1 = ScholarStatisticalDistributions.computeTwoTailedTPValue(tStat: 2.42, df: 48)
         let pF1 = ScholarStatisticalDistributions.computeFPValue(fStat: 6.84, df1: 2, df2: 87)
         let pChi = ScholarStatisticalDistributions.computeChiSquarePValue(chiSq: 11.34, df: 3)

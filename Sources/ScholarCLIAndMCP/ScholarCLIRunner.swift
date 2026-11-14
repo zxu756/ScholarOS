@@ -247,8 +247,14 @@ public struct ScholarCLIRunner: Sendable {
             lines.append(
                 "Evaluated=\(audit.totalEvaluated) Verified=\(audit.verifiedCount) Drift=\(audit.driftCount) NotFound=\(audit.notFoundCount) Retracted=\(audit.retractedCount) Unverified=\(audit.unverifiedCount)"
             )
+            // This command never contacts a registry in this version, whether or not --offline is passed.
+            // Say so once, instead of labelling individual entries "(offline)" as if a mode had been chosen.
+            lines.append(Self.noOnlineLookupNotice(lang))
             for verdict in audit.verdicts {
-                let note = Self.localizedVerdictAuditNote(verdict, lang: lang)
+                // The class is printed once, here; the note's own leading "[CLASS] " tag is dropped.
+                let note = CitationAuditWording.strippingLeadingClassTag(
+                    Self.localizedVerdictAuditNote(verdict, lang: lang)
+                )
                 lines.append("[\(verdict.firewallClass.rawValue)] \(verdict.citeKey): \(note)")
             }
             return CLIExecutionOutput(stdout: lines.joined(separator: "\n"), exitCode: exitCode)
@@ -778,6 +784,14 @@ public struct ScholarCLIRunner: Sendable {
         return urls
     }
 
+    /// One-line statement printed by `verify-citations`: this version performs no online lookups.
+    public static func noOnlineLookupNotice(_ lang: ScholarLanguage) -> String {
+        lang.L(
+            "Note: this version performs no online registry lookups (online verification is planned for M1); identifiers are checked for syntax only.",
+            "说明：本版本不联网核查（联网核查排在 M1），仅检查标识符格式。"
+        )
+    }
+
     private static func localizedVerdictAuditNote(
         _ verdict: CitationFirewallEntryVerdict,
         lang: ScholarLanguage
@@ -874,7 +888,8 @@ public struct ScholarCLIRunner: Sendable {
             Direct File Commands:
               outline <paper.tex> [--json]                           Print numbered section/subsection outline
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    Run LaTeX CST, cross-reference & citation lints
-              verify-citations <refs.bib> [--offline] [--json]       Audit BibTeX syntax & offline retraction hints (exits 1 if any entry is not VERIFIED)
+              verify-citations <refs.bib> [--offline] [--json]       Check identifier syntax & built-in retraction hints; no online lookup in this version,
+                                                                     --offline is accepted and changes nothing (exits 1 if any entry is not VERIFIED)
               format-bib <refs.bib> [--style apa|ieee] [--json]      Format BibTeX entries in APA 7th or IEEE style
 
             Project Bundle & Demo Commands (require --project <dir.scholarproj> or explicit --demo):
@@ -901,7 +916,8 @@ public struct ScholarCLIRunner: Sendable {
             单文件直读命令：
               outline <paper.tex> [--json]                           提取 LaTeX 章节与子章节编号大纲
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    执行 LaTeX 语法树、交叉引用与引文静态诊断
-              verify-citations <refs.bib> [--offline] [--json]       执行离线标识符语法与内置撤稿名单检查（任一条目非 VERIFIED 时退出码为 1）
+              verify-citations <refs.bib> [--offline] [--json]       检查标识符语法与内置撤稿名单；本版本不联网核查，
+                                                                     --offline 可以写但不改变行为（任一条目非 VERIFIED 时退出码为 1）
               format-bib <refs.bib> [--style apa|ieee] [--json]      按 APA 7th 或 IEEE 格式输出参考文献列表
 
             工程包与演示命令（必须显式指定 --project <dir.scholarproj> 或 --demo）：

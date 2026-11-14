@@ -1167,6 +1167,7 @@ public struct ScholarWorkbenchShellFrameView<CenterCanvas: View, RightInspector:
                         if docking.isBottomDrawerVisible {
                             ScholarBottomDrawerView(
                                 docking: docking,
+                                manuscriptFileCount: manuscriptFiles.count,
                                 diagnostics: diagnostics,
                                 bibliographyEntries: bibliographyEntries,
                                 editorialFindings: editorialFindings,

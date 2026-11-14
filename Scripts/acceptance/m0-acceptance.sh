@@ -1,78 +1,149 @@
 #!/usr/bin/env bash
+#
+# M0 acceptance: replays the ten rows of the M0 acceptance table plus the supplementary rows
+# added by the 2026-11-14 review, in --lang en and --lang zh where output text is involved.
+#
+# This script never starts the graphical interface. Every product invocation goes through the
+# `scholaros` shell function from lib-cli-guard.sh, which refuses argument lists that would open
+# a window and runs the binary with a throwaway home directory. The default state of the
+# interface (row 9) is checked through a windowless ViewModel unit test.
+#
+# Usage:
+#   Scripts/acceptance/m0-acceptance.sh            report goes to a temporary directory
+#   Scripts/acceptance/m0-acceptance.sh --record   report overwrites reports/m0-acceptance.txt
+#
+# Environment:
+#   SCHOLAR_REPORT_DIR   directory for the report (set by Scripts/test.sh); overrides the default
+#   SCHOLAR_BUILD_JOBS   optional cap for `swift build` / `swift test` parallelism (e.g. 3)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-mkdir -p "$REPO_ROOT/reports"
-REPORT_FILE="$REPO_ROOT/reports/m0-acceptance.txt"
+RECORD=0
+for arg in "$@"; do
+    case "$arg" in
+        --record) RECORD=1 ;;
+        *)
+            echo "Usage: Scripts/acceptance/m0-acceptance.sh [--record]" >&2
+            exit 2
+            ;;
+    esac
+done
 
 WORK="$(mktemp -d)"
-BIN_DIR="$WORK/bin"
-mkdir -p "$BIN_DIR"
 cleanup() {
     rm -rf "$WORK"
 }
 trap cleanup EXIT
 
+if [[ -n "${SCHOLAR_REPORT_DIR:-}" ]]; then
+    REPORT_DIR="$SCHOLAR_REPORT_DIR"
+elif [[ "$RECORD" -eq 1 ]]; then
+    REPORT_DIR="$REPO_ROOT/reports"
+else
+    REPORT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m0-report.XXXXXX")"
+fi
+mkdir -p "$REPORT_DIR"
+REPORT_FILE="$REPORT_DIR/m0-acceptance.txt"
+
+export SCHOLAR_SANDBOX_HOME="$WORK/home"
+mkdir -p "$SCHOLAR_SANDBOX_HOME"
+export SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS"
+# shellcheck source=Scripts/acceptance/lib-cli-guard.sh
+source "$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
+
 swift build >/dev/null
-ln -sf "$REPO_ROOT/.build/debug/ScholarOS" "$BIN_DIR/scholaros"
-export PATH="$BIN_DIR:$REPO_ROOT/.build/debug:$PATH"
 
-REAL_TEX_FILE="${REAL_TEX_FILE:-/Users/xu/Projects/FinalReport/hima_report/main.tex}"
+# Fictional IEEEtran-style sample manuscript that lives in this repository (see its header comment).
+FIXTURE_REL="Fixtures/sample-ieeetran-manuscript.tex"
+FIXTURE_TEX="$REPO_ROOT/$FIXTURE_REL"
 
-cat > "$WORK/refs.bib" <<'EOF'
-@article{real_lecun, author = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey}, title = {Deep learning}, journal = {Nature}, year = {2015}, volume = {521}, pages = {436--444}, doi = {10.1038/nature14539}}
-@article{real_lstm, author = {Hochreiter, Sepp and Schmidhuber, J{\"u}rgen}, title = {Long Short-Term Memory}, journal = {Neural Computation}, year = {1997}, volume = {9}, pages = {1735--1780}, doi = {10.1162/neco.1997.9.8.1735}}
-@article{real_watson, author = {Watson, J. D. and Crick, F. H. C.}, title = {Molecular Structure of Nucleic Acids: A Structure for Deoxyribose Nucleic Acid}, journal = {Nature}, year = {1953}, volume = {171}, pages = {737--738}, doi = {10.1038/171737a0}}
-@article{fake_nonsentinel, author = {Whitfield, Eleanor and Patel, Raj}, title = {Quantum Gradient Descent in Biological Neural Networks}, journal = {Nature Machine Intelligence}, year = {2026}, doi = {10.1038/fake.2026.99999}}
-@article{fake_sentinel, author = {Okafor, Ngozi and Lindqvist, Mats}, title = {Self-Supervised Topological Priors for Protein Folding}, journal = {Science}, year = {2026}, doi = {10.1234/fake.2026.99999}}
-@article{wrongtitle, author = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey}, title = {A Completely Different Invented Title About Ocean Currents}, journal = {Nature}, year = {2015}, doi = {10.1038/nature14539}}
-@article{wrongyear, author = {Hochreiter, Sepp and Schmidhuber, J{\"u}rgen}, title = {Long Short-Term Memory}, journal = {Neural Computation}, year = {1999}, doi = {10.1162/neco.1997.9.8.1735}}
-@article{wrongyear5, author = {Hochreiter, Sepp and Schmidhuber, J{\"u}rgen}, title = {Long Short-Term Memory}, journal = {Neural Computation}, year = {1992}, doi = {10.1162/neco.1997.9.8.1735}}
-@book{real_nodoi, author = {Knuth, Donald E.}, title = {The Art of Computer Programming, Volume 1: Fundamental Algorithms}, publisher = {Addison-Wesley}, year = {1968}}
-@article{fake_nodoi, author = {Whitfield, Eleanor and Patel, Raj}, title = {Recursive Causal Lattices for Zero-Shot Climate Forecasting}, journal = {Journal of Applied Machine Cognition}, year = {2023}, volume = {12}, pages = {101--119}}
-@article{retracted_seralini, author = {S{\'e}ralini, Gilles-{\'E}ric and Clair, Emilie and Mesnage, Robin}, title = {Long term toxicity of a Roundup herbicide and a Roundup-tolerant genetically modified maize}, journal = {Food and Chemical Toxicology}, year = {2012}, doi = {10.1016/j.fct.2012.08.005}}
-@article{retracted_wakefield, author = {Wakefield, A. J. and Murch, S. H.}, title = {Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children}, journal = {The Lancet}, year = {1998}, doi = {10.1016/S0140-6736(97)11096-0}}
-EOF
+# The 12-entry recheck bibliography (3 real, 2 fabricated DOIs, 3 real DOIs with a wrong title or year,
+# 2 without DOI, 2 retracted). It is a copy of the acceptance harness file and lives in Fixtures/.
+BIB_FIXTURE_REL="Fixtures/citations-m0-recheck.bib"
+if [[ ! -f "$REPO_ROOT/$BIB_FIXTURE_REL" ]]; then
+    echo "FAIL: bibliography fixture not found at $BIB_FIXTURE_REL" >&2
+    exit 1
+fi
+cp "$REPO_ROOT/$BIB_FIXTURE_REL" "$WORK/refs.bib"
+
+# Runs one named unit test and prints its real exit status; fails unless the test ran and passed.
+run_named_unit_test() {
+    local label="$1"
+    local filter="$2"
+    local expected_name_prefix="$3"
+    local out
+    local status
+    set +e
+    out="$(swift test --no-parallel --filter "$filter" 2>&1)"
+    status=$?
+    set -e
+    echo "${label}_test_exit=$status"
+    printf '%s\n' "$out" | grep -E "Test \"${expected_name_prefix}.*\" (passed|failed)|Test run with" || true
+    if [[ "$status" -ne 0 ]]; then
+        printf '%s\n' "$out" | tail -n 40
+        echo "FAIL: unit test '$filter' failed"
+        exit 1
+    fi
+    if ! printf '%s\n' "$out" | grep -q -E "Test \"${expected_name_prefix}.*\" passed"; then
+        echo "FAIL: unit test '$filter' did not run (filter matched nothing)"
+        exit 1
+    fi
+}
 
 {
     echo "# ScholarOS M0 Acceptance Verification Report (Bilingual: --lang en & --lang zh)"
-    echo "Date: 2026-11-14"
+    echo "Date: $(date +%Y-%m-%d)"
     echo "Platform: $(uname -s) $(uname -m)"
     echo ""
 
     # ------------------------------------------------------------------
-    # Row 1: scholaros --help & scholaros outline <real .tex> (--lang en & --lang zh)
+    # Row 1: scholaros --help & scholaros outline <.tex fixture> (--lang en & --lang zh)
     # ------------------------------------------------------------------
-    echo "== [Row 1] scholaros --help & scholaros outline <real .tex> (--lang en & --lang zh) =="
-    if [[ ! -f "$REAL_TEX_FILE" ]]; then
-        echo "FAIL: Real TeX fixture not found at $REAL_TEX_FILE"
+    echo "== [Row 1] scholaros --help & scholaros outline $FIXTURE_REL (--lang en & --lang zh) =="
+    if [[ ! -f "$FIXTURE_TEX" ]]; then
+        echo "FAIL: TeX fixture not found at $FIXTURE_REL"
         exit 1
     fi
     HELP_EN_OUT="$(scholaros --help --lang en)"
     HELP_EN_EXIT=$?
     HELP_ZH_OUT="$(scholaros --help --lang zh)"
     HELP_ZH_EXIT=$?
-    OUTLINE_EN_OUT="$(scholaros outline "$REAL_TEX_FILE" --lang en)"
+    OUTLINE_EN_OUT="$(scholaros outline "$FIXTURE_TEX" --lang en)"
     OUTLINE_EN_EXIT=$?
-    OUTLINE_ZH_OUT="$(scholaros outline "$REAL_TEX_FILE" --lang zh)"
+    OUTLINE_ZH_OUT="$(scholaros outline "$FIXTURE_TEX" --lang zh)"
     OUTLINE_ZH_EXIT=$?
     OUTLINE_EN_COUNT="$(printf '%s\n' "$OUTLINE_EN_OUT" | sed '/^$/d' | wc -l | tr -d ' ')"
     OUTLINE_ZH_COUNT="$(printf '%s\n' "$OUTLINE_ZH_OUT" | sed '/^$/d' | wc -l | tr -d ' ')"
-    GREP_COUNT="$(grep -c -E '\\(section|subsection)\*?\{' "$REAL_TEX_FILE" | tr -d ' ')"
+    GREP_COUNT="$(grep -c -E '\\(section|subsection)\*?\{' "$FIXTURE_TEX" | tr -d ' ')"
+    FIXTURE_LINES="$(wc -l < "$FIXTURE_TEX" | tr -d ' ')"
     echo "help_en_exit=$HELP_EN_EXIT help_zh_exit=$HELP_ZH_EXIT"
     echo "outline_en_exit=$OUTLINE_EN_EXIT outline_zh_exit=$OUTLINE_ZH_EXIT"
+    echo "fixture=$FIXTURE_REL fixture_line_count=$FIXTURE_LINES"
     echo "outline_en_heading_count=$OUTLINE_EN_COUNT outline_zh_heading_count=$OUTLINE_ZH_COUNT"
     echo "grep_section_subsection_count=$GREP_COUNT"
     if [[ "$HELP_EN_EXIT" -ne 0 || "$HELP_ZH_EXIT" -ne 0 || "$OUTLINE_EN_EXIT" -ne 0 || "$OUTLINE_ZH_EXIT" -ne 0 || "$OUTLINE_EN_COUNT" != "$GREP_COUNT" || "$OUTLINE_ZH_COUNT" != "$GREP_COUNT" ]]; then
         echo "FAIL: Row 1 mismatch"
         exit 1
     fi
+    if [[ "$GREP_COUNT" -lt 10 ]]; then
+        echo "FAIL: Row 1 fixture has too few headings to be a meaningful check"
+        exit 1
+    fi
     if ! printf '%s\n' "$HELP_ZH_OUT" | grep -q "单文件直读命令"; then
         echo "FAIL: Row 1 expected localized Chinese help banner"
         exit 1
     fi
+    # The numbers both READMEs quote for this fixture must be the ones measured above.
+    for README_FILE in README.md README.zh-CN.md; do
+        README_SENTENCE="$(grep -F "$FIXTURE_REL" "$REPO_ROOT/$README_FILE" || true)"
+        if ! printf '%s\n' "$README_SENTENCE" | grep -q -F "$FIXTURE_LINES" || ! printf '%s\n' "$README_SENTENCE" | grep -q -F "\`$GREP_COUNT\`"; then
+            echo "FAIL: Row 1 $README_FILE does not quote fixture_line_count=$FIXTURE_LINES and heading count $GREP_COUNT next to $FIXTURE_REL"
+            exit 1
+        fi
+    done
+    echo "readme_numbers_match_fixture=true"
     echo "PASS: Row 1"
     echo ""
 
@@ -108,7 +179,7 @@ EOF
     # ------------------------------------------------------------------
     # Row 3: scholaros verify-citations refs.bib --offline (--lang en & --lang zh)
     # ------------------------------------------------------------------
-    echo "== [Row 3] scholaros verify-citations refs.bib --offline (--lang en & --lang zh) =="
+    echo "== [Row 3] scholaros verify-citations $BIB_FIXTURE_REL --offline (--lang en & --lang zh) =="
     set +e
     OFFLINE_EN_OUT="$(scholaros verify-citations "$WORK/refs.bib" --offline --lang en 2>&1)"
     OFFLINE_EN_EXIT=$?
@@ -135,7 +206,11 @@ EOF
         fi
     done
     if ! printf '%s\n' "$OFFLINE_ZH_OUT" | grep -q "尚未向外部注册库核查"; then
-        echo "FAIL: Row 3 expected honest Chinese offline notice"
+        echo "FAIL: Row 3 expected honest Chinese not-checked notice"
+        exit 1
+    fi
+    if ! printf '%s\n' "$OFFLINE_EN_OUT" | grep -q "Not checked against any external registry"; then
+        echo "FAIL: Row 3 expected honest English not-checked notice"
         exit 1
     fi
     echo "PASS: Row 3"
@@ -144,12 +219,16 @@ EOF
     # ------------------------------------------------------------------
     # Row 4: sandbox-exec network denial without --offline (--lang en & --lang zh)
     # ------------------------------------------------------------------
-    echo "== [Row 4] sandbox-exec deny network* scholaros verify-citations refs.bib (--lang en & --lang zh) =="
+    echo "== [Row 4] sandbox-exec deny network* scholaros verify-citations $BIB_FIXTURE_REL, no --offline (--lang en & --lang zh) =="
     set +e
-    SANDBOX_EN_OUT="$(sandbox-exec -p '(version 1)(allow default)(deny network*)' "$BIN_DIR/scholaros" verify-citations "$WORK/refs.bib" --lang en 2>&1)"
+    SANDBOX_EN_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang en 2>&1)"
     SANDBOX_EN_EXIT=$?
-    SANDBOX_ZH_OUT="$(sandbox-exec -p '(version 1)(allow default)(deny network*)' "$BIN_DIR/scholaros" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
+    SANDBOX_ZH_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
     SANDBOX_ZH_EXIT=$?
+    NOFLAG_EN_OUT="$(scholaros verify-citations "$WORK/refs.bib" --lang en 2>&1)"
+    NOFLAG_EN_EXIT=$?
+    NOFLAG_ZH_OUT="$(scholaros verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
+    NOFLAG_ZH_EXIT=$?
     set -e
     echo "sandbox_en_exit=$SANDBOX_EN_EXIT sandbox_zh_exit=$SANDBOX_ZH_EXIT"
     echo "$SANDBOX_EN_OUT"
@@ -167,6 +246,11 @@ EOF
             exit 1
         fi
     done
+    if [[ "$SANDBOX_EN_OUT" != "$NOFLAG_EN_OUT" || "$SANDBOX_ZH_OUT" != "$NOFLAG_ZH_OUT" || "$NOFLAG_EN_EXIT" -ne "$SANDBOX_EN_EXIT" || "$NOFLAG_ZH_EXIT" -ne "$SANDBOX_ZH_EXIT" ]]; then
+        echo "FAIL: Row 4 output with the network denied differs from output with the network allowed"
+        exit 1
+    fi
+    echo "network_denied_output_identical_to_network_allowed=true"
     echo "PASS: Row 4"
     echo ""
 
@@ -174,16 +258,14 @@ EOF
     # Row 5: Unit test injecting transport error, HTTP 429, HTTP 500 -> UNVERIFIED
     # ------------------------------------------------------------------
     echo "== [Row 5] Injected transport error, HTTP 429, HTTP 500 -> UNVERIFIED =="
-    ROW5_TEST_OUT="$(swift test --no-parallel --filter "BibCSLAndFirewallTests/firewallOnlineRegistryTransport429And500FailuresReturnUnverified" 2>&1)"
-    echo "row5_test_exit=0"
-    printf '%s\n' "$ROW5_TEST_OUT" | grep -E "Test \"S19 regression|passed after" || true
+    run_named_unit_test "row5" "BibCSLAndFirewallTests/firewallOnlineRegistryTransport429And500FailuresReturnUnverified" "S19 regression"
     echo "PASS: Row 5"
     echo ""
 
     # ------------------------------------------------------------------
-    # Row 6: Built-in retracted paper -> RETRACTED + '内置名单' notice (--lang en & --lang zh)
+    # Row 6: Built-in retracted paper -> RETRACTED + built-in-list notice (--lang en & --lang zh)
     # ------------------------------------------------------------------
-    echo "== [Row 6] Built-in retracted paper -> RETRACTED + 内置名单 notice (--lang en & --lang zh) =="
+    echo "== [Row 6] Built-in retracted paper -> RETRACTED + built-in list notice (--lang en & --lang zh) =="
     WAKEFIELD_EN_LINE="$(printf '%s\n' "$OFFLINE_EN_OUT" | grep "retracted_wakefield" || true)"
     WAKEFIELD_ZH_LINE="$(printf '%s\n' "$OFFLINE_ZH_OUT" | grep "retracted_wakefield" || true)"
     echo "en: $WAKEFIELD_EN_LINE"
@@ -193,11 +275,15 @@ EOF
             echo "FAIL: Row 6 expected [RETRACTED]"
             exit 1
         fi
-        if ! printf '%s\n' "$W_LINE" | grep -q "内置名单，不完整"; then
-            echo "FAIL: Row 6 expected '内置名单，不完整'"
-            exit 1
-        fi
     done
+    if ! printf '%s\n' "$WAKEFIELD_EN_LINE" | grep -q "built-in list, incomplete"; then
+        echo "FAIL: Row 6 expected 'built-in list, incomplete' in the English line"
+        exit 1
+    fi
+    if ! printf '%s\n' "$WAKEFIELD_ZH_LINE" | grep -q "内置名单，不完整"; then
+        echo "FAIL: Row 6 expected '内置名单，不完整' in the Chinese line"
+        exit 1
+    fi
     echo "PASS: Row 6"
     echo ""
 
@@ -246,30 +332,19 @@ PY
     echo ""
 
     # ------------------------------------------------------------------
-    # Row 9: GUI default empty state (ViewModel test + live launch in en & zh + demo HTML marker)
+    # Row 9: Interface default state is empty. Checked WITHOUT opening a window: a default
+    # ScholarStudioViewModel must have no manuscripts, no bibliography, no screening records and
+    # no block alert, and its empty-state texts must not claim that anything was verified.
     # ------------------------------------------------------------------
-    echo "== [Row 9] GUI default empty state (ViewModel test + live launch --lang en & --lang zh) =="
-    ROW9_TEST_OUT="$(swift test --no-parallel --filter "ScholarStudioViewsTests/s21AndS22StudioViewModelStartsEmptyWithoutDemoDataOrFakeAlert" 2>&1)"
-    printf '%s\n' "$ROW9_TEST_OUT" | grep -E "Test \"S21/S22 regression|passed after" || true
-    for GUI_LANG in en zh; do
-        "$REPO_ROOT/.build/debug/ScholarOS" --lang "$GUI_LANG" >"$WORK/gui_${GUI_LANG}.stdout" 2>"$WORK/gui_${GUI_LANG}.stderr" &
-        GUI_PID=$!
-        python3 -c 'import time; time.sleep(1.0)'
-        if kill -0 "$GUI_PID" 2>/dev/null; then
-            echo "live_gui_launch_alive_${GUI_LANG}=true"
-            kill "$GUI_PID" 2>/dev/null || true
-            wait "$GUI_PID" 2>/dev/null || true
-        else
-            wait "$GUI_PID" || true
-            echo "FAIL: Row 9 GUI process ($GUI_LANG) exited unexpectedly"
-            exit 1
-        fi
-    done
+    echo "== [Row 9] Interface default state is empty (windowless ViewModel tests; no GUI process is started) =="
+    run_named_unit_test "row9_default_state" "ScholarStudioViewsTests/s21AndS22StudioViewModelStartsEmptyWithoutDemoDataOrFakeAlert" "S21/S22 regression"
+    run_named_unit_test "row9_empty_state_texts" "ScholarStudioViewsTests/s30EmptyWorkspaceShowsNoDataInsteadOfVerifiedOrPassedConclusions" "S30 regression"
     if ! grep -q "\[DEMO\] Sample Unverified Dataset" "$REPO_ROOT/docs/demo-scholar-dossier.html" || ! grep -q "\[DEMO / 演示数据\]" "$REPO_ROOT/docs/demo-scholar-dossier.html"; then
         echo "FAIL: Row 9 expected bilingual [DEMO / 演示数据] marker in docs/demo-scholar-dossier.html"
         exit 1
     fi
     echo "demo_html_bilingual_marker=present"
+    echo "gui_processes_started_by_this_script=0"
     echo "PASS: Row 9"
     echo ""
 
@@ -278,16 +353,101 @@ PY
     # ------------------------------------------------------------------
     echo "== [Row 10] Search banned EN/ZH strings in Sources/, README.md, README.zh-CN.md, docs/ =="
     set +e
-    RG_HITS="$(rg -i -n "VERIFIED_DOI|FIREWALL_CLEARED|Hardware-Gated|HardwareGated|Zero-Hallucination|returned HTTP 404|零幻觉|硬件门禁|硬件级门禁|硬件级|已验证 DOI" "$REPO_ROOT/Sources" "$REPO_ROOT/README.md" "$REPO_ROOT/README.zh-CN.md" "$REPO_ROOT/docs")"
-    RG_EXIT=$?
+    BANNED_HITS="$(grep -r -i -n -I -E "VERIFIED_DOI|FIREWALL_CLEARED|Hardware-Gated|HardwareGated|Zero-Hallucination|returned HTTP 404|零幻觉|硬件门禁|硬件级门禁|硬件级|已验证 DOI" "$REPO_ROOT/Sources" "$REPO_ROOT/README.md" "$REPO_ROOT/README.zh-CN.md" "$REPO_ROOT/docs")"
+    BANNED_EXIT=$?
     set -e
-    if [[ "$RG_EXIT" -eq 0 || -n "$RG_HITS" ]]; then
-        echo "FAIL: Row 10 found banned terms:"
-        echo "$RG_HITS"
+    if [[ "$BANNED_EXIT" -ne 1 || -n "$BANNED_HITS" ]]; then
+        echo "FAIL: Row 10 found banned terms (or the search itself failed, grep exit $BANNED_EXIT):"
+        echo "$BANNED_HITS"
         exit 1
     fi
     echo "matches_in_sources_readmes_and_docs=0"
     echo "PASS: Row 10"
     echo ""
-    echo "ALL 10 M0 ACCEPTANCE CHECKS PASSED (EN & ZH)."
+
+    # ------------------------------------------------------------------
+    # Row 11 (S32): English verify-citations output has exactly one class tag per entry line
+    # and contains no Chinese characters.
+    # ------------------------------------------------------------------
+    echo "== [Row 11] verify-citations --lang en: one class tag per entry line, no Chinese in English output =="
+    python3 - "$NOFLAG_EN_OUT" "$OFFLINE_EN_OUT" <<'PY'
+import re, sys
+tag = re.compile(r"\[(VERIFIED|DRIFT|NOT_FOUND|RETRACTED|UNVERIFIED)\]")
+cjk = re.compile(r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
+for label, blob in (("no_flag", sys.argv[1]), ("offline_flag", sys.argv[2])):
+    entry_lines = [line for line in blob.splitlines() if tag.search(line)]
+    assert len(entry_lines) == 12, (label, len(entry_lines))
+    for line in entry_lines:
+        assert len(tag.findall(line)) == 1, (label, "duplicate class tag", line)
+        assert tag.match(line), (label, "class tag is not at the start of the line", line)
+    assert not cjk.search(blob), (label, "Chinese characters in English output", cjk.findall(blob))
+    print(f"{label}: entry_lines={len(entry_lines)} tags_per_line=1 cjk_characters=0")
+PY
+    echo "PASS: Row 11"
+    echo ""
+
+    # ------------------------------------------------------------------
+    # Row 12 (S33): the output does not pretend there is an offline "mode". With or without
+    # --offline it is identical and states that this version performs no online lookups.
+    # ------------------------------------------------------------------
+    echo "== [Row 12] verify-citations states that this version performs no online lookups (--lang en & --lang zh) =="
+    if [[ "$NOFLAG_EN_OUT" != "$OFFLINE_EN_OUT" || "$NOFLAG_ZH_OUT" != "$OFFLINE_ZH_OUT" ]]; then
+        echo "FAIL: Row 12 expected identical output with and without --offline"
+        exit 1
+    fi
+    echo "output_identical_with_and_without_offline_flag=true"
+    printf '%s\n' "$NOFLAG_EN_OUT" | grep "performs no online registry lookups" || { echo "FAIL: Row 12 missing English no-online-lookup notice"; exit 1; }
+    printf '%s\n' "$NOFLAG_ZH_OUT" | grep "本版本不联网核查" || { echo "FAIL: Row 12 missing Chinese no-online-lookup notice"; exit 1; }
+    if printf '%s\n%s\n' "$NOFLAG_EN_OUT" "$NOFLAG_ZH_OUT" | grep -n -i -E "\(offline\)|unverified offline|离线模式"; then
+        echo "FAIL: Row 12 output still describes an offline mode"
+        exit 1
+    fi
+    echo "PASS: Row 12"
+    echo ""
+
+    # ------------------------------------------------------------------
+    # Row 13 (S30): no hard-coded "100%" verification conclusion in the studio views.
+    # ------------------------------------------------------------------
+    echo "== [Row 13] No hard-coded '100%' conclusion in Sources/ScholarStudioViews =="
+    set +e
+    HUNDRED_HITS="$(grep -r -n -F '100%' "$REPO_ROOT/Sources/ScholarStudioViews")"
+    HUNDRED_EXIT=$?
+    set -e
+    if [[ "$HUNDRED_EXIT" -ne 1 || -n "$HUNDRED_HITS" ]]; then
+        echo "FAIL: Row 13 found '100%' literals (or the search itself failed, grep exit $HUNDRED_EXIT):"
+        echo "$HUNDRED_HITS"
+        exit 1
+    fi
+    echo "literal_100_percent_matches_in_studio_views=0"
+    echo "PASS: Row 13"
+    echo ""
+
+    # ------------------------------------------------------------------
+    # Row 14 (C5): no absolute home-directory path of any machine in tracked files.
+    # (The pattern is assembled from two pieces so that this script does not match itself.)
+    # ------------------------------------------------------------------
+    echo "== [Row 14] No absolute home-directory paths in tracked files =="
+    HOME_PATH_PATTERN="/Use""rs/"
+    set +e
+    if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        HOME_PATH_HITS="$(git -C "$REPO_ROOT" grep -n -F "$HOME_PATH_PATTERN")"
+        HOME_PATH_EXIT=$?
+        echo "search=git-grep-over-tracked-files"
+    else
+        HOME_PATH_HITS="$(grep -r -n -I -F --exclude-dir=.build --exclude-dir=.git --exclude-dir=build "$HOME_PATH_PATTERN" "$REPO_ROOT")"
+        HOME_PATH_EXIT=$?
+        echo "search=grep-over-working-directory (not a git checkout)"
+    fi
+    set -e
+    if [[ "$HOME_PATH_EXIT" -ne 1 || -n "$HOME_PATH_HITS" ]]; then
+        echo "FAIL: Row 14 found absolute home-directory paths (or the search itself failed, exit $HOME_PATH_EXIT):"
+        echo "$HOME_PATH_HITS"
+        exit 1
+    fi
+    echo "absolute_home_path_matches=0"
+    echo "PASS: Row 14"
+    echo ""
+    echo "ALL M0 ACCEPTANCE CHECKS PASSED (EN & ZH): rows 1-10 of the M0 table and supplementary rows 11-14."
 } | tee "$REPORT_FILE"
+
+echo "[m0-acceptance] report written to $REPORT_FILE" >&2

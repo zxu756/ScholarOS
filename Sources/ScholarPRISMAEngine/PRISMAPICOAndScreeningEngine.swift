@@ -154,22 +154,11 @@ public final class PRISMAScreeningEngine: @unchecked Sendable {
         var ftExcludedByCode: [String: Int] = [:]
         var finalIncluded = 0
 
-        var pairedCount = 0
-        var agreements = 0
-        var countsA: [ScreeningDecision: Int] = [:]
-        var countsB: [ScreeningDecision: Int] = [:]
-        var categories = Set<ScreeningDecision>()
+        var pairedVotes: [(raterA: ScreeningDecision, raterB: ScreeningDecision)] = []
 
         for study in studies {
             if let a = study.reviewerADecision, let b = study.reviewerBDecision {
-                pairedCount += 1
-                if a == b {
-                    agreements += 1
-                }
-                countsA[a, default: 0] += 1
-                countsB[b, default: 0] += 1
-                categories.insert(a)
-                categories.insert(b)
+                pairedVotes.append((raterA: a, raterB: b))
             }
 
             let effectiveDecision = study.adjudicatedDecision ?? consensusDecision(study)
@@ -191,31 +180,11 @@ public final class PRISMAScreeningEngine: @unchecked Sendable {
         let soughtForRetrieval = max(0, screened - taExcluded)
         let ftAssessed = max(0, soughtForRetrieval - reportsNotRetrievedCount)
 
-        let po: Double
-        let kappa: Double
-        let pabak: Double
-        if pairedCount > 0 {
-            let n = Double(pairedCount)
-            po = Double(agreements) / n
-            var peNumerator = 0.0
-            for cat in categories {
-                let fa = Double(countsA[cat] ?? 0)
-                let fb = Double(countsB[cat] ?? 0)
-                peNumerator += fa * fb
-            }
-            let pe = peNumerator / (n * n)
-            if abs(1.0 - pe) < 1e-12 {
-                kappa = 1.0
-            } else {
-                kappa = (po - pe) / (1.0 - pe)
-            }
-            let k = max(2, categories.count)
-            pabak = (Double(k) * po - 1.0) / Double(k - 1)
-        } else {
-            po = 1.0
-            kappa = 1.0
-            pabak = 1.0
-        }
+        // The statistics themselves live in one place (ScholarModels) and are shared with ScholarProjectDatabase.
+        let agreement = NominalDualRaterAgreement.compute(votes: pairedVotes)
+        let po = agreement.observedAgreement
+        let kappa = agreement.cohensKappa
+        let pabak = agreement.pabak
 
         return PRISMA2020SummaryMetrics(
             databaseRecordsIdentified: dbIdentified,

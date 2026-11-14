@@ -1,12 +1,23 @@
 import Foundation
 import Testing
 import ScholarModels
-import ScholarBibAndCSL
+@testable import ScholarBibAndCSL
 
 @Suite("BibTeX/RIS/NBIB Codecs, Deduplication, 5-Style CSL & Citation Firewall")
 struct BibCSLAndFirewallTests {
 
     // MARK: - Helpers
+
+    /// True when `text` contains CJK ideographs, CJK punctuation, or full-width forms.
+    private func containsChineseCharacters(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            let v = scalar.value
+            return (0x3000...0x303F).contains(v)
+                || (0x3400...0x4DBF).contains(v)
+                || (0x4E00...0x9FFF).contains(v)
+                || (0xFF00...0xFFEF).contains(v)
+        }
+    }
 
     private func makeVaswaniEntry() -> BibliographyEntry {
         BibliographyEntry(
@@ -670,7 +681,165 @@ struct BibCSLAndFirewallTests {
         let verdict = firewall.evaluate(wakefield)
         #expect(verdict.firewallClass.rawValue == "RETRACTED")
         #expect(!verdict.allowsManuscriptInsertion)
-        #expect(verdict.auditNote.contains("内置名单，不完整"))
+        // S32: the library note is English; the Chinese wording lives only in the zh localization.
+        #expect(verdict.auditNote.contains("built-in list, incomplete"))
+        #expect(!containsChineseCharacters(verdict.auditNote))
+        #expect(verdict.auditedEntry.localizedFirewallAuditNote(.zhHans).contains("内置名单，不完整"))
+        #expect(verdict.auditedEntry.localizedFirewallAuditNote(.en) == verdict.auditNote)
+    }
+
+    @Test("S32 regression: English firewall notes and finding details contain no Chinese characters")
+    func s32EnglishFirewallNotesContainNoChineseCharacters() {
+        let firewall = CitationVerificationFirewall()
+        let samples: [BibliographyEntry] = [
+            BibliographyEntry(
+                citeKey: "wakefield1998retracted",
+                kind: .article,
+                title: "Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+                authors: [BibAuthor(givenName: "A. J.", familyName: "Wakefield")],
+                year: 1998,
+                venue: "The Lancet",
+                doi: "10.1016/S0140-6736(97)11096-0"
+            ),
+            BibliographyEntry(
+                citeKey: "titleMarkedRetracted",
+                kind: .article,
+                title: "RETRACTED: A study that was withdrawn",
+                authors: [BibAuthor(givenName: "Ada", familyName: "Example")],
+                year: 2012,
+                venue: "Journal of Examples"
+            ),
+            BibliographyEntry(
+                citeKey: "lecun2015deep",
+                kind: .article,
+                title: "Deep learning",
+                authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            BibliographyEntry(
+                citeKey: "sentinel2026",
+                kind: .article,
+                title: "Self-Supervised Topological Priors for Protein Folding",
+                authors: [BibAuthor(givenName: "Ngozi", familyName: "Okafor")],
+                year: 2026,
+                venue: "Science",
+                doi: "10.1234/fake.2026.99999"
+            ),
+            BibliographyEntry(
+                citeKey: "knuth1968",
+                kind: .book,
+                title: "The Art of Computer Programming, Volume 1: Fundamental Algorithms",
+                authors: [BibAuthor(givenName: "Donald E.", familyName: "Knuth")],
+                year: 1968,
+                venue: ""
+            )
+        ]
+        for entry in samples {
+            let verdict = firewall.evaluate(entry)
+            #expect(!containsChineseCharacters(verdict.auditNote), "note of \(entry.citeKey): \(verdict.auditNote)")
+            for finding in verdict.findings {
+                #expect(!containsChineseCharacters(finding.detail), "finding of \(entry.citeKey): \(finding.detail)")
+            }
+        }
+        // Both ways of reaching RETRACTED offline say that the list is built in and incomplete, in English.
+        #expect(firewall.evaluate(samples[0]).auditNote.contains("built-in list, incomplete"))
+        #expect(firewall.evaluate(samples[1]).firewallClass == .retracted)
+    }
+
+    @Test("S33 regression: notes say 'not checked' without claiming an offline mode, and a VERIFIED note never carries a not-checked clause")
+    func s33NotCheckedWordingIsHonestAndVerifiedNoteIsNotSelfContradictory() async {
+        struct UnreachableRegistrySession: CitationRegistrySession {
+            func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
+                throw URLError(.notConnectedToInternet)
+            }
+        }
+
+        let firewall = CitationVerificationFirewall()
+        let doiEntry = BibliographyEntry(
+            citeKey: "lecun2015deep",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let arxivEntry = BibliographyEntry(
+            citeKey: "vaswani2017attention",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+            year: 2017,
+            venue: "arXiv",
+            arxivID: "1706.03762"
+        )
+        let pmidEntry = BibliographyEntry(
+            citeKey: "page2021prisma",
+            kind: .article,
+            title: "The PRISMA 2020 statement",
+            authors: [BibAuthor(givenName: "Matthew J.", familyName: "Page")],
+            year: 2021,
+            venue: "BMJ",
+            pmid: "33782057"
+        )
+        let noIdentifierEntry = BibliographyEntry(
+            citeKey: "knuth1968",
+            kind: .book,
+            title: "The Art of Computer Programming, Volume 1: Fundamental Algorithms",
+            authors: [BibAuthor(givenName: "Donald E.", familyName: "Knuth")],
+            year: 1968,
+            venue: ""
+        )
+
+        for entry in [doiEntry, arxivEntry, pmidEntry, noIdentifierEntry] {
+            let verdict = firewall.evaluate(entry)
+            #expect(verdict.firewallClass == .unverified)
+            // 1. Without a registry query the note says so, and does not pretend the user chose an "offline" mode.
+            #expect(verdict.auditNote.contains("Not checked against any external registry."), "\(verdict.auditNote)")
+            #expect(!verdict.auditNote.lowercased().contains("offline"), "\(verdict.auditNote)")
+            // The Chinese rendering states the same thing, again without an "offline mode".
+            let zhNote = verdict.auditedEntry.localizedFirewallAuditNote(.zhHans)
+            #expect(zhNote.contains("尚未向外部注册库核查"), "\(zhNote)")
+            #expect(!zhNote.contains("离线"), "\(zhNote)")
+
+            // 2. Positive (pass) findings state facts about syntax only. They are what a VERIFIED note is
+            //    built from, so none of them may say "not checked" or "offline".
+            for finding in verdict.findings where finding.severity == .pass {
+                #expect(!finding.detail.lowercased().contains("not checked"), "\(finding.detail)")
+                #expect(!finding.detail.lowercased().contains("offline"), "\(finding.detail)")
+            }
+        }
+
+        // 3. Compose the note the way the online path does when a registry record matches: the offline
+        //    findings plus a registry-match finding, summarized for class VERIFIED. (This exercises the note
+        //    composer only; it is not evidence that online verification works. That is M1.)
+        let offlineFindings = firewall.evaluate(doiEntry).findings
+        let registryMatch = FirewallFinding(
+            code: .registryVerifiedMatch,
+            severity: .pass,
+            field: "registry",
+            detail: "Verified live metadata match against Crossref (title Jaro-Winkler 1.000)."
+        )
+        let verifiedNote = firewall.summarizeFindings(offlineFindings + [registryMatch], assignedClass: .verified)
+        #expect(verifiedNote.hasPrefix("[VERIFIED] "))
+        #expect(!verifiedNote.lowercased().contains("not checked"), "\(verifiedNote)")
+        #expect(!verifiedNote.lowercased().contains("offline"), "\(verifiedNote)")
+        var verifiedEntry = doiEntry
+        verifiedEntry.firewallClass = .verified
+        verifiedEntry.firewallAuditNote = verifiedNote
+        let zhVerifiedNote = verifiedEntry.localizedFirewallAuditNote(.zhHans)
+        #expect(!zhVerifiedNote.contains("尚未"), "\(zhVerifiedNote)")
+        #expect(!zhVerifiedNote.contains("离线"), "\(zhVerifiedNote)")
+
+        // 4. When a lookup was attempted and failed, the note reports the failure; it neither repeats the
+        //    "not checked" sentence of the no-lookup path nor mentions an offline mode.
+        let failed = await firewall.verifyAgainstPublicRegistries(entry: doiEntry, session: UnreachableRegistrySession())
+        #expect(failed.firewallClass == .unverified)
+        #expect(failed.auditNote.contains("unreachable"), "\(failed.auditNote)")
+        #expect(!failed.auditNote.contains("Not checked against any external registry."), "\(failed.auditNote)")
+        #expect(!failed.auditNote.contains("(offline)"), "\(failed.auditNote)")
     }
 
     @Test("S19 regression: transport error, HTTP 429, and HTTP 500 in verifyAgainstPublicRegistries all return UNVERIFIED")

@@ -2,11 +2,13 @@
 Date: 2026-11-14
 Platform: Darwin arm64
 
-== [Row 1] scholaros --help & scholaros outline <real .tex> (--lang en & --lang zh) ==
+== [Row 1] scholaros --help & scholaros outline Fixtures/sample-ieeetran-manuscript.tex (--lang en & --lang zh) ==
 help_en_exit=0 help_zh_exit=0
 outline_en_exit=0 outline_zh_exit=0
-outline_en_heading_count=40 outline_zh_heading_count=40
-grep_section_subsection_count=40
+fixture=Fixtures/sample-ieeetran-manuscript.tex fixture_line_count=449
+outline_en_heading_count=46 outline_zh_heading_count=46
+grep_section_subsection_count=46
+readme_numbers_match_fixture=true
 PASS: Row 1
 
 == [Row 2] scholaros outline & scholaros verify-citations (missing input, --lang en & --lang zh) ==
@@ -16,66 +18,68 @@ verify_en_noarg_exit=2 stdout_bytes=0 stderr=[ERR_SCHOLAROS] Invalid CLI usage: 
 verify_zh_noarg_exit=2 stdout_bytes=0 stderr=[ERR_SCHOLAROS] 命令行参数错误：用法：scholaros verify-citations <refs.bib> [--offline] [--json] | --project <dir.scholarproj> | --demo 
 PASS: Row 2
 
-== [Row 3] scholaros verify-citations refs.bib --offline (--lang en & --lang zh) ==
+== [Row 3] scholaros verify-citations Fixtures/citations-m0-recheck.bib --offline (--lang en & --lang zh) ==
 offline_en_exit=1
 Evaluated=12 Verified=0 Drift=0 NotFound=1 Retracted=1 Unverified=10
-[UNVERIFIED] real_lecun: [UNVERIFIED] DOI '10.1038/nature14539' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_lstm: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_watson: [UNVERIFIED] DOI '10.1038/171737a0' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] fake_nonsentinel: [UNVERIFIED] DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax; not checked against external registry (offline).
-[NOT_FOUND] fake_sentinel: [NOT_FOUND] DOI '10.1234/fake.2026.99999' is a known test/dummy/LLM placeholder sentinel.
-[UNVERIFIED] wrongtitle: [UNVERIFIED] DOI '10.1038/nature14539' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] wrongyear: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] wrongyear5: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_nodoi: [UNVERIFIED] No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry.
-[UNVERIFIED] fake_nodoi: [UNVERIFIED] No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry.
-[UNVERIFIED] retracted_seralini: [UNVERIFIED] DOI '10.1016/j.fct.2012.08.005' has valid ISO 26324 syntax; not checked against external registry (offline).
-[RETRACTED] retracted_wakefield: [RETRACTED] DOI '10.1016/s0140-6736(97)11096-0' matched built-in offline retracted list (内置名单，不完整).
+Note: this version performs no online registry lookups (online verification is planned for M1); identifiers are checked for syntax only.
+[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_lstm: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_watson: DOI '10.1038/171737a0' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax. Not checked against any external registry.
+[NOT_FOUND] fake_sentinel: DOI '10.1234/fake.2026.99999' is a known test/dummy/LLM placeholder sentinel.
+[UNVERIFIED] wrongtitle: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] wrongyear: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] wrongyear5: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_nodoi: No persistent identifier (DOI, arXiv ID, or PubMed PMID). Not checked against any external registry.
+[UNVERIFIED] fake_nodoi: No persistent identifier (DOI, arXiv ID, or PubMed PMID). Not checked against any external registry.
+[UNVERIFIED] retracted_seralini: DOI '10.1016/j.fct.2012.08.005' has valid ISO 26324 syntax. Not checked against any external registry.
+[RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete).
 --- (--lang zh) ---
 offline_zh_exit=1
 Evaluated=12 Verified=0 Drift=0 NotFound=1 Retracted=1 Unverified=10
-[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] real_lstm: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] real_watson: DOI '10.1038/171737a0' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' 语法格式合法；离线模式下尚未向外部注册库核查。
-[NOT_FOUND] fake_sentinel: DOI 格式非法或使用了占位前缀（离线结构检查未通过）。
-[UNVERIFIED] wrongtitle: DOI '10.1038/nature14539' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] wrongyear: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] wrongyear5: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] real_nodoi: 缺失外部持久标识符（DOI / arXiv / PMID）；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] fake_nodoi: 缺失外部持久标识符（DOI / arXiv / PMID）；离线模式下尚未向外部注册库核查。
-[UNVERIFIED] retracted_seralini: DOI '10.1016/j.fct.2012.08.005' 语法格式合法；离线模式下尚未向外部注册库核查。
-[RETRACTED] retracted_wakefield: 离线撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。
+说明：本版本不联网核查（联网核查排在 M1），仅检查标识符格式。
+[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] real_lstm: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] real_watson: DOI '10.1038/171737a0' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' 语法格式合法；尚未向外部注册库核查。
+[NOT_FOUND] fake_sentinel: DOI 格式非法或使用了占位前缀（结构检查未通过）。
+[UNVERIFIED] wrongtitle: DOI '10.1038/nature14539' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] wrongyear: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] wrongyear5: DOI '10.1162/neco.1997.9.8.1735' 语法格式合法；尚未向外部注册库核查。
+[UNVERIFIED] real_nodoi: 缺失外部持久标识符（DOI / arXiv / PMID）；尚未向外部注册库核查。
+[UNVERIFIED] fake_nodoi: 缺失外部持久标识符（DOI / arXiv / PMID）；尚未向外部注册库核查。
+[UNVERIFIED] retracted_seralini: DOI '10.1016/j.fct.2012.08.005' 语法格式合法；尚未向外部注册库核查。
+[RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。
 PASS: Row 3
 
-== [Row 4] sandbox-exec deny network* scholaros verify-citations refs.bib (--lang en & --lang zh) ==
+== [Row 4] sandbox-exec deny network* scholaros verify-citations Fixtures/citations-m0-recheck.bib, no --offline (--lang en & --lang zh) ==
 sandbox_en_exit=1 sandbox_zh_exit=1
 Evaluated=12 Verified=0 Drift=0 NotFound=1 Retracted=1 Unverified=10
-[UNVERIFIED] real_lecun: [UNVERIFIED] DOI '10.1038/nature14539' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_lstm: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_watson: [UNVERIFIED] DOI '10.1038/171737a0' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] fake_nonsentinel: [UNVERIFIED] DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax; not checked against external registry (offline).
-[NOT_FOUND] fake_sentinel: [NOT_FOUND] DOI '10.1234/fake.2026.99999' is a known test/dummy/LLM placeholder sentinel.
-[UNVERIFIED] wrongtitle: [UNVERIFIED] DOI '10.1038/nature14539' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] wrongyear: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] wrongyear5: [UNVERIFIED] DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax; not checked against external registry (offline).
-[UNVERIFIED] real_nodoi: [UNVERIFIED] No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry.
-[UNVERIFIED] fake_nodoi: [UNVERIFIED] No persistent identifier (DOI, arXiv ID, or PubMed PMID); not checked against external registry.
-[UNVERIFIED] retracted_seralini: [UNVERIFIED] DOI '10.1016/j.fct.2012.08.005' has valid ISO 26324 syntax; not checked against external registry (offline).
-[RETRACTED] retracted_wakefield: [RETRACTED] DOI '10.1016/s0140-6736(97)11096-0' matched built-in offline retracted list (内置名单，不完整).
+Note: this version performs no online registry lookups (online verification is planned for M1); identifiers are checked for syntax only.
+[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_lstm: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_watson: DOI '10.1038/171737a0' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax. Not checked against any external registry.
+[NOT_FOUND] fake_sentinel: DOI '10.1234/fake.2026.99999' is a known test/dummy/LLM placeholder sentinel.
+[UNVERIFIED] wrongtitle: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] wrongyear: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] wrongyear5: DOI '10.1162/neco.1997.9.8.1735' has valid ISO 26324 syntax. Not checked against any external registry.
+[UNVERIFIED] real_nodoi: No persistent identifier (DOI, arXiv ID, or PubMed PMID). Not checked against any external registry.
+[UNVERIFIED] fake_nodoi: No persistent identifier (DOI, arXiv ID, or PubMed PMID). Not checked against any external registry.
+[UNVERIFIED] retracted_seralini: DOI '10.1016/j.fct.2012.08.005' has valid ISO 26324 syntax. Not checked against any external registry.
+[RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete).
+network_denied_output_identical_to_network_allowed=true
 PASS: Row 4
 
 == [Row 5] Injected transport error, HTTP 429, HTTP 500 -> UNVERIFIED ==
 row5_test_exit=0
-◇ Test "S19 regression: transport error, HTTP 429, and HTTP 500 in verifyAgainstPublicRegistries all return UNVERIFIED" started.
 ✔ Test "S19 regression: transport error, HTTP 429, and HTTP 500 in verifyAgainstPublicRegistries all return UNVERIFIED" passed after 0.003 seconds.
-✔ Suite "BibTeX/RIS/NBIB Codecs, Deduplication, 5-Style CSL & Citation Firewall" passed after 0.003 seconds.
 ✔ Test run with 1 test in 1 suite passed after 0.003 seconds.
 PASS: Row 5
 
-== [Row 6] Built-in retracted paper -> RETRACTED + 内置名单 notice (--lang en & --lang zh) ==
-en: [RETRACTED] retracted_wakefield: [RETRACTED] DOI '10.1016/s0140-6736(97)11096-0' matched built-in offline retracted list (内置名单，不完整).
-zh: [RETRACTED] retracted_wakefield: 离线撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。
+== [Row 6] Built-in retracted paper -> RETRACTED + built-in list notice (--lang en & --lang zh) ==
+en: [RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete).
+zh: [RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。
 PASS: Row 6
 
 == [Row 7] prisma-stats kappa == MCP scholar_prisma_agreement kappa == 83/107 ==
@@ -83,22 +87,43 @@ hand_kappa_83_over_107=0.775701 cli_kappa=0.775701 mcp_kappa=0.7757
 PASS: Row 7
 
 == [Row 8] MCP invalid JSON (-32700) & unknown method (-32601) ==
-{"error":{"code":-32700,"message":"Parse error"},"jsonrpc":"2.0","id":null}
-{"jsonrpc":"2.0","id":99,"error":{"message":"Method not found: scholar\/nonexistent_method","code":-32601}}
+{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"},"id":null}
+{"jsonrpc":"2.0","id":99,"error":{"code":-32601,"message":"Method not found: scholar\/nonexistent_method"}}
 PASS: Row 8
 
-== [Row 9] GUI default empty state (ViewModel test + live launch --lang en & --lang zh) ==
-◇ Test "S21/S22 regression: ScholarStudioViewModel starts completely empty without manuscripts, citations, PDFs, or fake HTTP 404 alert" started.
-✔ Test "S21/S22 regression: ScholarStudioViewModel starts completely empty without manuscripts, citations, PDFs, or fake HTTP 404 alert" passed after 0.155 seconds.
-✔ Suite "ScholarStudioViews Empty Default State & Demo Mode Honesty" passed after 0.155 seconds.
-✔ Test run with 1 test in 1 suite passed after 0.155 seconds.
-live_gui_launch_alive_en=true
-live_gui_launch_alive_zh=true
+== [Row 9] Interface default state is empty (windowless ViewModel tests; no GUI process is started) ==
+row9_default_state_test_exit=0
+✔ Test "S21/S22 regression: ScholarStudioViewModel starts completely empty without manuscripts, citations, PDFs, or fake HTTP 404 alert" passed after 0.136 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.137 seconds.
+row9_empty_state_texts_test_exit=0
+✔ Test "S30 regression: with nothing loaded, the interface texts say 'no data' and never claim that something was verified or passed" passed after 0.002 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.002 seconds.
 demo_html_bilingual_marker=present
+gui_processes_started_by_this_script=0
 PASS: Row 9
 
 == [Row 10] Search banned EN/ZH strings in Sources/, README.md, README.zh-CN.md, docs/ ==
 matches_in_sources_readmes_and_docs=0
 PASS: Row 10
 
-ALL 10 M0 ACCEPTANCE CHECKS PASSED (EN & ZH).
+== [Row 11] verify-citations --lang en: one class tag per entry line, no Chinese in English output ==
+no_flag: entry_lines=12 tags_per_line=1 cjk_characters=0
+offline_flag: entry_lines=12 tags_per_line=1 cjk_characters=0
+PASS: Row 11
+
+== [Row 12] verify-citations states that this version performs no online lookups (--lang en & --lang zh) ==
+output_identical_with_and_without_offline_flag=true
+Note: this version performs no online registry lookups (online verification is planned for M1); identifiers are checked for syntax only.
+说明：本版本不联网核查（联网核查排在 M1），仅检查标识符格式。
+PASS: Row 12
+
+== [Row 13] No hard-coded '100%' conclusion in Sources/ScholarStudioViews ==
+literal_100_percent_matches_in_studio_views=0
+PASS: Row 13
+
+== [Row 14] No absolute home-directory paths in tracked files ==
+search=git-grep-over-tracked-files
+absolute_home_path_matches=0
+PASS: Row 14
+
+ALL M0 ACCEPTANCE CHECKS PASSED (EN & ZH): rows 1-10 of the M0 table and supplementary rows 11-14.
