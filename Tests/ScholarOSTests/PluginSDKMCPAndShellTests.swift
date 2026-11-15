@@ -1638,7 +1638,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(mcpText.contains("ERR_UNVERIFIED_CITATION"))
     }
 
-    @Test("M1 item 1, 2 & 3 (Stage 04): CLI verify-citations replay formats doi.org NOT_FOUND, wrong-DOI DRIFT, DataCite registered_no_metadata, and Crossref+OpenAlex RETRACTED in en and zh")
+    @Test("M1 item 1, 2 & 3 (Stage 04): CLI verify-citations replay formats doi.org NOT_FOUND, wrong-DOI DRIFT, CNKI registered_no_metadata, and Crossref+OpenAlex RETRACTED in en and zh")
     func m1Stage04CLIVerifyCitationsLocalizationAndLookupOrderReplay() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-m1-stage04-cli")
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -1666,6 +1666,13 @@ struct PluginSDKMCPAndShellTests {
           year      = {2015},
           doi       = {10.4230/LIPIcs.ICALP.2015.1}
         }
+        @article{yang2024jos,
+          author  = {Yang, Zezhou and Chen, Sirong and Gao, Cuiyun and Li, Zhenhao and Li, Ge and Lyu, Michael},
+          title   = {Deep Learning Based Code Generation Methods: Literature Review},
+          journal = {Journal of Software},
+          year    = {2024},
+          doi     = {10.13328/j.cnki.jos.006981}
+        }
         @article{retracted_wakefield,
           author  = {Wakefield, AJ and others},
           title   = {Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children},
@@ -1682,8 +1689,12 @@ struct PluginSDKMCPAndShellTests {
             arguments: ["verify-citations", stage04BibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
         )
         #expect(zhRun.exitCode == 1)
-        #expect(zhRun.stdout.contains("doi.org 说这个 DOI 没有注册"))
+        #expect(zhRun.stdout.contains("Evaluated=5 Verified=0 Drift=1 NotFound=2 Retracted=1 Unverified=1"))
+        #expect(zhRun.stdout.contains("1 条没查成，原因：registered_no_metadata=1；结果不完整。"))
+        #expect(zhRun.stdout.contains("doi.org 说这个 DOI 没有注册（10.1038/fake.2026.99999）"))
+        #expect(zhRun.stdout.contains("doi.org 说这个 DOI 没有注册（10.4230/LIPIcs.ICALP.2015.1）"))
         #expect(zhRun.stdout.contains("DOI错误（本地：10.1162/neco.1997.99999，Crossref：10.1162/neco.1997.9.8.1735）"))
+        #expect(zhRun.stdout.contains("doi.org 表明该 DOI 已注册，但两个元数据源里都没有"))
         #expect(zhRun.stdout.contains("OpenAlex 标明该文献已撤稿（撤稿字段：is_retracted）"))
         #expect(!zhRun.stdout.contains("内置名单，不完整"))
 
@@ -1691,8 +1702,11 @@ struct PluginSDKMCPAndShellTests {
             arguments: ["verify-citations", stage04BibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
         )
         #expect(enRun.exitCode == 1)
+        #expect(enRun.stdout.contains("Evaluated=5 Verified=0 Drift=1 NotFound=2 Retracted=1 Unverified=1"))
         #expect(enRun.stdout.contains("doi.org reported that DOI '10.1038/fake.2026.99999' is not registered"))
+        #expect(enRun.stdout.contains("doi.org reported that DOI '10.4230/lipics.icalp.2015.1' is not registered"))
         #expect(enRun.stdout.contains("10.1162/neco.1997.9.8.1735"))
         #expect(enRun.stdout.contains("registered_no_metadata"))
+        #expect(enRun.stdout.contains("doi.org reported DOI '10.13328/j.cnki.jos.006981' is registered"))
     }
 }

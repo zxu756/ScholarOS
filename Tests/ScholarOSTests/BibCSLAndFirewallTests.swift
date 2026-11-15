@@ -2048,12 +2048,12 @@ struct BibCSLAndFirewallTests {
         #expect(doiField.source == "Crossref")
     }
 
-    @Test("M1 item 3 (Stage 04): real DataCite DOI missing from Crossref and OpenAlex returns UNVERIFIED with registered_no_metadata")
-    func m1Stage04DataCiteRegisteredDOIWithoutMetadataReturnsUnverifiedRegisteredNoMetadata() async throws {
+    @Test("M1 item 3 (Stage 04): unregistered DataCite-prefix DOI 10.4230/LIPIcs.ICALP.2015.1 (doi.org responseCode 100) returns NOT_FOUND")
+    func m1Stage04UnregisteredDataCitePrefixDOIReturnsNotFoundViaDOIHandle() async throws {
         let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
         let firewall = CitationVerificationFirewall()
 
-        let dataCiteEntry = BibliographyEntry(
+        let unregisteredDataCiteEntry = BibliographyEntry(
             citeKey: "lipics_icalp_2015",
             kind: .inproceedings,
             title: "ICALP 2015 Frontmatter",
@@ -2063,19 +2063,59 @@ struct BibCSLAndFirewallTests {
             doi: "10.4230/LIPIcs.ICALP.2015.1"
         )
 
-        let verdict = await firewall.verifyAgainstPublicRegistries(entry: dataCiteEntry, session: replay)
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: unregisteredDataCiteEntry, session: replay)
+        #expect(verdict.firewallClass == .notFound)
+        #expect(verdict.insertable == false)
+        #expect(!verdict.reasons.contains("not_found_in_registries"))
+        #expect(verdict.reasons == ["doi_not_registered"])
+        #expect(verdict.auditNote.contains("doi.org"))
+        #expect(verdict.auditNote.contains("not registered"))
+        #expect(verdict.sources.count == 4)
+        #expect(verdict.sources.contains {
+            $0.source == "doi.org"
+                && $0.url == "https://doi.org/api/handles/10.4230/lipics.icalp.2015.1"
+                && $0.status == 404
+        })
+        #expect(verdict.sources.contains {
+            $0.source == "Crossref" && $0.url.contains("query.bibliographic=") && $0.status == 200
+        })
+    }
+
+    @Test("M1 item 3 (Stage 04): real CNKI/ISTIC-registered DOI missing from Crossref and OpenAlex returns UNVERIFIED with registered_no_metadata")
+    func m1Stage04DataCiteRegisteredDOIWithoutMetadataReturnsUnverifiedRegisteredNoMetadata() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let registeredNoMetadataEntry = BibliographyEntry(
+            citeKey: "yang2024jos",
+            kind: .article,
+            title: "Deep Learning Based Code Generation Methods: Literature Review",
+            authors: [
+                BibAuthor(givenName: "Zezhou", familyName: "Yang"),
+                BibAuthor(givenName: "Sirong", familyName: "Chen"),
+                BibAuthor(givenName: "Cuiyun", familyName: "Gao"),
+                BibAuthor(givenName: "Zhenhao", familyName: "Li"),
+                BibAuthor(givenName: "Ge", familyName: "Li"),
+                BibAuthor(givenName: "Michael", familyName: "Lyu")
+            ],
+            year: 2024,
+            venue: "Journal of Software",
+            doi: "10.13328/j.cnki.jos.006981"
+        )
+
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: registeredNoMetadataEntry, session: replay)
         #expect(verdict.firewallClass == .unverified)
         #expect(verdict.insertable == false)
         #expect(verdict.reasons == [CitationUnverifiedReasonCode.registeredNoMetadata.rawValue])
         #expect(verdict.sources.count == 3)
         #expect(verdict.sources.contains {
             $0.source == "doi.org"
-                && $0.url == "https://doi.org/api/handles/10.4230/lipics.icalp.2015.1"
+                && $0.url == "https://doi.org/api/handles/10.13328/j.cnki.jos.006981"
                 && $0.status == 200
         })
     }
 
-    @Test("M1 item 1 & 3 (Stage 04): injected doi.org disconnect, timeout, 500, 429, and corrupt JSON return UNVERIFIED and never NOT_FOUND")
+    @Test("M1 item 1 & 3 (Stage 04): injected doi.org disconnect, timeout, 500, 503, handle error code 2, 429, and corrupt JSON return UNVERIFIED and never NOT_FOUND")
     func m1Stage04InjectedDOIHandleFailuresReturnUnverifiedNeverNotFound() async throws {
         let firewall = CitationVerificationFirewall()
         let entry = BibliographyEntry(
@@ -2107,6 +2147,18 @@ struct BibCSLAndFirewallTests {
                 }
                 return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
             }),
+            ("server_error", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 503, body: Data("service unavailable".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("server_error", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 200, body: Data("{\"responseCode\":2,\"handle\":\"10.1038/probe.2024.99999\"}".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
             ("rate_limited", { req in
                 if req.url?.host == "doi.org" {
                     return RegistryHTTPResponse(statusCode: 429, body: Data("slow down".utf8))
@@ -2116,6 +2168,12 @@ struct BibCSLAndFirewallTests {
             ("unparseable", { req in
                 if req.url?.host == "doi.org" {
                     return RegistryHTTPResponse(statusCode: 404, body: Data("plain text 404 without handle json".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("unparseable", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 200, body: Data("{corrupt-json".utf8))
                 }
                 return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
             })
