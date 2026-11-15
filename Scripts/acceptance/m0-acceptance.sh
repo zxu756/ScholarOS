@@ -299,7 +299,7 @@ run_named_unit_test() {
     scholaros init --project "$KAPPA_PROJ" --seed-demo >/dev/null
     PRISMA_JSON="$(scholaros prisma-stats --project "$KAPPA_PROJ")"
     MCP_KAPPA_REQ="$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"scholar_prisma_agreement","arguments":{"projectPath":"%s"}}}\n' "$KAPPA_PROJ")"
-    MCP_KAPPA_RAW="$(printf '%s\n' "$MCP_KAPPA_REQ" | scholaros mcp --project "$KAPPA_PROJ")"
+    MCP_KAPPA_RAW="$(printf '%s\n' "$MCP_KAPPA_REQ" | scholaros mcp --project "$KAPPA_PROJ" --offline)"
     KAPPA_CHECK="$(python3 - "$PRISMA_JSON" "$MCP_KAPPA_RAW" <<'PY'
 import json, re, sys
 prisma = json.loads(sys.argv[1])
@@ -323,7 +323,7 @@ PY
     # Row 8: MCP invalid JSON -> -32700 and unknown method -> -32601
     # ------------------------------------------------------------------
     echo "== [Row 8] MCP invalid JSON (-32700) & unknown method (-32601) =="
-    MCP_ERR_OUT="$(printf '%s\n%s\n' '{invalid_json' '{"jsonrpc":"2.0","id":99,"method":"scholar/nonexistent_method","params":{}}' | scholaros mcp)"
+    MCP_ERR_OUT="$(printf '%s\n%s\n' '{invalid_json' '{"jsonrpc":"2.0","id":99,"method":"scholar/nonexistent_method","params":{}}' | scholaros mcp --offline)"
     echo "$MCP_ERR_OUT"
     python3 - "$MCP_ERR_OUT" <<'PY'
 import json, sys
