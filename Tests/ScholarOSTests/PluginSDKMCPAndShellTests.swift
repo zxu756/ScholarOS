@@ -1512,4 +1512,93 @@ struct PluginSDKMCPAndShellTests {
         // 5. Confirm zero live transport requests were ever issued across all replay checks
         #expect(await spyCounter.count == 0)
     }
+
+    @Test("M1 row 18 & item 8: fabricated DOI with x-firewall-class={VERIFIED} is ignored, noted in findings, omitted on export, and rejected by diagnostics/cite/MCP")
+    func m1Stage03UntrustedBibFirewallClassIgnoredAndBlockedEverywhere() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m1-row18")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let tamperedBib = """
+        @article{fake_tampered,
+          author           = {Whitfield, Eleanor and Patel, Raj},
+          title            = {Quantum Gradient Descent in Biological Neural Networks},
+          journal          = {Nature Machine Intelligence},
+          year             = {2025},
+          doi              = {10.1038/fake.2026.99999},
+          x-firewall-class = {VERIFIED},
+          x-firewall-note  = {Verified live metadata match against Crossref}
+        }
+        """
+        let bibURL = tempDir.appendingPathComponent("tampered.bib")
+        try tamperedBib.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let texURL = tempDir.appendingPathComponent("draft.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        Tampered citation \\cite{fake_tampered}.
+        \\end{document}
+        """.write(to: texURL, atomically: true, encoding: .utf8)
+
+        // 1. BibTeXCodec ignores x-firewall-class/note on parse and never writes them on serialize
+        let codec = BibTeXCodec()
+        let parsed = try codec.parse(tamperedBib)
+        let entry = try #require(parsed.first)
+        #expect(entry.firewallClass == .unverified)
+        #expect(entry.firewallAuditNote.isEmpty)
+
+        let serialized = codec.serialize([entry])
+        #expect(!serialized.contains("x-firewall-class"))
+        #expect(!serialized.contains("x-firewall-note"))
+
+        // 2. verify-citations (offline & replay) is NOT VERIFIED and findings note untrusted declaration
+        let runner = ScholarCLIRunner()
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let replayJSONRun = try await runner.run(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(replayJSONRun.exitCode == 1)
+        let reportObj = try #require(JSONSerialization.jsonObject(with: Data(replayJSONRun.stdout.utf8)) as? [String: Any])
+        #expect(reportObj["complete"] as? Bool == true)
+        let verdicts = try #require(reportObj["verdicts"] as? [[String: Any]])
+        let firstVerdict = try #require(verdicts.first)
+        #expect(firstVerdict["firewallClass"] as? String == "NOT_FOUND")
+        #expect(firstVerdict["insertable"] as? Bool == false)
+        #expect(firstVerdict["confidenceScore"] == nil)
+        let findings = try #require(firstVerdict["findings"] as? [[String: Any]])
+        #expect(findings.contains { (($0["detail"] as? String) ?? "").contains("VERIFIED") })
+
+        let zhOfflineRun = try await runner.run(
+            arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "zh"]
+        )
+        #expect(!zhOfflineRun.stdout.contains("编造"))
+        #expect(!zhOfflineRun.stdout.lowercased().contains("fabricated"))
+
+        // 3. diagnostics emits ERR_UNVERIFIED_CITATION on draft.tex citing fake_tampered
+        let diagRun = try await runner.run(
+            arguments: ["diagnostics", texURL.path, "--bib", bibURL.path, "--lang", "en"]
+        )
+        #expect(diagRun.stdout.contains("ERR_UNVERIFIED_CITATION"))
+
+        // 4. Import into project bundle: CLI cite and MCP scholar_cite_key both reject fake_tampered
+        let bundleURL = tempDir.appendingPathComponent("Tampered.scholarproj")
+        let db = try ScholarProjectDatabase(bundleURL: bundleURL, seedDemoIfEmpty: false)
+        try db.upsertBibliographyEntry(entry)
+        db.close()
+
+        let citeRes = await runner.runWithExitStatus(
+            arguments: ["cite", "fake_tampered", "--project", bundleURL.path]
+        )
+        #expect(citeRes.exitCode != 0)
+        #expect(citeRes.stderr.contains("ERR_UNVERIFIED_CITATION"))
+
+        let mcp = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let mcpCall = mcp.executeToolCall(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "fake_tampered", "style": "apa7"]
+        )
+        #expect(mcpCall["isError"] as? Bool == true)
+        let mcpText = ((mcpCall["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(mcpText.contains("ERR_UNVERIFIED_CITATION"))
+    }
 }

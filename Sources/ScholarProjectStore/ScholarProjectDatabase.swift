@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import ScholarBibAndCSL
 import ScholarModels
 
 // MARK: - Persistent Store Domain Records
@@ -322,6 +323,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     public let connection: ScholarSQLiteWALConnection
 
     private let lock = NSRecursiveLock()
+    private var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
 
     public convenience init(
         bundleURL: URL,
@@ -997,6 +999,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                     updatedAt
                 ]
             )
+            inRunVerdictsByKey.removeValue(forKey: entry.citeKey)
         }
     }
 
@@ -1057,6 +1060,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     @discardableResult
     public func deleteBibliographyEntry(citeKey: String) throws -> Bool {
         try withLock {
+            inRunVerdictsByKey.removeValue(forKey: citeKey)
             let changes = try connection.execute(
                 "DELETE FROM bibliography_entries WHERE cite_key = ?;",
                 bindings: [citeKey]
@@ -1072,6 +1076,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         updatedAt: Date = Date()
     ) throws {
         try withLock {
+            inRunVerdictsByKey.removeValue(forKey: citeKey)
             let changes = try connection.execute(
                 """
                 UPDATE bibliography_entries
@@ -1086,27 +1091,45 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         }
     }
 
-    /// Citation Firewall check: blocks unverified, retracted, or not-found citeKeys.
+    /// Records a verdict computed in the current process run. Never persisted as trust across restarts.
+    public func recordInRunVerdict(_ verdict: CitationFirewallEntryVerdict) {
+        withLock {
+            inRunVerdictsByKey[verdict.citeKey] = verdict
+        }
+    }
+
+    /// Records a batch of verdicts computed in the current process run.
+    public func recordInRunVerdicts(_ verdicts: [CitationFirewallEntryVerdict]) {
+        withLock {
+            for verdict in verdicts {
+                inRunVerdictsByKey[verdict.citeKey] = verdict
+            }
+        }
+    }
+
+    public func inRunVerdicts() -> [String: CitationFirewallEntryVerdict] {
+        withLock {
+            inRunVerdictsByKey
+        }
+    }
+
+    /// Citation Firewall check: only trusts verdicts computed in this run; stored `firewall_class` on disk is ignored.
     @discardableResult
     public func validateCitationKeyForInsertion(_ citeKey: String) throws -> BibliographyEntry {
         try withLock {
-            guard let entry = try bibliographyEntry(citeKey: citeKey) else {
+            let trimmed = citeKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let entry = try bibliographyEntry(citeKey: trimmed) else {
                 throw ScholarOSError.unverifiedCitationBlocked(
-                    citeKey: citeKey,
+                    citeKey: trimmed,
                     statusCode: "MISSING_BIB_ENTRY",
-                    reason: "Cite key '\(citeKey)' is absent from the verified project bibliography."
+                    reason: "Cite key '\(trimmed)' is absent from the project bibliography."
                 )
             }
-            guard entry.firewallClass.allowsManuscriptInsertion else {
-                throw ScholarOSError.unverifiedCitationBlocked(
-                    citeKey: entry.citeKey,
-                    statusCode: entry.firewallClass.rawValue,
-                    reason: entry.firewallAuditNote.isEmpty
-                        ? "Blocked by 5-class Citation Verification Firewall (\(entry.firewallClass.badgeTitle))."
-                        : entry.firewallAuditNote
-                )
-            }
-            return entry
+            return try CitationVerificationFirewall().assertCitationAllowed(
+                citeKey: trimmed,
+                in: [entry.citeKey: entry],
+                verifiedVerdicts: inRunVerdictsByKey
+            )
         }
     }
 
@@ -2758,7 +2781,7 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 doi: "10.9999/fake-llm-cite.9999",
                 abstractText: "Fabricated placeholder abstract produced by an unguarded LLM agent attempting to justify unsupported zero-latency claims.",
                 firewallClass: .notFound,
-                firewallAuditNote: "Demo synthetic fabricated citation - placeholder DOI prefix 10.9999 (unverified).",
+                firewallAuditNote: "Demo synthetic placeholder citation - placeholder DOI prefix 10.9999 (unverified).",
                 attachedPDFPath: nil,
                 citedByKeys: [],
                 referencesKeys: []

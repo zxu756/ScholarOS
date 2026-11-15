@@ -24,6 +24,91 @@ public enum FirewallFindingCode: String, Sendable, Codable, Hashable, CaseIterab
     case registryVerifiedMatch = "FW_REGISTRY_VERIFIED"
     case registryLookupNotFound = "FW_REGISTRY_NOT_FOUND"
     case registryTransportUnavailable = "FW_REGISTRY_OFFLINE"
+    case untrustedEmbeddedFirewallTag = "FW_UNTRUSTED_FILE_TAG"
+}
+
+/// Closed set of allowed `UNVERIFIED` reason codes defined in M1 item 1.
+public enum CitationUnverifiedReasonCode: String, Sendable, Codable, Hashable, CaseIterable {
+    case offline = "offline"
+    case transportError = "transport_error"
+    case timeout = "timeout"
+    case rateLimited = "rate_limited"
+    case serverError = "server_error"
+    case budgetExhausted = "budget_exhausted"
+    case unparseable = "unparseable"
+    case ambiguous = "ambiguous"
+    case registeredNoMetadata = "registered_no_metadata"
+    case noMatchInSearch = "no_match_in_search"
+}
+
+/// Per-request provenance record stored in `CitationFirewallEntryVerdict.sources`.
+public struct CitationVerdictSourceRecord: Sendable, Codable, Hashable {
+    public let source: String
+    public let url: String
+    public let status: Int?
+    public let fetchedAt: String
+    public let origin: CitationVerdictSourceOrigin
+
+    public init(
+        source: String,
+        url: String,
+        status: Int?,
+        fetchedAt: String,
+        origin: CitationVerdictSourceOrigin
+    ) {
+        self.source = source
+        self.url = url
+        self.status = status
+        self.fetchedAt = fetchedAt
+        self.origin = origin
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case source
+        case url
+        case status
+        case fetchedAt
+        case origin
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(source, forKey: .source)
+        try container.encode(url, forKey: .url)
+        if let status {
+            try container.encode(status, forKey: .status)
+        } else {
+            try container.encodeNil(forKey: .status)
+        }
+        try container.encode(fetchedAt, forKey: .fetchedAt)
+        try container.encode(origin, forKey: .origin)
+    }
+}
+
+/// Per-field discrepancy between local bibliography entry and retrieved registry metadata.
+public struct CitationFieldDiscrepancy: Sendable, Codable, Hashable {
+    public let field: String
+    public let localValue: String
+    public let remoteValue: String
+    public let source: String
+    public let severity: String
+    public let note: String?
+
+    public init(
+        field: String,
+        localValue: String,
+        remoteValue: String,
+        source: String,
+        severity: String = "error",
+        note: String? = nil
+    ) {
+        self.field = field
+        self.localValue = localValue
+        self.remoteValue = remoteValue
+        self.source = source
+        self.severity = severity
+        self.note = note
+    }
 }
 
 public struct FirewallFinding: Sendable, Codable, Hashable {
@@ -56,25 +141,46 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
     public var id: String { citeKey }
     public let citeKey: String
     public let firewallClass: CitationFirewallClass
-    public let allowsManuscriptInsertion: Bool
-    public let confidenceScore: Double
+    public let insertable: Bool
+    public let reasons: [String]
+    public let sources: [CitationVerdictSourceRecord]
+    public let fields: [CitationFieldDiscrepancy]
     public let findings: [FirewallFinding]
     public let auditNote: String
     public let auditedEntry: BibliographyEntry
 
+    /// Convenience alias matching `insertable` (not encoded separately in JSON).
+    public var allowsManuscriptInsertion: Bool { insertable }
+
+    private enum CodingKeys: String, CodingKey {
+        case citeKey
+        case firewallClass
+        case insertable
+        case reasons
+        case sources
+        case fields
+        case findings
+        case auditNote
+        case auditedEntry
+    }
+
     public init(
         citeKey: String,
         firewallClass: CitationFirewallClass,
-        allowsManuscriptInsertion: Bool,
-        confidenceScore: Double,
+        insertable: Bool,
+        reasons: [String] = [],
+        sources: [CitationVerdictSourceRecord] = [],
+        fields: [CitationFieldDiscrepancy] = [],
         findings: [FirewallFinding],
         auditNote: String,
         auditedEntry: BibliographyEntry
     ) {
         self.citeKey = citeKey
         self.firewallClass = firewallClass
-        self.allowsManuscriptInsertion = allowsManuscriptInsertion
-        self.confidenceScore = confidenceScore
+        self.insertable = insertable
+        self.reasons = reasons
+        self.sources = sources
+        self.fields = fields
         self.findings = findings
         self.auditNote = auditNote
         self.auditedEntry = auditedEntry
@@ -83,12 +189,14 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
 
 public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     public let generatedAtISO8601: String
+    public let complete: Bool
     public let totalEvaluated: Int
     public let verifiedCount: Int
     public let driftCount: Int
     public let notFoundCount: Int
     public let retractedCount: Int
     public let unverifiedCount: Int
+    public let unverifiedByReason: [String: Int]
     public let manuscriptInsertionAllowedCount: Int
     public let insertionPassRate: Double
     public let verdicts: [CitationFirewallEntryVerdict]
@@ -98,12 +206,14 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
 
     public init(
         generatedAtISO8601: String,
+        complete: Bool? = nil,
         totalEvaluated: Int,
         verifiedCount: Int,
         driftCount: Int,
         notFoundCount: Int,
         retractedCount: Int,
         unverifiedCount: Int,
+        unverifiedByReason: [String: Int] = [:],
         manuscriptInsertionAllowedCount: Int,
         insertionPassRate: Double,
         verdicts: [CitationFirewallEntryVerdict],
@@ -112,20 +222,24 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
         unverifiedCiteKeys: [String]
     ) {
         self.generatedAtISO8601 = generatedAtISO8601
+        self.complete = complete ?? (unverifiedCount == 0)
         self.totalEvaluated = totalEvaluated
         self.verifiedCount = verifiedCount
         self.driftCount = driftCount
         self.notFoundCount = notFoundCount
         self.retractedCount = retractedCount
         self.unverifiedCount = unverifiedCount
+        self.unverifiedByReason = unverifiedByReason
         self.manuscriptInsertionAllowedCount = manuscriptInsertionAllowedCount
         self.insertionPassRate = insertionPassRate
         self.verdicts = verdicts
         self.auditedEntries = auditedEntries
-        self.blockedCiteKeys = blockedCiteKeys
+        self.blockedCiteKeys = blockedKeys(from: blockedCiteKeys)
         self.unverifiedCiteKeys = unverifiedCiteKeys
     }
 }
+
+private func blockedKeys(from keys: [String]) -> [String] { keys }
 
 // MARK: - Cryptographic & Structural Identifier Checksum Validators (ISO DOI, arXiv, PMID, ORCID, ISSN)
 
@@ -571,50 +685,61 @@ public struct CitationVerificationFirewall: Sendable {
     // MARK: - Offline Deterministic Structural & Built-in Retraction Hint Evaluation
 
     /// Evaluates `entry` offline without querying external registries.
-    /// Offline evaluation NEVER returns `.verified`; syntactically valid identifiers receive `.unverified`.
+    /// Per M1 item 4 (S41), offline evaluation ONLY returns `.notFound` (`invalid_identifier`),
+    /// `.retracted` (`retracted_builtin_list`), or `.unverified` (`offline`).
+    /// Sentinel prefixes, placeholder authors, ORCID checksum failures, and year bounds emit `findings` only.
     public func evaluate(_ entry: BibliographyEntry) -> CitationFirewallEntryVerdict {
         var findings: [FirewallFinding] = []
-        var hasRetractedMatch = false
-        var hasStructuralOrSentinelBlock = false
+        var hasBuiltInRetractedDOI = false
+        var hasInvalidIdentifierSyntax = false
         var hasSyntacticallyValidPID = false
 
-        // 1. Title sentinel & explicit retraction prefix check
+        // 0. Record untrusted embedded x-firewall-class from .bib if present (M1 item 8 / S42)
+        if let declared = nonEmpty(entry.untrustedDeclaredFirewallClass) {
+            findings.append(
+                FirewallFinding(
+                    code: .untrustedEmbeddedFirewallTag,
+                    severity: .warning,
+                    field: "x-firewall-class",
+                    detail: "File declared x-firewall-class '\(declared)', \(CitationAuditWording.untrustedFileClassMarker)."
+                )
+            )
+        }
+
+        // 1. Title sentinel & explicit retraction prefix hint (findings only in offline mode)
         let trimmedTitle = entry.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerTitle = trimmedTitle.lowercased()
 
         if trimmedTitle.isEmpty || lowerTitle == "untitled" || lowerTitle == "tbd" || lowerTitle == "todo" {
-            hasStructuralOrSentinelBlock = true
             findings.append(
                 FirewallFinding(
                     code: .blockedPlaceholderSentinel,
-                    severity: .criticalBlock,
+                    severity: .warning,
                     field: "title",
                     detail: "Title '\(trimmedTitle)' is empty or an unverified placeholder."
                 )
             )
         } else if Self.sentinelTitlePhrases.contains(where: { lowerTitle.contains($0) }) {
-            hasStructuralOrSentinelBlock = true
             findings.append(
                 FirewallFinding(
                     code: .blockedPlaceholderSentinel,
-                    severity: .criticalBlock,
+                    severity: .warning,
                     field: "title",
-                    detail: "Title '\(trimmedTitle)' matches known placeholder/LLM sentinel text."
+                    detail: "Title '\(trimmedTitle)' matches placeholder sentinel text."
                 )
             )
         } else if lowerTitle.hasPrefix("retracted:") || lowerTitle.contains("[retracted]") || lowerTitle.hasPrefix("retraction:") {
-            hasRetractedMatch = true
             findings.append(
                 FirewallFinding(
                     code: .blockedRetractedWork,
-                    severity: .criticalBlock,
+                    severity: .warning,
                     field: "title",
-                    detail: "Title indicates a retracted publication ('\(trimmedTitle)') (\(CitationAuditWording.titleRetractionMarkerNotice))."
+                    detail: "Title carries a retraction marker ('\(trimmedTitle)') (\(CitationAuditWording.titleRetractionMarkerNotice))."
                 )
             )
         }
 
-        // 2. Author plausibility & ORCID ISO 7064 Mod 11-2 check-digit validation
+        // 2. Author plausibility & ORCID ISO 7064 Mod 11-2 check-digit validation (findings only)
         if entry.authors.isEmpty {
             findings.append(
                 FirewallFinding(
@@ -630,11 +755,10 @@ public struct CitationVerificationFirewall: Sendable {
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                     .lowercased()
                 if Self.suspiciousFakeAuthorFullNames.contains(fullName) {
-                    hasStructuralOrSentinelBlock = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedPlaceholderSentinel,
-                            severity: .criticalBlock,
+                            severity: .warning,
                             field: "authors",
                             detail: "Author '\(author.description)' matches placeholder sentinel identity."
                         )
@@ -652,11 +776,10 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     } else {
-                        hasStructuralOrSentinelBlock = true
                         findings.append(
                             FirewallFinding(
                                 code: .invalidORCIDChecksum,
-                                severity: .criticalBlock,
+                                severity: .warning,
                                 field: "authors.orcid",
                                 detail: orcidCheck.reason ?? "Invalid ORCID checksum."
                             )
@@ -666,14 +789,13 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
-        // 3. Publication year plausibility check
+        // 3. Publication year plausibility check (findings only)
         if let year = entry.year {
             if year < minAllowedPublicationYear || year > maxAllowedPublicationYear {
-                hasStructuralOrSentinelBlock = true
                 findings.append(
                     FirewallFinding(
                         code: .implausiblePublicationYear,
-                        severity: .criticalBlock,
+                        severity: .warning,
                         field: "year",
                         detail: "Publication year \(year) falls outside plausible scholarly bounds (\(minAllowedPublicationYear)..\(maxAllowedPublicationYear))."
                     )
@@ -690,11 +812,11 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        // 4. DOI validation, sentinel check & built-in offline retraction hint list lookup
+        // 4. DOI syntax validation, sentinel hint & built-in offline retraction hint list lookup
         if let rawDOI = nonEmpty(entry.doi) {
             let doiCheck = ScholarlyIdentifierValidator.validateDOISyntax(rawDOI)
             if !doiCheck.isValid {
-                hasStructuralOrSentinelBlock = true
+                hasInvalidIdentifierSyntax = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidDOISyntax,
@@ -706,23 +828,13 @@ public struct CitationVerificationFirewall: Sendable {
             } else {
                 let normDOI = doiCheck.normalized
                 if retractedDOIs.contains(normDOI) {
-                    hasRetractedMatch = true
+                    hasBuiltInRetractedDOI = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedRetractedWork,
                             severity: .criticalBlock,
                             field: "doi",
                             detail: "DOI '\(normDOI)' matched the built-in retraction hint list (\(CitationAuditWording.builtInRetractionListNotice))."
-                        )
-                    )
-                } else if isPlaceholderSentinelDOI(normDOI) {
-                    hasStructuralOrSentinelBlock = true
-                    findings.append(
-                        FirewallFinding(
-                            code: .blockedPlaceholderSentinel,
-                            severity: .criticalBlock,
-                            field: "doi",
-                            detail: "DOI '\(normDOI)' is a known test/dummy/LLM placeholder sentinel."
                         )
                     )
                 } else if normDOI.hasPrefix("10.48550/arxiv.") {
@@ -742,7 +854,7 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     } else {
-                        hasStructuralOrSentinelBlock = true
+                        hasInvalidIdentifierSyntax = true
                         findings.append(
                             FirewallFinding(
                                 code: .invalidArXivCalendarBounds,
@@ -752,37 +864,48 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     }
-                } else if normDOI.hasPrefix("10.5555/") {
-                    findings.append(
-                        FirewallFinding(
-                            code: .validCanonicalDOI,
-                            severity: .warning,
-                            field: "doi",
-                            detail: "DOI '\(normDOI)' uses the Crossref test prefix '10.5555/', which does not resolve."
-                        )
-                    )
                 } else {
                     hasSyntacticallyValidPID = true
-                    findings.append(
-                        FirewallFinding(
-                            code: .validCanonicalDOI,
-                            severity: .pass,
-                            field: "doi",
-                            detail: "DOI '\(normDOI)' has valid ISO 26324 syntax."
+                    if isPlaceholderSentinelDOI(normDOI) {
+                        findings.append(
+                            FirewallFinding(
+                                code: .blockedPlaceholderSentinel,
+                                severity: .warning,
+                                field: "doi",
+                                detail: "DOI '\(normDOI)' uses a test/dummy/placeholder sentinel pattern."
+                            )
                         )
-                    )
+                    } else if normDOI.hasPrefix("10.5555/") {
+                        findings.append(
+                            FirewallFinding(
+                                code: .validCanonicalDOI,
+                                severity: .warning,
+                                field: "doi",
+                                detail: "DOI '\(normDOI)' uses the Crossref test prefix '10.5555/', which does not resolve."
+                            )
+                        )
+                    } else {
+                        findings.append(
+                            FirewallFinding(
+                                code: .validCanonicalDOI,
+                                severity: .pass,
+                                field: "doi",
+                                detail: "DOI '\(normDOI)' has valid ISO 26324 syntax."
+                            )
+                        )
+                    }
                 }
             }
         }
 
-        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> NOT_FOUND!)
+        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> NOT_FOUND `invalid_identifier`)
         if let rawArXiv = nonEmpty(entry.arxivID) {
             let arxivCheck = ScholarlyIdentifierValidator.validateArXivID(
                 rawArXiv,
                 maxYear: maxAllowedPublicationYear
             )
             if !arxivCheck.isValid {
-                hasStructuralOrSentinelBlock = true
+                hasInvalidIdentifierSyntax = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidArXivCalendarBounds,
@@ -821,7 +944,7 @@ public struct CitationVerificationFirewall: Sendable {
         if let rawPMID = nonEmpty(entry.pmid) {
             let pmidCheck = ScholarlyIdentifierValidator.validatePMID(rawPMID)
             if !pmidCheck.isValid {
-                hasStructuralOrSentinelBlock = true
+                hasInvalidIdentifierSyntax = true
                 findings.append(
                     FirewallFinding(
                         code: .invalidPMIDBounds,
@@ -857,19 +980,19 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        // 8. Determine Offline Verdict (NEVER `.verified` or `.drift`)
+        // 8. Determine Offline Verdict (ONLY `.retracted`, `.notFound` on invalid syntax, or `.unverified`)
         let finalClass: CitationFirewallClass
-        let confidence: Double
+        let reasons: [String]
 
-        if hasRetractedMatch {
+        if hasBuiltInRetractedDOI {
             finalClass = .retracted
-            confidence = 0.95
-        } else if hasStructuralOrSentinelBlock {
+            reasons = ["retracted_builtin_list"]
+        } else if hasInvalidIdentifierSyntax {
             finalClass = .notFound
-            confidence = 0.98
+            reasons = ["invalid_identifier"]
         } else {
             finalClass = .unverified
-            confidence = hasSyntacticallyValidPID ? 0.40 : 0.25
+            reasons = [CitationUnverifiedReasonCode.offline.rawValue]
             if !hasSyntacticallyValidPID && nonEmpty(entry.doi) == nil {
                 findings.append(
                     FirewallFinding(
@@ -882,9 +1005,6 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
-        // Finding details state facts about the entry only. The statement that no registry was consulted
-        // belongs to this no-lookup verdict as a whole, so it is appended here and nowhere else: the online
-        // path reuses the findings above and must not inherit a "not checked" sentence.
         var summaryNote = summarizeFindings(findings, assignedClass: finalClass)
         if finalClass == .unverified {
             summaryNote += " " + CitationAuditWording.notCheckedAgainstRegistry
@@ -896,8 +1016,10 @@ public struct CitationVerificationFirewall: Sendable {
         return CitationFirewallEntryVerdict(
             citeKey: entry.citeKey,
             firewallClass: finalClass,
-            allowsManuscriptInsertion: finalClass.allowsManuscriptInsertion,
-            confidenceScore: confidence,
+            insertable: false,
+            reasons: reasons,
+            sources: [],
+            fields: [],
             findings: findings,
             auditNote: summaryNote,
             auditedEntry: updatedEntry
@@ -918,12 +1040,13 @@ public struct CitationVerificationFirewall: Sendable {
         var notFoundCount = 0
         var retractedCount = 0
         var unverifiedCount = 0
+        var unverifiedByReason: [String: Int] = [:]
         var allowedCount = 0
         var blockedKeys: [String] = []
         var unverifiedKeys: [String] = []
 
         for v in verdicts {
-            if v.allowsManuscriptInsertion {
+            if v.insertable && v.firewallClass == .verified {
                 allowedCount += 1
             }
             switch v.firewallClass {
@@ -941,6 +1064,10 @@ public struct CitationVerificationFirewall: Sendable {
             case .unverified:
                 unverifiedCount += 1
                 unverifiedKeys.append(v.citeKey)
+                let effectiveReasons = v.reasons.isEmpty ? [CitationUnverifiedReasonCode.offline.rawValue] : v.reasons
+                for code in effectiveReasons {
+                    unverifiedByReason[code, default: 0] += 1
+                }
             }
         }
 
@@ -949,12 +1076,14 @@ public struct CitationVerificationFirewall: Sendable {
 
         return CitationFirewallAuditReport(
             generatedAtISO8601: timestamp,
+            complete: unverifiedCount == 0,
             totalEvaluated: verdicts.count,
             verifiedCount: verifiedCount,
             driftCount: driftCount,
             notFoundCount: notFoundCount,
             retractedCount: retractedCount,
             unverifiedCount: unverifiedCount,
+            unverifiedByReason: unverifiedByReason,
             manuscriptInsertionAllowedCount: allowedCount,
             insertionPassRate: passRate,
             verdicts: verdicts,
@@ -967,11 +1096,14 @@ public struct CitationVerificationFirewall: Sendable {
     // MARK: - Citation Insertion Assertion (`ERR_UNVERIFIED_CITATION`)
 
     /// Enforces ScholarOS's citation firewall policy for CLI, MCP, and manuscript exporters.
-    /// Throws `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`) whenever `citeKey` is missing or not `.verified`.
+    /// Per M1 item 8 (S42, S48), stored `entry.firewallClass` is NEVER trusted; only an in-run
+    /// `CitationFirewallEntryVerdict` with `firewallClass == .verified`, `insertable == true`,
+    /// and non-empty `sources` allows manuscript insertion.
     @discardableResult
     public func assertCitationAllowed(
         citeKey: String,
-        in library: [String: BibliographyEntry]
+        in library: [String: BibliographyEntry],
+        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:]
     ) throws -> BibliographyEntry {
         let trimmedKey = citeKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let entry = library[trimmedKey] else {
@@ -982,105 +1114,160 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        // Gate 1: Stored firewall classification must permit manuscript insertion (`.verified` only)
-        guard entry.firewallClass.allowsManuscriptInsertion else {
-            let reasonDetail: String
-            if !entry.firewallAuditNote.isEmpty {
-                reasonDetail = entry.firewallAuditNote
-            } else {
-                reasonDetail = "Entry status is \(entry.firewallClass.rawValue) and has not been verified against external registries."
-            }
+        let offlineCheck = evaluate(entry)
+        if offlineCheck.firewallClass == .notFound || offlineCheck.firewallClass == .retracted {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
-                statusCode: entry.firewallClass.rawValue,
-                reason: reasonDetail
+                statusCode: offlineCheck.firewallClass.rawValue,
+                reason: offlineCheck.auditNote
             )
         }
 
-        // Gate 2: Re-verify deterministic structural & retraction invariants so tampered `x-firewall-class` tags cannot smuggle invalid/retracted IDs
-        let liveVerdict = evaluate(entry)
-        if liveVerdict.firewallClass == .notFound || liveVerdict.firewallClass == .retracted {
+        guard let inRunVerdict = verifiedVerdicts[trimmedKey] else {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
-                statusCode: liveVerdict.firewallClass.rawValue,
-                reason: liveVerdict.auditNote
+                statusCode: offlineCheck.firewallClass.rawValue,
+                reason: "Entry '\(entry.citeKey)' has not been verified in this run (\(offlineCheck.firewallClass.rawValue)); stored firewall status is not trusted."
             )
         }
 
-        return entry
+        guard inRunVerdict.citeKey == entry.citeKey,
+              inRunVerdict.firewallClass == .verified,
+              inRunVerdict.insertable,
+              !inRunVerdict.sources.isEmpty else {
+            throw ScholarOSError.unverifiedCitationBlocked(
+                citeKey: entry.citeKey,
+                statusCode: inRunVerdict.firewallClass.rawValue,
+                reason: inRunVerdict.auditNote
+            )
+        }
+
+        return inRunVerdict.auditedEntry
     }
 
     /// Validates a list of cited keys in manuscript order, throwing `ERR_UNVERIFIED_CITATION` on the first disallowed key.
     public func assertAllCitationsAllowed(
         citeKeys: [String],
-        in library: [String: BibliographyEntry]
+        in library: [String: BibliographyEntry],
+        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:]
     ) throws -> [BibliographyEntry] {
         try citeKeys.map { key in
-            try assertCitationAllowed(citeKey: key, in: library)
+            try assertCitationAllowed(citeKey: key, in: library, verifiedVerdicts: verifiedVerdicts)
         }
     }
 
     // MARK: - Async Live Public Registry Verification (Crossref / OpenAlex / arXiv)
 
     /// Resolves `entry` against Crossref, OpenAlex, or arXiv APIs via an injectable `CitationRegistrySession`.
-    /// Transport errors, rate limits (429), and server errors (5xx) ALWAYS yield `.unverified` — NEVER `.verified`.
+    /// Transport errors, timeouts, rate limits (429), server errors (5xx), and unparseable responses
+    /// ALWAYS yield `.unverified` with the corresponding reason code — NEVER `.verified` or `.notFound`.
     public func verifyAgainstPublicRegistries(
         entry: BibliographyEntry,
         session: any CitationRegistrySession = LiveURLSessionRegistryClient()
     ) async -> CitationFirewallEntryVerdict {
         let offlineVerdict = evaluate(entry)
-        if offlineVerdict.firewallClass == .retracted || offlineVerdict.firewallClass == .notFound {
+        if offlineVerdict.firewallClass == .notFound {
             return offlineVerdict
         }
 
+        let isBuiltInRetracted = (offlineVerdict.firewallClass == .retracted)
         var findings = offlineVerdict.findings
+        var sources: [CitationVerdictSourceRecord] = []
 
         // Path A: Resolve DOI via Crossref -> fallback to OpenAlex
         if let normDOI = ReferenceIdentifierNormalizer.normalizeDOI(entry.doi),
            !normDOI.hasPrefix("10.48550/arxiv.") {
             var crossrefReturned404 = false
             var openAlexReturned404 = false
+            var failureReasons: [CitationUnverifiedReasonCode] = []
 
             if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normDOI) {
                 do {
                     let response = try await session.send(URLRequest(url: crossrefURL))
-                    if response.statusCode == 404 {
+                    let fetchedAt = resolvedFetchedAt(from: response)
+                    let sourceRecord = CitationVerdictSourceRecord(
+                        source: "Crossref",
+                        url: crossrefURL.absoluteString,
+                        status: response.statusCode,
+                        fetchedAt: fetchedAt,
+                        origin: response.origin
+                    )
+                    sources.append(sourceRecord)
+
+                    if response.statusCode == 200 {
+                        switch parseCrossrefWorkPayload(response.body) {
+                        case .parsed(let remote):
+                            return reconcileRemoteRegistryMetadata(
+                                entry: entry,
+                                remote: remote,
+                                primarySource: sourceRecord,
+                                allSources: sources,
+                                existingFindings: findings,
+                                isBuiltInRetracted: isBuiltInRetracted
+                            )
+                        case .registeredNoMetadata:
+                            failureReasons.append(.registeredNoMetadata)
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "doi",
+                                    detail: "Crossref registered DOI '\(normDOI)' without title metadata."
+                                )
+                            )
+                        case .unparseable:
+                            failureReasons.append(.unparseable)
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "network",
+                                    detail: "Crossref payload for DOI '\(normDOI)' could not be parsed."
+                                )
+                            )
+                        }
+                    } else if response.statusCode == 404 {
                         crossrefReturned404 = true
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
                                 severity: .warning,
                                 field: "doi",
-                                detail: "Crossref returned 404 for DOI '\(normDOI)'; checking OpenAlex."
+                                detail: "Crossref reported DOI '\(normDOI)' not found (status 404); checking OpenAlex."
                             )
                         )
-                    } else if response.statusCode == 200,
-                              let remote = parseCrossrefWorkPayload(response.body) {
-                        return reconcileRemoteRegistryMetadata(
-                            entry: entry,
-                            remote: remote,
-                            baseClass: .verified,
-                            existingFindings: findings
-                        )
                     } else {
+                        let code = classifyHTTPFailureStatus(response.statusCode)
+                        failureReasons.append(code)
                         findings.append(
                             FirewallFinding(
                                 code: .registryTransportUnavailable,
                                 severity: .warning,
                                 field: "network",
-                                detail: "Crossref returned HTTP \(response.statusCode) or unparseable body for DOI '\(normDOI)'."
+                                detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: normDOI)
                             )
                         )
                     }
                 } catch is any FatalRegistrySessionError {
                     return offlineVerdict
                 } catch {
+                    let code = classifyThrownTransportError(error)
+                    failureReasons.append(code)
+                    sources.append(
+                        CitationVerdictSourceRecord(
+                            source: "Crossref",
+                            url: crossrefURL.absoluteString,
+                            status: nil,
+                            fetchedAt: currentISO8601Timestamp(),
+                            origin: .network
+                        )
+                    )
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: "Crossref unreachable (\(error.localizedDescription)); attempting OpenAlex fallback."
+                            detail: describeTransportError(source: "Crossref", code: code, error: error) + " Attempting OpenAlex fallback."
                         )
                     )
                 }
@@ -1089,61 +1276,145 @@ public struct CitationVerificationFirewall: Sendable {
             if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normDOI) {
                 do {
                     let response = try await session.send(URLRequest(url: openAlexURL))
-                    if response.statusCode == 404 {
+                    let fetchedAt = resolvedFetchedAt(from: response)
+                    let sourceRecord = CitationVerdictSourceRecord(
+                        source: "OpenAlex",
+                        url: openAlexURL.absoluteString,
+                        status: response.statusCode,
+                        fetchedAt: fetchedAt,
+                        origin: response.origin
+                    )
+                    sources.append(sourceRecord)
+
+                    if response.statusCode == 200 {
+                        switch parseOpenAlexWorkPayload(response.body) {
+                        case .parsed(let remote):
+                            return reconcileRemoteRegistryMetadata(
+                                entry: entry,
+                                remote: remote,
+                                primarySource: sourceRecord,
+                                allSources: sources,
+                                existingFindings: findings,
+                                isBuiltInRetracted: isBuiltInRetracted
+                            )
+                        case .registeredNoMetadata:
+                            failureReasons.append(.registeredNoMetadata)
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "doi",
+                                    detail: "OpenAlex registered DOI '\(normDOI)' without title metadata."
+                                )
+                            )
+                        case .unparseable:
+                            failureReasons.append(.unparseable)
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "network",
+                                    detail: "OpenAlex payload for DOI '\(normDOI)' could not be parsed."
+                                )
+                            )
+                        }
+                    } else if response.statusCode == 404 {
                         openAlexReturned404 = true
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
-                                severity: .criticalBlock,
+                                severity: .warning,
                                 field: "doi",
-                                detail: "OpenAlex confirmed 404 not found for DOI '\(normDOI)'."
+                                detail: "OpenAlex reported DOI '\(normDOI)' not found (status 404)."
                             )
                         )
-                    } else if response.statusCode == 200,
-                              let remote = parseOpenAlexWorkPayload(response.body) {
-                        return reconcileRemoteRegistryMetadata(
-                            entry: entry,
-                            remote: remote,
-                            baseClass: .verified,
-                            existingFindings: findings
-                        )
                     } else {
+                        let code = classifyHTTPFailureStatus(response.statusCode)
+                        failureReasons.append(code)
                         findings.append(
                             FirewallFinding(
                                 code: .registryTransportUnavailable,
                                 severity: .warning,
                                 field: "network",
-                                detail: "OpenAlex returned HTTP \(response.statusCode) or unparseable body for DOI '\(normDOI)'."
+                                detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: normDOI)
                             )
                         )
                     }
                 } catch is any FatalRegistrySessionError {
                     return offlineVerdict
                 } catch {
+                    let code = classifyThrownTransportError(error)
+                    failureReasons.append(code)
+                    sources.append(
+                        CitationVerdictSourceRecord(
+                            source: "OpenAlex",
+                            url: openAlexURL.absoluteString,
+                            status: nil,
+                            fetchedAt: currentISO8601Timestamp(),
+                            origin: .network
+                        )
+                    )
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: "OpenAlex unreachable (\(error.localizedDescription)); marking UNVERIFIED."
+                            detail: describeTransportError(source: "OpenAlex", code: code, error: error)
                         )
                     )
                 }
             }
 
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+
+            // Hard rule (M1 item 1): ANY failure prevents returning NOT_FOUND or VERIFIED.
+            if !failureReasons.isEmpty {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: deduplicatedReasons(failureReasons),
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+
             if crossrefReturned404 && openAlexReturned404 {
+                let notFoundNote = "[NOT_FOUND] Crossref and OpenAlex reported that DOI '\(normDOI)' does not exist."
+                findings.append(
+                    FirewallFinding(
+                        code: .registryLookupNotFound,
+                        severity: .criticalBlock,
+                        field: "doi",
+                        detail: "Crossref and OpenAlex reported that DOI '\(normDOI)' does not exist."
+                    )
+                )
                 return buildUpdatedVerdict(
                     for: entry,
                     assignedClass: .notFound,
-                    confidence: 0.98,
-                    findings: findings
+                    reasons: ["not_found_in_registries"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings,
+                    overrideNote: notFoundNote
                 )
             }
 
             return buildUpdatedVerdict(
                 for: entry,
                 assignedClass: .unverified,
-                confidence: 0.25,
+                reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
+                sources: sources,
+                fields: [],
                 findings: findings
             )
         }
@@ -1163,37 +1434,61 @@ public struct CitationVerificationFirewall: Sendable {
            let arxivURL = RegistryURLBuilder.arXivQueryURL(arXivID: arxivID) {
             do {
                 let response = try await session.send(URLRequest(url: arxivURL))
+                let fetchedAt = resolvedFetchedAt(from: response)
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "arXiv",
+                    url: arxivURL.absoluteString,
+                    status: response.statusCode,
+                    fetchedAt: fetchedAt,
+                    origin: response.origin
+                )
+                sources.append(sourceRecord)
+
                 if response.statusCode == 200 {
-                    if let remote = parseArXivAtomPayload(response.body) {
+                    switch parseArXivAtomPayload(response.body) {
+                    case .parsed(let remote):
                         return reconcileRemoteRegistryMetadata(
                             entry: entry,
                             remote: remote,
-                            baseClass: .verified,
-                            existingFindings: findings
+                            primarySource: sourceRecord,
+                            allSources: sources,
+                            existingFindings: findings,
+                            isBuiltInRetracted: isBuiltInRetracted
                         )
-                    } else if let xml = String(data: response.body, encoding: .utf8), xml.contains("<feed") {
+                    case .notFound:
                         findings.append(
                             FirewallFinding(
                                 code: .registryLookupNotFound,
                                 severity: .criticalBlock,
                                 field: "arxivID",
-                                detail: "arXiv API returned no matching preprint entry for 'arXiv:\(arxivID)'."
+                                detail: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
                             )
                         )
                         return buildUpdatedVerdict(
                             for: entry,
                             assignedClass: .notFound,
-                            confidence: 0.96,
-                            findings: findings
+                            reasons: ["not_found_in_registries"],
+                            sources: sources,
+                            fields: [],
+                            findings: findings,
+                            overrideNote: "[NOT_FOUND] arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
                         )
-                    } else {
+                    case .unparseable:
                         findings.append(
                             FirewallFinding(
                                 code: .registryTransportUnavailable,
                                 severity: .warning,
                                 field: "network",
-                                detail: "arXiv API returned unparseable HTTP 200 payload for 'arXiv:\(arxivID)'."
+                                detail: "arXiv payload for 'arXiv:\(arxivID)' could not be parsed."
                             )
+                        )
+                        return buildUpdatedVerdict(
+                            for: entry,
+                            assignedClass: .unverified,
+                            reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                            sources: sources,
+                            fields: [],
+                            findings: findings
                         )
                     }
                 } else if response.statusCode == 404 {
@@ -1202,266 +1497,1278 @@ public struct CitationVerificationFirewall: Sendable {
                             code: .registryLookupNotFound,
                             severity: .criticalBlock,
                             field: "arxivID",
-                            detail: "arXiv API returned 404 for 'arXiv:\(arxivID)'."
+                            detail: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist (status 404)."
                         )
                     )
                     return buildUpdatedVerdict(
                         for: entry,
                         assignedClass: .notFound,
-                        confidence: 0.96,
-                        findings: findings
+                        reasons: ["not_found_in_registries"],
+                        sources: sources,
+                        fields: [],
+                        findings: findings,
+                        overrideNote: "[NOT_FOUND] arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
                     )
                 } else {
+                    let code = classifyHTTPFailureStatus(response.statusCode)
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: "arXiv API returned HTTP \(response.statusCode) for 'arXiv:\(arxivID)'."
+                            detail: describeHTTPFailure(source: "arXiv", statusCode: response.statusCode, identifier: "arXiv:\(arxivID)")
                         )
+                    )
+                    return buildUpdatedVerdict(
+                        for: entry,
+                        assignedClass: .unverified,
+                        reasons: [code.rawValue],
+                        sources: sources,
+                        fields: [],
+                        findings: findings
                     )
                 }
             } catch is any FatalRegistrySessionError {
                 return offlineVerdict
             } catch {
+                let code = classifyThrownTransportError(error)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "arXiv",
+                        url: arxivURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
                 findings.append(
                     FirewallFinding(
                         code: .registryTransportUnavailable,
                         severity: .warning,
                         field: "network",
-                        detail: "arXiv API unreachable (\(error.localizedDescription)); marking UNVERIFIED."
+                        detail: describeTransportError(source: "arXiv", code: code, error: error)
                     )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [code.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
                 )
             }
         }
 
-        return buildUpdatedVerdict(
-            for: entry,
-            assignedClass: .unverified,
-            confidence: 0.25,
-            findings: findings
+        // Entries without a DOI/arXiv lookup path in Stage 03 remain UNVERIFIED with reason `offline`.
+        return offlineVerdict
+    }
+
+    // MARK: - Deterministic Field Comparison Rules (M1 Item 2: S36, S37, S38, S50)
+
+    struct RemoteWorkRecord: Sendable {
+        let sourceName: String
+        let title: String
+        let firstAuthorDisplay: String?
+        let firstAuthorSurname: String?
+        let firstAuthorIsCorporate: Bool
+        let authorSurnames: [String]
+        let publicationYears: [Int]
+        let venues: [String]
+        let retractionField: String?
+    }
+
+    private enum RegistryPayloadParseOutcome {
+        case parsed(RemoteWorkRecord)
+        case registeredNoMetadata
+        case unparseable
+    }
+
+    private enum ArXivPayloadParseOutcome {
+        case parsed(RemoteWorkRecord)
+        case notFound
+        case unparseable
+    }
+
+    private static let leadingRetractionPrefixes: [String] = [
+        "retracted article:",
+        "retracted paper:",
+        "retraction notice:",
+        "retraction of:",
+        "retracted:",
+        "retraction:",
+        "withdrawn:",
+        "[retracted article]",
+        "[retracted]",
+        "(retracted)",
+        "[withdrawn]",
+        "(withdrawn)"
+    ]
+
+    private static let trailingRetractionSuffixes: [String] = [
+        "[retracted article]",
+        "[retracted]",
+        "(retracted)",
+        "- retracted",
+        "[withdrawn]",
+        "(withdrawn)",
+        "- withdrawn"
+    ]
+
+    private static let venueStopwords: Set<String> = [
+        "the", "of", "on", "in", "for", "and", "to", "a", "an", "at", "by", "from", "with"
+    ]
+
+    private static let knownVenueAcronymExpansions: [String: String] = [
+        "pnas": "proceedings of the national academy of sciences",
+        "jmlr": "journal of machine learning research",
+        "neurips": "advances in neural information processing systems",
+        "nips": "advances in neural information processing systems",
+        "icml": "international conference on machine learning",
+        "iclr": "international conference on learning representations",
+        "cvpr": "conference on computer vision and pattern recognition",
+        "iccv": "international conference on computer vision",
+        "eccv": "european conference on computer vision",
+        "acl": "annual meeting of the association for computational linguistics",
+        "emnlp": "conference on empirical methods in natural language processing",
+        "naacl": "conference of the north american chapter of the association for computational linguistics",
+        "aaai": "aaai conference on artificial intelligence",
+        "ijcai": "international joint conference on artificial intelligence",
+        "cacm": "communications of the acm",
+        "jacm": "journal of the acm",
+        "tpami": "ieee transactions on pattern analysis and machine intelligence",
+        "pami": "ieee transactions on pattern analysis and machine intelligence",
+        "ijcv": "international journal of computer vision",
+        "tacl": "transactions of the association for computational linguistics",
+        "vldb": "proceedings of the vldb endowment",
+        "nejm": "new england journal of medicine",
+        "jama": "journal of the american medical association",
+        "bmj": "british medical journal"
+    ]
+
+    private static let knownISO4AbbreviationStems: Set<String> = [
+        "proc", "j", "trans", "comput", "comp", "natl", "nat", "acad", "sci",
+        "int", "intl", "conf", "symp", "annu", "ann", "rev", "lett", "commun",
+        "bull", "soc", "amer", "am", "eur", "phys", "chem", "biol", "biomed",
+        "med", "eng", "math", "stat", "appl", "res", "syst", "netw", "inf",
+        "inform", "mach", "learn", "intell", "artif", "anal", "patt", "recog",
+        "softw", "lang", "prog", "oper", "mag", "univ", "clin", "exp", "mol",
+        "cell", "genet", "psychol", "philos", "econ", "mgmt", "manag", "tech",
+        "technol", "elektron", "opt", "quant", "theor", "astron", "astrophys",
+        "geophys", "ecol", "evol", "neurosci", "pharmacol", "toxicol"
+    ]
+
+    /// Normalizes a scholarly title into lowercase alphanumeric words after stripping HTML tags,
+    /// LaTeX formatting/diacritics/braces/math, and leading/trailing retraction markers.
+    public static func normalizeTitleTokensForComparison(_ rawTitle: String) -> [String] {
+        if rawTitle.isEmpty { return [] }
+        let htmlStripped = stripHTMLTagsAndEntities(rawTitle)
+        let latexDecoded = LaTeXTextCodec().decode(htmlStripped)
+        let retractionStripped = stripOuterRetractionMarkers(latexDecoded)
+        let folded = foldLigaturesAndDiacritics(retractionStripped)
+        return splitAlphanumericWords(folded)
+    }
+
+    /// Word-by-word title comparison (no Jaro-Winkler). Missing local title or any word difference yields `DRIFT`.
+    func compareTitle(
+        localTitle: String,
+        remoteTitle: String,
+        sourceName: String
+    ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
+        let trimmedLocal = localTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedLocal.isEmpty {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "title",
+                    localValue: "",
+                    remoteValue: remoteTitle,
+                    source: sourceName,
+                    severity: "error",
+                    note: "Missing local title."
+                ),
+                "missing_title"
+            )
+        }
+
+        let localWords = Self.normalizeTitleTokensForComparison(trimmedLocal)
+        let remoteWords = Self.normalizeTitleTokensForComparison(remoteTitle)
+
+        if localWords.isEmpty {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "title",
+                    localValue: trimmedLocal,
+                    remoteValue: remoteTitle,
+                    source: sourceName,
+                    severity: "error",
+                    note: "Missing local title."
+                ),
+                "missing_title"
+            )
+        }
+
+        guard localWords == remoteWords else {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "title",
+                    localValue: trimmedLocal,
+                    remoteValue: remoteTitle,
+                    source: sourceName,
+                    severity: "error",
+                    note: "Title differs word-for-word from \(sourceName) record."
+                ),
+                "title_mismatch"
+            )
+        }
+        return (nil, nil)
+    }
+
+    /// Exact normalized first-author surname (or full corporate name) equality check (no Jaro-Winkler).
+    func compareFirstAuthor(
+        localAuthors: [BibAuthor],
+        remote: RemoteWorkRecord
+    ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
+        let namedLocalAuthors = localAuthors.filter { !Self.isEtAlTruncationAuthor($0) }
+        let remoteDisplay = remote.firstAuthorDisplay ?? remote.firstAuthorSurname ?? ""
+
+        guard let localFirst = namedLocalAuthors.first,
+              !localFirst.familyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "firstAuthor",
+                    localValue: "",
+                    remoteValue: remoteDisplay,
+                    source: remote.sourceName,
+                    severity: "error",
+                    note: "Missing local first author."
+                ),
+                "missing_first_author"
+            )
+        }
+
+        guard !remoteDisplay.isEmpty else {
+            return (nil, nil)
+        }
+
+        let localIsCorporate = localFirst.givenName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && localFirst.familyName.trimmingCharacters(in: .whitespacesAndNewlines).contains(" ")
+
+        if remote.firstAuthorIsCorporate || localIsCorporate {
+            let localFull = Self.normalizeCorporateOrAuthorToken(localFirst.description)
+            let remoteFull = Self.normalizeCorporateOrAuthorToken(remoteDisplay)
+            guard !localFull.isEmpty, localFull == remoteFull else {
+                return (
+                    CitationFieldDiscrepancy(
+                        field: "firstAuthor",
+                        localValue: localFirst.description,
+                        remoteValue: remoteDisplay,
+                        source: remote.sourceName,
+                        severity: "error",
+                        note: "Corporate/institutional first author differs from \(remote.sourceName)."
+                    ),
+                    "first_author_mismatch"
+                )
+            }
+            return (nil, nil)
+        }
+
+        let localNormSurname = Self.normalizeCorporateOrAuthorToken(localFirst.familyName)
+        let remoteSurnameRaw = remote.firstAuthorSurname ?? remoteDisplay
+        let remoteNormSurname = Self.normalizeCorporateOrAuthorToken(remoteSurnameRaw)
+
+        guard !localNormSurname.isEmpty, localNormSurname == remoteNormSurname else {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "firstAuthor",
+                    localValue: localFirst.familyName,
+                    remoteValue: remoteSurnameRaw,
+                    source: remote.sourceName,
+                    severity: "error",
+                    note: "First author surname '\(localFirst.familyName)' differs from \(remote.sourceName) '\(remoteSurnameRaw)'."
+                ),
+                "first_author_mismatch"
+            )
+        }
+        return (nil, nil)
+    }
+
+    /// Author count and `and others` (`et al.`) prefix check.
+    func compareAuthorCount(
+        localAuthors: [BibAuthor],
+        remote: RemoteWorkRecord
+    ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
+        let namedLocalAuthors = localAuthors.filter { !Self.isEtAlTruncationAuthor($0) }
+        let hasEtAlTruncation = localAuthors.contains(where: Self.isEtAlTruncationAuthor)
+
+        // Missing local author list is already reported by `compareFirstAuthor`.
+        guard !namedLocalAuthors.isEmpty, !remote.authorSurnames.isEmpty else {
+            return (nil, nil)
+        }
+
+        if hasEtAlTruncation {
+            if namedLocalAuthors.count > remote.authorSurnames.count {
+                return (
+                    CitationFieldDiscrepancy(
+                        field: "authorCount",
+                        localValue: "\(namedLocalAuthors.count)+",
+                        remoteValue: "\(remote.authorSurnames.count)",
+                        source: remote.sourceName,
+                        severity: "error",
+                        note: "Listed author prefix count (\(namedLocalAuthors.count)) exceeds \(remote.sourceName) total authors (\(remote.authorSurnames.count))."
+                    ),
+                    "author_count_mismatch"
+                )
+            }
+            // Index 0 was already checked by `compareFirstAuthor`; check remaining prefix authors.
+            if namedLocalAuthors.count > 1 {
+                for idx in 1..<namedLocalAuthors.count {
+                    let localSur = Self.normalizeCorporateOrAuthorToken(namedLocalAuthors[idx].familyName)
+                    let remoteSur = Self.normalizeCorporateOrAuthorToken(remote.authorSurnames[idx])
+                    if localSur != remoteSur {
+                        return (
+                            CitationFieldDiscrepancy(
+                                field: "authors",
+                                localValue: namedLocalAuthors[idx].familyName,
+                                remoteValue: remote.authorSurnames[idx],
+                                source: remote.sourceName,
+                                severity: "error",
+                                note: "Author #\(idx + 1) in 'and others' prefix differs from \(remote.sourceName)."
+                            ),
+                            "author_prefix_mismatch"
+                        )
+                    }
+                }
+            }
+            return (nil, nil)
+        }
+
+        if namedLocalAuthors.count != remote.authorSurnames.count {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "authorCount",
+                    localValue: "\(namedLocalAuthors.count)",
+                    remoteValue: "\(remote.authorSurnames.count)",
+                    source: remote.sourceName,
+                    severity: "error",
+                    note: "Local author count (\(namedLocalAuthors.count)) differs from \(remote.sourceName) (\(remote.authorSurnames.count))."
+                ),
+                "author_count_mismatch"
+            )
+        }
+        return (nil, nil)
+    }
+
+    /// Multi-date publication year comparison (`published-print`, `published-online`, `issued`).
+    /// Diff == 1 carries the online-first vs. print-issue explanation; diff >= 2 is marked as error.
+    func comparePublicationYear(
+        localYear: Int?,
+        remoteYears: [Int],
+        sourceName: String
+    ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
+        guard let localYear else {
+            let remoteStr = remoteYears.first.map(String.init) ?? ""
+            return (
+                CitationFieldDiscrepancy(
+                    field: "year",
+                    localValue: "",
+                    remoteValue: remoteStr,
+                    source: sourceName,
+                    severity: "error",
+                    note: "Missing local publication year."
+                ),
+                "missing_year"
+            )
+        }
+
+        guard !remoteYears.isEmpty else {
+            return (nil, nil)
+        }
+
+        if remoteYears.contains(localYear) {
+            return (nil, nil)
+        }
+
+        let closestYear = remoteYears.min(by: { abs($0 - localYear) < abs($1 - localYear) }) ?? remoteYears[0]
+        let diff = abs(localYear - closestYear)
+        let allRemoteDatesLabel = remoteYears.map(String.init).joined(separator: "/")
+
+        if diff == 1 {
+            return (
+                CitationFieldDiscrepancy(
+                    field: "year",
+                    localValue: "\(localYear)",
+                    remoteValue: "\(closestYear)",
+                    source: sourceName,
+                    severity: "warning",
+                    note: "Local year \(localYear) differs by 1 year from \(sourceName) (\(allRemoteDatesLabel)); \(CitationAuditWording.yearOnlineVsPrintNotice)."
+                ),
+                "year_diff_1"
+            )
+        }
+
+        return (
+            CitationFieldDiscrepancy(
+                field: "year",
+                localValue: "\(localYear)",
+                remoteValue: "\(closestYear)",
+                source: sourceName,
+                severity: "error",
+                note: "Local year \(localYear) differs by \(diff) years from \(sourceName) (\(allRemoteDatesLabel)) (error)."
+            ),
+            "year_mismatch"
         )
     }
 
-    // MARK: - Private Registry Parsers & Metadata Drift Reconciliation
+    /// Venue / journal / conference comparison supporting ISO-4 abbreviations and standard acronyms.
+    /// Skipped when either local or remote has no venue (e.g., arXiv preprints without `journal_ref`).
+    func compareVenue(
+        localVenue: String,
+        remoteVenues: [String],
+        sourceName: String
+    ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
+        let trimmedLocal = localVenue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedLocal.isEmpty, !remoteVenues.isEmpty else {
+            return (nil, nil)
+        }
+        let lowerLocal = trimmedLocal.lowercased()
+        if sourceName == "arXiv" && (lowerLocal == "arxiv" || lowerLocal.hasPrefix("arxiv:") || lowerLocal == "corr") {
+            return (nil, nil)
+        }
 
-    private struct RemoteWorkRecord {
-        let sourceName: String
-        let title: String
-        let firstAuthorSurname: String?
-        let year: Int?
-        let isRetracted: Bool
+        if venuesMatch(trimmedLocal, remoteVenues) {
+            return (nil, nil)
+        }
+
+        return (
+            CitationFieldDiscrepancy(
+                field: "venue",
+                localValue: trimmedLocal,
+                remoteValue: remoteVenues[0],
+                source: sourceName,
+                severity: "error",
+                note: "Local venue '\(trimmedLocal)' differs from \(sourceName) '\(remoteVenues[0])'."
+            ),
+            "venue_mismatch"
+        )
+    }
+
+    /// Checks whether `localVenue` matches any candidate in `remoteVenues` under normalized full name,
+    /// acronym expansion, or ISO-4 token abbreviation alignment.
+    func venuesMatch(_ localVenue: String, _ remoteVenues: [String]) -> Bool {
+        let localCandidates = Self.venueTokenCandidates(for: localVenue)
+        if localCandidates.isEmpty { return true }
+
+        for remoteRaw in remoteVenues {
+            let remoteCandidates = Self.venueTokenCandidates(for: remoteRaw)
+            for lTokens in localCandidates {
+                for rTokens in remoteCandidates {
+                    if Self.venueTokenSequenceMatches(lTokens, rTokens) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private func reconcileRemoteRegistryMetadata(
         entry: BibliographyEntry,
         remote: RemoteWorkRecord,
-        baseClass: CitationFirewallClass,
-        existingFindings: [FirewallFinding]
+        primarySource: CitationVerdictSourceRecord,
+        allSources: [CitationVerdictSourceRecord],
+        existingFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool
     ) -> CitationFirewallEntryVerdict {
         var findings = existingFindings
 
-        if remote.isRetracted {
+        if let retractionField = remote.retractionField {
+            // Remove offline built-in retraction hint if the live registry record itself carries retraction metadata.
+            findings.removeAll {
+                $0.code == .blockedRetractedWork && $0.detail.contains(CitationAuditWording.builtInRetractionListNotice)
+            }
+            let detail = "\(remote.sourceName) marks this publication as retracted (field: \(retractionField))."
             findings.append(
                 FirewallFinding(
                     code: .blockedRetractedWork,
                     severity: .criticalBlock,
-                    field: "doi",
-                    detail: "\(remote.sourceName) marks this work as RETRACTED ('\(remote.title)')."
+                    field: retractionField,
+                    detail: detail
                 )
             )
             return buildUpdatedVerdict(
                 for: entry,
                 assignedClass: .retracted,
-                confidence: 0.99,
+                reasons: ["retracted_\(remote.sourceName.lowercased())"],
+                sources: allSources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[RETRACTED] \(detail)"
+            )
+        }
+
+        if isBuiltInRetracted {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .retracted,
+                reasons: ["retracted_builtin_list"],
+                sources: allSources,
+                fields: [],
                 findings: findings
             )
         }
 
-        let localNormTitle = ReferenceIdentifierNormalizer.normalizeTitle(entry.title)
-        let remoteNormTitle = ReferenceIdentifierNormalizer.normalizeTitle(remote.title)
-        let titleSimilarity = ReferenceDeduplicator.jaroWinklerSimilarity(localNormTitle, remoteNormTitle)
-
+        var discrepancies: [CitationFieldDiscrepancy] = []
         var driftReasons: [String] = []
-        if !localNormTitle.isEmpty && !remoteNormTitle.isEmpty && titleSimilarity < 0.86 {
-            driftReasons.append("title '\(entry.title)' differs from \(remote.sourceName) '\(remote.title)' (similarity \(String(format: "%.2f", titleSimilarity)))")
-        }
-        if let localFirst = entry.authors.first.map({ ReferenceIdentifierNormalizer.normalizeSurname($0.familyName) }),
-           let remoteFirst = remote.firstAuthorSurname.map({ ReferenceIdentifierNormalizer.normalizeSurname($0) }),
-           !localFirst.isEmpty, !remoteFirst.isEmpty,
-           ReferenceDeduplicator.jaroWinklerSimilarity(localFirst, remoteFirst) < 0.80 {
-            driftReasons.append("first author '\(entry.firstAuthorFamily)' differs from \(remote.sourceName) '\(remote.firstAuthorSurname ?? "")'")
-        }
-        if let localYear = entry.year, let remoteYear = remote.year, abs(localYear - remoteYear) > 0 {
-            driftReasons.append("year \(localYear) differs from \(remote.sourceName) year \(remoteYear)")
+
+        let checks: [(CitationFieldDiscrepancy?, String?)] = [
+            compareTitle(localTitle: entry.title, remoteTitle: remote.title, sourceName: remote.sourceName),
+            compareFirstAuthor(localAuthors: entry.authors, remote: remote),
+            compareAuthorCount(localAuthors: entry.authors, remote: remote),
+            comparePublicationYear(localYear: entry.year, remoteYears: remote.publicationYears, sourceName: remote.sourceName),
+            compareVenue(localVenue: entry.venue, remoteVenues: remote.venues, sourceName: remote.sourceName)
+        ]
+
+        for (disc, reason) in checks {
+            if let disc {
+                discrepancies.append(disc)
+            }
+            if let reason, !driftReasons.contains(reason) {
+                driftReasons.append(reason)
+            }
         }
 
-        if !driftReasons.isEmpty {
+        if !discrepancies.isEmpty {
+            let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: remote.sourceName)
             findings.append(
                 FirewallFinding(
                     code: .metadataDriftDetected,
                     severity: .warning,
                     field: "metadata",
-                    detail: "\(remote.sourceName) metadata drift: \(driftReasons.joined(separator: "; "))."
+                    detail: driftSummary
                 )
             )
             return buildUpdatedVerdict(
                 for: entry,
                 assignedClass: .drift,
-                confidence: 0.85,
-                findings: findings
+                reasons: driftReasons,
+                sources: allSources,
+                fields: discrepancies,
+                findings: findings,
+                overrideNote: "[DRIFT] \(driftSummary)"
             )
         }
 
+        let dateLabel = Self.shortDateLabel(from: primarySource.fetchedAt)
+        let verifiedDetail = "Matched in \(remote.sourceName), fetched \(dateLabel) (\(primarySource.origin.rawValue))."
         findings.append(
             FirewallFinding(
                 code: .registryVerifiedMatch,
                 severity: .pass,
                 field: "registry",
-                detail: "Verified live metadata match against \(remote.sourceName) (title Jaro-Winkler \(String(format: "%.3f", titleSimilarity)))."
+                detail: verifiedDetail
             )
         )
         return buildUpdatedVerdict(
             for: entry,
-            assignedClass: baseClass,
-            confidence: 0.99,
-            findings: findings
+            assignedClass: .verified,
+            reasons: ["verified_match"],
+            sources: allSources,
+            fields: [],
+            findings: findings,
+            overrideNote: "[VERIFIED] \(verifiedDetail)"
         )
     }
 
-    private func parseCrossrefWorkPayload(_ data: Data) -> RemoteWorkRecord? {
+    // MARK: - Private Registry Payload Parsers (Crossref, OpenAlex, arXiv)
+
+    private func parseCrossrefWorkPayload(_ data: Data) -> RegistryPayloadParseOutcome {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+            return .unparseable
         }
-        let message = (root["message"] as? [String: Any]) ?? root
+        let message: [String: Any]
+        if let msg = root["message"] as? [String: Any] {
+            message = msg
+        } else if root["DOI"] != nil || root["title"] != nil {
+            message = root
+        } else {
+            return .unparseable
+        }
 
         let title: String = {
-            if let titles = message["title"] as? [String], let first = titles.first {
-                return first
+            if let titles = message["title"] as? [String], let first = titles.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                return first.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             if let single = message["title"] as? String {
-                return single
+                return single.trimmingCharacters(in: .whitespacesAndNewlines)
             }
             return ""
         }()
-        guard !title.isEmpty else { return nil }
-
-        var firstSurname: String?
-        if let authors = message["author"] as? [[String: Any]], let first = authors.first {
-            firstSurname = (first["family"] as? String) ?? (first["name"] as? String)
+        guard !title.isEmpty else {
+            return .registeredNoMetadata
         }
 
-        var pubYear: Int?
-        for dateKey in ["published-print", "published-online", "issued", "created"] {
-            if let dateObj = message[dateKey] as? [String: Any],
-               let parts = dateObj["date-parts"] as? [[Int]],
-               let firstRow = parts.first,
-               let yr = firstRow.first {
-                pubYear = yr
-                break
+        var firstAuthorDisplay: String?
+        var firstAuthorSurname: String?
+        var firstAuthorIsCorporate = false
+        var authorSurnames: [String] = []
+
+        if let authors = message["author"] as? [[String: Any]], !authors.isEmpty {
+            let firstIdx = authors.firstIndex {
+                (($0["sequence"] as? String)?.lowercased() == "first")
+            } ?? 0
+            let firstObj = authors[firstIdx]
+            if let fam = nonEmpty(firstObj["family"] as? String) {
+                firstAuthorDisplay = fam
+                firstAuthorSurname = fam
+                firstAuthorIsCorporate = false
+            } else if let corpName = nonEmpty(firstObj["name"] as? String) {
+                firstAuthorDisplay = corpName
+                firstAuthorSurname = corpName
+                firstAuthorIsCorporate = true
+            }
+
+            // Order `sequence == "first"` at index 0, followed by remaining authors in array order.
+            var orderedIndices = [firstIdx]
+            for idx in authors.indices where idx != firstIdx {
+                orderedIndices.append(idx)
+            }
+            for idx in orderedIndices {
+                let item = authors[idx]
+                if let fam = nonEmpty(item["family"] as? String) {
+                    authorSurnames.append(fam)
+                } else if let name = nonEmpty(item["name"] as? String) {
+                    authorSurnames.append(name)
+                }
             }
         }
 
-        var isRetracted = false
-        if let updates = message["update-to"] as? [[String: Any]] {
-            isRetracted = updates.contains {
-                let t = ($0["type"] as? String)?.lowercased() ?? ""
-                return t.contains("retraction")
+        // Collect all publication dates (`published-print`, `published-online`, `issued`), fallback `published`.
+        // Never treat Crossref deposit date `created` as publication year.
+        var publicationYears: [Int] = []
+        for dateKey in ["published-print", "published-online", "issued"] {
+            if let yr = extractCrossrefDateYear(message[dateKey]), !publicationYears.contains(yr) {
+                publicationYears.append(yr)
             }
         }
-        if let relation = message["relation"] as? [String: Any],
-           relation["is-retracted-by"] != nil {
-            isRetracted = true
+        if publicationYears.isEmpty, let yr = extractCrossrefDateYear(message["published"]) {
+            publicationYears.append(yr)
         }
 
-        return RemoteWorkRecord(
-            sourceName: "Crossref",
-            title: title,
-            firstAuthorSurname: firstSurname,
-            year: pubYear,
-            isRetracted: isRetracted
+        var venues: [String] = []
+        for venueKey in ["container-title", "short-container-title"] {
+            if let arr = message[venueKey] as? [String] {
+                for item in arr {
+                    if let v = nonEmpty(item), !venues.contains(v) {
+                        venues.append(v)
+                    }
+                }
+            } else if let single = nonEmpty(message[venueKey] as? String), !venues.contains(single) {
+                venues.append(single)
+            }
+        }
+
+        var retractionField: String?
+        if let updates = message["update-to"] as? [[String: Any]],
+           updates.contains(where: { (($0["type"] as? String)?.lowercased() ?? "").contains("retraction") }) {
+            retractionField = "update-to"
+        } else if let updatedBy = message["updated-by"] as? [[String: Any]],
+                  updatedBy.contains(where: { (($0["type"] as? String)?.lowercased() ?? "").contains("retraction") }) {
+            retractionField = "updated-by"
+        } else if let relation = message["relation"] as? [String: Any],
+                  let retractedBy = relation["is-retracted-by"] {
+            if let arr = retractedBy as? [Any], !arr.isEmpty {
+                retractionField = "relation.is-retracted-by"
+            } else if let dict = retractedBy as? [String: Any], !dict.isEmpty {
+                retractionField = "relation.is-retracted-by"
+            }
+        }
+
+        return .parsed(
+            RemoteWorkRecord(
+                sourceName: "Crossref",
+                title: title,
+                firstAuthorDisplay: firstAuthorDisplay,
+                firstAuthorSurname: firstAuthorSurname,
+                firstAuthorIsCorporate: firstAuthorIsCorporate,
+                authorSurnames: authorSurnames,
+                publicationYears: publicationYears,
+                venues: venues,
+                retractionField: retractionField
+            )
         )
     }
 
-    private func parseOpenAlexWorkPayload(_ data: Data) -> RemoteWorkRecord? {
+    private func parseOpenAlexWorkPayload(_ data: Data) -> RegistryPayloadParseOutcome {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+            return .unparseable
         }
-        let title = (root["title"] as? String) ?? (root["display_name"] as? String) ?? ""
-        guard !title.isEmpty else { return nil }
+        guard root["id"] != nil || root["title"] != nil || root["display_name"] != nil else {
+            return .unparseable
+        }
+        let title = nonEmpty(root["title"] as? String) ?? nonEmpty(root["display_name"] as? String) ?? ""
+        guard !title.isEmpty else {
+            return .registeredNoMetadata
+        }
 
-        let year = root["publication_year"] as? Int
+        var publicationYears: [Int] = []
+        if let yr = root["publication_year"] as? Int {
+            publicationYears.append(yr)
+        } else if let pubDate = nonEmpty(root["publication_date"] as? String),
+                  pubDate.count >= 4,
+                  let yr = Int(pubDate.prefix(4)) {
+            publicationYears.append(yr)
+        }
+
         let isRetracted = (root["is_retracted"] as? Bool) ?? false
 
-        var firstSurname: String?
-        if let authorships = root["authorships"] as? [[String: Any]],
-           let first = authorships.first,
-           let authorObj = first["author"] as? [String: Any],
-           let displayName = authorObj["display_name"] as? String {
-            firstSurname = displayName.split(whereSeparator: \.isWhitespace).last.map(String.init)
+        var firstAuthorDisplay: String?
+        var firstAuthorSurname: String?
+        var authorSurnames: [String] = []
+
+        if let authorships = root["authorships"] as? [[String: Any]], !authorships.isEmpty {
+            for (idx, item) in authorships.enumerated() {
+                // M1 item 2 (S50): prefer `raw_author_name`, falling back to `author.display_name`.
+                let rawName = nonEmpty(item["raw_author_name"] as? String)
+                let displayName = nonEmpty((item["author"] as? [String: Any])?["display_name"] as? String)
+                let chosen = rawName ?? displayName
+                if let chosen, let extracted = Self.extractSurnameFromAuthorString(chosen) {
+                    authorSurnames.append(extracted)
+                    if idx == 0 {
+                        firstAuthorDisplay = extracted
+                        firstAuthorSurname = extracted
+                    }
+                } else if let fallback = displayName, let extracted = Self.extractSurnameFromAuthorString(fallback) {
+                    authorSurnames.append(extracted)
+                    if idx == 0 {
+                        firstAuthorDisplay = extracted
+                        firstAuthorSurname = extracted
+                    }
+                }
+            }
         }
 
-        return RemoteWorkRecord(
-            sourceName: "OpenAlex",
-            title: title,
-            firstAuthorSurname: firstSurname,
-            year: year,
-            isRetracted: isRetracted
+        var venues: [String] = []
+        if let primaryLoc = root["primary_location"] as? [String: Any],
+           let sourceObj = primaryLoc["source"] as? [String: Any] {
+            if let disp = nonEmpty(sourceObj["display_name"] as? String) {
+                venues.append(disp)
+            }
+            if let abbr = nonEmpty(sourceObj["abbreviated_title"] as? String), !venues.contains(abbr) {
+                venues.append(abbr)
+            }
+            if let alts = sourceObj["alternate_titles"] as? [String] {
+                for alt in alts {
+                    if let cleanAlt = nonEmpty(alt), !venues.contains(cleanAlt) {
+                        venues.append(cleanAlt)
+                    }
+                }
+            }
+        }
+        if let hostVenue = root["host_venue"] as? [String: Any],
+           let disp = nonEmpty(hostVenue["display_name"] as? String),
+           !venues.contains(disp) {
+            venues.append(disp)
+        }
+
+        return .parsed(
+            RemoteWorkRecord(
+                sourceName: "OpenAlex",
+                title: title,
+                firstAuthorDisplay: firstAuthorDisplay,
+                firstAuthorSurname: firstAuthorSurname,
+                firstAuthorIsCorporate: false,
+                authorSurnames: authorSurnames,
+                publicationYears: publicationYears,
+                venues: venues,
+                retractionField: isRetracted ? "is_retracted" : nil
+            )
         )
     }
 
-    private func parseArXivAtomPayload(_ data: Data) -> RemoteWorkRecord? {
+    private func parseArXivAtomPayload(_ data: Data) -> ArXivPayloadParseOutcome {
         guard let xml = String(data: data, encoding: .utf8),
-              let entryRange = xml.range(of: "<entry>"),
+              xml.contains("<feed"),
+              xml.contains("</feed>") else {
+            return .unparseable
+        }
+
+        guard let entryRange = xml.range(of: "<entry>"),
               let entryClose = xml.range(of: "</entry>", range: entryRange.upperBound..<xml.endIndex) else {
-            return nil
+            return .notFound
         }
         let entrySlice = String(xml[entryRange.upperBound..<entryClose.lowerBound])
 
-        guard let rawTitle = extractXMLTagValue("title", in: entrySlice),
-              !rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
+        if let entryID = extractXMLTagValue("id", in: entrySlice),
+           entryID.lowercased().contains("arxiv.org/api/errors") {
+            return .notFound
+        }
+
+        guard let rawTitle = extractXMLTagValue("title", in: entrySlice) else {
+            return .notFound
         }
         let cleanTitle = rawTitle
             .replacingOccurrences(of: "\n", with: " ")
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
-
-        var firstSurname: String?
-        if let authorBlock = extractXMLTagValue("author", in: entrySlice),
-           let authorName = extractXMLTagValue("name", in: authorBlock) {
-            firstSurname = authorName.split(whereSeparator: \.isWhitespace).last.map(String.init)
+        guard !cleanTitle.isEmpty, cleanTitle.lowercased() != "error" else {
+            return .notFound
         }
 
-        var pubYear: Int?
+        let authorBlocks = extractAllXMLTagValues("author", in: entrySlice)
+        var authorSurnames: [String] = []
+        for block in authorBlocks {
+            if let name = extractXMLTagValue("name", in: block),
+               let sur = Self.extractSurnameFromAuthorString(name) {
+                authorSurnames.append(sur)
+            }
+        }
+        let firstSurname = authorSurnames.first
+
+        var publicationYears: [Int] = []
         if let published = extractXMLTagValue("published", in: entrySlice),
            published.count >= 4,
            let yr = Int(published.prefix(4)) {
-            pubYear = yr
+            publicationYears.append(yr)
         }
 
-        let lowerTitle = cleanTitle.lowercased()
-        let withdrawn = lowerTitle.contains("withdrawn") || lowerTitle.contains("retracted")
+        var venues: [String] = []
+        if let journalRef = extractXMLTagValue("arxiv:journal_ref", in: entrySlice) {
+            let cleanedRef = journalRef
+                .replacingOccurrences(of: "\n", with: " ")
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+            if !cleanedRef.isEmpty {
+                venues.append(cleanedRef)
+            }
+        }
 
-        return RemoteWorkRecord(
-            sourceName: "arXiv",
-            title: cleanTitle,
-            firstAuthorSurname: firstSurname,
-            year: pubYear,
-            isRetracted: withdrawn
+        var retractionField: String?
+        let lowerTitle = cleanTitle.lowercased()
+        let commentText = (extractXMLTagValue("arxiv:comment", in: entrySlice) ?? "").lowercased()
+        let summaryText = (extractXMLTagValue("summary", in: entrySlice) ?? "").lowercased()
+        if commentText.contains("withdrawn") || commentText.contains("retracted") {
+            retractionField = "arxiv:comment"
+        } else if lowerTitle.contains("withdrawn") || lowerTitle.contains("retracted") {
+            retractionField = "title"
+        } else if summaryText.contains("this paper has been withdrawn") || summaryText.contains("this paper has been retracted") {
+            retractionField = "summary"
+        }
+
+        return .parsed(
+            RemoteWorkRecord(
+                sourceName: "arXiv",
+                title: cleanTitle,
+                firstAuthorDisplay: firstSurname,
+                firstAuthorSurname: firstSurname,
+                firstAuthorIsCorporate: false,
+                authorSurnames: authorSurnames,
+                publicationYears: publicationYears,
+                venues: venues,
+                retractionField: retractionField
+            )
         )
     }
 
+    // MARK: - Normalization, Parsing & Verdict Formatting Helpers
+
+    private func extractCrossrefDateYear(_ rawDateObj: Any?) -> Int? {
+        guard let dateObj = rawDateObj as? [String: Any],
+              let parts = dateObj["date-parts"] as? [[Any]],
+              let firstRow = parts.first,
+              let firstElem = firstRow.first else {
+            return nil
+        }
+        if let yr = firstElem as? Int {
+            return yr
+        }
+        if let num = firstElem as? NSNumber {
+            return num.intValue
+        }
+        return nil
+    }
+
     private func extractXMLTagValue(_ tag: String, in xml: String) -> String? {
-        guard let open = xml.range(of: "<\(tag)>"),
+        guard let open = findXMLOpeningTag(tag, in: xml, from: xml.startIndex),
               let close = xml.range(of: "</\(tag)>", range: open.upperBound..<xml.endIndex) else {
             return nil
         }
-        return String(xml[open.upperBound..<close.lowerBound])
+        return Self.decodeXMLEntities(String(xml[open.upperBound..<close.lowerBound]))
+    }
+
+    private func extractAllXMLTagValues(_ tag: String, in xml: String) -> [String] {
+        var results: [String] = []
+        var cursor = xml.startIndex
+        while let open = findXMLOpeningTag(tag, in: xml, from: cursor),
+              let close = xml.range(of: "</\(tag)>", range: open.upperBound..<xml.endIndex) {
+            results.append(Self.decodeXMLEntities(String(xml[open.upperBound..<close.lowerBound])))
+            cursor = close.upperBound
+        }
+        return results
+    }
+
+    private func findXMLOpeningTag(_ tag: String, in xml: String, from start: String.Index) -> Range<String.Index>? {
+        if let exact = xml.range(of: "<\(tag)>", range: start..<xml.endIndex) {
+            if let attrOpen = xml.range(of: "<\(tag) ", range: start..<xml.endIndex),
+               attrOpen.lowerBound < exact.lowerBound,
+               let gt = xml.range(of: ">", range: attrOpen.upperBound..<xml.endIndex) {
+                return attrOpen.lowerBound..<gt.upperBound
+            }
+            return exact
+        }
+        if let attrOpen = xml.range(of: "<\(tag) ", range: start..<xml.endIndex),
+           let gt = xml.range(of: ">", range: attrOpen.upperBound..<xml.endIndex) {
+            return attrOpen.lowerBound..<gt.upperBound
+        }
+        return nil
+    }
+
+    private static func decodeXMLEntities(_ text: String) -> String {
+        text
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&#x27;", with: "'")
+            .replacingOccurrences(of: "&ndash;", with: "–")
+            .replacingOccurrences(of: "&mdash;", with: "—")
+    }
+
+    private static func stripHTMLTagsAndEntities(_ text: String) -> String {
+        var stripped = ""
+        stripped.reserveCapacity(text.count)
+        var insideTag = false
+        for ch in text {
+            if ch == "<" {
+                insideTag = true
+                stripped.append(" ")
+            } else if ch == ">" && insideTag {
+                insideTag = false
+                stripped.append(" ")
+            } else if !insideTag {
+                stripped.append(ch)
+            }
+        }
+        return decodeXMLEntities(stripped)
+    }
+
+    private static func stripOuterRetractionMarkers(_ text: String) -> String {
+        var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var changed = true
+        while changed && !s.isEmpty {
+            changed = false
+            let lower = s.lowercased()
+            for prefix in leadingRetractionPrefixes where lower.hasPrefix(prefix) {
+                s = String(s.dropFirst(prefix.count)).trimmingCharacters(in: CharacterSet(charactersIn: " \t\r\n:-–—"))
+                changed = true
+                break
+            }
+            let lowerAfterPrefix = s.lowercased()
+            for suffix in trailingRetractionSuffixes where lowerAfterPrefix.hasSuffix(suffix) {
+                s = String(s.dropLast(suffix.count)).trimmingCharacters(in: CharacterSet(charactersIn: " \t\r\n:-–—"))
+                changed = true
+                break
+            }
+        }
+        return s
+    }
+
+    private static func foldLigaturesAndDiacritics(_ text: String) -> String {
+        let ligatureExpanded = text
+            .replacingOccurrences(of: "ß", with: "ss")
+            .replacingOccurrences(of: "ẞ", with: "ss")
+            .replacingOccurrences(of: "æ", with: "ae")
+            .replacingOccurrences(of: "Æ", with: "ae")
+            .replacingOccurrences(of: "œ", with: "oe")
+            .replacingOccurrences(of: "Œ", with: "oe")
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "Ø", with: "o")
+            .replacingOccurrences(of: "ł", with: "l")
+            .replacingOccurrences(of: "Ł", with: "l")
+            .replacingOccurrences(of: "đ", with: "d")
+            .replacingOccurrences(of: "Đ", with: "d")
+            .replacingOccurrences(of: "ı", with: "i")
+
+        return ligatureExpanded.folding(
+            options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        ).lowercased()
+    }
+
+    private static func splitAlphanumericWords(_ foldedLowercase: String) -> [String] {
+        var words: [String] = []
+        var current = ""
+        for ch in foldedLowercase {
+            if ch.isLetter || ch.isNumber {
+                current.append(ch)
+            } else if !current.isEmpty {
+                words.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty {
+            words.append(current)
+        }
+        return words
+    }
+
+    private static func normalizeCorporateOrAuthorToken(_ raw: String) -> String {
+        let decoded = LaTeXTextCodec().decode(raw)
+        let folded = foldLigaturesAndDiacritics(decoded)
+        return splitAlphanumericWords(folded).joined()
+    }
+
+    private static func isEtAlTruncationAuthor(_ author: BibAuthor) -> Bool {
+        guard author.givenName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        let fam = author.familyName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return fam == "et al." || fam == "et al" || fam == "others"
+    }
+
+    static func extractSurnameFromAuthorString(_ raw: String) -> String? {
+        let decoded = LaTeXTextCodec().decode(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !decoded.isEmpty else { return nil }
+
+        if decoded.contains(",") {
+            let parts = decoded.split(separator: ",", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if let firstPart = parts.first, !firstPart.isEmpty {
+                return firstPart
+            }
+        }
+
+        var words = decoded.split(whereSeparator: \.isWhitespace).map(String.init)
+        if words.isEmpty { return nil }
+
+        let generationalSuffixes: Set<String> = ["jr", "jr.", "sr", "sr.", "ii", "iii", "iv"]
+        if words.count >= 3, let last = words.last?.lowercased(), generationalSuffixes.contains(last) {
+            words.removeLast()
+        }
+
+        if words.count == 1 {
+            return words[0]
+        }
+
+        let particles: Set<String> = ["von", "van", "de", "del", "della", "der", "di", "du", "la", "le", "ten", "ter", "zu"]
+        var surnameStart = words.count - 1
+        while surnameStart > 1 {
+            let candidate = words[surnameStart - 1].lowercased()
+            if particles.contains(candidate) {
+                surnameStart -= 1
+            } else {
+                break
+            }
+        }
+        return words[surnameStart..<words.count].joined(separator: " ")
+    }
+
+    private struct VenueToken: Equatable {
+        let stem: String
+        let isAbbreviated: Bool
+    }
+
+    private static func venueTokenCandidates(for rawVenue: String) -> [[VenueToken]] {
+        let decoded = LaTeXTextCodec().decode(stripHTMLTagsAndEntities(rawVenue))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if decoded.isEmpty { return [] }
+
+        // Strip trailing parenthetical acronym if preceded by full title, e.g. "Advances in ... (NeurIPS)"
+        var variants: [String] = [decoded]
+        if let openParen = decoded.lastIndex(of: "("),
+           let closeParen = decoded.lastIndex(of: ")"),
+           openParen > decoded.startIndex,
+           openParen < closeParen {
+            let beforeParen = String(decoded[..<openParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let insideParen = String(decoded[decoded.index(after: openParen)..<closeParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !beforeParen.isEmpty {
+                variants.append(beforeParen)
+            }
+            if !insideParen.isEmpty {
+                variants.append(insideParen)
+            }
+        }
+
+        var candidateTokenLists: [[VenueToken]] = []
+        for variant in variants {
+            let tokens = tokenizeVenueString(variant)
+            if !tokens.isEmpty && !candidateTokenLists.contains(tokens) {
+                candidateTokenLists.append(tokens)
+            }
+            // Check single-token or acronym expansion (`PNAS`, `JMLR`, `NeurIPS`, etc.)
+            if tokens.count == 1, let expanded = knownVenueAcronymExpansions[tokens[0].stem] {
+                let expTokens = tokenizeVenueString(expanded)
+                if !expTokens.isEmpty && !candidateTokenLists.contains(expTokens) {
+                    candidateTokenLists.append(expTokens)
+                }
+            }
+            // Strip trailing geographic suffix "USA" / "United States of America" (e.g. Proc. Natl. Acad. Sci. USA)
+            if tokens.count >= 4 && tokens.last?.stem == "usa" {
+                let droppedUSA = Array(tokens.dropLast())
+                if !candidateTokenLists.contains(droppedUSA) {
+                    candidateTokenLists.append(droppedUSA)
+                }
+            }
+        }
+        return candidateTokenLists
+    }
+
+    private static func tokenizeVenueString(_ text: String) -> [VenueToken] {
+        let rawChunks = text.split(whereSeparator: { $0.isWhitespace || $0 == "/" || $0 == ":" || $0 == "," || $0 == ";" || $0 == "–" || $0 == "—" || $0 == "-" })
+        var out: [VenueToken] = []
+        for chunk in rawChunks {
+            let rawStr = String(chunk)
+            if rawStr == "&" { continue }
+            let hadDot = rawStr.hasSuffix(".")
+            let folded = foldLigaturesAndDiacritics(rawStr)
+            let words = splitAlphanumericWords(folded)
+            for (idx, word) in words.enumerated() {
+                if venueStopwords.contains(word) { continue }
+                // Skip ordinal conference numbers like "27th", "31st", "2017" only when >1 token? Keep words unless pure stopword.
+                let isAbbr = (hadDot && idx == words.count - 1) || knownISO4AbbreviationStems.contains(word)
+                out.append(VenueToken(stem: word, isAbbreviated: isAbbr))
+            }
+        }
+        return out
+    }
+
+    private static func venueTokenSequenceMatches(_ lhs: [VenueToken], _ rhs: [VenueToken]) -> Bool {
+        guard lhs.count == rhs.count, !lhs.isEmpty else {
+            return false
+        }
+        for (a, b) in zip(lhs, rhs) {
+            if a.stem == b.stem {
+                continue
+            }
+            if a.isAbbreviated && Self.abbreviationMatchesFullWord(abbr: a.stem, full: b.stem) {
+                continue
+            }
+            if b.isAbbreviated && Self.abbreviationMatchesFullWord(abbr: b.stem, full: a.stem) {
+                continue
+            }
+            return false
+        }
+        return true
+    }
+
+    private static func abbreviationMatchesFullWord(abbr: String, full: String) -> Bool {
+        if abbr == "j" {
+            return full == "journal"
+        }
+        if abbr == "int" || abbr == "intl" {
+            return full == "international"
+        }
+        guard abbr.count >= 2, full.count > abbr.count else {
+            return false
+        }
+        return full.hasPrefix(abbr)
+    }
+
+    private func formatEnglishDriftSummary(
+        discrepancies: [CitationFieldDiscrepancy],
+        sourceName: String
+    ) -> String {
+        let items = discrepancies.map { d -> String in
+            if d.localValue.isEmpty {
+                return "missing \(d.field) (\(sourceName): '\(d.remoteValue)')"
+            }
+            if d.field == "year" {
+                if let note = d.note, note.contains(CitationAuditWording.yearOnlineVsPrintNotice) {
+                    return "year local '\(d.localValue)' vs \(sourceName) '\(d.remoteValue)' (\(CitationAuditWording.yearOnlineVsPrintNotice))"
+                }
+                return "year error: local '\(d.localValue)' vs \(sourceName) '\(d.remoteValue)'"
+            }
+            return "\(d.field) local '\(d.localValue)' vs \(sourceName) '\(d.remoteValue)'"
+        }
+        return "Metadata drift against \(sourceName): \(items.joined(separator: "; "))."
+    }
+
+    private func classifyHTTPFailureStatus(_ statusCode: Int) -> CitationUnverifiedReasonCode {
+        if statusCode == 429 {
+            return .rateLimited
+        }
+        if (500...599).contains(statusCode) {
+            return .serverError
+        }
+        if statusCode == 408 {
+            return .timeout
+        }
+        return .transportError
+    }
+
+    private func classifyThrownTransportError(_ error: Error) -> CitationUnverifiedReasonCode {
+        if let transportErr = error as? RegistryTransportError {
+            return transportErr.kind == .timeout ? .timeout : .transportError
+        }
+        if let urlErr = error as? URLError, urlErr.code == .timedOut {
+            return .timeout
+        }
+        let nsErr = error as NSError
+        if nsErr.domain == NSURLErrorDomain && nsErr.code == NSURLErrorTimedOut {
+            return .timeout
+        }
+        return .transportError
+    }
+
+    private func describeHTTPFailure(source: String, statusCode: Int, identifier: String) -> String {
+        if statusCode == 429 {
+            return "\(source) rate-limited the lookup for '\(identifier)' (status 429)."
+        }
+        if (500...599).contains(statusCode) {
+            return "\(source) server error for '\(identifier)' (status \(statusCode))."
+        }
+        return "\(source) lookup failed for '\(identifier)' (status \(statusCode))."
+    }
+
+    private func describeTransportError(
+        source: String,
+        code: CitationUnverifiedReasonCode,
+        error: Error
+    ) -> String {
+        if code == .timeout {
+            return "\(source) request timed out (\(error.localizedDescription))."
+        }
+        return "\(source) unreachable (\(error.localizedDescription))."
+    }
+
+    private func deduplicatedReasons(_ codes: [CitationUnverifiedReasonCode]) -> [String] {
+        var result: [String] = []
+        for code in codes where !result.contains(code.rawValue) {
+            result.append(code.rawValue)
+        }
+        return result.isEmpty ? [CitationUnverifiedReasonCode.transportError.rawValue] : result
+    }
+
+    private func resolvedFetchedAt(from response: RegistryHTTPResponse) -> String {
+        if let explicit = nonEmpty(response.fetchedAt) {
+            return explicit
+        }
+        if let dateHeader = nonEmpty(response.headerValue(for: "Date")) {
+            return dateHeader
+        }
+        return currentISO8601Timestamp()
+    }
+
+    private func currentISO8601Timestamp() -> String {
+        ISO8601DateFormatter().string(from: Date())
+    }
+
+    public static func shortDateLabel(from rawTimestamp: String) -> String {
+        let trimmed = rawTimestamp.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count >= 10 {
+            let prefix10 = String(trimmed.prefix(10))
+            let chars = Array(prefix10)
+            if chars.count == 10,
+               chars[4] == "-",
+               chars[7] == "-",
+               chars[0...3].allSatisfy(\.isNumber),
+               chars[5...6].allSatisfy(\.isNumber),
+               chars[8...9].allSatisfy(\.isNumber) {
+                return prefix10
+            }
+        }
+        return trimmed.isEmpty ? "current-run" : trimmed
     }
 
     private func isPlaceholderSentinelDOI(_ normalizedDOI: String) -> Bool {
@@ -1471,7 +2778,6 @@ public struct CitationVerificationFirewall: Sendable {
         for prefix in Self.sentinelDOIRegistrantPrefixes where normalizedDOI.hasPrefix(prefix) {
             return true
         }
-        // Distinguish real ACM DL non-DOI Guide identifiers (`10.5555/3295222.3295349`) from fake `10.5555/fake`
         if normalizedDOI.hasPrefix("10.5555/") {
             let suffix = String(normalizedDOI.dropFirst("10.5555/".count))
             let lowerSuffix = suffix.lowercased()
@@ -1489,18 +2795,31 @@ public struct CitationVerificationFirewall: Sendable {
     private func buildUpdatedVerdict(
         for entry: BibliographyEntry,
         assignedClass: CitationFirewallClass,
-        confidence: Double,
-        findings: [FirewallFinding]
+        reasons: [String],
+        sources: [CitationVerdictSourceRecord],
+        fields: [CitationFieldDiscrepancy],
+        findings: [FirewallFinding],
+        overrideNote: String? = nil
     ) -> CitationFirewallEntryVerdict {
-        let summary = summarizeFindings(findings, assignedClass: assignedClass)
+        let baseSummary = overrideNote ?? summarizeFindings(findings, assignedClass: assignedClass)
+        let summary: String
+        if let declared = nonEmpty(entry.untrustedDeclaredFirewallClass),
+           !baseSummary.contains("x-firewall-class") {
+            summary = "\(baseSummary) File declared x-firewall-class '\(declared)', \(CitationAuditWording.untrustedFileClassMarker)."
+        } else {
+            summary = baseSummary
+        }
         var updated = entry
         updated.firewallClass = assignedClass
         updated.firewallAuditNote = summary
+        let canInsert = (assignedClass == .verified)
         return CitationFirewallEntryVerdict(
             citeKey: entry.citeKey,
             firewallClass: assignedClass,
-            allowsManuscriptInsertion: assignedClass.allowsManuscriptInsertion,
-            confidenceScore: confidence,
+            insertable: canInsert,
+            reasons: reasons,
+            sources: sources,
+            fields: fields,
             findings: findings,
             auditNote: summary,
             auditedEntry: updated

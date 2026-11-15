@@ -1527,4 +1527,319 @@ struct BibCSLAndFirewallTests {
         let writtenFiles = (try? FileManager.default.contentsOfDirectory(atPath: cleanDir.path)) ?? []
         #expect(!writtenFiles.contains { $0.hasSuffix(".raw") })
     }
+
+    // MARK: - 9. M1 Stage 03 Verdict Structure & Comparison Rule Tests (TDD)
+
+    private static var recordedRegistryFixturesURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/registry", isDirectory: true)
+    }
+
+    private func encodeVerdictJSONObject(_ verdict: CitationFirewallEntryVerdict) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(verdict)
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    @Test("M1 row 9: every drifted title, surname typo, missing field, and wrong venue pair yields DRIFT with remote values in fields and insertable=false")
+    func m1Stage03Row9DriftPairsAndMissingOrWrongFields() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let lecunAuthors = [
+            BibAuthor(givenName: "Yann", familyName: "LeCun"),
+            BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+            BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+        ]
+        let lstmAuthors = [
+            BibAuthor(givenName: "Sepp", familyName: "Hochreiter"),
+            BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber")
+        ]
+        let vaswaniAuthors = [
+            BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+            BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+            BibAuthor(givenName: "Niki", familyName: "Parmar"),
+            BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+            BibAuthor(givenName: "Llion", familyName: "Jones"),
+            BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+            BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+            BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+        ]
+
+        // 1. Real DOI + "Deep learning for protein structure prediction"
+        let v1 = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_protein",
+                kind: .article,
+                title: "Deep learning for protein structure prediction",
+                authors: lecunAuthors,
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            session: replay
+        )
+        #expect(v1.firewallClass == .drift)
+        let j1 = try encodeVerdictJSONObject(v1)
+        #expect(j1["insertable"] as? Bool == false)
+        #expect(j1["confidenceScore"] == nil)
+        let f1 = (j1["fields"] as? [[String: Any]]) ?? []
+        #expect(f1.contains { ($0["field"] as? String) == "title" && ($0["remoteValue"] as? String) == "Deep learning" })
+
+        // 2. Real DOI + single-letter typo "Deep lerning"
+        let v2 = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_typo",
+                kind: .article,
+                title: "Deep lerning",
+                authors: lecunAuthors,
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            session: replay
+        )
+        #expect(v2.firewallClass == .drift)
+        let j2 = try encodeVerdictJSONObject(v2)
+        #expect(j2["insertable"] as? Bool == false)
+        let f2 = (j2["fields"] as? [[String: Any]]) ?? []
+        #expect(f2.contains { ($0["field"] as? String) == "title" && ($0["remoteValue"] as? String) == "Deep learning" })
+
+        // 3. LSTM DOI + "Long Short-Term Memory Networks for Weather"
+        let v3 = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_lstm_weather",
+                kind: .article,
+                title: "Long Short-Term Memory Networks for Weather",
+                authors: lstmAuthors,
+                year: 1997,
+                venue: "Neural Computation",
+                doi: "10.1162/neco.1997.9.8.1735"
+            ),
+            session: replay
+        )
+        #expect(v3.firewallClass == .drift)
+        let j3 = try encodeVerdictJSONObject(v3)
+        #expect(j3["insertable"] as? Bool == false)
+        let f3 = (j3["fields"] as? [[String: Any]]) ?? []
+        #expect(f3.contains { ($0["field"] as? String) == "title" && ($0["remoteValue"] as? String) == "Long Short-Term Memory" })
+
+        // 4. 10.48550/arXiv.1706.03762 + "Attention is not all you need"
+        let v4 = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_attention_not",
+                kind: .article,
+                title: "Attention is not all you need",
+                authors: vaswaniAuthors,
+                year: 2017,
+                doi: "10.48550/arXiv.1706.03762"
+            ),
+            session: replay
+        )
+        #expect(v4.firewallClass == .drift)
+        let j4 = try encodeVerdictJSONObject(v4)
+        #expect(j4["insertable"] as? Bool == false)
+        let f4 = (j4["fields"] as? [[String: Any]]) ?? []
+        #expect(f4.contains { ($0["field"] as? String) == "title" && ($0["remoteValue"] as? String) == "Attention Is All You Need" })
+
+        // 5a. First author surname off by 1 letter: LeCunn vs LeCun
+        let v5a = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_lecunn",
+                kind: .article,
+                title: "Deep learning",
+                authors: [
+                    BibAuthor(givenName: "Yann", familyName: "LeCunn"),
+                    BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                    BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+                ],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            session: replay
+        )
+        #expect(v5a.firewallClass == .drift)
+        let j5a = try encodeVerdictJSONObject(v5a)
+        #expect(j5a["insertable"] as? Bool == false)
+        let f5a = (j5a["fields"] as? [[String: Any]]) ?? []
+        #expect(f5a.contains { ($0["field"] as? String) == "firstAuthor" && ($0["remoteValue"] as? String) == "LeCun" })
+
+        // 5b. First author surname off by 1 letter: Hochriter vs Hochreiter
+        let v5b = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_hochriter",
+                kind: .article,
+                title: "Long Short-Term Memory",
+                authors: [
+                    BibAuthor(givenName: "Sepp", familyName: "Hochriter"),
+                    BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber")
+                ],
+                year: 1997,
+                venue: "Neural Computation",
+                doi: "10.1162/neco.1997.9.8.1735"
+            ),
+            session: replay
+        )
+        #expect(v5b.firewallClass == .drift)
+        let j5b = try encodeVerdictJSONObject(v5b)
+        #expect(j5b["insertable"] as? Bool == false)
+        let f5b = (j5b["fields"] as? [[String: Any]]) ?? []
+        #expect(f5b.contains { ($0["field"] as? String) == "firstAuthor" && ($0["remoteValue"] as? String) == "Hochreiter" })
+
+        // 6. Only title + DOI, missing year and author
+        let missingBib = """
+        @article{missing_year_author,
+          title = {Deep learning},
+          doi   = {10.1038/nature14539}
+        }
+        """
+        let missingEntry = try #require(try BibTeXCodec().parse(missingBib).first)
+        let v6 = await firewall.verifyAgainstPublicRegistries(entry: missingEntry, session: replay)
+        #expect(v6.firewallClass == .drift)
+        let j6 = try encodeVerdictJSONObject(v6)
+        #expect(j6["insertable"] as? Bool == false)
+        let f6 = (j6["fields"] as? [[String: Any]]) ?? []
+        #expect(f6.contains { ($0["field"] as? String) == "year" && ($0["remoteValue"] as? String) == "2015" })
+        #expect(f6.contains { ($0["field"] as? String) == "firstAuthor" && ($0["remoteValue"] as? String) == "LeCun" })
+
+        // 7. Wrong journal / venue ("Science" vs "Nature")
+        let v7 = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "drift_wrong_venue",
+                kind: .article,
+                title: "Deep learning",
+                authors: lecunAuthors,
+                year: 2015,
+                venue: "Science",
+                doi: "10.1038/nature14539"
+            ),
+            session: replay
+        )
+        #expect(v7.firewallClass == .drift)
+        let j7 = try encodeVerdictJSONObject(v7)
+        #expect(j7["insertable"] as? Bool == false)
+        let f7 = (j7["fields"] as? [[String: Any]]) ?? []
+        #expect(f7.contains { ($0["field"] as? String) == "venue" && ($0["remoteValue"] as? String) == "Nature" })
+    }
+
+    @Test("M1 item 1 & 2: clean real entries are VERIFIED with sources/reasons/fields/insertable and no confidenceScore")
+    func m1Stage03CleanRealEntriesRemainVerifiedWithoutConfidenceScore() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let cleanLeCun = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: cleanLeCun, session: replay)
+        #expect(verdict.firewallClass == .verified)
+
+        let json = try encodeVerdictJSONObject(verdict)
+        #expect(json["insertable"] as? Bool == true)
+        #expect(json["confidenceScore"] == nil)
+        #expect(json["reasons"] as? [String] != nil)
+        let fields = try #require(json["fields"] as? [[String: Any]])
+        #expect(fields.isEmpty)
+        let sources = try #require(json["sources"] as? [[String: Any]])
+        #expect(sources.count == 1)
+        #expect(sources.first?["origin"] as? String == "replay")
+        #expect(sources.first?["status"] as? Int == 200)
+        #expect((sources.first?["url"] as? String) == "https://api.crossref.org/works/10.1038/nature14539")
+
+        // Abbreviated venue "Neural Comput." matches "Neural Computation"
+        let cleanLSTM = BibliographyEntry(
+            citeKey: "real_lstm_abbrev",
+            kind: .article,
+            title: "Long Short-Term Memory",
+            authors: [
+                BibAuthor(givenName: "Sepp", familyName: "Hochreiter"),
+                BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber")
+            ],
+            year: 1997,
+            venue: "Neural Comput.",
+            doi: "10.1162/neco.1997.9.8.1735"
+        )
+        let lstmVerdict = await firewall.verifyAgainstPublicRegistries(entry: cleanLSTM, session: replay)
+        #expect(lstmVerdict.firewallClass == .verified)
+    }
+
+    @Test("M1 item 4: sentinel list and wrong ORCID check digit emit findings only and still verify online")
+    func m1Stage03PlaceholderAndBadORCIDDoNotBlockOnlineVerification() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall(additionalSentinelDOIs: ["10.1038/nature14539"])
+
+        let lecunBadORCID = BibliographyEntry(
+            citeKey: "lecun_bad_orcid",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun", orcid: "0000-0002-1825-0098"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+
+        // Offline: must be UNVERIFIED (reason offline), NOT NOT_FOUND, while retaining advisory findings
+        let offlineVerdict = firewall.evaluate(lecunBadORCID)
+        #expect(offlineVerdict.firewallClass == .unverified)
+        #expect(offlineVerdict.findings.contains { $0.code == .invalidORCIDChecksum })
+        #expect(offlineVerdict.findings.contains { $0.code == .blockedPlaceholderSentinel })
+        let offlineJSON = try encodeVerdictJSONObject(offlineVerdict)
+        #expect((offlineJSON["reasons"] as? [String]) == ["offline"])
+
+        // Online (replay): must NOT short-circuit on offline hints; queries Crossref and derives VERIFIED
+        let onlineVerdict = await firewall.verifyAgainstPublicRegistries(entry: lecunBadORCID, session: replay)
+        #expect(onlineVerdict.firewallClass == .verified)
+        let onlineJSON = try encodeVerdictJSONObject(onlineVerdict)
+        #expect(onlineJSON["insertable"] as? Bool == true)
+    }
+
+    @Test("M1 item 1: injected disconnect, timeout, 429, 500, and malformed 200 JSON return UNVERIFIED with corresponding reason codes")
+    func m1Stage03InjectedFailuresReturnUnverifiedWithExactReasonCodes() async throws {
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+
+        let cases: [(String, ClosureRegistrySession)] = [
+            ("transport_error", ClosureRegistrySession { _ in throw URLError(.notConnectedToInternet) }),
+            ("timeout", ClosureRegistrySession { _ in throw URLError(.timedOut) }),
+            ("rate_limited", ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 429, body: Data("too many".utf8)) }),
+            ("server_error", ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 500, body: Data("boom".utf8)) }),
+            ("unparseable", ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 200, body: Data("{corrupt_json".utf8)) })
+        ]
+
+        for (expectedReason, session) in cases {
+            let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: session)
+            #expect(verdict.firewallClass == .unverified, "Expected UNVERIFIED for \(expectedReason)")
+            let json = try encodeVerdictJSONObject(verdict)
+            #expect(json["insertable"] as? Bool == false)
+            let reasons = (json["reasons"] as? [String]) ?? []
+            #expect(reasons == [expectedReason], "Expected [\(expectedReason)], got \(reasons)")
+        }
+    }
 }

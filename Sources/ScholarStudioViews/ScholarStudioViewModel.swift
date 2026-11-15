@@ -1990,7 +1990,7 @@ extension ScholarStudioViewModel {
             doi: "10.9999/fake.2025.001",
             abstractText: "Synthetic sample entry with sentinel DOI prefix 10.9999.",
             firewallClass: .notFound,
-            firewallAuditNote: "Demo synthetic fabricated entry - unverified",
+            firewallAuditNote: "Demo synthetic placeholder entry - unverified",
             citedByKeys: [],
             referencesKeys: []
         )

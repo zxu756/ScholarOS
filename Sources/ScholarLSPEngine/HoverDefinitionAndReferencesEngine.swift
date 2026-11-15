@@ -157,7 +157,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         at position: TextPosition,
         in workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry] = [],
-        bibliographyFiles: [String: String] = [:]
+        bibliographyFiles: [String: String] = [:],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
     ) -> LSPHoverCard? {
         hover(
             at: position,
@@ -165,7 +166,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
             workspace: workspace,
             sourcesByFile: [:],
             bibliography: bibliography,
-            bibliographyFiles: bibliographyFiles
+            bibliographyFiles: bibliographyFiles,
+            inRunVerdictsByKey: inRunVerdictsByKey
         )
     }
 
@@ -175,7 +177,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         workspace: MergedManuscriptWorkspaceAST,
         sourcesByFile: [String: String] = [:],
         bibliography: [BibliographyEntry] = [],
-        bibliographyFiles: [String: String] = [:]
+        bibliographyFiles: [String: String] = [:],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
     ) -> LSPHoverCard? {
         guard let symbol = resolveSymbol(
             at: position,
@@ -197,7 +200,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
                 clusterKeys: clusterKeys,
                 bibByKey: bibByKey,
                 workspace: workspace,
-                bibliographyFiles: bibliographyFiles
+                bibliographyFiles: bibliographyFiles,
+                inRunVerdictsByKey: inRunVerdictsByKey
             )
 
         case .crossReference(let targetKey, let command, _, _):
@@ -483,7 +487,8 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         clusterKeys: [String],
         bibByKey: [String: BibliographyEntry],
         workspace: MergedManuscriptWorkspaceAST,
-        bibliographyFiles: [String: String]
+        bibliographyFiles: [String: String],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     ) -> LSPHoverCard {
         let occurrences = workspace.symbolTable.citationsByKey[citeKey] ?? []
         let defLink = locateBibTeXEntryDefinition(
@@ -515,18 +520,33 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
             )
         }
 
-        let verdict = firewall.evaluate(entry)
+        let offline = firewall.evaluate(entry)
         let effectiveFirewallClass: CitationFirewallClass
-        let overriddenByOfflineCheck: Bool
-        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
-            effectiveFirewallClass = verdict.firewallClass
-            overriddenByOfflineCheck = (entry.firewallClass != verdict.firewallClass)
-        } else if entry.firewallClass != .unverified {
-            effectiveFirewallClass = entry.firewallClass
-            overriddenByOfflineCheck = false
+        let effectiveAuditNote: String
+        if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
+            if let inRun = inRunVerdictsByKey[entry.citeKey], !inRun.sources.isEmpty {
+                effectiveFirewallClass = inRun.firewallClass
+                effectiveAuditNote = inRun.auditNote
+            } else {
+                effectiveFirewallClass = offline.firewallClass
+                effectiveAuditNote = offline.auditNote
+            }
+        } else if let inRun = inRunVerdictsByKey[entry.citeKey] {
+            if inRun.firewallClass == .verified {
+                if inRun.insertable && !inRun.sources.isEmpty {
+                    effectiveFirewallClass = .verified
+                    effectiveAuditNote = inRun.auditNote
+                } else {
+                    effectiveFirewallClass = offline.firewallClass
+                    effectiveAuditNote = offline.auditNote
+                }
+            } else {
+                effectiveFirewallClass = inRun.firewallClass
+                effectiveAuditNote = inRun.auditNote
+            }
         } else {
-            effectiveFirewallClass = verdict.firewallClass
-            overriddenByOfflineCheck = false
+            effectiveFirewallClass = offline.firewallClass
+            effectiveAuditNote = offline.auditNote
         }
 
         let apaFormatted = cslFormatter.formatEntry(entry, style: .apa7)
@@ -535,10 +555,9 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         var lines: [String] = []
         lines.append("**Firewall Status:** `\(effectiveFirewallClass.badgeTitle)` (`\(effectiveFirewallClass.rawValue)`)")
         if !effectiveFirewallClass.allowsManuscriptInsertion {
-            let reason = (overriddenByOfflineCheck || entry.firewallAuditNote.isEmpty) ? verdict.auditNote : entry.firewallAuditNote
-            lines.append("> **Citation Firewall (`ERR_UNVERIFIED_CITATION`):** \(reason)")
-        } else if !entry.firewallAuditNote.isEmpty {
-            lines.append("_\(entry.firewallAuditNote)_")
+            lines.append("> **Citation Firewall (`ERR_UNVERIFIED_CITATION`):** \(effectiveAuditNote)")
+        } else if !effectiveAuditNote.isEmpty {
+            lines.append("_\(effectiveAuditNote)_")
         }
 
         lines.append("")

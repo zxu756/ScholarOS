@@ -104,6 +104,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         var bibliographyByKey: [String: BibliographyEntry]
         var orderedBibliographyKeys: [String]
         var bibliographyRawFiles: [String: String]
+        var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
         var cachedWorkspaceAST: MergedManuscriptWorkspaceAST?
         var cachedDiagnosticsReport: WorkspaceDiagnosticsReport?
         var externalSyncTeXSolver: SyncTeXCoordinateSolver?
@@ -198,6 +199,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             bibliographyByKey: bibMap,
             orderedBibliographyKeys: bibOrder,
             bibliographyRawFiles: rawBibs,
+            inRunVerdictsByKey: [:],
             cachedWorkspaceAST: nil,
             cachedDiagnosticsReport: nil,
             externalSyncTeXSolver: extSolver,
@@ -487,6 +489,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         }
                         st.bibliographyByKey = newBibMap
                         st.orderedBibliographyKeys = newOrder
+                        st.inRunVerdictsByKey = [:]
                     }
                 }
             }
@@ -519,6 +522,10 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         withLock { $0.bibliographyByKey[citeKey] }
     }
 
+    public var inRunVerdicts: [String: CitationFirewallEntryVerdict] {
+        withLock { $0.inRunVerdictsByKey }
+    }
+
     public func setBibliography(_ entries: [BibliographyEntry]) {
         withLock { st in
             var map: [String: BibliographyEntry] = [:]
@@ -531,6 +538,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             }
             st.bibliographyByKey = map
             st.orderedBibliographyKeys = order
+            st.inRunVerdictsByKey = [:]
             st.cachedDiagnosticsReport = nil
         }
     }
@@ -541,6 +549,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 st.orderedBibliographyKeys.append(entry.citeKey)
             }
             st.bibliographyByKey[entry.citeKey] = entry
+            st.inRunVerdictsByKey.removeValue(forKey: entry.citeKey)
             st.cachedDiagnosticsReport = nil
         }
     }
@@ -549,6 +558,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         withLock { st in
             st.bibliographyByKey.removeValue(forKey: citeKey)
             st.orderedBibliographyKeys.removeAll { $0 == citeKey }
+            st.inRunVerdictsByKey.removeValue(forKey: citeKey)
             st.cachedDiagnosticsReport = nil
         }
     }
@@ -564,6 +574,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     st.orderedBibliographyKeys.append(entry.citeKey)
                 }
                 st.bibliographyByKey[entry.citeKey] = entry
+                st.inRunVerdictsByKey.removeValue(forKey: entry.citeKey)
             }
             st.cachedDiagnosticsReport = nil
         }
@@ -576,14 +587,18 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
     }
 
     /// Assertion throwing `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`)
-    /// if ANY cited key in the manuscript is missing or not `VERIFIED`.
+    /// if ANY cited key in the manuscript is missing or not `VERIFIED` in the current run.
     public func assertAllCitedEntriesPassFirewall() throws {
-        let (ws, bibMap) = withLock { st -> (MergedManuscriptWorkspaceAST, [String: BibliographyEntry]) in
-            (ensureWorkspaceAST(&st), st.bibliographyByKey)
+        let (ws, bibMap, inRun) = withLock { st -> (MergedManuscriptWorkspaceAST, [String: BibliographyEntry], [String: CitationFirewallEntryVerdict]) in
+            (ensureWorkspaceAST(&st), st.bibliographyByKey, st.inRunVerdictsByKey)
         }
 
         let uniqueCited = Set(ws.symbolTable.allCitationOccurrences.map(\.citeKey)).sorted()
-        _ = try citationFirewall.assertAllCitationsAllowed(citeKeys: uniqueCited, in: bibMap)
+        _ = try citationFirewall.assertAllCitationsAllowed(
+            citeKeys: uniqueCited,
+            in: bibMap,
+            verifiedVerdicts: inRun
+        )
     }
 
     /// Runs live/mocked online registry verification (Crossref, OpenAlex, arXiv) across all bibliography entries
@@ -600,7 +615,23 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             verdicts.append(verdict)
         }
 
-        setBibliography(verdicts.map(\.auditedEntry))
+        withLock { st in
+            var map: [String: BibliographyEntry] = [:]
+            var order: [String] = []
+            var verdictMap: [String: CitationFirewallEntryVerdict] = [:]
+            for verdict in verdicts {
+                let entry = verdict.auditedEntry
+                if map[entry.citeKey] == nil {
+                    order.append(entry.citeKey)
+                }
+                map[entry.citeKey] = entry
+                verdictMap[entry.citeKey] = verdict
+            }
+            st.bibliographyByKey = map
+            st.orderedBibliographyKeys = order
+            st.inRunVerdictsByKey = verdictMap
+            st.cachedDiagnosticsReport = nil
+        }
         return citationFirewall.summarizeVerdicts(verdicts)
     }
 
@@ -661,11 +692,11 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         maxItems: Int = 50
     ) -> [LSPCompletionItem] {
         let norm = Self.normalizeWorkspacePath(filePath)
-        let (docOpt, ws, bibList, knownFiles) = withLock { st -> (DocumentBufferSnapshot?, MergedManuscriptWorkspaceAST, [BibliographyEntry], [String]) in
+        let (docOpt, ws, bibList, inRun, knownFiles) = withLock { st -> (DocumentBufferSnapshot?, MergedManuscriptWorkspaceAST, [BibliographyEntry], [String: CitationFirewallEntryVerdict], [String]) in
             let w = ensureWorkspaceAST(&st)
             let b = st.orderedBibliographyKeys.compactMap { st.bibliographyByKey[$0] }
             let files = Array(st.documents.keys) + Array(st.bibliographyRawFiles.keys)
-            return (st.documents[norm], w, b, files)
+            return (st.documents[norm], w, b, st.inRunVerdictsByKey, files)
         }
         guard let doc = docOpt else { return [] }
         let ctx = completionEngine.detectContext(in: doc.source, filePath: norm, at: position, lineIndex: doc.lineIndex)
@@ -674,6 +705,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             in: doc.source,
             symbolTable: ws.symbolTable,
             bibliography: bibList,
+            inRunVerdictsByKey: inRun,
             workspaceFiles: knownFiles,
             maxItems: maxItems
         )
@@ -692,14 +724,15 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
 
     public func hover(at position: TextPosition, in filePath: String) -> LSPHoverCard? {
         let norm = Self.normalizeWorkspacePath(filePath)
-        let (ws, sources, bibList, bibRaw) = snapshotNavigationInputs()
+        let (ws, sources, bibList, bibRaw, inRun) = snapshotNavigationInputsWithVerdicts()
         return navigationEngine.hover(
             at: position,
             in: norm,
             workspace: ws,
             sourcesByFile: sources,
             bibliography: bibList,
-            bibliographyFiles: bibRaw
+            bibliographyFiles: bibRaw,
+            inRunVerdictsByKey: inRun
         )
     }
 
@@ -843,11 +876,26 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         abstractText: entry.abstractText,
                         firewallClass: entry.firewallClass,
                         firewallAuditNote: entry.firewallAuditNote,
+                        untrustedDeclaredFirewallClass: entry.untrustedDeclaredFirewallClass,
+                        untrustedDeclaredFirewallNote: entry.untrustedDeclaredFirewallNote,
                         attachedPDFPath: entry.attachedPDFPath,
                         citedByKeys: entry.citedByKeys,
                         referencesKeys: entry.referencesKeys
                     )
                     st.bibliographyByKey[newKey] = renamedEntry
+                    if let oldVerdict = st.inRunVerdictsByKey.removeValue(forKey: oldKey) {
+                        st.inRunVerdictsByKey[newKey] = CitationFirewallEntryVerdict(
+                            citeKey: newKey,
+                            firewallClass: oldVerdict.firewallClass,
+                            insertable: oldVerdict.insertable,
+                            reasons: oldVerdict.reasons,
+                            sources: oldVerdict.sources,
+                            fields: oldVerdict.fields,
+                            findings: oldVerdict.findings,
+                            auditNote: oldVerdict.auditNote,
+                            auditedEntry: renamedEntry
+                        )
+                    }
                     if let idx = st.orderedBibliographyKeys.firstIndex(of: oldKey) {
                         st.orderedBibliographyKeys[idx] = newKey
                     } else {
@@ -1000,7 +1048,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             workspace: workspace,
             bibliography: bibList,
             sourcesByFile: sources,
-            bibliographyFiles: st.bibliographyRawFiles
+            bibliographyFiles: st.bibliographyRawFiles,
+            inRunVerdictsByKey: st.inRunVerdictsByKey
         )
         st.cachedDiagnosticsReport = report
         return report
@@ -1027,12 +1076,23 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         [BibliographyEntry],
         [String: String]
     ) {
+        let (ws, sources, bibList, bibRaw, _) = snapshotNavigationInputsWithVerdicts()
+        return (ws, sources, bibList, bibRaw)
+    }
+
+    private func snapshotNavigationInputsWithVerdicts() -> (
+        MergedManuscriptWorkspaceAST,
+        [String: String],
+        [BibliographyEntry],
+        [String: String],
+        [String: CitationFirewallEntryVerdict]
+    ) {
         withLock { st in
             let ws = ensureWorkspaceAST(&st)
             var sources: [String: String] = [:]
             for (k, snap) in st.documents { sources[k] = snap.source }
             let bibList = st.orderedBibliographyKeys.compactMap { st.bibliographyByKey[$0] }
-            return (ws, sources, bibList, st.bibliographyRawFiles)
+            return (ws, sources, bibList, st.bibliographyRawFiles, st.inRunVerdictsByKey)
         }
     }
 

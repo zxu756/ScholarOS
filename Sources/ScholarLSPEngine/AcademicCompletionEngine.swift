@@ -285,6 +285,7 @@ public struct AcademicCompletionEngine: Sendable {
         sourceOverride: String? = nil,
         at position: TextPosition,
         bibliography: [BibliographyEntry] = [],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         maxItems: Int = 50
     ) -> [LSPCompletionItem] {
         let targetFile = filePath ?? workspace.includeGraph.rootFilePath
@@ -303,6 +304,7 @@ public struct AcademicCompletionEngine: Sendable {
             at: position,
             symbolTable: workspace.symbolTable,
             bibliography: bibliography,
+            inRunVerdictsByKey: inRunVerdictsByKey,
             workspaceFiles: knownFiles,
             maxItems: maxItems
         )
@@ -314,12 +316,21 @@ public struct AcademicCompletionEngine: Sendable {
         at position: TextPosition,
         symbolTable: ManuscriptSymbolTable = .empty,
         bibliography: [BibliographyEntry] = [],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         workspaceFiles: [String] = [],
         maxItems: Int = 50
     ) -> [LSPCompletionItem] {
         let idx = LineByteIndex(source: source)
         let context = detectContext(in: source, filePath: filePath, at: position, lineIndex: idx)
-        return complete(for: context, in: source, symbolTable: symbolTable, bibliography: bibliography, workspaceFiles: workspaceFiles, maxItems: maxItems)
+        return complete(
+            for: context,
+            in: source,
+            symbolTable: symbolTable,
+            bibliography: bibliography,
+            inRunVerdictsByKey: inRunVerdictsByKey,
+            workspaceFiles: workspaceFiles,
+            maxItems: maxItems
+        )
     }
 
     public func complete(
@@ -327,6 +338,7 @@ public struct AcademicCompletionEngine: Sendable {
         in source: String = "",
         symbolTable: ManuscriptSymbolTable = .empty,
         bibliography: [BibliographyEntry] = [],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         workspaceFiles: [String] = [],
         maxItems: Int = 50
     ) -> [LSPCompletionItem] {
@@ -341,6 +353,7 @@ public struct AcademicCompletionEngine: Sendable {
             results = rankCitationCompletions(
                 context: context,
                 bibliography: bibliography,
+                inRunVerdictsByKey: inRunVerdictsByKey,
                 symbolTable: symbolTable
             )
             // In Typst `@...` shorthand, `@` also addresses `<label>` anchors (`@fig:...`, `@sec:...`)!
@@ -362,6 +375,7 @@ public struct AcademicCompletionEngine: Sendable {
                 let citeItems = rankCitationCompletions(
                     context: context,
                     bibliography: bibliography,
+                    inRunVerdictsByKey: inRunVerdictsByKey,
                     symbolTable: symbolTable
                 ).filter { $0.relevanceScore >= 0.45 }
                 results.append(contentsOf: citeItems)
@@ -416,6 +430,7 @@ public struct AcademicCompletionEngine: Sendable {
     private func rankCitationCompletions(
         context: AcademicCompletionContext,
         bibliography: [BibliographyEntry],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict],
         symbolTable: ManuscriptSymbolTable
     ) -> [LSPCompletionItem] {
         let query = context.queryPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -428,7 +443,10 @@ public struct AcademicCompletionEngine: Sendable {
                 continue
             }
 
-            let effectiveFirewallClass = resolveEffectiveFirewallClass(for: entry)
+            let (effectiveFirewallClass, effectiveAuditNote) = resolveEffectiveFirewallClass(
+                for: entry,
+                inRunVerdictsByKey: inRunVerdictsByKey
+            )
             let baseMatchScore = scoreBibliographyMatch(entry: entry, query: query)
             guard baseMatchScore > 0.0 else { continue }
 
@@ -441,26 +459,26 @@ public struct AcademicCompletionEngine: Sendable {
             case .verified:
                 firewallDelta = 0.20
                 statusPrefix = "[✓ Verified]"
-                firewallWarningMarkdown = "**Firewall Status:** `VERIFIED` — Registry metadata verified; cleared for submission."
+                firewallWarningMarkdown = "**Firewall Status:** `VERIFIED` — \(effectiveAuditNote)"
             case .drift:
                 firewallDelta = -0.15
                 statusPrefix = "[⚠ Metadata Drift]"
-                let note = entry.firewallAuditNote.isEmpty ? "Metadata discrepancy vs external registry." : entry.firewallAuditNote
+                let note = effectiveAuditNote.isEmpty ? "Metadata discrepancy vs external registry." : effectiveAuditNote
                 firewallWarningMarkdown = "**Firewall Status:** `DRIFT` — \(note)"
             case .unverified:
                 firewallDelta = -0.25
                 statusPrefix = "[⚠ UNVERIFIED]"
-                let note = entry.firewallAuditNote.isEmpty ? "Entry has not been verified against external registries." : entry.firewallAuditNote
+                let note = effectiveAuditNote.isEmpty ? "Entry has not been verified against external registries." : effectiveAuditNote
                 firewallWarningMarkdown = "> **WARNING (`ERR_UNVERIFIED_CITATION`):** Unverified reference (`UNVERIFIED`). \(note)"
             case .notFound:
                 firewallDelta = -0.55
                 statusPrefix = "[⛔ NOT FOUND]"
-                let note = entry.firewallAuditNote.isEmpty ? "Identifier not found or failed structural check." : entry.firewallAuditNote
+                let note = effectiveAuditNote.isEmpty ? "Identifier not found or failed structural check." : effectiveAuditNote
                 firewallWarningMarkdown = "> **BLOCKED (`ERR_UNVERIFIED_CITATION`):** Citation Firewall marks this entry `NOT_FOUND`. \(note)"
             case .retracted:
                 firewallDelta = -0.60
                 statusPrefix = "[⛔ RETRACTED]"
-                let note = entry.firewallAuditNote.isEmpty ? "Marked as retracted work." : entry.firewallAuditNote
+                let note = effectiveAuditNote.isEmpty ? "Marked as retracted work." : effectiveAuditNote
                 firewallWarningMarkdown = "> **BLOCKED (`ERR_UNVERIFIED_CITATION`):** Citation Firewall marks this entry `RETRACTED`. \(note)"
             }
 
@@ -515,15 +533,27 @@ public struct AcademicCompletionEngine: Sendable {
         return items
     }
 
-    private func resolveEffectiveFirewallClass(for entry: BibliographyEntry) -> CitationFirewallClass {
-        let verdict = firewall.evaluate(entry)
-        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
-            return verdict.firewallClass
+    private func resolveEffectiveFirewallClass(
+        for entry: BibliographyEntry,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
+    ) -> (CitationFirewallClass, String) {
+        let offline = firewall.evaluate(entry)
+        if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
+            if let inRun = inRunVerdictsByKey[entry.citeKey], !inRun.sources.isEmpty {
+                return (inRun.firewallClass, inRun.auditNote)
+            }
+            return (offline.firewallClass, offline.auditNote)
         }
-        if entry.firewallClass != .unverified {
-            return entry.firewallClass
+        if let inRun = inRunVerdictsByKey[entry.citeKey] {
+            if inRun.firewallClass == .verified {
+                if inRun.insertable && !inRun.sources.isEmpty {
+                    return (.verified, inRun.auditNote)
+                }
+                return (offline.firewallClass, offline.auditNote)
+            }
+            return (inRun.firewallClass, inRun.auditNote)
         }
-        return verdict.firewallClass
+        return (offline.firewallClass, offline.auditNote)
     }
 
     private func scoreBibliographyMatch(entry: BibliographyEntry, query: String) -> Double {

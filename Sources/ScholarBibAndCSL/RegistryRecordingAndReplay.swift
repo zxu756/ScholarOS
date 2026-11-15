@@ -681,7 +681,9 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             return RegistryHTTPResponse(
                 statusCode: existing.status,
                 body: data,
-                headers: existing.responseHeaders
+                headers: existing.responseHeaders,
+                origin: .network,
+                fetchedAt: existing.requestedAt
             )
         }
 
@@ -799,7 +801,13 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             throw err
         }
 
-        return response
+        return RegistryHTTPResponse(
+            statusCode: response.statusCode,
+            body: response.body,
+            headers: response.headers,
+            origin: .network,
+            fetchedAt: requestedAt
+        )
     }
 
     @discardableResult
@@ -1102,7 +1110,9 @@ public actor RegistryReplaySession: CitationRegistrySession {
         return RegistryHTTPResponse(
             statusCode: entry.item.status,
             body: entry.body,
-            headers: entry.item.responseHeaders
+            headers: entry.item.responseHeaders,
+            origin: .replay,
+            fetchedAt: entry.item.requestedAt
         )
     }
 }

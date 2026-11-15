@@ -1,6 +1,6 @@
 {
-  "completed_at" : "2026-11-15T11:19:13Z",
-  "count" : 6,
+  "completed_at" : "2026-11-15T11:47:19Z",
+  "count" : 7,
   "items" : [
     {
       "attempts" : 1,
@@ -141,9 +141,30 @@
       "slug" : "crossref_doi_10.1016_j.fct.2012.08.005_f091402146",
       "status" : 200,
       "url" : "https://api.crossref.org/works/10.1016/j.fct.2012.08.005"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2965,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1706.03762_87e6038c6f.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T11:47:18Z",
+      "response_date_header" : "Sun, 15 Nov 2026 11:47:19 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Sun, 15 Nov 2026 11:47:19 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "962722d031270b9d775cf100b03f56fd3ebf5758e3c8aaa3afc8e9c23b04ed79",
+      "slug" : "arxiv_id_1706.03762_87e6038c6f",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1706.03762"
     }
   ],
   "meta_files_sha256" : {
+    "arxiv_id_1706.03762_87e6038c6f.meta.json" : "39b72e0602f65547ea021222cc207ae224772999d1d40c82c6d4d5f2b54c485f",
     "crossref_doi_10.1016_j.fct.2012.08.005_f091402146.meta.json" : "8796c6ca16ec92ad0ca0af0b0bba913d94c4f507d00e0047d70d51810f9a975b",
     "crossref_doi_10.1038_171737a0_acacff2238.meta.json" : "9d4431b70b282030ec451297b48a4aeab90323ccc39d9959853b9903dce83fbb",
     "crossref_doi_10.1038_fake.2026.99999_1138775f70.meta.json" : "9fd634974b8a2c70ae4ef626e8bd8f42507834aa62bf6e423fe3450810e80212",
@@ -152,6 +173,6 @@
     "openalex_doi_10.1038_fake.2026.99999_fcda3cff0b.meta.json" : "8f503da9f85424a97ce33052b2d66efde5feb531a25a8c9899566fc3d8e94fc2"
   },
   "started_at" : "2026-11-15T11:19:08Z",
-  "total_http_requests_sent" : 6,
+  "total_http_requests_sent" : 7,
   "user_agent" : "ScholarOS/1.2.0"
 }

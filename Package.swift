@@ -63,7 +63,10 @@ let package = Package(
         ),
         .target(
             name: "ScholarProjectStore",
-            dependencies: ["ScholarModels"],
+            dependencies: [
+                "ScholarModels",
+                "ScholarBibAndCSL"
+            ],
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]

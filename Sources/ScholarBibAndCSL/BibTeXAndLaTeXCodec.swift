@@ -1402,12 +1402,7 @@ public struct BibTeXCodec: Sendable {
             fields.append(("file", ":\(pdfPath):PDF"))
         }
 
-        if options.includeFirewallMetadataFields {
-            fields.append(("x-firewall-class", entry.firewallClass.rawValue))
-            if let note = nonEmpty(entry.firewallAuditNote) {
-                fields.append(("x-firewall-note", latexCodec.encode(note, escapeUnicodeToLaTeX: options.escapeUnicodeToLaTeX)))
-            }
-        }
+        // S42 / M1 item 8: never serialize x-firewall-class or x-firewall-note when exporting .bib.
 
         if options.includeCitationGraphFields {
             if !entry.citedByKeys.isEmpty {
@@ -1565,7 +1560,7 @@ public struct BibTeXCodec: Sendable {
             return nil
         }
 
-        let rawTitle = take("title", "booktitle") ?? "Untitled"
+        let rawTitle = take("title", "booktitle") ?? ""
         let decodedTitle = latexCodec.decode(rawTitle)
 
         let rawAuthor = take("author", "editor") ?? ""
@@ -1631,24 +1626,19 @@ public struct BibTeXCodec: Sendable {
             venue: decodedVenue
         )
 
-        var firewallClass: CitationFirewallClass = .unverified
-        if let rawFW = take("x-firewall-class") {
-            let decodedFW = latexCodec.decode(rawFW)
-            if let matched = CitationFirewallClass(rawValue: decodedFW) {
-                firewallClass = matched
-            } else {
-                diagnostics.append(
-                    BibTeXParseDiagnostic(
-                        line: line,
-                        column: 1,
-                        severity: .warning,
-                        citeKey: citeKey,
-                        message: "Unrecognized x-firewall-class '\(decodedFW)'; defaulting to UNVERIFIED."
-                    )
-                )
-            }
-        }
-        let firewallNote = take("x-firewall-note").map { latexCodec.decode($0) } ?? ""
+        // S42 / M1 item 8: never trust x-firewall-class or x-firewall-note embedded in .bib files.
+        let untrustedFWClass: String? = {
+            guard let rawFW = take("x-firewall-class") else { return nil }
+            let decoded = latexCodec.decode(rawFW).trimmingCharacters(in: .whitespacesAndNewlines)
+            return decoded.isEmpty ? nil : decoded
+        }()
+        let untrustedFWNote: String? = {
+            guard let rawNote = take("x-firewall-note") else { return nil }
+            let decoded = latexCodec.decode(rawNote).trimmingCharacters(in: .whitespacesAndNewlines)
+            return decoded.isEmpty ? nil : decoded
+        }()
+        let firewallClass: CitationFirewallClass = .unverified
+        let firewallNote = ""
 
         let citedByKeys = splitCitationKeyList(take("x-cited-by"))
         let referencesKeys = splitCitationKeyList(take("x-references", "cites"))
@@ -1676,6 +1666,8 @@ public struct BibTeXCodec: Sendable {
             abstractText: abstractText,
             firewallClass: firewallClass,
             firewallAuditNote: firewallNote,
+            untrustedDeclaredFirewallClass: untrustedFWClass,
+            untrustedDeclaredFirewallNote: untrustedFWNote,
             attachedPDFPath: attachedPDF,
             citedByKeys: citedByKeys,
             referencesKeys: referencesKeys

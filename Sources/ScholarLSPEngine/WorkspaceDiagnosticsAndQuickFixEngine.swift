@@ -121,7 +121,7 @@ public struct WorkspaceDiagnosticsReport: Sendable, Codable, Hashable {
         self.errorCount = diagnostics.filter { $0.severity == .error }.count
         self.warningCount = diagnostics.filter { $0.severity == .warning }.count
         self.firewallViolationCount = diagnostics.filter {
-            $0.code == "ERR_UNVERIFIED_CITATION" || $0.code == "CITE404"
+            $0.code == "ERR_UNVERIFIED_CITATION" || $0.code == "CITE404" || $0.code == "FW_METADATA_DRIFT"
         }.count
     }
 }
@@ -147,7 +147,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry] = [],
         sourcesByFile: [String: String] = [:],
-        bibliographyFiles: [String: String] = [:]
+        bibliographyFiles: [String: String] = [:],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
     ) -> WorkspaceDiagnosticsReport {
         var diagnostics: [LSPDiagnostic] = []
         var actions: [LSPCodeAction] = []
@@ -166,7 +167,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         let (fwDiags, fwActions) = analyzeCitationFirewallGates(
             workspace: workspace,
             bibliography: bibliography,
-            sourcesByFile: resolvedSources
+            sourcesByFile: resolvedSources,
+            inRunVerdictsByKey: inRunVerdictsByKey
         )
         diagnostics.append(contentsOf: fwDiags)
         actions.append(contentsOf: fwActions)
@@ -189,9 +191,14 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
     public func diagnostics(
         in workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry] = [],
-        filePathFilter: String? = nil
+        filePathFilter: String? = nil,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
     ) -> [LSPDiagnostic] {
-        let all = analyze(workspace: workspace, bibliography: bibliography).diagnostics
+        let all = analyze(
+            workspace: workspace,
+            bibliography: bibliography,
+            inRunVerdictsByKey: inRunVerdictsByKey
+        ).diagnostics
         guard let filter = filePathFilter else { return all }
         return all.filter { $0.span.filePath == filter }
     }
@@ -200,9 +207,14 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         in workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry] = [],
         filePath: String? = nil,
-        overlapping range: TextSpan? = nil
+        overlapping range: TextSpan? = nil,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
     ) -> [LSPCodeAction] {
-        let all = analyze(workspace: workspace, bibliography: bibliography).codeActions
+        let all = analyze(
+            workspace: workspace,
+            bibliography: bibliography,
+            inRunVerdictsByKey: inRunVerdictsByKey
+        ).codeActions
         return all.filter { action in
             if let f = filePath, action.workspaceEdit.editsByFile[f] == nil {
                 return false
@@ -315,18 +327,21 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         return actions
     }
 
-    // MARK: - Layer 4: Citation Verification Firewall Hardware-Gate Analysis
+    // MARK: - Layer 4: Citation Verification Firewall Gate Analysis
 
     private func analyzeCitationFirewallGates(
         workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry],
-        sourcesByFile: [String: String]
+        sourcesByFile: [String: String],
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     ) -> ([LSPDiagnostic], [LSPCodeAction]) {
         var diagnostics: [LSPDiagnostic] = []
         var actions: [LSPCodeAction] = []
 
         let bibByKey = Dictionary(bibliography.map { ($0.citeKey, $0) }, uniquingKeysWith: { first, _ in first })
-        let verifiedCiteKeys = bibliography.filter { resolveEffectiveFirewall(for: $0).0.allowsManuscriptInsertion }.map(\.citeKey)
+        let verifiedCiteKeys = bibliography
+            .filter { resolveEffectiveFirewall(for: $0, inRunVerdictsByKey: inRunVerdictsByKey).0.allowsManuscriptInsertion }
+            .map(\.citeKey)
         let allCiteKeys = Array(bibByKey.keys)
 
         for occ in workspace.symbolTable.allCitationOccurrences {
@@ -372,7 +387,10 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                 continue
             }
 
-            let (effectiveClass, verdictNote) = resolveEffectiveFirewall(for: entry)
+            let (effectiveClass, verdictNote) = resolveEffectiveFirewall(
+                for: entry,
+                inRunVerdictsByKey: inRunVerdictsByKey
+            )
 
             switch effectiveClass {
             case .verified:
@@ -433,20 +451,27 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         return (diagnostics, actions)
     }
 
-    private func resolveEffectiveFirewall(for entry: BibliographyEntry) -> (CitationFirewallClass, String) {
-        let verdict = firewall.evaluate(entry)
-        if verdict.firewallClass == .retracted || verdict.firewallClass == .notFound {
-            let note = (entry.firewallClass == verdict.firewallClass && !entry.firewallAuditNote.isEmpty)
-                ? entry.firewallAuditNote
-                : verdict.auditNote
-            return (verdict.firewallClass, note)
+    private func resolveEffectiveFirewall(
+        for entry: BibliographyEntry,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
+    ) -> (CitationFirewallClass, String) {
+        let offline = firewall.evaluate(entry)
+        if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
+            if let inRun = inRunVerdictsByKey[entry.citeKey], !inRun.sources.isEmpty {
+                return (inRun.firewallClass, inRun.auditNote)
+            }
+            return (offline.firewallClass, offline.auditNote)
         }
-        if entry.firewallClass != .unverified {
-            let note = entry.firewallAuditNote.isEmpty ? verdict.auditNote : entry.firewallAuditNote
-            return (entry.firewallClass, note)
+        if let inRun = inRunVerdictsByKey[entry.citeKey] {
+            if inRun.firewallClass == .verified {
+                if inRun.insertable && !inRun.sources.isEmpty {
+                    return (.verified, inRun.auditNote)
+                }
+                return (offline.firewallClass, offline.auditNote)
+            }
+            return (inRun.firewallClass, inRun.auditNote)
         }
-        let note = entry.firewallAuditNote.isEmpty ? verdict.auditNote : entry.firewallAuditNote
-        return (verdict.firewallClass, note)
+        return (offline.firewallClass, offline.auditNote)
     }
 
     // MARK: - Layer 5: Structural Academic Lint Rules & Quick-Fixes

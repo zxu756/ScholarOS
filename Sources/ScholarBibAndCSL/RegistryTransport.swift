@@ -25,15 +25,31 @@ public struct RegistryTransportError: Error, LocalizedError, Sendable, Hashable 
     }
 }
 
+public enum CitationVerdictSourceOrigin: String, Sendable, Codable, Hashable, CaseIterable {
+    case network = "network"
+    case cache = "cache"
+    case replay = "replay"
+}
+
 public struct RegistryHTTPResponse: Sendable, Codable, Hashable {
     public let statusCode: Int
     public let body: Data
     public let headers: [String: String]
+    public let origin: CitationVerdictSourceOrigin
+    public let fetchedAt: String?
 
-    public init(statusCode: Int, body: Data, headers: [String: String] = [:]) {
+    public init(
+        statusCode: Int,
+        body: Data,
+        headers: [String: String] = [:],
+        origin: CitationVerdictSourceOrigin = .network,
+        fetchedAt: String? = nil
+    ) {
         self.statusCode = statusCode
         self.body = body
         self.headers = headers
+        self.origin = origin
+        self.fetchedAt = fetchedAt
     }
 
     /// Case-insensitive header lookup across captured response headers.
@@ -241,7 +257,9 @@ public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
         return RegistryHTTPResponse(
             statusCode: httpResponse.statusCode,
             body: data,
-            headers: headers
+            headers: headers,
+            origin: .network,
+            fetchedAt: ISO8601DateFormatter().string(from: Date())
         )
     }
 

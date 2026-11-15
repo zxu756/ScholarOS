@@ -222,12 +222,29 @@ public struct ScholarCLIRunner: Sendable {
             let parsed = try parseArgs(
                 rest,
                 subcommand: subcommand,
-                valueFlags: ["--project", "--bib"],
+                valueFlags: ["--project", "--bib", "--registry-replay"],
                 boolFlags: ["--demo", "--json"],
                 maxPositionals: 1,
                 lang: lang
             )
             let emitJSON = parsed.bools.contains("--json")
+            let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let replayDir, replayDir.isEmpty {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Option '--registry-replay' requires a non-empty directory path.",
+                        "选项 '--registry-replay' 需要提供非空目录路径。"
+                    )
+                )
+            }
+            if parsed.bools.contains("--demo") && replayDir != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --demo with --registry-replay.",
+                        "不能将 --demo 与 --registry-replay 同时使用。"
+                    )
+                )
+            }
             if let fileArg = parsed.positionals.first {
                 if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
                     throw ScholarOSError.invalidCLIArguments(
@@ -241,6 +258,11 @@ public struct ScholarCLIRunner: Sendable {
                     path: fileArg,
                     explicitBibPath: parsed.values["--bib"]
                 )
+                if let replayDir {
+                    let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
+                    _ = await lsp.verifyCitationsOnline(using: replaySession)
+                    try await replaySession.throwIfFailed()
+                }
                 return CLIExecutionOutput(
                     stdout: try formatDiagnostics(lsp.diagnosticsReport(), asJSON: emitJSON, isDemo: false, lang: lang),
                     exitCode: 0
@@ -249,13 +271,18 @@ public struct ScholarCLIRunner: Sendable {
             let opened = try openReadDatabase(
                 parsed: parsed,
                 usage: lang.L(
-                    "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--json] | --project <dir.scholarproj> | --demo",
-                    "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--json] | --project <dir.scholarproj> | --demo"
+                    "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--registry-replay <dir>] [--json] | --project <dir.scholarproj> | --demo",
+                    "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--registry-replay <目录>] [--json] | --project <dir.scholarproj> | --demo"
                 ),
                 lang: lang
             )
             defer { opened.db.close() }
             let lsp = try makeLSPService(from: opened.db)
+            if let replayDir {
+                let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
+                _ = await lsp.verifyCitationsOnline(using: replaySession)
+                try await replaySession.throwIfFailed()
+            }
             return CLIExecutionOutput(
                 stdout: try formatDiagnostics(lsp.diagnosticsReport(), asJSON: emitJSON, isDemo: opened.isDemo, lang: lang),
                 exitCode: 0
@@ -345,7 +372,7 @@ public struct ScholarCLIRunner: Sendable {
             }
 
             let firewall = CitationVerificationFirewall()
-            let audit: CitationFirewallAuditReport
+            let rawAudit: CitationFirewallAuditReport
             let isReplayMode: Bool
             let performedRegistryLookup: Bool
 
@@ -365,7 +392,7 @@ public struct ScholarCLIRunner: Sendable {
                     verdicts.append(verdict)
                 }
                 _ = try await recordingSession.finalize()
-                audit = firewall.summarizeVerdicts(verdicts)
+                rawAudit = firewall.summarizeVerdicts(verdicts)
                 isReplayMode = false
                 performedRegistryLookup = true
             } else if let replayDir {
@@ -382,14 +409,16 @@ public struct ScholarCLIRunner: Sendable {
                     try await replaySession.throwIfFailed()
                     verdicts.append(verdict)
                 }
-                audit = firewall.summarizeVerdicts(verdicts)
+                rawAudit = firewall.summarizeVerdicts(verdicts)
                 isReplayMode = true
                 performedRegistryLookup = true
             } else {
-                audit = firewall.auditLibrary(entries)
+                rawAudit = firewall.auditLibrary(entries)
                 isReplayMode = false
                 performedRegistryLookup = false
             }
+
+            let audit = Self.localizingUntrustedFileTagFindings(in: rawAudit, firewall: firewall, lang: lang)
 
             let allVerified = audit.totalEvaluated > 0 && audit.verifiedCount == audit.totalEvaluated
             let exitCode: Int32 = allVerified ? 0 : 1
@@ -434,6 +463,9 @@ public struct ScholarCLIRunner: Sendable {
                 // Without --registry-record or --registry-replay, this command performs no online lookups yet.
                 lines.append(Self.noOnlineLookupNotice(lang))
             }
+            if audit.unverifiedCount > 0 {
+                lines.append(Self.incompleteUnverifiedSummaryLine(audit: audit, lang: lang))
+            }
             for verdict in audit.verdicts {
                 // The class is printed once, here; the note's own leading "[CLASS] " tag is dropped.
                 let note = CitationAuditWording.strippingLeadingClassTag(
@@ -447,20 +479,73 @@ public struct ScholarCLIRunner: Sendable {
             let parsed = try parseArgs(
                 rest,
                 subcommand: subcommand,
-                valueFlags: ["--project"],
+                valueFlags: ["--project", "--bib", "--registry-replay"],
                 boolFlags: ["--demo"],
-                maxPositionals: 1
+                maxPositionals: 1,
+                lang: lang
             )
             guard let citeKey = parsed.positionals.first else {
                 throw ScholarOSError.invalidCLIArguments(
-                    "Usage: scholaros cite <citeKey> --project <dir.scholarproj> | --demo"
+                    "Usage: scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--registry-replay <dir>]"
+                )
+            }
+            let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let replayDir, replayDir.isEmpty {
+                throw ScholarOSError.invalidCLIArguments(
+                    "Option '--registry-replay' requires a non-empty directory path."
+                )
+            }
+            if parsed.bools.contains("--demo") && replayDir != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    "Cannot combine --demo with --registry-replay."
+                )
+            }
+            if let bibPath = parsed.values["--bib"] {
+                if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
+                    throw ScholarOSError.invalidCLIArguments(
+                        "Cannot combine --bib '\(bibPath)' with --project or --demo."
+                    )
+                }
+                let rawBib = try readRequiredRegularFile(atPath: bibPath)
+                let entries = try BibTeXCodec().parse(rawBib)
+                var byKey: [String: BibliographyEntry] = [:]
+                for entry in entries {
+                    byKey[entry.citeKey] = entry
+                }
+                let firewall = CitationVerificationFirewall()
+                var inRunVerdicts: [String: CitationFirewallEntryVerdict] = [:]
+                if let replayDir, let targetEntry = byKey[citeKey] {
+                    let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
+                    let verdict = await firewall.verifyAgainstPublicRegistries(entry: targetEntry, session: replaySession)
+                    try await replaySession.throwIfFailed()
+                    inRunVerdicts[citeKey] = verdict
+                }
+                let verified = try firewall.assertCitationAllowed(
+                    citeKey: citeKey,
+                    in: byKey,
+                    verifiedVerdicts: inRunVerdicts
+                )
+                let formatted = CSLCitationFormatterEngine().formatEntry(verified, style: .apa7)
+                return CLIExecutionOutput(
+                    stdout: "\\cite{\(verified.citeKey)} -> \(formatted.bibliographyPlainText)",
+                    exitCode: 0
                 )
             }
             let opened = try openReadDatabase(
                 parsed: parsed,
-                usage: "Usage: scholaros cite <citeKey> --project <dir.scholarproj> | --demo"
+                usage: "Usage: scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--registry-replay <dir>]",
+                lang: lang
             )
             defer { opened.db.close() }
+            if let replayDir, let targetEntry = try opened.db.bibliographyEntry(citeKey: citeKey) {
+                let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
+                let verdict = await CitationVerificationFirewall().verifyAgainstPublicRegistries(
+                    entry: targetEntry,
+                    session: replaySession
+                )
+                try await replaySession.throwIfFailed()
+                opened.db.recordInRunVerdict(verdict)
+            }
             let verified = try opened.db.validateCitationKeyForInsertion(citeKey)
             let formatted = CSLCitationFormatterEngine().formatEntry(verified, style: .apa7)
             let prefix = opened.isDemo ? "[DEMO] " : ""
@@ -712,7 +797,7 @@ public struct ScholarCLIRunner: Sendable {
             let parsed = try parseArgs(
                 rest,
                 subcommand: subcommand,
-                valueFlags: ["--project"],
+                valueFlags: ["--project", "--registry-replay"],
                 boolFlags: ["--demo"],
                 maxPositionals: 0
             )
@@ -720,9 +805,14 @@ public struct ScholarCLIRunner: Sendable {
             if let projectPath, !FileManager.default.fileExists(atPath: projectPath) {
                 throw ScholarOSError.fileNotFound(projectPath)
             }
+            let replayPath = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let replayPath, replayPath.isEmpty {
+                throw ScholarOSError.invalidCLIArguments("Option '--registry-replay' requires a non-empty directory path.")
+            }
             let server = ScholarMCPServer(
                 defaultProjectBundlePath: projectPath,
-                allowDemoMode: parsed.bools.contains("--demo")
+                allowDemoMode: parsed.bools.contains("--demo"),
+                defaultRegistryReplayPath: replayPath
             )
             await server.serveStdio()
             return CLIExecutionOutput(stdout: "", exitCode: 0)
@@ -993,12 +1083,159 @@ public struct ScholarCLIRunner: Sendable {
         )
     }
 
+    private static func incompleteUnverifiedSummaryLine(
+        audit: CitationFirewallAuditReport,
+        lang: ScholarLanguage
+    ) -> String {
+        let sortedPairs = audit.unverifiedByReason.keys.sorted().map { key in
+            "\(key)=\(audit.unverifiedByReason[key] ?? 0)"
+        }
+        let reasonSummary = sortedPairs.isEmpty
+            ? "offline=\(audit.unverifiedCount)"
+            : sortedPairs.joined(separator: ", ")
+        return lang.L(
+            "\(audit.unverifiedCount) entries could not be verified, reasons: \(reasonSummary); results are incomplete.",
+            "\(audit.unverifiedCount) 条没查成，原因：\(reasonSummary)；结果不完整。"
+        )
+    }
+
+    private static func localizingUntrustedFileTagFindings(
+        in report: CitationFirewallAuditReport,
+        firewall: CitationVerificationFirewall,
+        lang: ScholarLanguage
+    ) -> CitationFirewallAuditReport {
+        guard lang == .zhHans else { return report }
+        var changed = false
+        let updatedVerdicts = report.verdicts.map { verdict -> CitationFirewallEntryVerdict in
+            guard let declared = verdict.auditedEntry.untrustedDeclaredFirewallClass, !declared.isEmpty else {
+                return verdict
+            }
+            changed = true
+            let updatedFindings = verdict.findings.map { finding -> FirewallFinding in
+                guard finding.code == .untrustedEmbeddedFirewallTag else { return finding }
+                return FirewallFinding(
+                    code: finding.code,
+                    severity: finding.severity,
+                    field: finding.field,
+                    detail: "文件里写着 \(declared)，未采信。"
+                )
+            }
+            return CitationFirewallEntryVerdict(
+                citeKey: verdict.citeKey,
+                firewallClass: verdict.firewallClass,
+                insertable: verdict.insertable,
+                reasons: verdict.reasons,
+                sources: verdict.sources,
+                fields: verdict.fields,
+                findings: updatedFindings,
+                auditNote: verdict.auditNote,
+                auditedEntry: verdict.auditedEntry
+            )
+        }
+        return changed ? firewall.summarizeVerdicts(updatedVerdicts) : report
+    }
+
     private static func localizedVerdictAuditNote(
         _ verdict: CitationFirewallEntryVerdict,
         lang: ScholarLanguage
     ) -> String {
         guard lang == .zhHans else { return verdict.auditNote }
-        return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+
+        let untrustedSuffix: String = {
+            if let declared = verdict.auditedEntry.untrustedDeclaredFirewallClass, !declared.isEmpty {
+                return " 文件里写着 \(declared)，未采信。"
+            }
+            return ""
+        }()
+
+        switch verdict.firewallClass {
+        case .verified:
+            if let primary = verdict.sources.first(where: { $0.status == 200 }) ?? verdict.sources.first {
+                let dateStr = CitationVerificationFirewall.shortDateLabel(from: primary.fetchedAt)
+                let originZH: String
+                switch primary.origin {
+                case .network: originZH = "网络"
+                case .replay: originZH = "回放"
+                case .cache: originZH = "缓存"
+                }
+                return "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）。" + untrustedSuffix
+            }
+            return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+
+        case .drift:
+            guard !verdict.fields.isEmpty else {
+                return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+            }
+            let parts = verdict.fields.map { f -> String in
+                let fieldZH: String
+                switch f.field {
+                case "title": fieldZH = "标题"
+                case "firstAuthor": fieldZH = "第一作者"
+                case "authorCount": fieldZH = "作者数"
+                case "year": fieldZH = "年份"
+                case "venue": fieldZH = "刊名"
+                default: fieldZH = f.field
+                }
+                let localLabel = f.localValue.isEmpty ? "缺失" : f.localValue
+                let remoteLabel = f.remoteValue.isEmpty ? "无" : f.remoteValue
+                if f.field == "year", (f.note ?? "").contains(CitationAuditWording.yearOnlineVsPrintNotice) {
+                    return "年份不符（本地：\(localLabel)，\(f.source)：\(remoteLabel)；可能是在线发表年和刊期年的差别）"
+                }
+                if f.severity == "error" {
+                    return "\(fieldZH)错误（本地：\(localLabel)，\(f.source)：\(remoteLabel)）"
+                }
+                return "\(fieldZH)不符（本地：\(localLabel)，\(f.source)：\(remoteLabel)）"
+            }
+            return parts.joined(separator: "；") + "。" + untrustedSuffix
+
+        case .notFound:
+            if !verdict.sources.isEmpty {
+                let sourceNames = verdict.sources.map(\.source).joined(separator: "、")
+                let idLabel = verdict.auditedEntry.doi
+                    ?? verdict.auditedEntry.arxivID
+                    ?? verdict.auditedEntry.pmid
+                    ?? verdict.citeKey
+                return "\(sourceNames) 报告标识符 '\(idLabel)' 不存在。" + untrustedSuffix
+            }
+            return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+
+        case .retracted:
+            if verdict.reasons.contains("retracted_builtin_list") {
+                return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+            }
+            let primarySource = verdict.sources.first(where: { $0.status == 200 })?.source
+                ?? verdict.sources.first?.source
+                ?? "注册库"
+            let fieldDetail: String = {
+                if verdict.auditNote.contains("update-to") { return "update-to" }
+                if verdict.auditNote.contains("updated-by") { return "updated-by" }
+                if verdict.auditNote.contains("relation.is-retracted-by") { return "relation.is-retracted-by" }
+                if verdict.auditNote.contains("is_retracted") { return "is_retracted" }
+                if verdict.auditNote.lowercased().contains("withdrawn") { return "arXiv withdrawn/retracted" }
+                return "retraction"
+            }()
+            return "\(primarySource) 标明该文献已撤稿（撤稿字段：\(fieldDetail)）。" + untrustedSuffix
+
+        case .unverified:
+            if verdict.reasons.isEmpty || verdict.reasons == [CitationUnverifiedReasonCode.offline.rawValue] {
+                return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+            }
+            let reasonLabels = verdict.reasons.map { code -> String in
+                switch code {
+                case CitationUnverifiedReasonCode.transportError.rawValue: return "网络连接失败"
+                case CitationUnverifiedReasonCode.timeout.rawValue: return "请求超时"
+                case CitationUnverifiedReasonCode.rateLimited.rawValue: return "触发限速 (HTTP 429)"
+                case CitationUnverifiedReasonCode.serverError.rawValue: return "服务端错误 (HTTP 5xx)"
+                case CitationUnverifiedReasonCode.budgetExhausted.rawValue: return "请求配额已用尽"
+                case CitationUnverifiedReasonCode.unparseable.rawValue: return "响应解析失败"
+                case CitationUnverifiedReasonCode.ambiguous.rawValue: return "检索结果存在歧义"
+                case CitationUnverifiedReasonCode.registeredNoMetadata.rawValue: return "标识符已注册但缺少题录元数据"
+                case CitationUnverifiedReasonCode.noMatchInSearch.rawValue: return "检索未找到匹配记录"
+                default: return code
+                }
+            }
+            return "核查未完成（原因：\(reasonLabels.joined(separator: "、"))）。" + untrustedSuffix
+        }
     }
 
     private func formatOutline(

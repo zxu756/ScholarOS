@@ -548,6 +548,10 @@ public enum CitationAuditWording {
     public static let builtInRetractionListNotice = "built-in list, incomplete"
     /// Parenthetical attached when only the title text carries a retraction marker.
     public static let titleRetractionMarkerNotice = "title text only, no registry consulted"
+    /// Explanatory note when local year differs by 1 year from registry dates.
+    public static let yearOnlineVsPrintNotice = "may reflect online-first vs. print issue year difference"
+    /// Marker recorded in findings when a .bib file carries an untrusted x-firewall-class field.
+    public static let untrustedFileClassMarker = "not trusted (ignored)"
 
     /// Removes one leading `[CLASS] ` tag (e.g. `[UNVERIFIED] `) from an audit note, so that callers
     /// which print the class themselves do not print it twice.
@@ -568,19 +572,25 @@ extension BibliographyEntry {
         if firewallAuditNote.isEmpty {
             return ""
         }
+        let untrustedSuffix: String = {
+            if let declared = untrustedDeclaredFirewallClass, !declared.isEmpty {
+                return " 文件里写着 \(declared)，未采信。"
+            }
+            return ""
+        }()
         if firewallAuditNote.contains(CitationAuditWording.builtInRetractionListNotice) {
             if let doi, !doi.isEmpty {
-                return "撤稿提示：DOI '\(doi)' 命中内置撤稿名单（内置名单，不完整）。"
+                return "撤稿提示：DOI '\(doi)' 命中内置撤稿名单（内置名单，不完整）。" + untrustedSuffix
             }
-            return "撤稿提示：命中内置撤稿名单（内置名单，不完整）。"
+            return "撤稿提示：命中内置撤稿名单（内置名单，不完整）。" + untrustedSuffix
         }
         if firewallAuditNote.contains(CitationAuditWording.titleRetractionMarkerNotice) {
-            return "撤稿提示：标题带有撤稿标记（仅依据标题文字判断，未向注册库核查）。"
+            return "撤稿提示：标题带有撤稿标记（仅依据标题文字判断，未向注册库核查）。" + untrustedSuffix
         }
         if firewallAuditNote == "Demo data - unverified" {
             return "演示数据 - 未核查（尚未向外部注册库核对）"
         }
-        if firewallAuditNote == "Demo synthetic fabricated entry - unverified" {
+        if firewallAuditNote == "Demo synthetic placeholder entry - unverified" {
             return "演示合成条目 - 未核查（占位或非法 DOI 前缀）"
         }
         // The next translations describe an entry that was NOT looked up in any registry. They apply only
@@ -590,44 +600,47 @@ extension BibliographyEntry {
             let notChecked = "尚未向外部注册库核查。"
             if firewallAuditNote.localizedCaseInsensitiveContains("valid ISO 26324 syntax") {
                 if let doi, !doi.isEmpty {
-                    return "DOI '\(doi)' 语法格式合法；\(notChecked)"
+                    return "DOI '\(doi)' 语法格式合法；\(notChecked)" + untrustedSuffix
                 }
-                return "DOI 语法格式合法；\(notChecked)"
+                return "DOI 语法格式合法；\(notChecked)" + untrustedSuffix
             }
             if firewallAuditNote.localizedCaseInsensitiveContains("valid calendar/sequence syntax")
                 || firewallAuditNote.localizedCaseInsensitiveContains("DataCite arXiv DOI")
             {
-                return "arXiv 标识符格式合法；\(notChecked)"
+                return "arXiv 标识符格式合法；\(notChecked)" + untrustedSuffix
             }
             if firewallAuditNote.localizedCaseInsensitiveContains("valid numeric bounds") {
-                return "PubMed PMID 格式合法；\(notChecked)"
+                return "PubMed PMID 格式合法；\(notChecked)" + untrustedSuffix
             }
             if firewallAuditNote.localizedCaseInsensitiveContains("10.5555/") {
-                return "DOI 使用了 Crossref 的测试前缀（10.5555/），无法解析；\(notChecked)"
+                return "DOI 使用了 Crossref 的测试前缀（10.5555/），无法解析；\(notChecked)" + untrustedSuffix
+            }
+            if firewallAuditNote.localizedCaseInsensitiveContains("placeholder")
+                || firewallAuditNote.localizedCaseInsensitiveContains("sentinel")
+            {
+                return "DOI 使用了示例或占位前缀；\(notChecked)" + untrustedSuffix
             }
             if firewallAuditNote.localizedCaseInsensitiveContains("No persistent identifier") {
-                return "缺失外部持久标识符（DOI / arXiv / PMID）；\(notChecked)"
+                return "缺失外部持久标识符（DOI / arXiv / PMID）；\(notChecked)" + untrustedSuffix
             }
-            return firewallAuditNote
+            return "尚未向外部注册库核查。" + untrustedSuffix
         }
-        if firewallAuditNote.localizedCaseInsensitiveContains("placeholder")
-            || firewallAuditNote.localizedCaseInsensitiveContains("sentinel")
-            || firewallAuditNote.localizedCaseInsensitiveContains("Invalid DOI")
+        if firewallAuditNote.localizedCaseInsensitiveContains("Invalid DOI")
             || firewallAuditNote.localizedCaseInsensitiveContains("Malformed DOI")
         {
-            return "DOI 格式非法或使用了占位前缀（结构检查未通过）。"
+            return "DOI 格式非法（结构检查未通过）。" + untrustedSuffix
         }
         if firewallAuditNote.localizedCaseInsensitiveContains("Invalid arXiv")
             || firewallAuditNote.localizedCaseInsensitiveContains("Malformed arXiv")
         {
-            return "arXiv 标识符格式非法（结构检查未通过）。"
+            return "arXiv 标识符格式非法（结构检查未通过）。" + untrustedSuffix
         }
         if firewallAuditNote.localizedCaseInsensitiveContains("Invalid PubMed")
             || firewallAuditNote.localizedCaseInsensitiveContains("Malformed PubMed")
         {
-            return "PubMed PMID 格式非法（结构检查未通过）。"
+            return "PubMed PMID 格式非法（结构检查未通过）。" + untrustedSuffix
         }
-        return firewallAuditNote
+        return firewallAuditNote + untrustedSuffix
     }
 }
 

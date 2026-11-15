@@ -14,10 +14,19 @@ import ScholarProjectStore
 public struct ScholarMCPServer: Sendable {
     public let defaultProjectBundlePath: String?
     public let allowDemoMode: Bool
+    public let defaultRegistryReplayPath: String?
+    public let inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
 
-    public init(defaultProjectBundlePath: String? = nil, allowDemoMode: Bool = false) {
+    public init(
+        defaultProjectBundlePath: String? = nil,
+        allowDemoMode: Bool = false,
+        defaultRegistryReplayPath: String? = nil,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
+    ) {
         self.defaultProjectBundlePath = defaultProjectBundlePath
         self.allowDemoMode = allowDemoMode
+        self.defaultRegistryReplayPath = defaultRegistryReplayPath
+        self.inRunVerdictsByKey = inRunVerdictsByKey
     }
 
     public func handleJSONRPCLine(_ rawLine: String) -> String? {
@@ -79,6 +88,54 @@ public struct ScholarMCPServer: Sendable {
         return String(decoding: outData, as: UTF8.self)
     }
 
+    public func handleJSONRPCLineAsync(_ rawLine: String) async -> String? {
+        let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        guard let data = trimmed.data(using: .utf8),
+              let rawObj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return errorEnvelope(id: NSNull(), code: -32700, message: "Parse error")
+        }
+        guard let req = rawObj as? [String: Any] else {
+            return errorEnvelope(id: NSNull(), code: -32600, message: "Invalid Request")
+        }
+
+        let idVal = req["id"]
+        guard let method = req["method"] as? String, !method.isEmpty else {
+            return errorEnvelope(id: idVal ?? NSNull(), code: -32600, message: "Invalid Request")
+        }
+
+        let resultPayload: Any
+        switch method {
+        case "initialize", "tools/list":
+            return handleJSONRPCLine(rawLine)
+
+        case "tools/call":
+            let params = req["params"] as? [String: Any] ?? [:]
+            let toolName = params["name"] as? String ?? ""
+            let arguments = params["arguments"] as? [String: Any] ?? [:]
+            resultPayload = await executeToolCallAsync(name: toolName, arguments: arguments)
+
+        default:
+            if idVal == nil && method.hasPrefix("notifications/") {
+                return nil
+            }
+            return errorEnvelope(id: idVal ?? NSNull(), code: -32601, message: "Method not found: \(method)")
+        }
+
+        guard let idVal else { return nil }
+        let envelope: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": idVal,
+            "result": resultPayload
+        ]
+        guard let outData = try? JSONSerialization.data(withJSONObject: envelope) else {
+            return nil
+        }
+        return String(decoding: outData, as: UTF8.self)
+    }
+
     private func errorEnvelope(id: Any, code: Int, message: String) -> String? {
         let envelope: [String: Any] = [
             "jsonrpc": "2.0",
@@ -96,7 +153,7 @@ public struct ScholarMCPServer: Sendable {
 
     public func serveStdio() async {
         while let line = readLine() {
-            if let response = handleJSONRPCLine(line) {
+            if let response = await handleJSONRPCLineAsync(line) {
                 print(response)
                 fflush(stdout)
             }
@@ -105,6 +162,134 @@ public struct ScholarMCPServer: Sendable {
 
     // MARK: - Tool Execution Router
 
+    public func executeToolCallAsync(name: String, arguments: [String: Any]) async -> [String: Any] {
+        let replayPath = (arguments["registryReplayPath"] as? String ?? defaultRegistryReplayPath)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let replayPath, !replayPath.isEmpty else {
+            return executeToolCall(name: name, arguments: arguments)
+        }
+
+        do {
+            let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayPath))
+            let firewall = CitationVerificationFirewall()
+
+            switch name {
+            case "scholar_cite_key":
+                let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
+                let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
+
+                let entries: [BibliographyEntry]
+                let isDemo: Bool
+                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
+                    entries = try BibTeXCodec().parse(rawBib)
+                    isDemo = false
+                } else {
+                    let opened = try openDatabase(from: arguments)
+                    defer { opened.db.close() }
+                    entries = try opened.db.listBibliographyEntries()
+                    isDemo = opened.isDemo
+                }
+
+                var byKey: [String: BibliographyEntry] = [:]
+                for entry in entries {
+                    byKey[entry.citeKey] = entry
+                }
+                var verdicts = inRunVerdictsByKey
+                if let targetEntry = byKey[citeKey] {
+                    let verdict = await firewall.verifyAgainstPublicRegistries(entry: targetEntry, session: replaySession)
+                    try await replaySession.throwIfFailed()
+                    verdicts[citeKey] = verdict
+                }
+                let verifiedEntry = try firewall.assertCitationAllowed(
+                    citeKey: citeKey,
+                    in: byKey,
+                    verifiedVerdicts: verdicts
+                )
+                return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
+
+            case "scholar_verify_bibliography":
+                let entries: [BibliographyEntry]
+                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
+                    entries = try BibTeXCodec().parse(rawBib)
+                } else {
+                    let opened = try openDatabase(from: arguments)
+                    defer { opened.db.close() }
+                    entries = try opened.db.listBibliographyEntries()
+                }
+                var verdicts: [CitationFirewallEntryVerdict] = []
+                verdicts.reserveCapacity(entries.count)
+                for entry in entries {
+                    let v = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replaySession)
+                    try await replaySession.throwIfFailed()
+                    verdicts.append(v)
+                }
+                let report = firewall.summarizeVerdicts(verdicts)
+                let data = try JSONEncoder().encode(report)
+                return textResult(String(decoding: data, as: UTF8.self), isError: false)
+
+            case "scholar_lsp_diagnostics":
+                if let inlineSource = arguments["source"] as? String {
+                    let path = arguments["filePath"] as? String ?? "main.tex"
+                    var entries: [BibliographyEntry] = []
+                    if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
+                        entries = try BibTeXCodec().parse(rawBib)
+                    } else if hasExplicitDatabaseTarget(in: arguments) {
+                        let opened = try openDatabase(from: arguments)
+                        defer { opened.db.close() }
+                        entries = try opened.db.listBibliographyEntries()
+                    }
+                    let lsp = ScholarLSPWorkspaceService(
+                        rootFilePath: path,
+                        files: [path: inlineSource],
+                        bibliography: entries
+                    )
+                    _ = await lsp.verifyCitationsOnline(using: replaySession)
+                    try await replaySession.throwIfFailed()
+                    let diagReport = lsp.diagnosticsReport()
+                    let data = try JSONEncoder().encode(diagReport.diagnostics)
+                    return textResult(
+                        String(decoding: data, as: UTF8.self),
+                        isError: diagReport.firewallViolationCount > 0 || diagReport.errorCount > 0
+                    )
+                }
+                let opened = try openDatabase(from: arguments)
+                defer { opened.db.close() }
+                let entries = try opened.db.listBibliographyEntries()
+                var files: [String: String] = [:]
+                for rec in try opened.db.listManuscriptFiles() {
+                    files[rec.path] = rec.content
+                }
+                let primary = arguments["filePath"] as? String ?? ((try? opened.db.primaryManuscriptFile()) ?? "main.tex")
+                let lsp = ScholarLSPWorkspaceService(
+                    rootFilePath: primary,
+                    files: files,
+                    bibliography: entries
+                )
+                _ = await lsp.verifyCitationsOnline(using: replaySession)
+                try await replaySession.throwIfFailed()
+                let diagReport = lsp.diagnosticsReport()
+                let data = try JSONEncoder().encode(diagReport.diagnostics)
+                return textResult(
+                    String(decoding: data, as: UTF8.self),
+                    isError: diagReport.firewallViolationCount > 0
+                )
+
+            default:
+                return executeToolCall(name: name, arguments: arguments)
+            }
+        } catch let scholarErr as ScholarOSError {
+            let prefix = "[\(scholarErr.errorCodeIdentifier)] "
+            let body = scholarErr.errorDescription ?? String(describing: scholarErr)
+            let formatted = body.hasPrefix("[") ? body : (prefix + body)
+            return textResult(formatted, isError: true)
+        } catch let replayErr as RegistryReplayError {
+            return textResult("[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)", isError: true)
+        } catch {
+            return textResult("[ERR_SCHOLAROS] \(error.localizedDescription)", isError: true)
+        }
+    }
+
     public func executeToolCall(name: String, arguments: [String: Any]) -> [String: Any] {
         do {
             switch name {
@@ -112,10 +297,24 @@ public struct ScholarMCPServer: Sendable {
                 let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
                 let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
-                let opened = try openDatabase(from: arguments)
-                defer { opened.db.close() }
 
-                let entries = try opened.db.listBibliographyEntries()
+                let entries: [BibliographyEntry]
+                let isDemo: Bool
+                var effectiveVerdicts = inRunVerdictsByKey
+
+                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
+                    entries = try BibTeXCodec().parse(rawBib)
+                    isDemo = false
+                } else {
+                    let opened = try openDatabase(from: arguments)
+                    defer { opened.db.close() }
+                    entries = try opened.db.listBibliographyEntries()
+                    isDemo = opened.isDemo
+                    for (k, v) in opened.db.inRunVerdicts() where effectiveVerdicts[k] == nil {
+                        effectiveVerdicts[k] = v
+                    }
+                }
+
                 var byKey: [String: BibliographyEntry] = [:]
                 for entry in entries {
                     byKey[entry.citeKey] = entry
@@ -123,25 +322,10 @@ public struct ScholarMCPServer: Sendable {
 
                 let verifiedEntry = try CitationVerificationFirewall().assertCitationAllowed(
                     citeKey: citeKey,
-                    in: byKey
+                    in: byKey,
+                    verifiedVerdicts: effectiveVerdicts
                 )
-                let style: CitationFormatStyle
-                switch styleRaw {
-                case "ieee": style = .ieee
-                case "acm": style = .acm
-                case "nature": style = .nature
-                case "vancouver": style = .vancouver
-                default: style = .apa7
-                }
-                let formatted = CSLCitationFormatterEngine().formatEntry(verifiedEntry, style: style)
-                let snippet = formatRaw == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
-                let demoPrefix = opened.isDemo ? "[DEMO]\n" : ""
-                let payloadText = """
-                \(demoPrefix)[CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)]
-                Snippet: \(snippet)
-                Reference (\(style.rawValue)): \(formatted.bibliographyPlainText)
-                """
-                return textResult(payloadText, isError: false)
+                return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
 
             case "scholar_verify_bibliography":
                 if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
@@ -358,6 +542,31 @@ public struct ScholarMCPServer: Sendable {
         )
     }
 
+    private func formatCiteKeyResult(
+        verifiedEntry: BibliographyEntry,
+        styleRaw: String,
+        formatRaw: String,
+        isDemo: Bool
+    ) -> [String: Any] {
+        let style: CitationFormatStyle
+        switch styleRaw {
+        case "ieee": style = .ieee
+        case "acm": style = .acm
+        case "nature": style = .nature
+        case "vancouver": style = .vancouver
+        default: style = .apa7
+        }
+        let formatted = CSLCitationFormatterEngine().formatEntry(verifiedEntry, style: style)
+        let snippet = formatRaw == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
+        let demoPrefix = isDemo ? "[DEMO]\n" : ""
+        let payloadText = """
+        \(demoPrefix)[CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)]
+        Snippet: \(snippet)
+        Reference (\(style.rawValue)): \(formatted.bibliographyPlainText)
+        """
+        return textResult(payloadText, isError: false)
+    }
+
     private func textResult(_ text: String, isError: Bool) -> [String: Any] {
         [
             "content": [
@@ -371,14 +580,16 @@ public struct ScholarMCPServer: Sendable {
         [
         [
             "name": "scholar_cite_key",
-            "description": "Citation insertion check. Returns formatted \\cite{key} or #cite(<key>) ONLY if the entry has status VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
+            "description": "Citation insertion check. Returns formatted \\cite{key} or #cite(<key>) ONLY if the entry is VERIFIED in the current run; otherwise returns ERR_UNVERIFIED_CITATION.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "citeKey": ["type": "string"],
                     "style": ["type": "string"],
                     "manuscriptFormat": ["type": "string"],
+                    "bibtex": ["type": "string"],
                     "projectPath": ["type": "string"],
+                    "registryReplayPath": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ],
                 "required": ["citeKey"]
@@ -386,12 +597,13 @@ public struct ScholarMCPServer: Sendable {
         ],
         [
             "name": "scholar_verify_bibliography",
-            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall. This version performs no online registry lookups: it checks identifier syntax and a built-in, incomplete retraction hint list, so no entry is ever VERIFIED.",
+            "description": "Audit a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (offline syntax/hint check unless registryReplayPath is provided).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bibtex": ["type": "string"],
                     "projectPath": ["type": "string"],
+                    "registryReplayPath": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ]
             ]
@@ -406,6 +618,7 @@ public struct ScholarMCPServer: Sendable {
                     "bibtex": ["type": "string"],
                     "filePath": ["type": "string"],
                     "projectPath": ["type": "string"],
+                    "registryReplayPath": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ]
             ]
