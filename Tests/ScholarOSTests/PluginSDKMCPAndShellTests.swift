@@ -414,9 +414,20 @@ struct PluginSDKMCPAndShellTests {
         db.close()
 
         let cli = ScholarCLIRunner()
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
 
-        // 1. Verified record in project succeeds and formats APA 7th reference
-        let allowedOut = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path])
+        // 1a. Stored SQLite `.verified` flag alone is NOT trusted without in-run verification (M1 item 8 / S42/S48).
+        do {
+            _ = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path])
+            Issue.record("Expected cite without in-run verification to throw ERR_UNVERIFIED_CITATION")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
+
+        // 1b. In-run verification via recorded registry fixtures succeeds and formats APA 7th reference
+        let allowedOut = try await cli.execute(
+            arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path, "--registry-replay", registryDir.path]
+        )
         #expect(allowedOut.contains("\\cite{vaswani2017attention}"))
         #expect(allowedOut.contains("Attention Is All You Need"))
 
@@ -428,9 +439,11 @@ struct PluginSDKMCPAndShellTests {
             #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
         }
 
-        // 3. Blocked hallucinated key MUST throw ScholarOSError with ERR_UNVERIFIED_CITATION
+        // 3. Blocked hallucinated key MUST throw ScholarOSError with ERR_UNVERIFIED_CITATION even under --registry-replay
         do {
-            _ = try await cli.execute(arguments: ["cite", "smith2025hallucinated", "--project", bundleURL.path])
+            _ = try await cli.execute(
+                arguments: ["cite", "smith2025hallucinated", "--project", bundleURL.path, "--registry-replay", registryDir.path]
+            )
             Issue.record("Expected CLI cite smith2025hallucinated to throw ERR_UNVERIFIED_CITATION")
         } catch let err as ScholarOSError {
             #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
@@ -454,7 +467,9 @@ struct PluginSDKMCPAndShellTests {
         #expect(verifyRun.stdout.contains("[DEMO]"))
         #expect(verifyRun.stdout.contains("Evaluated=10"))
         #expect(verifyRun.stdout.contains("Verified=0"))
-        #expect(verifyRun.stdout.contains("NotFound=1"))
+        // M1 item 4 (S41): sentinel prefix DOI 10.9999/fake-llm-cite.9999 has valid ISO 26324 syntax, so offline it is UNVERIFIED, not NOT_FOUND.
+        #expect(verifyRun.stdout.contains("NotFound=0"))
+        #expect(verifyRun.stdout.contains("Unverified=10"))
 
         let ieeeBib = try await cli.execute(arguments: ["format-bib", "--demo", "--style", "ieee"])
         #expect(ieeeBib.contains("[DEMO]"))
@@ -528,7 +543,7 @@ struct PluginSDKMCPAndShellTests {
     }
 
     @Test("MCP scholar_cite_key returns isError: true + ERR_UNVERIFIED_CITATION on missing project or hallucinated key and succeeds on verified record")
-    func mcpServerCiteKeyBlocksHallucinationAndAllowsVerifiedRecord() throws {
+    func mcpServerCiteKeyBlocksHallucinationAndAllowsVerifiedRecord() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-cite")
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
@@ -541,13 +556,30 @@ struct PluginSDKMCPAndShellTests {
         )
         db.close()
 
-        let server = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let offlineServer = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let okReq = #"""
+        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention","style":"ieee"}}}
+        """#
+
+        // 0. Stored SQLite `.verified` status alone is NOT trusted without in-run verification (M1 item 8 / S42/S48).
+        let offlineRaw = try #require(offlineServer.handleJSONRPCLine(okReq))
+        let offlineEnv = try #require(JSONSerialization.jsonObject(with: Data(offlineRaw.utf8)) as? [String: Any])
+        let offlineResult = try #require(offlineEnv["result"] as? [String: Any])
+        #expect(offlineResult["isError"] as? Bool == true)
+        let offlineText = try #require(((offlineResult["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(offlineText.contains("ERR_UNVERIFIED_CITATION"))
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let server = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            defaultRegistryReplayPath: registryDir.path
+        )
 
         // 1. Hallucinated key via full JSON-RPC tools/call envelope -> isError: true + ERR_UNVERIFIED_CITATION
         let blockedReq = #"""
         {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"smith2025hallucinated","style":"apa7"}}}
         """#
-        let blockedRaw = try #require(server.handleJSONRPCLine(blockedReq))
+        let blockedRaw = try #require(await server.handleJSONRPCLineAsync(blockedReq))
         let blockedEnv = try #require(JSONSerialization.jsonObject(with: Data(blockedRaw.utf8)) as? [String: Any])
         let blockedResult = try #require(blockedEnv["result"] as? [String: Any])
         #expect(blockedResult["isError"] as? Bool == true)
@@ -556,11 +588,8 @@ struct PluginSDKMCPAndShellTests {
         #expect(blockedText.contains("ERR_UNVERIFIED_CITATION"))
         #expect(blockedText.contains("smith2025hallucinated"))
 
-        // 2. Verified record via JSON-RPC tools/call -> isError: false + CITATION_STATUS:VERIFIED
-        let okReq = #"""
-        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention","style":"ieee"}}}
-        """#
-        let okRaw = try #require(server.handleJSONRPCLine(okReq))
+        // 2. In-run verified record via JSON-RPC tools/call -> isError: false + CITATION_STATUS:VERIFIED
+        let okRaw = try #require(await server.handleJSONRPCLineAsync(okReq))
         let okEnv = try #require(JSONSerialization.jsonObject(with: Data(okRaw.utf8)) as? [String: Any])
         let okResult = try #require(okEnv["result"] as? [String: Any])
         #expect(okResult["isError"] as? Bool == false)
@@ -1132,12 +1161,16 @@ struct PluginSDKMCPAndShellTests {
         let zhPlain = try await runner.run(arguments: ["verify-citations", bibPath, "--lang", "zh"])
         let zhOffline = try await runner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "zh"])
 
-        // The original M0 rows still hold: nothing is VERIFIED and the exit code is non-zero.
+        // M1 item 4 (S41): sentinel DOI `10.1234/fake.2026.99999` has valid ISO 26324 syntax, so offline it is UNVERIFIED rather than NOT_FOUND.
         for out in [enPlain, enOffline, zhPlain, zhOffline] {
             #expect(out.exitCode == 1)
-            #expect(out.stdout.contains("Evaluated=12 Verified=0 Drift=0 NotFound=1 Retracted=1 Unverified=10"))
+            #expect(out.stdout.contains("Evaluated=12 Verified=0 Drift=0 NotFound=0 Retracted=1 Unverified=11"))
             #expect(!out.stdout.contains("[VERIFIED]"))
+            #expect(!out.stdout.contains("编造"))
+            #expect(!out.stdout.lowercased().contains("fabricated"))
         }
+        #expect(enPlain.stdout.contains("11 entries could not be verified, reasons: offline=11; results are incomplete."))
+        #expect(zhPlain.stdout.contains("11 条没查成，原因：offline=11；结果不完整。"))
 
         // S33: --offline changes nothing, and the output says why instead of labelling entries "(offline)".
         #expect(enPlain.stdout == enOffline.stdout)
