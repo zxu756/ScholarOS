@@ -41,6 +41,67 @@ public enum CitationUnverifiedReasonCode: String, Sendable, Codable, Hashable, C
     case noMatchInSearch = "no_match_in_search"
 }
 
+/// Injectable request pacer enforcing at least `minimumIntervalSeconds` (default 3.0s) between arXiv API requests.
+public actor ArXivRequestPacer {
+    public static let shared = ArXivRequestPacer()
+
+    public nonisolated let minimumIntervalSeconds: TimeInterval
+    private let nowSeconds: @Sendable () -> TimeInterval
+    private let sleepSeconds: @Sendable (TimeInterval) async throws -> Void
+    private var lastRequestTimestamp: TimeInterval?
+    private var isExecutingRequest: Bool = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    public init(
+        minimumIntervalSeconds: TimeInterval = 3.0,
+        nowSeconds: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        sleepSeconds: @escaping @Sendable (TimeInterval) async throws -> Void = { seconds in
+            guard seconds > 0 else { return }
+            let nanos = UInt64((seconds * 1_000_000_000).rounded(.up))
+            try await Task.sleep(nanoseconds: nanos)
+        }
+    ) {
+        self.minimumIntervalSeconds = max(0, minimumIntervalSeconds)
+        self.nowSeconds = nowSeconds
+        self.sleepSeconds = sleepSeconds
+    }
+
+    public func perform<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
+        await acquireSerialSlot()
+        defer { releaseSerialSlot() }
+
+        if minimumIntervalSeconds > 0, let last = lastRequestTimestamp {
+            let elapsed = nowSeconds() - last
+            let remaining = minimumIntervalSeconds - elapsed
+            if remaining > 0 {
+                try await sleepSeconds(remaining)
+            }
+        }
+        lastRequestTimestamp = nowSeconds()
+        defer { lastRequestTimestamp = nowSeconds() }
+        return try await operation()
+    }
+
+    private func acquireSerialSlot() async {
+        if !isExecutingRequest {
+            isExecutingRequest = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    private func releaseSerialSlot() {
+        if !waiters.isEmpty {
+            let next = waiters.removeFirst()
+            next.resume()
+        } else {
+            isExecutingRequest = false
+        }
+    }
+}
+
 /// Per-request provenance record stored in `CitationFirewallEntryVerdict.sources`.
 public struct CitationVerdictSourceRecord: Sendable, Codable, Hashable {
     public let source: String
@@ -500,7 +561,7 @@ public enum ScholarlyIdentifierValidator: Sendable {
         )
     }
 
-    /// Validates NCBI PubMed numeric PMID bounds (`1 ... 49_999_999`, no leading zero padding).
+    /// Validates NCBI PubMed numeric PMID bounds (`1 ... 99_999_999`, 1-8 digits, no leading zero padding).
     public static func validatePMID(_ rawPMID: String) -> (isValid: Bool, normalized: String, reason: String?) {
         var trimmed = rawPMID.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.lowercased().hasPrefix("pmid:") {
@@ -515,8 +576,8 @@ public enum ScholarlyIdentifierValidator: Sendable {
         guard !trimmed.hasPrefix("0") else {
             return (false, trimmed, "PMID '\(trimmed)' has invalid leading zero(s).")
         }
-        guard let numeric = Int(trimmed), (1...49_999_999).contains(numeric) else {
-            return (false, trimmed, "PMID '\(trimmed)' falls outside valid NLM numeric range 1..49,999,999.")
+        guard let numeric = Int(trimmed), (1...99_999_999).contains(numeric) else {
+            return (false, trimmed, "PMID '\(trimmed)' falls outside valid NLM numeric range 1..99,999,999.")
         }
         return (true, trimmed, nil)
     }
@@ -669,19 +730,22 @@ public struct CitationVerificationFirewall: Sendable {
     public let sentinelDOIs: Set<String>
     public let maxAllowedPublicationYear: Int
     public let minAllowedPublicationYear: Int
+    public let arXivPacer: ArXivRequestPacer?
 
     public init(
         includeBuiltInRetractedDOIs: Bool = true,
         additionalRetractedDOIs: Set<String> = [],
         additionalSentinelDOIs: Set<String> = [],
         minAllowedPublicationYear: Int = 1450,
-        maxAllowedPublicationYear: Int = 2030
+        maxAllowedPublicationYear: Int = 2030,
+        arXivPacer: ArXivRequestPacer? = nil
     ) {
         let baseRetracted = includeBuiltInRetractedDOIs ? Self.defaultRetractedDOIs : []
         self.retractedDOIs = baseRetracted.union(additionalRetractedDOIs.map { $0.lowercased() })
         self.sentinelDOIs = Self.defaultSentinelDOIs.union(additionalSentinelDOIs.map { $0.lowercased() })
         self.minAllowedPublicationYear = minAllowedPublicationYear
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
+        self.arXivPacer = arXivPacer
     }
 
     // MARK: - Offline Deterministic Structural & Built-in Retraction Hint Evaluation
@@ -1158,9 +1222,9 @@ public struct CitationVerificationFirewall: Sendable {
         }
     }
 
-    // MARK: - Async Live Public Registry Verification (Crossref / OpenAlex / arXiv)
+    // MARK: - Async Live Public Registry Verification (Crossref / OpenAlex / doi.org / arXiv / PubMed)
 
-    /// Resolves `entry` against Crossref, OpenAlex, or arXiv APIs via an injectable `CitationRegistrySession`.
+    /// Resolves `entry` against Crossref, OpenAlex, doi.org, arXiv, or PubMed APIs via an injectable `CitationRegistrySession`.
     /// Transport errors, timeouts, rate limits (429), server errors (5xx), and unparseable responses
     /// ALWAYS yield `.unverified` with the corresponding reason code — NEVER `.verified` or `.notFound`.
     public func verifyAgainstPublicRegistries(
@@ -1173,13 +1237,13 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         let isBuiltInRetracted = (offlineVerdict.firewallClass == .retracted)
-        var findings = offlineVerdict.findings
-        var sources: [CitationVerdictSourceRecord] = []
+        let findings = offlineVerdict.findings
 
-        // Path A: Resolve non-arXiv DOI via Crossref -> OpenAlex -> doi.org handle -> Crossref bibliographic search
+        // Path A: Resolve non-arXiv DOI via Crossref -> OpenAlex -> doi.org handle -> Crossref bibliographic search,
+        // and when an arXiv ID is also present on the entry, query arXiv as well for cross-checking (DOI remains authoritative).
         if let normDOI = ReferenceIdentifierNormalizer.normalizeDOI(entry.doi),
            !normDOI.hasPrefix("10.48550/arxiv.") {
-            return await verifyNonArXivDOIEntry(
+            let doiVerdict = await verifyNonArXivDOIEntry(
                 entry: entry,
                 normalizedDOI: normDOI,
                 offlineVerdict: offlineVerdict,
@@ -1187,9 +1251,21 @@ public struct CitationVerificationFirewall: Sendable {
                 isBuiltInRetracted: isBuiltInRetracted,
                 session: session
             )
+            if let explicitArXivID = ReferenceIdentifierNormalizer.normalizeArXivID(entry.arxivID, stripVersion: true) {
+                return await crossCheckArXivAlongsideDOIVerdict(
+                    entry: entry,
+                    normalizedDOI: normDOI,
+                    arxivID: explicitArXivID,
+                    doiVerdict: doiVerdict,
+                    offlineVerdict: offlineVerdict,
+                    isBuiltInRetracted: isBuiltInRetracted,
+                    session: session
+                )
+            }
+            return doiVerdict
         }
 
-        // Path B: Resolve arXiv preprint via arXiv Atom API
+        // Path B: Resolve arXiv preprint (including `10.48550/arXiv.*` DataCite DOIs) via arXiv Atom API
         let candidateArXiv: String? = {
             if let a = ReferenceIdentifierNormalizer.normalizeArXivID(entry.arxivID, stripVersion: true) {
                 return a
@@ -1200,123 +1276,105 @@ public struct CitationVerificationFirewall: Sendable {
             return nil
         }()
 
-        if let arxivID = candidateArXiv,
-           let arxivURL = RegistryURLBuilder.arXivQueryURL(arXivID: arxivID) {
-            do {
-                let response = try await session.send(URLRequest(url: arxivURL))
-                let fetchedAt = resolvedFetchedAt(from: response)
-                let sourceRecord = CitationVerdictSourceRecord(
-                    source: "arXiv",
-                    url: arxivURL.absoluteString,
-                    status: response.statusCode,
-                    fetchedAt: fetchedAt,
-                    origin: response.origin
-                )
-                sources.append(sourceRecord)
+        if let arxivID = candidateArXiv {
+            return await verifyArXivEntry(
+                entry: entry,
+                arxivID: arxivID,
+                offlineVerdict: offlineVerdict,
+                initialFindings: findings,
+                isBuiltInRetracted: isBuiltInRetracted,
+                session: session
+            )
+        }
 
-                if response.statusCode == 200 {
-                    switch parseArXivAtomPayload(response.body) {
-                    case .parsed(let remote):
-                        return reconcileRemoteRegistryMetadata(
-                            entry: entry,
-                            remote: remote,
-                            primarySource: sourceRecord,
-                            allSources: sources,
-                            existingFindings: findings,
-                            isBuiltInRetracted: isBuiltInRetracted
-                        )
-                    case .notFound:
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryLookupNotFound,
-                                severity: .criticalBlock,
-                                field: "arxivID",
-                                detail: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
-                            )
-                        )
-                        return buildUpdatedVerdict(
-                            for: entry,
-                            assignedClass: .notFound,
-                            reasons: ["arxiv_not_found"],
-                            sources: sources,
-                            fields: [],
-                            findings: findings,
-                            overrideNote: "[NOT_FOUND] arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
-                        )
-                    case .unparseable:
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryTransportUnavailable,
-                                severity: .warning,
-                                field: "network",
-                                detail: "arXiv payload for 'arXiv:\(arxivID)' could not be parsed."
-                            )
-                        )
-                        return buildUpdatedVerdict(
-                            for: entry,
-                            assignedClass: .unverified,
-                            reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
-                            sources: sources,
-                            fields: [],
-                            findings: findings
-                        )
-                    }
-                } else if response.statusCode == 404 {
-                    findings.append(
-                        FirewallFinding(
-                            code: .registryLookupNotFound,
-                            severity: .criticalBlock,
-                            field: "arxivID",
-                            detail: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist (status 404)."
-                        )
-                    )
-                    return buildUpdatedVerdict(
-                        for: entry,
-                        assignedClass: .notFound,
-                        reasons: ["arxiv_not_found"],
-                        sources: sources,
-                        fields: [],
-                        findings: findings,
-                        overrideNote: "[NOT_FOUND] arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
-                    )
-                } else {
-                    let code = classifyHTTPFailureStatus(response.statusCode)
-                    findings.append(
-                        FirewallFinding(
-                            code: .registryTransportUnavailable,
-                            severity: .warning,
-                            field: "network",
-                            detail: describeHTTPFailure(source: "arXiv", statusCode: response.statusCode, identifier: "arXiv:\(arxivID)")
-                        )
-                    )
-                    return buildUpdatedVerdict(
-                        for: entry,
-                        assignedClass: .unverified,
-                        reasons: [code.rawValue],
-                        sources: sources,
-                        fields: [],
-                        findings: findings
-                    )
-                }
-            } catch is any FatalRegistrySessionError {
-                return offlineVerdict
-            } catch {
-                let code = classifyThrownTransportError(error)
-                sources.append(
-                    CitationVerdictSourceRecord(
-                        source: "arXiv",
-                        url: arxivURL.absoluteString,
-                        status: nil,
-                        fetchedAt: currentISO8601Timestamp(),
-                        origin: .network
-                    )
+        // Path C: Resolve PubMed PMID via E-utilities `esummary`
+        if let rawPMID = nonEmpty(entry.pmid) {
+            let pmidCheck = ScholarlyIdentifierValidator.validatePMID(rawPMID)
+            if pmidCheck.isValid {
+                return await verifyPubMedEntry(
+                    entry: entry,
+                    normalizedPMID: pmidCheck.normalized,
+                    offlineVerdict: offlineVerdict,
+                    initialFindings: findings,
+                    isBuiltInRetracted: isBuiltInRetracted,
+                    session: session
                 )
+            }
+        }
+
+        // Path D: No persistent identifier — search Crossref `query.bibliographic` (title + surname + year, rows=5),
+        // falling back to OpenAlex title search (`per-page=5`) only when Crossref returns 0 matching candidates.
+        return await verifyIdentifierlessEntry(
+            entry: entry,
+            offlineVerdict: offlineVerdict,
+            initialFindings: findings,
+            isBuiltInRetracted: isBuiltInRetracted,
+            session: session
+        )
+    }
+
+    private func sendArXivRequest(
+        _ request: URLRequest,
+        session: any CitationRegistrySession
+    ) async throws -> RegistryHTTPResponse {
+        if let customPacer = arXivPacer {
+            return try await customPacer.perform {
+                try await session.send(request)
+            }
+        }
+        if session is LiveURLSessionRegistryClient {
+            return try await ArXivRequestPacer.shared.perform {
+                try await session.send(request)
+            }
+        }
+        return try await session.send(request)
+    }
+
+    // MARK: - arXiv Primary Lookup & Dual-Identifier Cross-Check (M1 Item 3)
+
+    private func verifyArXivEntry(
+        entry: BibliographyEntry,
+        arxivID: String,
+        offlineVerdict: CitationFirewallEntryVerdict,
+        initialFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var findings = initialFindings
+        var sources: [CitationVerdictSourceRecord] = []
+
+        guard let arxivURL = RegistryURLBuilder.arXivQueryURL(arXivID: arxivID) else {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        do {
+            let response = try await sendArXivRequest(URLRequest(url: arxivURL), session: session)
+            let fetchedAt = resolvedFetchedAt(from: response)
+            let sourceRecord = CitationVerdictSourceRecord(
+                source: "arXiv",
+                url: arxivURL.absoluteString,
+                status: response.statusCode,
+                fetchedAt: fetchedAt,
+                origin: response.origin
+            )
+            sources.append(sourceRecord)
+
+            // Rate-limit (429), timeout (408), and server errors (5xx) always yield UNVERIFIED.
+            if response.statusCode == 429 || response.statusCode == 408 || (500...599).contains(response.statusCode) {
+                let code = classifyHTTPFailureStatus(response.statusCode)
                 findings.append(
                     FirewallFinding(
                         code: .registryTransportUnavailable,
                         severity: .warning,
                         field: "network",
-                        detail: describeTransportError(source: "arXiv", code: code, error: error)
+                        detail: describeHTTPFailure(source: "arXiv", statusCode: response.statusCode, identifier: "arXiv:\(arxivID)")
                     )
                 )
                 return buildUpdatedVerdict(
@@ -1328,10 +1386,980 @@ public struct CitationVerificationFirewall: Sendable {
                     findings: findings
                 )
             }
+
+            // Decide strictly from Atom `totalResults` and `<entry>` rather than HTTP status code.
+            switch parseArXivAtomPayload(response.body) {
+            case .parsed(let remote):
+                return reconcileRemoteRegistryMetadata(
+                    entry: entry,
+                    remote: remote,
+                    primarySource: sourceRecord,
+                    allSources: sources,
+                    existingFindings: findings,
+                    isBuiltInRetracted: isBuiltInRetracted
+                )
+            case .notFound:
+                let detail = "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
+                findings.append(
+                    FirewallFinding(
+                        code: .registryLookupNotFound,
+                        severity: .criticalBlock,
+                        field: "arxivID",
+                        detail: detail
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .notFound,
+                    reasons: ["arxiv_not_found"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings,
+                    overrideNote: "[NOT_FOUND] \(detail)"
+                )
+            case .unparseable:
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: "arXiv payload for 'arXiv:\(arxivID)' could not be parsed."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+        } catch is any FatalRegistrySessionError {
+            return offlineVerdict
+        } catch {
+            let code = classifyThrownTransportError(error)
+            sources.append(
+                CitationVerdictSourceRecord(
+                    source: "arXiv",
+                    url: arxivURL.absoluteString,
+                    status: nil,
+                    fetchedAt: currentISO8601Timestamp(),
+                    origin: .network
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeTransportError(source: "arXiv", code: code, error: error)
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+    }
+
+    /// Queries arXiv when an entry carries BOTH a non-arXiv DOI and an `arxivID`.
+    /// The DOI verdict remains authoritative for metadata comparison, while arXiv cross-checks
+    /// withdrawal/retraction and `arxivID` existence/identity.
+    private func crossCheckArXivAlongsideDOIVerdict(
+        entry: BibliographyEntry,
+        normalizedDOI: String,
+        arxivID: String,
+        doiVerdict: CitationFirewallEntryVerdict,
+        offlineVerdict: CitationFirewallEntryVerdict,
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        guard let arxivURL = RegistryURLBuilder.arXivQueryURL(arXivID: arxivID) else {
+            return doiVerdict
+        }
+        // If `verifyNonArXivDOIEntry` already aborted on a FatalRegistrySessionError, preserve `offlineVerdict`.
+        if doiVerdict == offlineVerdict && doiVerdict.sources.isEmpty {
+            return offlineVerdict
         }
 
-        // Entries without a DOI/arXiv lookup path remain UNVERIFIED with reason `offline`.
-        return offlineVerdict
+        var sources = doiVerdict.sources
+        var findings = doiVerdict.findings
+
+        let response: RegistryHTTPResponse
+        do {
+            response = try await sendArXivRequest(URLRequest(url: arxivURL), session: session)
+        } catch is any FatalRegistrySessionError {
+            return offlineVerdict
+        } catch {
+            let code = classifyThrownTransportError(error)
+            sources.append(
+                CitationVerdictSourceRecord(
+                    source: "arXiv",
+                    url: arxivURL.absoluteString,
+                    status: nil,
+                    fetchedAt: currentISO8601Timestamp(),
+                    origin: .network
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .advisory,
+                    field: "network",
+                    detail: describeTransportError(source: "arXiv", code: code, error: error)
+                )
+            )
+            if doiVerdict.firewallClass == .notFound {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [code.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: doiVerdict.firewallClass,
+                reasons: doiVerdict.reasons,
+                sources: sources,
+                fields: doiVerdict.fields,
+                findings: findings,
+                overrideNote: doiVerdict.auditNote
+            )
+        }
+
+        let sourceRecord = CitationVerdictSourceRecord(
+            source: "arXiv",
+            url: arxivURL.absoluteString,
+            status: response.statusCode,
+            fetchedAt: resolvedFetchedAt(from: response),
+            origin: response.origin
+        )
+        sources.append(sourceRecord)
+
+        if response.statusCode == 429 || response.statusCode == 408 || (500...599).contains(response.statusCode) {
+            let code = classifyHTTPFailureStatus(response.statusCode)
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .advisory,
+                    field: "network",
+                    detail: describeHTTPFailure(source: "arXiv", statusCode: response.statusCode, identifier: "arXiv:\(arxivID)")
+                )
+            )
+            if doiVerdict.firewallClass == .notFound {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [code.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: doiVerdict.firewallClass,
+                reasons: doiVerdict.reasons,
+                sources: sources,
+                fields: doiVerdict.fields,
+                findings: findings,
+                overrideNote: doiVerdict.auditNote
+            )
+        }
+
+        switch parseArXivAtomPayload(response.body) {
+        case .parsed(let arxivRemote):
+            if let arxivRetField = arxivRemote.retractionField {
+                findings.removeAll {
+                    $0.code == .blockedRetractedWork && $0.detail.contains(CitationAuditWording.builtInRetractionListNotice)
+                }
+                let arxivDetail = "arXiv marks this publication as retracted (field: \(arxivRetField))."
+                findings.append(
+                    FirewallFinding(
+                        code: .blockedRetractedWork,
+                        severity: .criticalBlock,
+                        field: arxivRetField,
+                        detail: arxivDetail
+                    )
+                )
+                var mergedReasons = doiVerdict.firewallClass == .retracted
+                    ? doiVerdict.reasons.filter { $0 != "retracted_builtin_list" }
+                    : []
+                if !mergedReasons.contains("retracted_arxiv") {
+                    mergedReasons.append("retracted_arxiv")
+                }
+                let note = doiVerdict.firewallClass == .retracted
+                    ? "\(doiVerdict.auditNote) \(arxivDetail)"
+                    : "[RETRACTED] \(arxivDetail)"
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: mergedReasons,
+                    sources: sources,
+                    fields: [],
+                    findings: findings,
+                    overrideNote: note
+                )
+            }
+
+            if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
+                let doiLinked = (arxivRemote.doi == normalizedDOI)
+                let authorAligned = (compareFirstAuthor(localAuthors: entry.authors, remote: arxivRemote).discrepancy == nil)
+                let titleAligned = (compareTitle(localTitle: entry.title, remoteTitle: arxivRemote.title, sourceName: "arXiv").discrepancy == nil)
+
+                if !doiLinked && !authorAligned && !titleAligned {
+                    var discrepancies = doiVerdict.fields
+                    discrepancies.append(
+                        CitationFieldDiscrepancy(
+                            field: "arxivID",
+                            localValue: arxivID,
+                            remoteValue: arxivRemote.title,
+                            source: "arXiv",
+                            severity: "error",
+                            note: "arXiv:\(arxivID) points to a different work ('\(arxivRemote.title)') than the DOI record."
+                        )
+                    )
+                    var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+                    if !reasons.contains("arxiv_mismatch") {
+                        reasons.append("arxiv_mismatch")
+                    }
+                    let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: "arXiv")
+                    findings.append(
+                        FirewallFinding(
+                            code: .metadataDriftDetected,
+                            severity: .warning,
+                            field: "arxivID",
+                            detail: driftSummary
+                        )
+                    )
+                    return buildUpdatedVerdict(
+                        for: entry,
+                        assignedClass: .drift,
+                        reasons: reasons,
+                        sources: sources,
+                        fields: discrepancies,
+                        findings: findings,
+                        overrideNote: "[DRIFT] \(driftSummary)"
+                    )
+                }
+
+                findings.append(
+                    FirewallFinding(
+                        code: .validArXivIdentifier,
+                        severity: .pass,
+                        field: "arxivID",
+                        detail: "Cross-checked arXiv:\(arxivID) alongside authoritative DOI '\(normalizedDOI)'."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: doiVerdict.firewallClass,
+                    reasons: doiVerdict.reasons,
+                    sources: sources,
+                    fields: doiVerdict.fields,
+                    findings: findings,
+                    overrideNote: doiVerdict.auditNote
+                )
+            }
+
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: doiVerdict.firewallClass,
+                reasons: doiVerdict.reasons,
+                sources: sources,
+                fields: doiVerdict.fields,
+                findings: findings,
+                overrideNote: doiVerdict.auditNote
+            )
+
+        case .notFound:
+            if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
+                var discrepancies = doiVerdict.fields
+                discrepancies.append(
+                    CitationFieldDiscrepancy(
+                        field: "arxivID",
+                        localValue: arxivID,
+                        remoteValue: "",
+                        source: "arXiv",
+                        severity: "error",
+                        note: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
+                    )
+                )
+                var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+                if !reasons.contains("arxiv_not_found") {
+                    reasons.append("arxiv_not_found")
+                }
+                let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: "arXiv")
+                findings.append(
+                    FirewallFinding(
+                        code: .registryLookupNotFound,
+                        severity: .warning,
+                        field: "arxivID",
+                        detail: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .drift,
+                    reasons: reasons,
+                    sources: sources,
+                    fields: discrepancies,
+                    findings: findings,
+                    overrideNote: "[DRIFT] \(driftSummary)"
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: doiVerdict.firewallClass,
+                reasons: doiVerdict.reasons,
+                sources: sources,
+                fields: doiVerdict.fields,
+                findings: findings,
+                overrideNote: doiVerdict.auditNote
+            )
+
+        case .unparseable:
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .advisory,
+                    field: "network",
+                    detail: "arXiv cross-check payload for 'arXiv:\(arxivID)' could not be parsed."
+                )
+            )
+            if doiVerdict.firewallClass == .notFound {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: doiVerdict.firewallClass,
+                reasons: doiVerdict.reasons,
+                sources: sources,
+                fields: doiVerdict.fields,
+                findings: findings,
+                overrideNote: doiVerdict.auditNote
+            )
+        }
+    }
+
+    // MARK: - PubMed PMID Lookup via E-utilities `esummary` (M1 Item 3)
+
+    private func verifyPubMedEntry(
+        entry: BibliographyEntry,
+        normalizedPMID: String,
+        offlineVerdict: CitationFirewallEntryVerdict,
+        initialFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var findings = initialFindings
+        var sources: [CitationVerdictSourceRecord] = []
+
+        guard let pubmedURL = RegistryURLBuilder.pubMedSummaryURL(pmid: normalizedPMID) else {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        do {
+            let response = try await session.send(URLRequest(url: pubmedURL))
+            let fetchedAt = resolvedFetchedAt(from: response)
+            let sourceRecord = CitationVerdictSourceRecord(
+                source: "PubMed",
+                url: pubmedURL.absoluteString,
+                status: response.statusCode,
+                fetchedAt: fetchedAt,
+                origin: response.origin
+            )
+            sources.append(sourceRecord)
+
+            guard response.statusCode == 200 else {
+                let code = classifyHTTPFailureStatus(response.statusCode)
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeHTTPFailure(source: "PubMed", statusCode: response.statusCode, identifier: "PMID:\(normalizedPMID)")
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [code.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+
+            switch parsePubMedSummaryPayload(response.body, requestedPMID: normalizedPMID) {
+            case .parsed(let remote):
+                return reconcileRemoteRegistryMetadata(
+                    entry: entry,
+                    remote: remote,
+                    primarySource: sourceRecord,
+                    allSources: sources,
+                    existingFindings: findings,
+                    isBuiltInRetracted: isBuiltInRetracted
+                )
+            case .notFound(let errDetail):
+                let detail = "PubMed reported that identifier 'PMID:\(normalizedPMID)' does not exist (\(errDetail))."
+                findings.append(
+                    FirewallFinding(
+                        code: .registryLookupNotFound,
+                        severity: .criticalBlock,
+                        field: "pmid",
+                        detail: detail
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .notFound,
+                    reasons: ["pmid_not_found"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings,
+                    overrideNote: "[NOT_FOUND] \(detail)"
+                )
+            case .registeredNoMetadata:
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "pmid",
+                        detail: "PubMed record 'PMID:\(normalizedPMID)' returned empty title metadata."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.registeredNoMetadata.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            case .rateLimited:
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: "PubMed reported rate limiting for 'PMID:\(normalizedPMID)'."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.rateLimited.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            case .unparseable:
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: "PubMed esummary payload for 'PMID:\(normalizedPMID)' could not be parsed."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+        } catch is any FatalRegistrySessionError {
+            return offlineVerdict
+        } catch {
+            let code = classifyThrownTransportError(error)
+            sources.append(
+                CitationVerdictSourceRecord(
+                    source: "PubMed",
+                    url: pubmedURL.absoluteString,
+                    status: nil,
+                    fetchedAt: currentISO8601Timestamp(),
+                    origin: .network
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeTransportError(source: "PubMed", code: code, error: error)
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+    }
+
+    // MARK: - Identifierless Bibliographic Search (Crossref -> OpenAlex, M1 Item 3)
+
+    private func verifyIdentifierlessEntry(
+        entry: BibliographyEntry,
+        offlineVerdict: CitationFirewallEntryVerdict,
+        initialFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var findings = initialFindings
+        var sources: [CitationVerdictSourceRecord] = []
+        var failureReasons: [CitationUnverifiedReasonCode] = []
+
+        guard let crossrefQuery = buildIdentifierlessCrossrefQuery(for: entry),
+              let openAlexQuery = buildOpenAlexTitleSearchQuery(for: entry) else {
+            let detail = CitationAuditWording.noMatchInSearchNotice
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "doi/arxivID/pmid",
+                    detail: detail
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.noMatchInSearch.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[UNVERIFIED] \(detail)"
+            )
+        }
+
+        // 1. Crossref `query.bibliographic` (title + first author surname + year, rows=5)
+        if let crossrefURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: crossrefQuery, rows: 5) {
+            do {
+                let response = try await session.send(URLRequest(url: crossrefURL))
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "Crossref",
+                    url: crossrefURL.absoluteString,
+                    status: response.statusCode,
+                    fetchedAt: resolvedFetchedAt(from: response),
+                    origin: response.origin
+                )
+                sources.append(sourceRecord)
+
+                if response.statusCode == 200 {
+                    switch parseCrossrefSearchPayload(response.body) {
+                    case .parsed(let candidates):
+                        switch selectMatchingSearchCandidate(entry: entry, candidates: candidates, sourceName: "Crossref") {
+                        case .single(let matched):
+                            return reconcileIdentifierlessMatchedCandidate(
+                                entry: entry,
+                                remote: matched,
+                                primarySource: sourceRecord,
+                                allSources: sources,
+                                existingFindings: findings,
+                                isBuiltInRetracted: isBuiltInRetracted
+                            )
+                        case .ambiguous(let count):
+                            let detail = "Crossref bibliographic search returned \(count) equally matching records for '\(entry.title)'."
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "doi/arxivID/pmid",
+                                    detail: detail
+                                )
+                            )
+                            return buildUpdatedVerdict(
+                                for: entry,
+                                assignedClass: .unverified,
+                                reasons: [CitationUnverifiedReasonCode.ambiguous.rawValue],
+                                sources: sources,
+                                fields: [],
+                                findings: findings,
+                                overrideNote: "[UNVERIFIED] \(detail)"
+                            )
+                        case .none:
+                            break
+                        }
+                    case .unparseable:
+                        failureReasons.append(.unparseable)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "Crossref bibliographic search payload for '\(crossrefQuery)' could not be parsed."
+                            )
+                        )
+                    }
+                } else {
+                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    failureReasons.append(code)
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .warning,
+                            field: "network",
+                            detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: crossrefQuery)
+                        )
+                    )
+                }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
+            } catch {
+                let code = classifyThrownTransportError(error)
+                failureReasons.append(code)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "Crossref",
+                        url: crossrefURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeTransportError(source: "Crossref", code: code, error: error)
+                    )
+                )
+            }
+        }
+
+        // 2. OpenAlex title search (`per-page=5`) only when Crossref did not yield a match
+        if let openAlexURL = RegistryURLBuilder.openAlexSearchURL(query: openAlexQuery, perPage: 5) {
+            do {
+                let response = try await session.send(URLRequest(url: openAlexURL))
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "OpenAlex",
+                    url: openAlexURL.absoluteString,
+                    status: response.statusCode,
+                    fetchedAt: resolvedFetchedAt(from: response),
+                    origin: response.origin
+                )
+                sources.append(sourceRecord)
+
+                if response.statusCode == 200 {
+                    switch parseOpenAlexSearchPayload(response.body) {
+                    case .parsed(let candidates):
+                        switch selectMatchingSearchCandidate(entry: entry, candidates: candidates, sourceName: "OpenAlex") {
+                        case .single(let matched):
+                            return reconcileIdentifierlessMatchedCandidate(
+                                entry: entry,
+                                remote: matched,
+                                primarySource: sourceRecord,
+                                allSources: sources,
+                                existingFindings: findings,
+                                isBuiltInRetracted: isBuiltInRetracted
+                            )
+                        case .ambiguous(let count):
+                            let detail = "OpenAlex title search returned \(count) equally matching records for '\(entry.title)'."
+                            findings.append(
+                                FirewallFinding(
+                                    code: .registryTransportUnavailable,
+                                    severity: .warning,
+                                    field: "doi/arxivID/pmid",
+                                    detail: detail
+                                )
+                            )
+                            return buildUpdatedVerdict(
+                                for: entry,
+                                assignedClass: .unverified,
+                                reasons: [CitationUnverifiedReasonCode.ambiguous.rawValue],
+                                sources: sources,
+                                fields: [],
+                                findings: findings,
+                                overrideNote: "[UNVERIFIED] \(detail)"
+                            )
+                        case .none:
+                            break
+                        }
+                    case .unparseable:
+                        failureReasons.append(.unparseable)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "OpenAlex search payload for '\(openAlexQuery)' could not be parsed."
+                            )
+                        )
+                    }
+                } else {
+                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    failureReasons.append(code)
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .warning,
+                            field: "network",
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: openAlexQuery)
+                        )
+                    )
+                }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
+            } catch {
+                let code = classifyThrownTransportError(error)
+                failureReasons.append(code)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "OpenAlex",
+                        url: openAlexURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeTransportError(source: "OpenAlex", code: code, error: error)
+                    )
+                )
+            }
+        }
+
+        if !failureReasons.isEmpty {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: deduplicatedReasons(failureReasons),
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        let noMatchDetail = CitationAuditWording.noMatchInSearchNotice
+        findings.append(
+            FirewallFinding(
+                code: .registryTransportUnavailable,
+                severity: .warning,
+                field: "doi/arxivID/pmid",
+                detail: noMatchDetail
+            )
+        )
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: .unverified,
+            reasons: [CitationUnverifiedReasonCode.noMatchInSearch.rawValue],
+            sources: sources,
+            fields: [],
+            findings: findings,
+            overrideNote: "[UNVERIFIED] \(noMatchDetail)"
+        )
+    }
+
+    private enum SearchCandidateSelection {
+        case none
+        case single(RemoteWorkRecord)
+        case ambiguous(Int)
+    }
+
+    /// Filters search candidates strictly by:
+    /// 1. Normalized word-for-word title equality (`compareTitle == nil`)
+    /// 2. Publication year difference `<= 1`
+    /// 3. Normalized first-author surname equality (`compareFirstAuthor == nil`)
+    /// Book reviews are excluded solely by these three criteria, NEVER by Crossref's `type` field.
+    private func selectMatchingSearchCandidate(
+        entry: BibliographyEntry,
+        candidates: [RemoteWorkRecord],
+        sourceName: String
+    ) -> SearchCandidateSelection {
+        guard let localYear = entry.year else {
+            return .none
+        }
+
+        var uniqueMatches: [RemoteWorkRecord] = []
+        var seenDOIs: Set<String> = []
+
+        for candidate in candidates {
+            if let candDOI = candidate.doi, !candDOI.isEmpty {
+                if seenDOIs.contains(candDOI) {
+                    continue
+                }
+            }
+            guard compareTitle(localTitle: entry.title, remoteTitle: candidate.title, sourceName: sourceName).discrepancy == nil else {
+                continue
+            }
+            guard compareFirstAuthor(localAuthors: entry.authors, remote: candidate).discrepancy == nil else {
+                continue
+            }
+            guard let minYearDiff = candidate.publicationYears.map({ abs($0 - localYear) }).min(),
+                  minYearDiff <= 1 else {
+                continue
+            }
+            if let candDOI = candidate.doi, !candDOI.isEmpty {
+                seenDOIs.insert(candDOI)
+            }
+            uniqueMatches.append(candidate)
+        }
+
+        if uniqueMatches.isEmpty {
+            return .none
+        }
+        if uniqueMatches.count == 1 {
+            return .single(uniqueMatches[0])
+        }
+
+        let scored: [(record: RemoteWorkRecord, secondaryMismatches: Int)] = uniqueMatches.map { cand in
+            var mismatches = 0
+            if compareAuthorCount(localAuthors: entry.authors, remote: cand).discrepancy != nil {
+                mismatches += 1
+            }
+            if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: sourceName).discrepancy != nil {
+                mismatches += 1
+            }
+            if compareVenue(localVenue: entry.venue, remoteVenues: cand.venues, sourceName: sourceName).discrepancy != nil {
+                mismatches += 1
+            }
+            return (cand, mismatches)
+        }
+        let minMismatches = scored.map(\.secondaryMismatches).min() ?? 0
+        let best = scored.filter { $0.secondaryMismatches == minMismatches }
+        if best.count == 1 {
+            return .single(best[0].record)
+        }
+        return .ambiguous(best.count)
+    }
+
+    private func reconcileIdentifierlessMatchedCandidate(
+        entry: BibliographyEntry,
+        remote: RemoteWorkRecord,
+        primarySource: CitationVerdictSourceRecord,
+        allSources: [CitationVerdictSourceRecord],
+        existingFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool
+    ) -> CitationFirewallEntryVerdict {
+        let matchedBuiltInRetracted = isBuiltInRetracted || (remote.doi.map { retractedDOIs.contains($0) } ?? false)
+        let baseVerdict = reconcileRemoteRegistryMetadata(
+            entry: entry,
+            remote: remote,
+            primarySource: primarySource,
+            allSources: allSources,
+            existingFindings: existingFindings,
+            isBuiltInRetracted: matchedBuiltInRetracted
+        )
+
+        guard let remoteDOI = nonEmpty(remote.doi),
+              baseVerdict.firewallClass == .verified || baseVerdict.firewallClass == .drift else {
+            return baseVerdict
+        }
+
+        var updatedFields = baseVerdict.fields
+        if !updatedFields.contains(where: { $0.field == "doi" }) {
+            updatedFields.append(
+                CitationFieldDiscrepancy(
+                    field: "doi",
+                    localValue: "",
+                    remoteValue: remoteDOI,
+                    source: remote.sourceName,
+                    severity: "advisory",
+                    note: "Matched via \(remote.sourceName) bibliographic search; remote record provides DOI '\(remoteDOI)'."
+                )
+            )
+        }
+
+        let updatedNote: String
+        if baseVerdict.firewallClass == .verified {
+            let dateLabel = Self.shortDateLabel(from: primarySource.fetchedAt)
+            updatedNote = "[VERIFIED] Matched in \(remote.sourceName), fetched \(dateLabel) (\(primarySource.origin.rawValue)); DOI: \(remoteDOI)."
+        } else {
+            updatedNote = "\(baseVerdict.auditNote) Matched DOI: \(remoteDOI)."
+        }
+
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: baseVerdict.firewallClass,
+            reasons: baseVerdict.reasons,
+            sources: baseVerdict.sources,
+            fields: updatedFields,
+            findings: baseVerdict.findings,
+            overrideNote: updatedNote
+        )
+    }
+
+    private func buildIdentifierlessCrossrefQuery(for entry: BibliographyEntry) -> String? {
+        guard !Self.normalizeTitleTokensForComparison(entry.title).isEmpty else {
+            return nil
+        }
+        let cleanTitle = Self.stripOuterRetractionMarkers(
+            LaTeXTextCodec().decode(Self.stripHTMLTagsAndEntities(entry.title))
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return nil }
+
+        var parts: [String] = [cleanTitle]
+        let namedAuthors = entry.authors.filter { !Self.isEtAlTruncationAuthor($0) }
+        if let firstAuthor = namedAuthors.first {
+            let cleanSurname = LaTeXTextCodec().decode(Self.stripHTMLTagsAndEntities(firstAuthor.familyName))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanSurname.isEmpty {
+                parts.append(cleanSurname)
+            }
+        }
+        if let yr = entry.year {
+            parts.append(String(yr))
+        }
+        let combined = parts
+            .joined(separator: " ")
+            .replacingOccurrences(of: "@", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return combined.isEmpty ? nil : combined
+    }
+
+    private func buildOpenAlexTitleSearchQuery(for entry: BibliographyEntry) -> String? {
+        let decoded = Self.stripOuterRetractionMarkers(
+            LaTeXTextCodec().decode(Self.stripHTMLTagsAndEntities(entry.title))
+        )
+        var cleaned = ""
+        cleaned.reserveCapacity(decoded.count)
+        for ch in decoded {
+            if ch.isLetter || ch.isNumber || ch == "-" {
+                cleaned.append(ch)
+            } else {
+                cleaned.append(" ")
+            }
+        }
+        let collapsed = cleaned
+            .replacingOccurrences(of: "@", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
     }
 
     // MARK: - Non-arXiv DOI Lookup Order, Retraction Cross-Check & Handle Resolution (M1 Item 3)
@@ -2258,6 +3286,14 @@ public struct CitationVerificationFirewall: Sendable {
         case unparseable
     }
 
+    private enum PubMedPayloadParseOutcome {
+        case parsed(RemoteWorkRecord)
+        case notFound(String)
+        case registeredNoMetadata
+        case rateLimited
+        case unparseable
+    }
+
     private static let leadingRetractionPrefixes: [String] = [
         "retracted article:",
         "retracted paper:",
@@ -2969,6 +4005,25 @@ public struct CitationVerificationFirewall: Sendable {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return .unparseable
         }
+        return parseOpenAlexWorkObject(root)
+    }
+
+    private func parseOpenAlexSearchPayload(_ data: Data) -> CrossrefSearchParseOutcome {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = root["results"] as? [[String: Any]] else {
+            return .unparseable
+        }
+        var records: [RemoteWorkRecord] = []
+        records.reserveCapacity(results.count)
+        for item in results {
+            if case .parsed(let record) = parseOpenAlexWorkObject(item) {
+                records.append(record)
+            }
+        }
+        return .parsed(records)
+    }
+
+    private func parseOpenAlexWorkObject(_ root: [String: Any]) -> RegistryPayloadParseOutcome {
         guard root["id"] != nil || root["title"] != nil || root["display_name"] != nil else {
             return .unparseable
         }
@@ -3067,6 +4122,14 @@ public struct CitationVerificationFirewall: Sendable {
             return .unparseable
         }
 
+        let totalResultsRaw = extractXMLTagValue("opensearch:totalResults", in: xml)
+            ?? extractXMLTagValue("totalResults", in: xml)
+        if let totalStr = totalResultsRaw?.trimmingCharacters(in: .whitespacesAndNewlines),
+           let totalInt = Int(totalStr),
+           totalInt == 0 {
+            return .notFound
+        }
+
         guard let entryRange = xml.range(of: "<entry>"),
               let entryClose = xml.range(of: "</entry>", range: entryRange.upperBound..<xml.endIndex) else {
             return .notFound
@@ -3151,6 +4214,192 @@ public struct CitationVerificationFirewall: Sendable {
                 retractionField: retractionField
             )
         )
+    }
+
+    private func parsePubMedSummaryPayload(_ data: Data, requestedPMID: String) -> PubMedPayloadParseOutcome {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return .unparseable
+        }
+
+        if let topError = nonEmpty(root["error"] as? String) {
+            if topError.lowercased().contains("rate limit") {
+                return .rateLimited
+            }
+            return .unparseable
+        }
+
+        guard let resultObj = root["result"] as? [String: Any] else {
+            return .unparseable
+        }
+
+        guard let doc = resultObj[requestedPMID] as? [String: Any] else {
+            if let uids = resultObj["uids"] as? [String], uids.isEmpty {
+                return .notFound("empty uids")
+            }
+            return .unparseable
+        }
+
+        if let docError = nonEmpty(doc["error"] as? String) {
+            return .notFound(docError)
+        }
+
+        var title = (doc["title"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.hasSuffix(".") && !title.hasSuffix("..") {
+            title.removeLast()
+            title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !title.isEmpty else {
+            return .registeredNoMetadata
+        }
+
+        var normalizedDOI: String?
+        if let articleIDs = doc["articleids"] as? [[String: Any]] {
+            for item in articleIDs {
+                if (item["idtype"] as? String)?.lowercased() == "doi",
+                   let doiVal = ReferenceIdentifierNormalizer.normalizeDOI(item["value"] as? String) {
+                    normalizedDOI = doiVal
+                    break
+                }
+            }
+        }
+
+        var retractionField: String?
+        if let pubTypes = doc["pubtype"] as? [String],
+           pubTypes.contains(where: { $0.lowercased().contains("retracted publication") }) {
+            retractionField = "pubtype (Retracted Publication)"
+        }
+
+        var firstAuthorDisplay: String?
+        var firstAuthorSurname: String?
+        var firstAuthorFullName: String?
+        var firstAuthorHasExplicitFamilyField = false
+        var firstAuthorIsCorporate = false
+        var authorSurnames: [String] = []
+
+        if let rawAuthors = doc["authors"] as? [[String: Any]], !rawAuthors.isEmpty {
+            let primaryAuthors: [[String: Any]] = {
+                let filtered = rawAuthors.filter {
+                    let t = (($0["authtype"] as? String) ?? "author").lowercased()
+                    return t == "author" || t == "collectivename"
+                }
+                return filtered.isEmpty ? rawAuthors : filtered
+            }()
+
+            for (idx, item) in primaryAuthors.enumerated() {
+                guard let name = nonEmpty(item["name"] as? String) else { continue }
+                let authtype = ((item["authtype"] as? String) ?? "Author").lowercased()
+                if authtype == "collectivename" {
+                    authorSurnames.append(name)
+                    if idx == 0 {
+                        firstAuthorDisplay = name
+                        firstAuthorSurname = name
+                        firstAuthorFullName = name
+                        firstAuthorHasExplicitFamilyField = false
+                        firstAuthorIsCorporate = true
+                    }
+                } else {
+                    let parsed = Self.extractPubMedAuthorSurname(from: name)
+                    authorSurnames.append(parsed.surname)
+                    if idx == 0 {
+                        firstAuthorDisplay = parsed.surname
+                        firstAuthorSurname = parsed.surname
+                        firstAuthorFullName = name
+                        firstAuthorHasExplicitFamilyField = parsed.hasExplicitFamily
+                        firstAuthorIsCorporate = false
+                    }
+                }
+            }
+        }
+
+        var publicationYears: [Int] = []
+        for dateKey in ["pubdate", "epubdate", "sortpubdate"] {
+            if let dateStr = nonEmpty(doc[dateKey] as? String),
+               let yr = Self.extractFourDigitYear(from: dateStr),
+               !publicationYears.contains(yr) {
+                publicationYears.append(yr)
+            }
+        }
+
+        var venues: [String] = []
+        for venueKey in ["fulljournalname", "source", "booktitle"] {
+            if let v = nonEmpty(doc[venueKey] as? String), !venues.contains(v) {
+                venues.append(v)
+            }
+        }
+
+        return .parsed(
+            RemoteWorkRecord(
+                sourceName: "PubMed",
+                doi: normalizedDOI,
+                title: title,
+                firstAuthorDisplay: firstAuthorDisplay,
+                firstAuthorSurname: firstAuthorSurname,
+                firstAuthorFullName: firstAuthorFullName,
+                firstAuthorHasExplicitFamilyField: firstAuthorHasExplicitFamilyField,
+                firstAuthorIsCorporate: firstAuthorIsCorporate,
+                authorSurnames: authorSurnames,
+                publicationYears: publicationYears,
+                venues: venues,
+                retractionField: retractionField
+            )
+        )
+    }
+
+    private static func extractPubMedAuthorSurname(from rawName: String) -> (surname: String, hasExplicitFamily: Bool) {
+        let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains(",") {
+            let beforeComma = trimmed.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+                .first
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? trimmed
+            return (beforeComma.isEmpty ? trimmed : beforeComma, true)
+        }
+
+        var tokens = trimmed.split(whereSeparator: \.isWhitespace).map(String.init)
+        if tokens.count <= 1 {
+            return (trimmed, false)
+        }
+
+        let suffixes: Set<String> = ["jr", "jr.", "sr", "sr.", "2nd", "3rd", "4th", "ii", "iii", "iv"]
+        if tokens.count >= 3, let last = tokens.last?.lowercased(), suffixes.contains(last) {
+            tokens.removeLast()
+        }
+
+        if tokens.count >= 2, let lastToken = tokens.last, isPubMedInitialsToken(lastToken) {
+            tokens.removeLast()
+            return (tokens.joined(separator: " "), true)
+        }
+
+        return (extractSurnameFromAuthorString(trimmed) ?? trimmed, false)
+    }
+
+    private static func isPubMedInitialsToken(_ token: String) -> Bool {
+        guard (1...5).contains(token.count) else { return false }
+        var hasUppercase = false
+        for ch in token {
+            if ch.isUppercase {
+                hasUppercase = true
+            } else if ch == "-" || ch == "." {
+                continue
+            } else {
+                return false
+            }
+        }
+        return hasUppercase
+    }
+
+    private static func extractFourDigitYear(from text: String) -> Int? {
+        var digits = ""
+        for ch in text {
+            if ch.isNumber {
+                digits.append(ch)
+                if digits.count == 4, let yr = Int(digits), (1450...2100).contains(yr) {
+                    return yr
+                }
+            } else {
+                digits.removeAll(keepingCapacity: true)
+            }
+        }
+        return nil
     }
 
     // MARK: - Normalization, Parsing & Verdict Formatting Helpers

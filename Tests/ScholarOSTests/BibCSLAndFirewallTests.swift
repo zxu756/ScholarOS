@@ -2280,4 +2280,266 @@ struct BibCSLAndFirewallTests {
         #expect(titleCheck.discrepancy == nil)
         #expect(titleCheck.reason == nil)
     }
+
+    // MARK: - 11. M1 Stage 05 arXiv, PubMed & Identifierless Search Tests (TDD)
+
+    @Test("M1 item 3 (Stage 05): arXiv parses totalResults and <entry> independent of HTTP status, verifies 1706.03762, and flags wrong title as DRIFT")
+    func m1Stage05ArXivTotalResultsParsingStatusIndependenceAndDrift() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+        let vaswaniAuthors = [
+            BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+            BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+            BibAuthor(givenName: "Niki", familyName: "Parmar"),
+            BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+            BibAuthor(givenName: "Llion", familyName: "Jones"),
+            BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+            BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+            BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+        ]
+
+        // 1. Real arXiv ID 1706.03762 (without DOI) -> VERIFIED from recorded Atom feed
+        let cleanArXiv = BibliographyEntry(
+            citeKey: "vaswani2017_arxiv",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: vaswaniAuthors,
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        let vClean = await firewall.verifyAgainstPublicRegistries(entry: cleanArXiv, session: replay)
+        #expect(vClean.firewallClass == .verified)
+        #expect(vClean.insertable == true)
+        #expect(vClean.sources.contains { $0.source == "arXiv" && $0.status == 200 })
+
+        // 2. arXiv-only entry with wrong title -> DRIFT
+        let wrongTitleArXiv = BibliographyEntry(
+            citeKey: "vaswani2017_wrong_title",
+            kind: .misc,
+            title: "Attention Is Completely Optional for Sequence Transduction",
+            authors: vaswaniAuthors,
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        let vDrift = await firewall.verifyAgainstPublicRegistries(entry: wrongTitleArXiv, session: replay)
+        #expect(vDrift.firewallClass == .drift)
+        #expect(vDrift.insertable == false)
+        #expect(vDrift.fields.contains { $0.field == "title" && $0.remoteValue == "Attention Is All You Need" })
+
+        // 3. HTTP 404 with non-Atom HTML body MUST NOT be judged NOT_FOUND (must judge by totalResults & <entry>, not HTTP status)
+        let html404Session = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 404, body: Data("<html><body>404 Gateway Not Found</body></html>".utf8))
+        }
+        let vHtml404 = await firewall.verifyAgainstPublicRegistries(entry: cleanArXiv, session: html404Session)
+        #expect(vHtml404.firewallClass == .unverified)
+        #expect(vHtml404.firewallClass != .notFound)
+        #expect(vHtml404.reasons == [CitationUnverifiedReasonCode.unparseable.rawValue])
+
+        // 4. Atom feed with <opensearch:totalResults>0</opensearch:totalResults> -> NOT_FOUND even when HTTP status is 200
+        let emptyAtomXML = """
+        <?xml version='1.0' encoding='UTF-8'?>
+        <feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns="http://www.w3.org/2005/Atom">
+          <opensearch:totalResults>0</opensearch:totalResults>
+        </feed>
+        """
+        let emptyAtomSession = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 200, body: Data(emptyAtomXML.utf8))
+        }
+        let nonexistentEntry = BibliographyEntry(
+            citeKey: "arxiv_missing_2401",
+            kind: .misc,
+            title: "Nonexistent Preprint",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 2024,
+            arxivID: "2401.99999"
+        )
+        let vMissing = await firewall.verifyAgainstPublicRegistries(entry: nonexistentEntry, session: emptyAtomSession)
+        #expect(vMissing.firewallClass == .notFound)
+        #expect(vMissing.reasons == ["arxiv_not_found"])
+        #expect(vMissing.auditNote.contains("arXiv"))
+    }
+
+    @Test("M1 item 3 & 5 (Stage 05): injectable ArXivRequestPacer enforces >= 3s spacing between arXiv requests without sleeping in real wall-clock time")
+    func m1Stage05ArXivInjectableRateLimiterEnforcesThreeSecondSpacingWithoutRealSleep() async throws {
+        final class MockClockState: @unchecked Sendable {
+            private let lock = NSLock()
+            var now: TimeInterval = 100.0
+            var recordedSleeps: [TimeInterval] = []
+
+            func currentTime() -> TimeInterval {
+                lock.lock()
+                defer { lock.unlock() }
+                return now
+            }
+
+            func advance(_ delta: TimeInterval) {
+                lock.lock()
+                defer { lock.unlock() }
+                now += delta
+            }
+
+            func recordSleep(_ seconds: TimeInterval) {
+                lock.lock()
+                defer { lock.unlock() }
+                recordedSleeps.append(seconds)
+                now += seconds
+            }
+        }
+
+        let clock = MockClockState()
+        let pacer = ArXivRequestPacer(
+            minimumIntervalSeconds: 3.0,
+            nowSeconds: { clock.currentTime() },
+            sleepSeconds: { seconds in clock.recordSleep(seconds) }
+        )
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall(arXivPacer: pacer)
+        let entry = BibliographyEntry(
+            citeKey: "vaswani2017_paced",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [
+                BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                BibAuthor(givenName: "", familyName: "others")
+            ],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+
+        let wallStart = ProcessInfo.processInfo.systemUptime
+        // 1st arXiv call at t=100.0 -> 0s sleep
+        _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+        // 2nd arXiv call 1.2s later at t=101.2 -> must sleep 1.8s (advancing mock clock to 103.0)
+        clock.advance(1.2)
+        _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+        // 3rd arXiv call immediately at t=103.0 -> must sleep full 3.0s (advancing mock clock to 106.0)
+        _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+        // 4th arXiv call 3.5s later at t=109.5 -> >=3.0s elapsed, 0s sleep
+        clock.advance(3.5)
+        _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+        let wallElapsed = ProcessInfo.processInfo.systemUptime - wallStart
+
+        #expect(wallElapsed < 1.0, "Unit test must never sleep real 3 seconds (took \(wallElapsed)s)")
+        #expect(clock.recordedSleeps.count == 2)
+        if clock.recordedSleeps.count == 2 {
+            #expect(abs(clock.recordedSleeps[0] - 1.8) < 0.001)
+            #expect(abs(clock.recordedSleeps[1] - 3.0) < 0.001)
+        }
+    }
+
+    @Test("M1 item 1, 3 & 4 (Stage 05): injected disconnect, timeout, 500, 429, and corrupt 200 on arXiv, PubMed, and identifierless search return UNVERIFIED, never NOT_FOUND")
+    func m1Stage05InjectedFailuresAcrossArXivPubMedAndSearchReturnUnverifiedNeverNotFound() async throws {
+        // 8-digit PMID (e.g. 99999999) is syntactically valid so online PubMed esummary is queried
+        #expect(ScholarlyIdentifierValidator.validatePMID("99999999").isValid)
+
+        let firewall = CitationVerificationFirewall()
+        let arxivEntry = BibliographyEntry(
+            citeKey: "arxiv_fail_probe",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        let pmidEntry = BibliographyEntry(
+            citeKey: "pmid_fail_probe",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [BibAuthor(givenName: "Hiroshi T.", familyName: "Ito")],
+            year: 2015,
+            venue: "Nature",
+            pmid: "26017312"
+        )
+        let nodoiEntry = BibliographyEntry(
+            citeKey: "nodoi_fail_probe",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature"
+        )
+
+        let failureModes: [(String, @Sendable (URLRequest) async throws -> RegistryHTTPResponse)] = [
+            ("transport_error", { _ in throw URLError(.notConnectedToInternet) }),
+            ("timeout", { _ in throw URLError(.timedOut) }),
+            ("server_error", { _ in RegistryHTTPResponse(statusCode: 500, body: Data("internal server error".utf8)) }),
+            ("rate_limited", { _ in RegistryHTTPResponse(statusCode: 429, body: Data("too many requests".utf8)) }),
+            ("unparseable", { _ in RegistryHTTPResponse(statusCode: 200, body: Data("<<<corrupt-payload".utf8)) })
+        ]
+
+        for target in [arxivEntry, pmidEntry, nodoiEntry] {
+            for (expectedReason, handler) in failureModes {
+                let verdict = await firewall.verifyAgainstPublicRegistries(
+                    entry: target,
+                    session: ClosureRegistrySession(handler)
+                )
+                #expect(
+                    verdict.firewallClass == .unverified,
+                    "Entry \(target.citeKey) under \(expectedReason) returned \(verdict.firewallClass)"
+                )
+                #expect(verdict.firewallClass != .notFound)
+                #expect(verdict.insertable == false)
+                #expect(
+                    verdict.reasons == [expectedReason],
+                    "Entry \(target.citeKey) expected [\(expectedReason)], got \(verdict.reasons)"
+                )
+                #expect(!verdict.sources.isEmpty)
+            }
+        }
+
+        // Identifierless search where Crossref returns 200 (0 matches) and OpenAlex fails with 500 -> UNVERIFIED (server_error), NOT no_match_in_search
+        let openAlex500AfterEmptyCrossref = ClosureRegistrySession { req in
+            if req.url?.host == "api.crossref.org" {
+                return RegistryHTTPResponse(statusCode: 200, body: Data("{\"status\":\"ok\",\"message\":{\"items\":[]}}".utf8))
+            }
+            return RegistryHTTPResponse(statusCode: 500, body: Data("openalex 500".utf8))
+        }
+        let partialSearchFail = await firewall.verifyAgainstPublicRegistries(
+            entry: nodoiEntry,
+            session: openAlex500AfterEmptyCrossref
+        )
+        #expect(partialSearchFail.firewallClass == .unverified)
+        #expect(partialSearchFail.reasons == [CitationUnverifiedReasonCode.serverError.rawValue])
+        #expect(partialSearchFail.sources.count == 2)
+    }
+
+    @Test("M1 item 3 (Stage 05): identifierless search with >=2 equally matching candidates returns UNVERIFIED with reason ambiguous")
+    func m1Stage05AmbiguousIdentifierlessSearchCandidatesReturnUnverifiedAmbiguous() async throws {
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "ambiguous_nodoi",
+            kind: .article,
+            title: "On Computable Numbers",
+            authors: [BibAuthor(givenName: "Alan", familyName: "Turing")],
+            year: 1936
+        )
+        let tiedSearchJSON = """
+        {
+          "status": "ok",
+          "message": {
+            "items": [
+              {
+                "DOI": "10.1112/plms/s2-42.1.230",
+                "title": ["On Computable Numbers"],
+                "author": [{"given": "Alan", "family": "Turing", "sequence": "first"}],
+                "issued": {"date-parts": [[1936]]}
+              },
+              {
+                "DOI": "10.2307/2268810",
+                "title": ["On Computable Numbers"],
+                "author": [{"given": "Alan", "family": "Turing", "sequence": "first"}],
+                "issued": {"date-parts": [[1936]]}
+              }
+            ]
+          }
+        }
+        """
+        let session = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 200, body: Data(tiedSearchJSON.utf8))
+        }
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: session)
+        #expect(verdict.firewallClass == .unverified)
+        #expect(verdict.insertable == false)
+        #expect(verdict.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+    }
 }

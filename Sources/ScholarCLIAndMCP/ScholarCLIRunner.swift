@@ -1158,6 +1158,11 @@ public struct ScholarCLIRunner: Sendable {
                 case .replay: originZH = "回放"
                 case .cache: originZH = "缓存"
                 }
+                if let discoveredDOI = verdict.fields.first(where: {
+                    $0.field == "doi" && $0.localValue.isEmpty && !$0.remoteValue.isEmpty
+                })?.remoteValue {
+                    return "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）；DOI：\(discoveredDOI)。" + untrustedSuffix
+                }
                 return "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）。" + untrustedSuffix
             }
             return verdict.auditedEntry.localizedFirewallAuditNote(lang)
@@ -1167,9 +1172,14 @@ public struct ScholarCLIRunner: Sendable {
                 return verdict.auditedEntry.localizedFirewallAuditNote(lang)
             }
             let parts = verdict.fields.map { f -> String in
+                if f.field == "doi", f.localValue.isEmpty, !f.remoteValue.isEmpty, f.severity == "advisory" {
+                    return "数据源 \(f.source) 提供 DOI：\(f.remoteValue)"
+                }
                 let fieldZH: String
                 switch f.field {
                 case "doi": fieldZH = "DOI"
+                case "arxivID": fieldZH = "arXiv编号"
+                case "pmid": fieldZH = "PMID"
                 case "title": fieldZH = "标题"
                 case "firstAuthor": fieldZH = "第一作者"
                 case "authorCount": fieldZH = "作者数"
@@ -1196,6 +1206,12 @@ public struct ScholarCLIRunner: Sendable {
                 ?? verdict.citeKey
             if verdict.reasons.contains("doi_not_registered") {
                 return "doi.org 说这个 DOI 没有注册（\(idLabel)）。" + untrustedSuffix
+            }
+            if verdict.reasons.contains("arxiv_not_found") {
+                return "arXiv 说没有这个编号（arXiv:\(idLabel)）。" + untrustedSuffix
+            }
+            if verdict.reasons.contains("pmid_not_found") {
+                return "PubMed 说没有这个编号（PMID:\(idLabel)）。" + untrustedSuffix
             }
             if !verdict.sources.isEmpty {
                 let sourceNames = verdict.sources.map(\.source).joined(separator: "、")
@@ -1239,6 +1255,7 @@ public struct ScholarCLIRunner: Sendable {
                 if verdict.auditNote.contains("updated-by") { return "updated-by" }
                 if verdict.auditNote.contains("relation.is-retracted-by") { return "relation.is-retracted-by" }
                 if verdict.auditNote.contains("is_retracted") { return "is_retracted" }
+                if verdict.auditNote.contains("pubtype") { return "pubtype (Retracted Publication)" }
                 if verdict.auditNote.lowercased().contains("withdrawn") { return "arXiv withdrawn/retracted" }
                 return "retraction"
             }()
@@ -1247,6 +1264,9 @@ public struct ScholarCLIRunner: Sendable {
         case .unverified:
             if verdict.reasons.isEmpty || verdict.reasons == [CitationUnverifiedReasonCode.offline.rawValue] {
                 return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+            }
+            if verdict.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue] {
+                return CitationAuditWording.noMatchInSearchChineseNotice + untrustedSuffix
             }
             let reasonLabels = verdict.reasons.map { code -> String in
                 switch code {
@@ -1258,7 +1278,7 @@ public struct ScholarCLIRunner: Sendable {
                 case CitationUnverifiedReasonCode.unparseable.rawValue: return "响应解析失败"
                 case CitationUnverifiedReasonCode.ambiguous.rawValue: return "检索结果存在歧义"
                 case CitationUnverifiedReasonCode.registeredNoMetadata.rawValue: return "doi.org 表明该 DOI 已注册，但两个元数据源里都没有"
-                case CitationUnverifiedReasonCode.noMatchInSearch.rawValue: return "检索未找到匹配记录"
+                case CitationUnverifiedReasonCode.noMatchInSearch.rawValue: return "两个数据源均未找到匹配记录"
                 default: return code
                 }
             }

@@ -552,6 +552,12 @@ public enum CitationAuditWording {
     public static let yearOnlineVsPrintNotice = "may reflect online-first vs. print issue year difference"
     /// Marker recorded in findings when a .bib file carries an untrusted x-firewall-class field.
     public static let untrustedFileClassMarker = "not trusted (ignored)"
+    /// Honest explanation when an identifierless entry has no matching candidate in either Crossref or OpenAlex search.
+    public static let noMatchInSearchNotice =
+        "Neither Crossref nor OpenAlex returned a matching record; the work may not exist, or it may not be indexed by either source (for example, a book, book chapter, or older publication)."
+    /// Localized Chinese explanation for `no_match_in_search` (avoids prohibited substring while stating both possibilities).
+    public static let noMatchInSearchChineseNotice =
+        "两个数据源都没有找到，可能文献并不存在，也可能是数据源没有收录，比如书、章节、早年文献。"
 
     /// Removes one leading `[CLASS] ` tag (e.g. `[UNVERIFIED] `) from an audit note, so that callers
     /// which print the class themselves do not print it twice.
@@ -586,6 +592,9 @@ extension BibliographyEntry {
         }
         if firewallAuditNote.contains(CitationAuditWording.titleRetractionMarkerNotice) {
             return "撤稿提示：标题带有撤稿标记（仅依据标题文字判断，未向注册库核查）。" + untrustedSuffix
+        }
+        if firewallAuditNote.contains(CitationAuditWording.noMatchInSearchNotice) {
+            return CitationAuditWording.noMatchInSearchChineseNotice + untrustedSuffix
         }
         if firewallAuditNote == "Demo data - unverified" {
             return "演示数据 - 未核查（尚未向外部注册库核对）"

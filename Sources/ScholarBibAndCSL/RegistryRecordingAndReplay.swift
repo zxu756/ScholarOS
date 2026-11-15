@@ -536,6 +536,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
     private var httpRequestsSent: Int
     private var lastRequestFinishedUptime: TimeInterval?
     private var lastCrossrefSearchFinishedUptime: TimeInterval?
+    private var lastArXivRequestFinishedUptime: TimeInterval?
     private var rateLimitAbortError: RegistryRecordingError?
     private var fatalError: RegistryRecordingError?
 
@@ -706,6 +707,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         }
 
         let isCrossrefSearch = (service == "crossref" && canonicalURL.contains("query.bibliographic"))
+        let isArXiv = (service == "arxiv")
         if minimumIntervalSeconds > 0 {
             var sleepSeconds: TimeInterval = 0
             if let lastUptime = lastRequestFinishedUptime {
@@ -715,6 +717,10 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             if isCrossrefSearch, let lastSearchUptime = lastCrossrefSearchFinishedUptime {
                 let elapsedSearch = ProcessInfo.processInfo.systemUptime - lastSearchUptime
                 sleepSeconds = max(sleepSeconds, max(minimumIntervalSeconds, 1.05) - elapsedSearch)
+            }
+            if isArXiv, let lastArXivUptime = lastArXivRequestFinishedUptime {
+                let elapsedArXiv = ProcessInfo.processInfo.systemUptime - lastArXivUptime
+                sleepSeconds = max(sleepSeconds, max(minimumIntervalSeconds, 3.05) - elapsedArXiv)
             }
             if sleepSeconds > 0 {
                 let nanos = UInt64((sleepSeconds * 1_000_000_000).rounded(.up))
@@ -736,6 +742,9 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             if isCrossrefSearch {
                 lastCrossrefSearchFinishedUptime = nowUp
             }
+            if isArXiv {
+                lastArXivRequestFinishedUptime = nowUp
+            }
             let err = RegistryRecordingError.transportFailed(
                 url: canonicalURL,
                 detail: error.localizedDescription
@@ -747,6 +756,9 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         lastRequestFinishedUptime = finishedUp
         if isCrossrefSearch {
             lastCrossrefSearchFinishedUptime = finishedUp
+        }
+        if isArXiv {
+            lastArXivRequestFinishedUptime = finishedUp
         }
 
         if response.statusCode == 429 {
