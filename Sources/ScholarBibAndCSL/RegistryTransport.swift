@@ -212,6 +212,8 @@ public struct RegistryRequestTelemetryEvent: Sendable, Equatable {
     public let errorDescription: String?
     public let elapsedSeconds: TimeInterval
     public let origin: CitationVerdictSourceOrigin
+    public let startedAtUptime: TimeInterval
+    public let completedAtUptime: TimeInterval
 
     public init(
         source: String,
@@ -219,7 +221,9 @@ public struct RegistryRequestTelemetryEvent: Sendable, Equatable {
         statusCode: Int?,
         errorDescription: String? = nil,
         elapsedSeconds: TimeInterval,
-        origin: CitationVerdictSourceOrigin
+        origin: CitationVerdictSourceOrigin,
+        startedAtUptime: TimeInterval = 0,
+        completedAtUptime: TimeInterval = 0
     ) {
         self.source = source
         self.url = url
@@ -227,6 +231,8 @@ public struct RegistryRequestTelemetryEvent: Sendable, Equatable {
         self.errorDescription = errorDescription
         self.elapsedSeconds = elapsedSeconds
         self.origin = origin
+        self.startedAtUptime = startedAtUptime
+        self.completedAtUptime = completedAtUptime
     }
 }
 
@@ -379,7 +385,8 @@ public actor RegistryRateLimiter {
                 response = try await session.send(request)
             } catch {
                 let clockEnd = max(clockStart, clock.now())
-                let wallElapsed = max(0, ProcessInfo.processInfo.systemUptime - wallStart)
+                let wallEnd = max(wallStart, ProcessInfo.processInfo.systemUptime)
+                let wallElapsed = wallEnd - wallStart
                 if isCrossref {
                     currentCrossrefInFlight -= 1
                 }
@@ -394,7 +401,9 @@ public actor RegistryRateLimiter {
                             statusCode: nil,
                             errorDescription: error.localizedDescription,
                             elapsedSeconds: wallElapsed,
-                            origin: fallbackOrigin
+                            origin: fallbackOrigin,
+                            startedAtUptime: wallStart,
+                            completedAtUptime: wallEnd
                         )
                     )
                 }
@@ -402,7 +411,8 @@ public actor RegistryRateLimiter {
             }
 
             let clockEnd = max(clockStart, clock.now())
-            let wallElapsed = max(0, ProcessInfo.processInfo.systemUptime - wallStart)
+            let wallEnd = max(wallStart, ProcessInfo.processInfo.systemUptime)
+            let wallElapsed = wallEnd - wallStart
             if isCrossref {
                 currentCrossrefInFlight -= 1
             }
@@ -422,7 +432,9 @@ public actor RegistryRateLimiter {
                     statusCode: response.statusCode,
                     errorDescription: nil,
                     elapsedSeconds: wallElapsed,
-                    origin: response.origin
+                    origin: response.origin,
+                    startedAtUptime: wallStart,
+                    completedAtUptime: wallEnd
                 )
             )
 

@@ -1268,7 +1268,7 @@ public struct CitationVerificationFirewall: Sendable {
                 observer: requestObserver
             )
         }
-        if session is RegistryReplaySession || session is RegistryRecordingSession {
+        if session is RegistryReplaySession {
             return try await RegistryRateLimiter(clock: .immediate).send(
                 request,
                 source: source,

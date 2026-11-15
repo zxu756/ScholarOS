@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 import ScholarBibAndCSL
@@ -463,7 +464,7 @@ struct PluginSDKMCPAndShellTests {
         let cli = ScholarCLIRunner()
 
         let verifyRun = try await cli.run(arguments: ["verify-citations", "--demo"])
-        #expect(verifyRun.exitCode == 1)
+        #expect(verifyRun.exitCode == 3)
         #expect(verifyRun.stdout.contains("[DEMO]"))
         #expect(verifyRun.stdout.contains("Evaluated=10"))
         #expect(verifyRun.stdout.contains("Verified=0"))
@@ -700,7 +701,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(!outlineOut.contains("Methodology and Verification Semantics"))
 
         let verifyRun = try await cli.run(arguments: ["verify-citations", bibFile.path, "--offline"])
-        #expect(verifyRun.exitCode == 1)
+        #expect(verifyRun.exitCode == 3)
         #expect(verifyRun.stdout.contains("Verified=0"))
         #expect(!verifyRun.stdout.contains("VERIFIED_DOI"))
 
@@ -1148,42 +1149,46 @@ struct PluginSDKMCPAndShellTests {
         #expect(!html.contains("\u{2014}"))
     }
 
-    @Test("S32/S33 regression: verify-citations prints one class tag per entry, no Chinese in English output, and states that this version performs no online lookups")
+    @Test("S32/S33 regression: verify-citations prints one class tag per entry, no Chinese in English output, defaults to online, and states when --offline skips online lookups")
     func s32AndS33VerifyCitationsOutputHasSingleTagNoChineseInEnglishAndHonestNoLookupNotice() async throws {
         // 12-entry recheck bibliography (3 real, 2 fabricated DOIs, 3 real DOIs with wrong title/year,
         // 2 without DOI, 2 retracted), copied into the repository from the acceptance harness.
         let bibPath = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib").path
         #expect(FileManager.default.fileExists(atPath: bibPath))
 
-        let runner = ScholarCLIRunner()
-        let enPlain = try await runner.run(arguments: ["verify-citations", bibPath, "--lang", "en"])
-        let enOffline = try await runner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "en"])
-        let zhPlain = try await runner.run(arguments: ["verify-citations", bibPath, "--lang", "zh"])
-        let zhOffline = try await runner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "zh"])
+        actor CallCounter {
+            var count = 0
+            func increment() { count += 1 }
+        }
+        let offlineCounter = CallCounter()
+        let offlineSpyTransport = ClosureRegistrySession { req in
+            await offlineCounter.increment()
+            throw RegistryTransportError(kind: .transportError, detail: "--offline must send zero requests", url: req.url)
+        }
+        let offlineRunner = ScholarCLIRunner(registryTransport: offlineSpyTransport)
+        let enOffline = try await offlineRunner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "en"])
+        let zhOffline = try await offlineRunner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "zh"])
+        #expect(await offlineCounter.count == 0)
 
         // M1 item 4 (S41): sentinel DOI `10.1234/fake.2026.99999` has valid ISO 26324 syntax, so offline it is UNVERIFIED rather than NOT_FOUND.
-        for out in [enPlain, enOffline, zhPlain, zhOffline] {
+        for out in [enOffline, zhOffline] {
             #expect(out.exitCode == 1)
             #expect(out.stdout.contains("Evaluated=12 Verified=0 Drift=0 NotFound=0 Retracted=1 Unverified=11"))
             #expect(!out.stdout.contains("[VERIFIED]"))
             #expect(!out.stdout.contains("编造"))
             #expect(!out.stdout.lowercased().contains("fabricated"))
         }
-        #expect(enPlain.stdout.contains("11 entries could not be verified, reasons: offline=11; results are incomplete."))
-        #expect(zhPlain.stdout.contains("11 条没查成，原因：offline=11；结果不完整。"))
-
-        // S33: --offline changes nothing, and the output says why instead of labelling entries "(offline)".
-        #expect(enPlain.stdout == enOffline.stdout)
-        #expect(zhPlain.stdout == zhOffline.stdout)
-        #expect(enPlain.stdout.contains("this version performs no online registry lookups (online verification is planned for M1)"))
-        #expect(zhPlain.stdout.contains("本版本不联网核查（联网核查排在 M1）"))
-        #expect(!enPlain.stdout.lowercased().contains("(offline)"))
-        #expect(!enPlain.stdout.lowercased().contains("unverified offline"))
-        #expect(!zhPlain.stdout.contains("离线模式"))
+        #expect(enOffline.stdout.contains("11 entries could not be verified, reasons: offline=11; results are incomplete."))
+        #expect(zhOffline.stdout.contains("11 条没查成，原因：offline=11；结果不完整。"))
+        #expect(enOffline.stdout.contains("--offline skips online registry lookups"))
+        #expect(zhOffline.stdout.contains("已指定 --offline，本次不向外部注册库发网络请求"))
+        #expect(!enOffline.stdout.lowercased().contains("(offline)"))
+        #expect(!enOffline.stdout.lowercased().contains("unverified offline"))
+        #expect(!zhOffline.stdout.contains("离线模式"))
 
         // S32: exactly one class tag per entry line, at the start of the line, in both languages.
         let classTags = CitationFirewallClass.allCases.map { "[\($0.rawValue)]" }
-        for out in [enPlain, zhPlain] {
+        for out in [enOffline, zhOffline] {
             let entryLines = out.stdout
                 .split(separator: "\n", omittingEmptySubsequences: true)
                 .map(String.init)
@@ -1196,14 +1201,14 @@ struct PluginSDKMCPAndShellTests {
             }
         }
         // S32: no Chinese anywhere in the English output.
-        #expect(!containsChineseCharacters(enPlain.stdout), "\(enPlain.stdout)")
+        #expect(!containsChineseCharacters(enOffline.stdout), "\(enOffline.stdout)")
 
         // Expected lines for three representative entries, in both languages.
-        #expect(enPlain.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry."))
-        #expect(enPlain.stdout.contains("[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax. Not checked against any external registry."))
-        #expect(enPlain.stdout.contains("[RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete)."))
-        #expect(zhPlain.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' 语法格式合法；尚未向外部注册库核查。"))
-        #expect(zhPlain.stdout.contains("[RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。"))
+        #expect(enOffline.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' has valid ISO 26324 syntax. Not checked against any external registry."))
+        #expect(enOffline.stdout.contains("[UNVERIFIED] fake_nonsentinel: DOI '10.1038/fake.2026.99999' has valid ISO 26324 syntax. Not checked against any external registry."))
+        #expect(enOffline.stdout.contains("[RETRACTED] retracted_wakefield: DOI '10.1016/s0140-6736(97)11096-0' matched the built-in retraction hint list (built-in list, incomplete)."))
+        #expect(zhOffline.stdout.contains("[UNVERIFIED] real_lecun: DOI '10.1038/nature14539' 语法格式合法；尚未向外部注册库核查。"))
+        #expect(zhOffline.stdout.contains("[RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。"))
 
         // The MCP tool returns the same library notes: no "(offline)" label and no Chinese in them either.
         let rawBib = try String(contentsOfFile: bibPath, encoding: .utf8)
@@ -1282,7 +1287,7 @@ struct PluginSDKMCPAndShellTests {
             )
         }
 
-        let recordRunner = ScholarCLIRunner(registryTransport: recordedFixtureTransport)
+        let recordRunner = ScholarCLIRunner(registryTransport: recordedFixtureTransport, registryClock: .immediate)
         let recResult = await recordRunner.runWithExitStatus(
             arguments: ["verify-citations", fakeBibURL.path, "--registry-record", recDir.path, "--lang", "en"]
         )
@@ -1775,5 +1780,518 @@ struct PluginSDKMCPAndShellTests {
         #expect(enRun.stdout.contains("DOI: 10.1038/nature14539"))
         #expect(enRun.stdout.contains("may not exist, or it may not be indexed"))
         #expect(!enRun.stdout.lowercased().contains("fabricated"))
+    }
+
+    // MARK: - 9. M1 Item 8 (Stage 06): CLI Online-by-Default, Exit Codes (0/1/3/2), `--verbose`, and Rows 15-17
+
+    @Test("M1 item 8 (Stage 06): verify-citations defaults to online, --offline and --registry-replay send 0 live requests, and --verbose logs one stderr line per HTTP request")
+    func m1Stage06DefaultOnlineOfflineAndReplayTransportRoutingAndVerboseTelemetry() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage06-verbose")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+
+        let singleBibURL = tempDir.appendingPathComponent("lecun.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """.write(to: singleBibURL, atomically: true, encoding: .utf8)
+
+        actor TransportTracker {
+            var count = 0
+            func record() -> Int {
+                count += 1
+                return count
+            }
+        }
+        let onlineTracker = TransportTracker()
+        let mockNetworkTransport = ClosureRegistrySession { req in
+            _ = await onlineTracker.record()
+            let replayed = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(
+                statusCode: replayed.statusCode,
+                body: replayed.body,
+                headers: replayed.headers,
+                origin: .network,
+                fetchedAt: replayed.fetchedAt
+            )
+        }
+
+        let onlineRunner = ScholarCLIRunner(registryTransport: mockNetworkTransport)
+
+        let helpEN = try await onlineRunner.execute(arguments: ["--help", "--lang", "en"])
+        let helpZH = try await onlineRunner.execute(arguments: ["--help", "--lang", "zh"])
+        #expect(helpEN.contains("--verbose"))
+        #expect(helpZH.contains("--verbose"))
+
+        // 1. Default without flags is online and emits per-request stderr telemetry with --verbose
+        let onlineRes = await onlineRunner.runWithExitStatus(
+            arguments: ["verify-citations", singleBibURL.path, "--verbose", "--lang", "en"]
+        )
+        #expect(onlineRes.exitCode == 0)
+        #expect(onlineRes.stdout.contains("Evaluated=1 Verified=1"))
+        #expect(await onlineTracker.count == 2)
+
+        let onlineStderrLines = onlineRes.stderr
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        #expect(onlineStderrLines.count == 2)
+        #expect(onlineStderrLines.contains {
+            $0.contains("source=Crossref")
+                && $0.contains("url=https://api.crossref.org/works/10.1038/nature14539")
+                && $0.contains("status=200")
+                && $0.contains("elapsed=")
+                && $0.contains("origin=network")
+        })
+        #expect(onlineStderrLines.contains {
+            $0.contains("source=OpenAlex")
+                && $0.contains("url=https://api.openalex.org/works/https://doi.org/10.1038/nature14539")
+                && $0.contains("status=200")
+                && $0.contains("elapsed=")
+                && $0.contains("origin=network")
+        })
+
+        // 2. Without --verbose, stderr is empty on success
+        let quietRes = await onlineRunner.runWithExitStatus(
+            arguments: ["verify-citations", singleBibURL.path, "--lang", "en"]
+        )
+        #expect(quietRes.exitCode == 0)
+        #expect(quietRes.stderr.isEmpty)
+
+        // 3. --offline sends 0 requests and emits 0 HTTP lines even with --verbose
+        let offlineTracker = TransportTracker()
+        let failIfCalledTransport = ClosureRegistrySession { req in
+            _ = await offlineTracker.record()
+            throw RegistryTransportError(kind: .transportError, detail: "Must not be called", url: req.url)
+        }
+        let guardedRunner = ScholarCLIRunner(registryTransport: failIfCalledTransport)
+
+        let offlineVerbose = await guardedRunner.runWithExitStatus(
+            arguments: ["verify-citations", singleBibURL.path, "--offline", "--verbose", "--lang", "en"]
+        )
+        #expect(offlineVerbose.exitCode == 3)
+        #expect(await offlineTracker.count == 0)
+        #expect(offlineVerbose.stderr.isEmpty)
+
+        // 4. --registry-replay sends 0 live requests and logs origin=replay on stderr under --verbose
+        let replayVerbose = await guardedRunner.runWithExitStatus(
+            arguments: ["verify-citations", singleBibURL.path, "--registry-replay", registryDir.path, "--verbose", "--lang", "en"]
+        )
+        #expect(replayVerbose.exitCode == 0)
+        #expect(await offlineTracker.count == 0)
+        #expect(replayVerbose.stdout.hasPrefix("[REPLAY]"))
+        let replayStderrLines = replayVerbose.stderr
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        #expect(replayStderrLines.count == 2)
+        #expect(replayStderrLines.allSatisfy { $0.contains("origin=replay") && $0.contains("status=200") })
+
+        // 5. Retrying 429 -> 200 logs each HTTP attempt on stderr under --verbose
+        let retryTracker = TransportTracker()
+        let retryTransport = ClosureRegistrySession { req in
+            let attempt = await retryTracker.record()
+            if req.url?.host == "api.crossref.org", attempt == 1 {
+                return RegistryHTTPResponse(
+                    statusCode: 429,
+                    body: Data("Too Many Requests".utf8),
+                    headers: ["Retry-After": "1"],
+                    origin: .network,
+                    fetchedAt: "2026-11-16T00:00:00Z"
+                )
+            }
+            let replayed = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(
+                statusCode: replayed.statusCode,
+                body: replayed.body,
+                headers: replayed.headers,
+                origin: .network,
+                fetchedAt: replayed.fetchedAt
+            )
+        }
+        let retryRunner = ScholarCLIRunner(registryTransport: retryTransport, registryClock: .immediate)
+        let retryVerbose = await retryRunner.runWithExitStatus(
+            arguments: ["verify-citations", singleBibURL.path, "--verbose", "--lang", "en"]
+        )
+        #expect(retryVerbose.exitCode == 0)
+        let retryStderrLines = retryVerbose.stderr
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+        #expect(retryStderrLines.count == 3)
+        #expect(retryStderrLines.first?.contains("status=429") == true)
+    }
+
+    @Test("M1 acceptance row 15 (Stage 06): --offline and transport-denied online runs produce 0 VERIFIED, 0 NOT_FOUND except malformed DOI syntax, and transport_error reasons")
+    func m1Stage06Row15OfflineAndTransportDeniedNeverVerifyAndOnlyInvalidSyntaxIsNotFound() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage06-row15")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let baseRecheck = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        )
+        let row15BibURL = tempDir.appendingPathComponent("row15.bib")
+        let row15Bib = baseRecheck + """
+
+        @article{malformed_doi_syntax,
+          author  = {Test, Author},
+          title   = {Paper With Broken DOI Syntax},
+          journal = {Journal},
+          year    = {2024},
+          doi     = {not-a-valid-doi}
+        }
+        """
+        try row15Bib.write(to: row15BibURL, atomically: true, encoding: .utf8)
+
+        let singleValidBibURL = tempDir.appendingPathComponent("single_valid.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          doi     = {10.1038/nature14539}
+        }
+        """.write(to: singleValidBibURL, atomically: true, encoding: .utf8)
+
+        let deniedTransport = ClosureRegistrySession { req in
+            throw RegistryTransportError(
+                kind: .transportError,
+                detail: "Simulated sandbox-exec network denial",
+                url: req.url
+            )
+        }
+        let runner = ScholarCLIRunner(registryTransport: deniedTransport, registryClock: .immediate)
+
+        // 1. --offline on the 13-entry list (12 recheck + 1 syntactically invalid DOI)
+        let offlineJSONRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", row15BibURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(offlineJSONRun.exitCode == 1)
+        let offlineReport = try JSONDecoder().decode(
+            CitationFirewallAuditReport.self,
+            from: Data(offlineJSONRun.stdout.utf8)
+        )
+        #expect(offlineReport.verifiedCount == 0)
+        #expect(offlineReport.notFoundCount == 1)
+        let offlineNotFoundKeys = offlineReport.verdicts.filter { $0.firewallClass == .notFound }.map(\.citeKey)
+        #expect(offlineNotFoundKeys == ["malformed_doi_syntax"])
+
+        // Valid-syntax non-retracted entry under --offline exits 3
+        let offlineSingleRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", singleValidBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(offlineSingleRun.exitCode == 3)
+
+        // 2. Online (without --offline) when network is denied on all 13 entries:
+        //    0 VERIFIED, only malformed_doi_syntax is NOT_FOUND, every UNVERIFIED has reason transport_error
+        let deniedFullRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", row15BibURL.path, "--json", "--lang", "en"]
+        )
+        #expect(deniedFullRun.exitCode == 1)
+        let deniedFullReport = try JSONDecoder().decode(
+            CitationFirewallAuditReport.self,
+            from: Data(deniedFullRun.stdout.utf8)
+        )
+        #expect(deniedFullReport.verifiedCount == 0)
+        #expect(deniedFullReport.notFoundCount == 1)
+        #expect(deniedFullReport.retractedCount == 1)
+        #expect(deniedFullReport.unverifiedCount == 11)
+        #expect(deniedFullReport.verdicts.filter { $0.firewallClass == .notFound }.map(\.citeKey) == ["malformed_doi_syntax"])
+        #expect(deniedFullReport.unverifiedByReason == [CitationUnverifiedReasonCode.transportError.rawValue: 11])
+        for v in deniedFullReport.verdicts where v.firewallClass == .unverified {
+            #expect(v.reasons == [CitationUnverifiedReasonCode.transportError.rawValue])
+        }
+
+        // Valid-syntax non-retracted entry under network denial exits 3
+        let deniedSingleRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", singleValidBibURL.path, "--json", "--lang", "en"]
+        )
+        #expect(deniedSingleRun.exitCode == 3)
+        let deniedSingleReport = try JSONDecoder().decode(
+            CitationFirewallAuditReport.self,
+            from: Data(deniedSingleRun.stdout.utf8)
+        )
+        #expect(deniedSingleReport.verifiedCount == 0)
+        #expect(deniedSingleReport.notFoundCount == 0)
+        #expect(deniedSingleReport.unverifiedCount == 1)
+        #expect(deniedSingleReport.unverifiedByReason == [CitationUnverifiedReasonCode.transportError.rawValue: 1])
+    }
+
+    @Test("M1 acceptance row 16 (Stage 06): exit codes 0 (all VERIFIED), 1 (DRIFT/NOT_FOUND/RETRACTED), 3 (only VERIFIED+UNVERIFIED via 500 replay), and 2 (missing/invalid/unparseable BibTeX)")
+    func m1Stage06Row16ExitCodesZeroOneThreeTwo() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage06-row16")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let failTransport = ClosureRegistrySession { req in
+            throw RegistryTransportError(kind: .transportError, detail: "Replay only", url: req.url)
+        }
+        let runner = ScholarCLIRunner(registryTransport: failTransport, registryClock: .immediate)
+
+        let cleanRealEntries = """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        @article{pmid_real_ito2015,
+          author  = {Ito, Hiroshi T. and Zhang, Sheng-Jia and Witter, Menno P. and Moser, Edvard I. and Moser, May-Britt},
+          title   = {A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation},
+          journal = {Nature},
+          year    = {2015},
+          pmid    = {26017312}
+        }
+        """
+
+        // 1. Exit code 0: all real clean entries -> VERIFIED=3
+        let cleanBibURL = tempDir.appendingPathComponent("clean3.bib")
+        try cleanRealEntries.write(to: cleanBibURL, atomically: true, encoding: .utf8)
+        let exit0Run = await runner.runWithExitStatus(
+            arguments: ["verify-citations", cleanBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(exit0Run.exitCode == 0)
+        #expect(exit0Run.stdout.contains("Evaluated=3 Verified=3 Drift=0 NotFound=0 Retracted=0 Unverified=0"))
+
+        // 2. Exit code 1: mixing in 1 fabricated entry (NOT_FOUND), or DRIFT, or RETRACTED
+        let mixedFakeBibURL = tempDir.appendingPathComponent("mixed_fake.bib")
+        try (cleanRealEntries + """
+
+        @article{fake_nonsentinel,
+          author  = {Whitfield, Eleanor and Patel, Raj},
+          title   = {Quantum Gradient Descent in Biological Neural Networks},
+          journal = {Nature Machine Intelligence},
+          year    = {2025},
+          doi     = {10.1038/fake.2026.99999}
+        }
+        """).write(to: mixedFakeBibURL, atomically: true, encoding: .utf8)
+        let exit1NotFoundRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", mixedFakeBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(exit1NotFoundRun.exitCode == 1)
+
+        let mixedDriftBibURL = tempDir.appendingPathComponent("mixed_drift.bib")
+        try (cleanRealEntries + """
+
+        @article{wrongtitle,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Completely Wrong Title for Deep Learning},
+          journal = {Nature},
+          year    = {2015},
+          doi     = {10.1038/nature14539}
+        }
+        """).write(to: mixedDriftBibURL, atomically: true, encoding: .utf8)
+        let exit1DriftRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", mixedDriftBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(exit1DriftRun.exitCode == 1)
+
+        // 3. Exit code 3: same 3 real clean entries, but one entry's recorded request in replay is mutated to HTTP 500
+        let replay500Dir = tempDir.appendingPathComponent("replay-one-500", isDirectory: true)
+        try FileManager.default.copyItem(at: registryDir, to: replay500Dir)
+        let origManifest = try JSONDecoder().decode(
+            RegistryRecordingManifest.self,
+            from: Data(contentsOf: replay500Dir.appendingPathComponent("manifest.json"))
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        func sha256Hex(_ data: Data) -> String {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
+
+        var updatedMetaHashes = origManifest.metaFilesSHA256 ?? [:]
+        let updatedItems = try origManifest.items.map { item -> RegistryRecordedItem in
+            guard item.url.contains("id=26017312") else { return item }
+            let raw500 = Data("Internal Server Error".utf8)
+            try raw500.write(to: replay500Dir.appendingPathComponent(item.rawFile), options: .atomic)
+            let mutatedItem = RegistryRecordedItem(
+                slug: item.slug,
+                service: item.service,
+                url: item.url,
+                status: 500,
+                contentType: "text/plain",
+                requestedAt: item.requestedAt,
+                responseDateHeader: item.responseDateHeader,
+                requestHeaders: item.requestHeaders,
+                responseHeaders: ["Content-Type": "text/plain"],
+                rawFile: item.rawFile,
+                byteLength: raw500.count,
+                sha256: sha256Hex(raw500),
+                attempts: item.attempts
+            )
+            let metaFileName = "\(item.slug).meta.json"
+            let metaData = try encoder.encode(mutatedItem)
+            try metaData.write(to: replay500Dir.appendingPathComponent(metaFileName), options: .atomic)
+            updatedMetaHashes[metaFileName] = sha256Hex(metaData)
+            return mutatedItem
+        }
+        let mutatedManifest = RegistryRecordingManifest(
+            startedAt: origManifest.startedAt,
+            completedAt: origManifest.completedAt,
+            userAgent: origManifest.userAgent,
+            count: updatedItems.count,
+            totalHTTPRequestsSent: origManifest.totalHTTPRequestsSent,
+            items: updatedItems,
+            metaFilesSHA256: updatedMetaHashes
+        )
+        try encoder.encode(mutatedManifest).write(
+            to: replay500Dir.appendingPathComponent("manifest.json"),
+            options: .atomic
+        )
+
+        let exit3Run = await runner.runWithExitStatus(
+            arguments: ["verify-citations", cleanBibURL.path, "--registry-replay", replay500Dir.path, "--json", "--lang", "en"]
+        )
+        #expect(exit3Run.exitCode == 3)
+        let exit3Report = try JSONDecoder().decode(
+            CitationFirewallAuditReport.self,
+            from: Data(exit3Run.stdout.utf8)
+        )
+        #expect(exit3Report.verifiedCount == 2)
+        #expect(exit3Report.driftCount == 0)
+        #expect(exit3Report.notFoundCount == 0)
+        #expect(exit3Report.retractedCount == 0)
+        #expect(exit3Report.unverifiedCount == 1)
+        #expect(exit3Report.unverifiedByReason == [CitationUnverifiedReasonCode.serverError.rawValue: 1])
+        #expect(exit3Report.complete == false)
+
+        // 4. Exit code 2: missing file, invalid flag, broken BibTeX brace, and non-BibTeX garbage file
+        let missingRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", tempDir.appendingPathComponent("missing.bib").path]
+        )
+        #expect(missingRun.exitCode == 2)
+
+        let badFlagRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", cleanBibURL.path, "--unknown-flag"]
+        )
+        #expect(badFlagRun.exitCode == 2)
+
+        let unclosedBibURL = tempDir.appendingPathComponent("unclosed.bib")
+        try "@article{broken_key,\n  title = {Unclosed brace\n".write(to: unclosedBibURL, atomically: true, encoding: .utf8)
+        let unclosedRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", unclosedBibURL.path, "--offline"]
+        )
+        #expect(unclosedRun.exitCode == 2)
+
+        let garbageBibURL = tempDir.appendingPathComponent("garbage.bib")
+        try "{\"not\": \"bibtex\"}".write(to: garbageBibURL, atomically: true, encoding: .utf8)
+        let garbageRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", garbageBibURL.path, "--offline"]
+        )
+        #expect(garbageRun.exitCode == 2)
+    }
+
+    @Test("M1 acceptance row 17 (Stage 06): full fixture replay JSON schema, DRIFT fields, UNVERIFIED reason set, zero confidenceScore, incomplete summary line right after first line, and no fabricated wording")
+    func m1Stage06Row17JSONSchemaCompletenessSummaryLineOrderAndNoFabricatedWording() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage06-row17")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let recheckBib = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        )
+        let stage05Bib = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib"),
+            encoding: .utf8
+        )
+        let combinedBibURL = tempDir.appendingPathComponent("combined22.bib")
+        try (recheckBib + "\n" + stage05Bib).write(to: combinedBibURL, atomically: true, encoding: .utf8)
+
+        let failTransport = ClosureRegistrySession { req in
+            throw RegistryTransportError(kind: .transportError, detail: "Replay only", url: req.url)
+        }
+        let runner = ScholarCLIRunner(registryTransport: failTransport)
+
+        let jsonRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", combinedBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(jsonRun.exitCode == 1)
+
+        let rawObj = try JSONSerialization.jsonObject(with: Data(jsonRun.stdout.utf8))
+        let topDict = try #require(rawObj as? [String: Any])
+        #expect(topDict["complete"] as? Bool == false)
+        let byReason = try #require(topDict["unverifiedByReason"] as? [String: Int])
+        #expect(byReason == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue: 3])
+
+        let allowedUnverifiedCodes = Set(CitationUnverifiedReasonCode.allCases.map(\.rawValue))
+        #expect(allowedUnverifiedCodes.count == 10)
+
+        let verdicts = try #require(topDict["verdicts"] as? [[String: Any]])
+        #expect(verdicts.count == 22)
+
+        for v in verdicts {
+            let fClass = try #require(v["firewallClass"] as? String)
+            let reasons = try #require(v["reasons"] as? [String])
+            let sources = try #require(v["sources"] as? [[String: Any]])
+            let insertable = try #require(v["insertable"] as? Bool)
+            let fields = try #require(v["fields"] as? [[String: Any]])
+            _ = sources
+
+            #expect(insertable == (fClass == "VERIFIED"))
+            if fClass == "DRIFT" {
+                #expect(!fields.isEmpty, "DRIFT verdict \(v["citeKey"] ?? "?") must have non-empty fields")
+            }
+            if fClass == "UNVERIFIED" {
+                #expect(!reasons.isEmpty, "UNVERIFIED verdict \(v["citeKey"] ?? "?") must have reason codes")
+                for code in reasons {
+                    #expect(allowedUnverifiedCodes.contains(code), "Unexpected UNVERIFIED reason code: \(code)")
+                }
+            }
+        }
+
+        func containsKeyRecursively(_ value: Any, key targetKey: String) -> Bool {
+            if let dict = value as? [String: Any] {
+                if dict.keys.contains(targetKey) { return true }
+                return dict.values.contains { containsKeyRecursively($0, key: targetKey) }
+            }
+            if let arr = value as? [Any] {
+                return arr.contains { containsKeyRecursively($0, key: targetKey) }
+            }
+            return false
+        }
+        #expect(!containsKeyRecursively(rawObj, key: "confidenceScore"))
+
+        // Text output checks in ZH and EN (both replay and offline): incomplete line immediately follows Evaluated=...
+        let zhTextRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", combinedBibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        let enTextRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", combinedBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        let zhOfflineRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", combinedBibURL.path, "--offline", "--lang", "zh"]
+        )
+
+        for (out, expectedSubstring) in [
+            (zhTextRun.stdout, "3 条没查成，原因：no_match_in_search=3；结果不完整。"),
+            (enTextRun.stdout, "3 entries could not be verified, reasons: no_match_in_search=3; results are incomplete."),
+            (zhOfflineRun.stdout, "21 条没查成，原因：offline=21；结果不完整。")
+        ] {
+            let lines = out.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            let evalIdx = try #require(lines.firstIndex { $0.hasPrefix("Evaluated=") })
+            #expect(evalIdx + 1 < lines.count)
+            #expect(lines[evalIdx + 1] == expectedSubstring)
+            #expect(!out.contains("编造"))
+            #expect(!out.lowercased().contains("fabricated"))
+        }
     }
 }

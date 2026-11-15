@@ -49,11 +49,12 @@ REPORT_FILE="$REPORT_DIR/m0-acceptance.txt"
 
 export SCHOLAR_SANDBOX_HOME="$WORK/home"
 mkdir -p "$SCHOLAR_SANDBOX_HOME"
-export SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS"
+if [[ -z "${SCHOLAR_CLI_BIN:-}" ]]; then
+    export SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS"
+    swift build >/dev/null
+fi
 # shellcheck source=Scripts/acceptance/lib-cli-guard.sh
 source "$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
-
-swift build >/dev/null
 
 # Fictional IEEEtran-style sample manuscript that lives in this repository (see its header comment).
 FIXTURE_REL="Fixtures/sample-ieeetran-manuscript.tex"
@@ -217,7 +218,7 @@ run_named_unit_test() {
     echo ""
 
     # ------------------------------------------------------------------
-    # Row 4: sandbox-exec network denial without --offline (--lang en & --lang zh)
+    # Row 4: sandbox-exec network denial without --offline, plus offline --registry-replay (--lang en & --lang zh)
     # ------------------------------------------------------------------
     echo "== [Row 4] sandbox-exec deny network* scholaros verify-citations $BIB_FIXTURE_REL, no --offline (--lang en & --lang zh) =="
     set +e
@@ -225,32 +226,35 @@ run_named_unit_test() {
     SANDBOX_EN_EXIT=$?
     SANDBOX_ZH_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
     SANDBOX_ZH_EXIT=$?
-    NOFLAG_EN_OUT="$(scholaros verify-citations "$WORK/refs.bib" --lang en 2>&1)"
-    NOFLAG_EN_EXIT=$?
-    NOFLAG_ZH_OUT="$(scholaros verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
-    NOFLAG_ZH_EXIT=$?
+    REPLAY_EN_OUT="$(scholaros verify-citations "$WORK/refs.bib" --registry-replay "$REPO_ROOT/Tests/Fixtures/registry" --lang en 2>&1)"
+    REPLAY_EN_EXIT=$?
+    REPLAY_ZH_OUT="$(scholaros verify-citations "$WORK/refs.bib" --registry-replay "$REPO_ROOT/Tests/Fixtures/registry" --lang zh 2>&1)"
+    REPLAY_ZH_EXIT=$?
     set -e
-    echo "sandbox_en_exit=$SANDBOX_EN_EXIT sandbox_zh_exit=$SANDBOX_ZH_EXIT"
+    echo "sandbox_en_exit=$SANDBOX_EN_EXIT sandbox_zh_exit=$SANDBOX_ZH_EXIT replay_en_exit=$REPLAY_EN_EXIT replay_zh_exit=$REPLAY_ZH_EXIT"
     echo "$SANDBOX_EN_OUT"
-    if [[ "$SANDBOX_EN_EXIT" -eq 0 || "$SANDBOX_ZH_EXIT" -eq 0 ]]; then
+    if [[ "$SANDBOX_EN_EXIT" -eq 0 || "$SANDBOX_ZH_EXIT" -eq 0 || "$REPLAY_EN_EXIT" -eq 0 || "$REPLAY_ZH_EXIT" -eq 0 ]]; then
         echo "FAIL: Row 4 expected non-zero exit code"
         exit 1
     fi
     for OUT_BLOB in "$SANDBOX_EN_OUT" "$SANDBOX_ZH_OUT"; do
         if ! printf '%s\n' "$OUT_BLOB" | grep -q "Verified=0"; then
-            echo "FAIL: Row 4 expected Verified=0"
+            echo "FAIL: Row 4 expected Verified=0 under network denial"
             exit 1
         fi
         if printf '%s\n' "$OUT_BLOB" | grep -q "\[VERIFIED\]"; then
-            echo "FAIL: Row 4 found unexpected [VERIFIED] entry"
+            echo "FAIL: Row 4 found unexpected [VERIFIED] entry under network denial"
+            exit 1
+        fi
+        if ! printf '%s\n' "$OUT_BLOB" | grep -q "transport_error=11"; then
+            echo "FAIL: Row 4 expected transport_error=11 under network denial"
             exit 1
         fi
     done
-    if [[ "$SANDBOX_EN_OUT" != "$NOFLAG_EN_OUT" || "$SANDBOX_ZH_OUT" != "$NOFLAG_ZH_OUT" || "$NOFLAG_EN_EXIT" -ne "$SANDBOX_EN_EXIT" || "$NOFLAG_ZH_EXIT" -ne "$SANDBOX_ZH_EXIT" ]]; then
-        echo "FAIL: Row 4 output with the network denied differs from output with the network allowed"
+    if ! printf '%s\n' "$REPLAY_EN_OUT" | grep -q "^\[REPLAY\]" || ! printf '%s\n' "$REPLAY_ZH_OUT" | grep -q "^\[REPLAY"; then
+        echo "FAIL: Row 4 expected [REPLAY] banner on --registry-replay"
         exit 1
     fi
-    echo "network_denied_output_identical_to_network_allowed=true"
     echo "PASS: Row 4"
     echo ""
 
@@ -370,11 +374,11 @@ PY
     # and contains no Chinese characters.
     # ------------------------------------------------------------------
     echo "== [Row 11] verify-citations --lang en: one class tag per entry line, no Chinese in English output =="
-    python3 - "$NOFLAG_EN_OUT" "$OFFLINE_EN_OUT" <<'PY'
+    python3 - "$SANDBOX_EN_OUT" "$OFFLINE_EN_OUT" "$REPLAY_EN_OUT" <<'PY'
 import re, sys
 tag = re.compile(r"\[(VERIFIED|DRIFT|NOT_FOUND|RETRACTED|UNVERIFIED)\]")
 cjk = re.compile(r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]")
-for label, blob in (("no_flag", sys.argv[1]), ("offline_flag", sys.argv[2])):
+for label, blob in (("sandbox_no_flag", sys.argv[1]), ("offline_flag", sys.argv[2]), ("replay_flag", sys.argv[3])):
     entry_lines = [line for line in blob.splitlines() if tag.search(line)]
     assert len(entry_lines) == 12, (label, len(entry_lines))
     for line in entry_lines:
@@ -387,18 +391,13 @@ PY
     echo ""
 
     # ------------------------------------------------------------------
-    # Row 12 (S33): the output does not pretend there is an offline "mode". With or without
-    # --offline it is identical and states that this version performs no online lookups.
+    # Row 12 (S33): --offline honestly states that online registry lookups were skipped,
+    # and no output uses legacy "(offline)" / "unverified offline" / "离线模式" labels.
     # ------------------------------------------------------------------
-    echo "== [Row 12] verify-citations states that this version performs no online lookups (--lang en & --lang zh) =="
-    if [[ "$NOFLAG_EN_OUT" != "$OFFLINE_EN_OUT" || "$NOFLAG_ZH_OUT" != "$OFFLINE_ZH_OUT" ]]; then
-        echo "FAIL: Row 12 expected identical output with and without --offline"
-        exit 1
-    fi
-    echo "output_identical_with_and_without_offline_flag=true"
-    printf '%s\n' "$NOFLAG_EN_OUT" | grep "performs no online registry lookups" || { echo "FAIL: Row 12 missing English no-online-lookup notice"; exit 1; }
-    printf '%s\n' "$NOFLAG_ZH_OUT" | grep "本版本不联网核查" || { echo "FAIL: Row 12 missing Chinese no-online-lookup notice"; exit 1; }
-    if printf '%s\n%s\n' "$NOFLAG_EN_OUT" "$NOFLAG_ZH_OUT" | grep -n -i -E "\(offline\)|unverified offline|离线模式"; then
+    echo "== [Row 12] verify-citations --offline states that online lookups were skipped (--lang en & --lang zh) =="
+    printf '%s\n' "$OFFLINE_EN_OUT" | grep -F -- "--offline skips online registry lookups" || { echo "FAIL: Row 12 missing English --offline notice"; exit 1; }
+    printf '%s\n' "$OFFLINE_ZH_OUT" | grep -F -- "已指定 --offline，本次不向外部注册库发网络请求" || { echo "FAIL: Row 12 missing Chinese --offline notice"; exit 1; }
+    if printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$OFFLINE_EN_OUT" "$OFFLINE_ZH_OUT" "$SANDBOX_EN_OUT" "$SANDBOX_ZH_OUT" "$REPLAY_EN_OUT" "$REPLAY_ZH_OUT" | grep -n -i -E "\(offline\)|unverified offline|离线模式"; then
         echo "FAIL: Row 12 output still describes an offline mode"
         exit 1
     fi
