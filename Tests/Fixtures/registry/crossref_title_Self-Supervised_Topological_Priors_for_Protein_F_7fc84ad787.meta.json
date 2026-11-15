@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 18478,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:25:22Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:25:23 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Sun, 15 Nov 2026 14:25:23 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "940510b0b4ebaf314c61df7084178cf234e6c5227247bf2b455524bec70f2890",
+  "slug" : "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Self-Supervised%20Topological%20Priors%20for%20Protein%20Folding%20Okafor&rows=5"
+}

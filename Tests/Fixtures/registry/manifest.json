@@ -1,6 +1,6 @@
 {
-  "completed_at" : "2026-11-15T13:21:37Z",
-  "count" : 19,
+  "completed_at" : "2026-11-15T14:25:26Z",
+  "count" : 28,
   "items" : [
     {
       "attempts" : 1,
@@ -444,6 +444,217 @@
       "slug" : "openalex_doi_10.4230_lipics.icalp.2015.1_edcc0563b6",
       "status" : 404,
       "url" : "https://api.openalex.org/works/https://doi.org/10.4230/lipics.icalp.2015.1"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 21383,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1038_nature14539_04360041c9.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:16Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:17 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:17 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34483"
+      },
+      "service" : "openalex",
+      "sha256" : "a41f7bf135816cc32d87962ea9ab669ab7cfe09db42a5ad1faf850a776130166",
+      "slug" : "openalex_doi_10.1038_nature14539_04360041c9",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1038/nature14539"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 17410,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:17Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:18 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:18 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34482"
+      },
+      "service" : "openalex",
+      "sha256" : "3ed177ff4531fd021062ae9974484c9577e0b0664c9160ad3949a545c49e2981",
+      "slug" : "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1162/neco.1997.9.8.1735"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 13691,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1038_171737a0_5344f8b191.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:19Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:19 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:19 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34481"
+      },
+      "service" : "openalex",
+      "sha256" : "f40475a3bd2c96c808f2e7a8ce82498700ee39076bbc559663277b92abca14d6",
+      "slug" : "openalex_doi_10.1038_171737a0_5344f8b191",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1038/171737a0"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 55,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.1038_fake.2026.99999_9c181c6145.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:20Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:20 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:25:20 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "d65d3575f159891856385e52fe8b9f49036242c303678d93eb2527622b94da6e",
+      "slug" : "doi_handle_10.1038_fake.2026.99999_9c181c6145",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.1038/fake.2026.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 29342,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Quantum_Gradient_Descent_in_Biological_Neural_Ne_c04ed1c4ce.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:21Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:21 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:21 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "575052f9a72c83374b009256fbdcbe4db392e3a6f2e0925f08e2120665587dcb",
+      "slug" : "crossref_title_Quantum_Gradient_Descent_in_Biological_Neural_Ne_c04ed1c4ce",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Quantum%20Gradient%20Descent%20in%20Biological%20Neural%20Networks%20Whitfield&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 473,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:22Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:22 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:25:22 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "ddcca8fdc5b3c9a2b3f471a6c53beb6f130c69d7a6cbb8f472306c7cb0cfc85a",
+      "slug" : "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.1234/fake.2026.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 18478,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:22Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:23 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:23 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "940510b0b4ebaf314c61df7084178cf234e6c5227247bf2b455524bec70f2890",
+      "slug" : "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Self-Supervised%20Topological%20Priors%20for%20Protein%20Folding%20Okafor&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 33425,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1016_j.fct.2012.08.005_34a553aa3e.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:23Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:24 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:24 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34476"
+      },
+      "service" : "openalex",
+      "sha256" : "c82fb427f4a2f424d24d52a235492f763014e3330f459bdee326c3056ebe843a",
+      "slug" : "openalex_doi_10.1016_j.fct.2012.08.005_34a553aa3e",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.fct.2012.08.005"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 25959,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1016_s0140-6736_97_11096-0_2e54c91765.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:25:25Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:25:25 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:25:25 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34475"
+      },
+      "service" : "openalex",
+      "sha256" : "023259e201f0e7df6b48ab438e0620cb99e9bd01f343db4ff8b99129f373f427",
+      "slug" : "openalex_doi_10.1016_s0140-6736_97_11096-0_2e54c91765",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1016/s0140-6736(97)11096-0"
     }
   ],
   "meta_files_sha256" : {
@@ -460,7 +671,16 @@
     "crossref_doi_10.9999_fake-llm-cite.9999_53b79a24bb.meta.json" : "75c352d12b36bc6212aae81fd4fefab2e5f39bf94d3ea70402f8f66faf4ade7e",
     "crossref_doi_10.9999_fake.2025.999_f120606925.meta.json" : "f8a881521391ef63c2af9acce0411f7be860fd39ba95c1f22aaceec09581f5a1",
     "crossref_doi_10.9999_hallucinated.2025.0001_dea67e4de6.meta.json" : "9d3b16d034eb044cc7fe57545a6d0f46992d873cea2a1aa853b3cf1643d0feab",
+    "crossref_title_Quantum_Gradient_Descent_in_Biological_Neural_Ne_c04ed1c4ce.meta.json" : "fe68f290738a350d423c84d3f21110a9a92113fd69525a126c0fbca5605de7b3",
+    "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787.meta.json" : "8bfc6b29be5326a07778afcbdad10dafa2a8265c327c9471258bcdb2ecfb57a4",
+    "doi_handle_10.1038_fake.2026.99999_9c181c6145.meta.json" : "6913fc5c06ea1e21ab5cc84c71003aaf8d2f90f42b2e02269b479d6ea19d33f7",
+    "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7.meta.json" : "86dd1b43eb263e2140f9a67ff3b07c72c04185eaf1bcb93f53d26af1341c2765",
+    "openalex_doi_10.1016_j.fct.2012.08.005_34a553aa3e.meta.json" : "7a97f150276e098d6c64bc8eed9c975a84df08f4658f38d902b05985506d3d57",
+    "openalex_doi_10.1016_s0140-6736_97_11096-0_2e54c91765.meta.json" : "221c08478c04311a2bd793283d91109b9e7abc2e7c9d44e7484ec3aae5856764",
+    "openalex_doi_10.1038_171737a0_5344f8b191.meta.json" : "cf23ee947367ef22ca3d18e05b2196b9e2003fb958b7b27c165141d29bd04e0d",
     "openalex_doi_10.1038_fake.2026.99999_fcda3cff0b.meta.json" : "8f503da9f85424a97ce33052b2d66efde5feb531a25a8c9899566fc3d8e94fc2",
+    "openalex_doi_10.1038_nature14539_04360041c9.meta.json" : "8c7198e3635cecf77abb3a270a3966c4679da3cfd8f46beb697d0f22786dfb0c",
+    "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d.meta.json" : "41da752e5ccb464ad89be4ffd71167c788962313bd5fc0abf1b4ff4fb5769560",
     "openalex_doi_10.1234_fake.2026.99999_fc3ec3aaad.meta.json" : "ab2f66d0118709746ac9571e0ee3a768d579a197713925e8c13f4f7cd7c9c517",
     "openalex_doi_10.4230_lipics.icalp.2015.1_edcc0563b6.meta.json" : "c2233900a599b30c8722135460ffb14c395934d754a5b2ce32f3228a73b61186",
     "openalex_doi_10.9999_fake-llm-cite.9999_0d2b898f6f.meta.json" : "96fbdc25a092ce083c4790e8ac45a0a1e58199b614581b91cd9b9a240a080647",
@@ -468,6 +688,6 @@
     "openalex_doi_10.9999_hallucinated.2025.0001_5d34a3c86a.meta.json" : "0b960a627d282b8ddbe974be455a8beadd2a88fd0f484988b7b2a3c79786971c"
   },
   "started_at" : "2026-11-15T11:19:08Z",
-  "total_http_requests_sent" : 19,
+  "total_http_requests_sent" : 28,
   "user_agent" : "ScholarOS/1.2.0"
 }
