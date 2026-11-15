@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 1234,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.13328_j.cnki.jos.006981_e3cf0da0b0.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:58:43Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:58:43 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Sun, 15 Nov 2026 14:58:43 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "c73c6bb1202d39a7c39f374a0d330537cd3e20e560f1c08195b5e94a6ca7f871",
+  "slug" : "doi_handle_10.13328_j.cnki.jos.006981_e3cf0da0b0",
+  "status" : 200,
+  "url" : "https://doi.org/api/handles/10.13328/j.cnki.jos.006981"
+}
