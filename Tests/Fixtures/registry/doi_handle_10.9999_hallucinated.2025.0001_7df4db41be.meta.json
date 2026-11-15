@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 215,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.9999_hallucinated.2025.0001_7df4db41be.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:28:12Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:28:13 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Sun, 15 Nov 2026 14:28:13 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "524c4b034e9336ce227d9b686b34a34df03728d1fd98cfb29411907a5131db02",
+  "slug" : "doi_handle_10.9999_hallucinated.2025.0001_7df4db41be",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.9999/hallucinated.2025.0001"
+}

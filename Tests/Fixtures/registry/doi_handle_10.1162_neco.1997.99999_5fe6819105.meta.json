@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 55,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1162_neco.1997.99999_5fe6819105.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:28:21Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:28:21 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Sun, 15 Nov 2026 14:28:21 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "3ac1fdab944d5f934136e0cd09afb80e89639676a88100e23c92b48651742995",
+  "slug" : "doi_handle_10.1162_neco.1997.99999_5fe6819105",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1162/neco.1997.99999"
+}

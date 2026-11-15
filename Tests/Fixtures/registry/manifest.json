@@ -1,6 +1,6 @@
 {
-  "completed_at" : "2026-11-15T14:25:26Z",
-  "count" : 28,
+  "completed_at" : "2026-11-15T14:28:22Z",
+  "count" : 40,
   "items" : [
     {
       "attempts" : 1,
@@ -655,6 +655,269 @@
       "slug" : "openalex_doi_10.1016_s0140-6736_97_11096-0_2e54c91765",
       "status" : 200,
       "url" : "https://api.openalex.org/works/https://doi.org/10.1016/s0140-6736(97)11096-0"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 215,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.9999_hallucinated.2025.0001_7df4db41be.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:12Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:13 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:13 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "524c4b034e9336ce227d9b686b34a34df03728d1fd98cfb29411907a5131db02",
+      "slug" : "doi_handle_10.9999_hallucinated.2025.0001_7df4db41be",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.9999/hallucinated.2025.0001"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 18150,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Autonomous_Quantum_Hyper-Transformers_for_Zero-S_5591e7e581.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:13Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:14 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:28:14 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "8dee54fe8c6c02484265000cde9dd8cbf6448431c31c2b662d8f721d89dd33c0",
+      "slug" : "crossref_title_Autonomous_Quantum_Hyper-Transformers_for_Zero-S_5591e7e581",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Autonomous%20Quantum%20Hyper-Transformers%20for%20Zero-Shot%20Omniscience%20Smith&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 206,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.9999_fake.2025.999_0f2b1753b3.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:14Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:15 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:15 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "67b146451eafec4a6ef3c6d6eef16e9c71a7439a4c371502e1967f3f28b64746",
+      "slug" : "doi_handle_10.9999_fake.2025.999_0f2b1753b3",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.9999/fake.2025.999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 17287,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Hallucinated_Zero-Overhead_Infinite_Context_Atte_57b154247b.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:15Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:15 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:28:15 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "68a960b777be78d73a9e325a2961eda253a489072295f6e99612f2a855079b40",
+      "slug" : "crossref_title_Hallucinated_Zero-Overhead_Infinite_Context_Atte_57b154247b",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Hallucinated%20Zero-Overhead%20Infinite%20Context%20Attention%20Smith&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 211,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.9999_fake-llm-cite.9999_c7c84d51da.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:16Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:16 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:16 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "9e22764e100c3b937f5f8606dccdf5b63602fc79305a6b85c0dd154088e47664",
+      "slug" : "doi_handle_10.9999_fake-llm-cite.9999_c7c84d51da",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.9999/fake-llm-cite.9999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 12371,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:16Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:17 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:28:17 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "df957a39be99a6f516e7926a04b6f7840c55fdc2efd60fc7becbd5708e1b3a9c",
+      "slug" : "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Zero-Latency%20Quantum%20Citation%20Telepathy%20in%20Autonomous%20Foundation%20Models%20Smith&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 59,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.4230_lipics.icalp.2015.1_f5d3c1bda8.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:17Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:18 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:18 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "a166989a309b9b40c236850f3853f096d19e83765d933598fb12a4bd7562d18f",
+      "slug" : "doi_handle_10.4230_lipics.icalp.2015.1_f5d3c1bda8",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.4230/lipics.icalp.2015.1"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 38772,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_ICALP_2015_Frontmatter_Halld_rsson_304d1047e1.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:18Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:18 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:28:18 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "8883fd745497361653e3cdc4909fc5f7ae16bac090ebf8c1f17e278abe2d469a",
+      "slug" : "crossref_title_ICALP_2015_Frontmatter_Halld_rsson_304d1047e1",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=ICALP%202015%20Frontmatter%20Halld%C3%B3rsson&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 19,
+      "content_type" : "text/plain",
+      "raw_file" : "crossref_doi_10.1162_neco.1997.99999_67b9d52f07.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:19Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:19 GMT",
+      "response_headers" : {
+        "Content-Type" : "text/plain",
+        "Date" : "Sun, 15 Nov 2026 14:28:19 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "ae8462e3af85ca7577aaa97ff22a194f9dfd7fada58cf4944b53d2fdfa7b1f92",
+      "slug" : "crossref_doi_10.1162_neco.1997.99999_67b9d52f07",
+      "status" : 404,
+      "url" : "https://api.crossref.org/works/10.1162/neco.1997.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 207,
+      "content_type" : "text/html; charset=utf-8",
+      "raw_file" : "openalex_doi_10.1162_neco.1997.99999_dc022da667.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:19Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:20 GMT",
+      "response_headers" : {
+        "Content-Type" : "text/html; charset=utf-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:20 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "968",
+        "x-ratelimit-reset" : "34300"
+      },
+      "service" : "openalex",
+      "sha256" : "e9639e3c4681ce85f852fbac48e2eeee5ba51296dbfec57c200d59b76237ab80",
+      "slug" : "openalex_doi_10.1162_neco.1997.99999_dc022da667",
+      "status" : 404,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1162/neco.1997.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 55,
+      "content_type" : "application/json;charset=UTF-8",
+      "raw_file" : "doi_handle_10.1162_neco.1997.99999_5fe6819105.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:21Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:21 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json;charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 14:28:21 GMT"
+      },
+      "service" : "doi",
+      "sha256" : "3ac1fdab944d5f934136e0cd09afb80e89639676a88100e23c92b48651742995",
+      "slug" : "doi_handle_10.1162_neco.1997.99999_5fe6819105",
+      "status" : 404,
+      "url" : "https://doi.org/api/handles/10.1162/neco.1997.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 62693,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Long_Short-Term_Memory_Hochreiter_d106bcff37.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T14:28:21Z",
+      "response_date_header" : "Sun, 15 Nov 2026 14:28:22 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 14:28:22 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "15d6fbfd5baf110bd935dd05e38f727c7d9fc9d7b9438efd3e0b1e83dc265378",
+      "slug" : "crossref_title_Long_Short-Term_Memory_Hochreiter_d106bcff37",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Long%20Short-Term%20Memory%20Hochreiter&rows=5"
     }
   ],
   "meta_files_sha256" : {
@@ -666,21 +929,33 @@
     "crossref_doi_10.1038_fake.2026.99999_1138775f70.meta.json" : "9fd634974b8a2c70ae4ef626e8bd8f42507834aa62bf6e423fe3450810e80212",
     "crossref_doi_10.1038_nature14539_2019f44854.meta.json" : "c65ed28960c019aab492173b2e7ec6fd347b0a1c041553202b26d07ca665f4a3",
     "crossref_doi_10.1162_neco.1997.9.8.1735_7bd3eaa382.meta.json" : "206588fc3df634e1a4ab9bd3ae380194b55281b2e6f144f7d78e2e26c33741ab",
+    "crossref_doi_10.1162_neco.1997.99999_67b9d52f07.meta.json" : "5ddba571b1c894161935f2316bbce1fd8572ab8498254414c998569277cfc45c",
     "crossref_doi_10.1234_fake.2026.99999_b67c9dbe38.meta.json" : "c278463d71c0c5e10695bc4e95e7257586aee04bb3598988999e7f5872142d2b",
     "crossref_doi_10.4230_lipics.icalp.2015.1_75e311a90f.meta.json" : "27bba481a144337aeb9dc25e860a86726a6a30f1a392a0748a98b8bc21e59a9e",
     "crossref_doi_10.9999_fake-llm-cite.9999_53b79a24bb.meta.json" : "75c352d12b36bc6212aae81fd4fefab2e5f39bf94d3ea70402f8f66faf4ade7e",
     "crossref_doi_10.9999_fake.2025.999_f120606925.meta.json" : "f8a881521391ef63c2af9acce0411f7be860fd39ba95c1f22aaceec09581f5a1",
     "crossref_doi_10.9999_hallucinated.2025.0001_dea67e4de6.meta.json" : "9d3b16d034eb044cc7fe57545a6d0f46992d873cea2a1aa853b3cf1643d0feab",
+    "crossref_title_Autonomous_Quantum_Hyper-Transformers_for_Zero-S_5591e7e581.meta.json" : "f5824f0a6adf71d5dcba21d2b4fa11cf981e7052553e7b9e712a0d2ad1e1fe61",
+    "crossref_title_Hallucinated_Zero-Overhead_Infinite_Context_Atte_57b154247b.meta.json" : "68f5138add7cbaa5902b76b95ffa9d532f7f458e566c93fc45f385157100b5ad",
+    "crossref_title_ICALP_2015_Frontmatter_Halld_rsson_304d1047e1.meta.json" : "5912bf66ba8c115e1fc70405e30d86930cbdfa697727c89d10e3001ace4d99f4",
+    "crossref_title_Long_Short-Term_Memory_Hochreiter_d106bcff37.meta.json" : "498e78610dba859da601ecfe5818672d8c6282c4c43d041b97faeca7b53964fd",
     "crossref_title_Quantum_Gradient_Descent_in_Biological_Neural_Ne_c04ed1c4ce.meta.json" : "fe68f290738a350d423c84d3f21110a9a92113fd69525a126c0fbca5605de7b3",
     "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787.meta.json" : "8bfc6b29be5326a07778afcbdad10dafa2a8265c327c9471258bcdb2ecfb57a4",
+    "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306.meta.json" : "1db5261bdb0c6f2454a4153f90ac9d1501a0d85b819b71521fc0f479aa5a7900",
     "doi_handle_10.1038_fake.2026.99999_9c181c6145.meta.json" : "6913fc5c06ea1e21ab5cc84c71003aaf8d2f90f42b2e02269b479d6ea19d33f7",
+    "doi_handle_10.1162_neco.1997.99999_5fe6819105.meta.json" : "c4b68f7043518d250ef8f5d789a694c85e30c187286a7924e8c1d6186e29dfa6",
     "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7.meta.json" : "86dd1b43eb263e2140f9a67ff3b07c72c04185eaf1bcb93f53d26af1341c2765",
+    "doi_handle_10.4230_lipics.icalp.2015.1_f5d3c1bda8.meta.json" : "b59b224a2378e533528a6ab27b83fed695da75c5b59017a3ff09595160f66c8b",
+    "doi_handle_10.9999_fake-llm-cite.9999_c7c84d51da.meta.json" : "58c3c28133908028d3b104ca36ad23968a5702d2b76f41abe43848c3d56f0b1c",
+    "doi_handle_10.9999_fake.2025.999_0f2b1753b3.meta.json" : "af5f8be4f58c2e0f66df354671ce5bd760d832912fc47bf671a15b55f58bc5c9",
+    "doi_handle_10.9999_hallucinated.2025.0001_7df4db41be.meta.json" : "1fd7f425d45d94bcc23a21d71c8167114a913b65abb9e555ebbf12ea166bc776",
     "openalex_doi_10.1016_j.fct.2012.08.005_34a553aa3e.meta.json" : "7a97f150276e098d6c64bc8eed9c975a84df08f4658f38d902b05985506d3d57",
     "openalex_doi_10.1016_s0140-6736_97_11096-0_2e54c91765.meta.json" : "221c08478c04311a2bd793283d91109b9e7abc2e7c9d44e7484ec3aae5856764",
     "openalex_doi_10.1038_171737a0_5344f8b191.meta.json" : "cf23ee947367ef22ca3d18e05b2196b9e2003fb958b7b27c165141d29bd04e0d",
     "openalex_doi_10.1038_fake.2026.99999_fcda3cff0b.meta.json" : "8f503da9f85424a97ce33052b2d66efde5feb531a25a8c9899566fc3d8e94fc2",
     "openalex_doi_10.1038_nature14539_04360041c9.meta.json" : "8c7198e3635cecf77abb3a270a3966c4679da3cfd8f46beb697d0f22786dfb0c",
     "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d.meta.json" : "41da752e5ccb464ad89be4ffd71167c788962313bd5fc0abf1b4ff4fb5769560",
+    "openalex_doi_10.1162_neco.1997.99999_dc022da667.meta.json" : "98a9819b910c60890031e006617ee1c76bb7899dda189c0193c4083f1405d8c7",
     "openalex_doi_10.1234_fake.2026.99999_fc3ec3aaad.meta.json" : "ab2f66d0118709746ac9571e0ee3a768d579a197713925e8c13f4f7cd7c9c517",
     "openalex_doi_10.4230_lipics.icalp.2015.1_edcc0563b6.meta.json" : "c2233900a599b30c8722135460ffb14c395934d754a5b2ce32f3228a73b61186",
     "openalex_doi_10.9999_fake-llm-cite.9999_0d2b898f6f.meta.json" : "96fbdc25a092ce083c4790e8ac45a0a1e58199b614581b91cd9b9a240a080647",
@@ -688,6 +963,6 @@
     "openalex_doi_10.9999_hallucinated.2025.0001_5d34a3c86a.meta.json" : "0b960a627d282b8ddbe974be455a8beadd2a88fd0f484988b7b2a3c79786971c"
   },
   "started_at" : "2026-11-15T11:19:08Z",
-  "total_http_requests_sent" : 28,
+  "total_http_requests_sent" : 40,
   "user_agent" : "ScholarOS/1.2.0"
 }

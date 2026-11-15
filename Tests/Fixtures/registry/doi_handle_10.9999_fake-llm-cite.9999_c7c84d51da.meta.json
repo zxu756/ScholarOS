@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 211,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.9999_fake-llm-cite.9999_c7c84d51da.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:28:16Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:28:16 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Sun, 15 Nov 2026 14:28:16 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "9e22764e100c3b937f5f8606dccdf5b63602fc79305a6b85c0dd154088e47664",
+  "slug" : "doi_handle_10.9999_fake-llm-cite.9999_c7c84d51da",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.9999/fake-llm-cite.9999"
+}

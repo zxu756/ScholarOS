@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 12371,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:28:16Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:28:17 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Sun, 15 Nov 2026 14:28:17 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "df957a39be99a6f516e7926a04b6f7840c55fdc2efd60fc7becbd5708e1b3a9c",
+  "slug" : "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Zero-Latency%20Quantum%20Citation%20Telepathy%20in%20Autonomous%20Foundation%20Models%20Smith&rows=5"
+}

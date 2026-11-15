@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 59,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.4230_lipics.icalp.2015.1_f5d3c1bda8.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T14:28:17Z",
+  "response_date_header" : "Sun, 15 Nov 2026 14:28:18 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Sun, 15 Nov 2026 14:28:18 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "a166989a309b9b40c236850f3853f096d19e83765d933598fb12a4bd7562d18f",
+  "slug" : "doi_handle_10.4230_lipics.icalp.2015.1_f5d3c1bda8",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.4230/lipics.icalp.2015.1"
+}
