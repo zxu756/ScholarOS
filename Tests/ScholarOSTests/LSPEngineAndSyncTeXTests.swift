@@ -10,16 +10,32 @@ struct LSPEngineAndSyncTeXTests {
 
     // MARK: - Fixtures
 
+    private static var recordedRegistryFixturesURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/registry", isDirectory: true)
+    }
+
     private func sampleBibliography() -> [BibliographyEntry] {
         [
             BibliographyEntry(
                 citeKey: "vaswani2017",
                 kind: .inproceedings,
                 title: "Attention Is All You Need",
-                authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+                authors: [
+                    BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                    BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+                    BibAuthor(givenName: "Niki", familyName: "Parmar"),
+                    BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+                    BibAuthor(givenName: "Llion", familyName: "Jones"),
+                    BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+                    BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+                    BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+                ],
                 year: 2017,
                 venue: "NeurIPS",
-                doi: "10.5555/3295222.3295349",
+                doi: "10.48550/arXiv.1706.03762",
                 firewallClass: .verified,
                 firewallAuditNote: "Verified registry record"
             ),
@@ -27,7 +43,10 @@ struct LSPEngineAndSyncTeXTests {
                 citeKey: "dao2022",
                 kind: .inproceedings,
                 title: "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
-                authors: [BibAuthor(givenName: "Tri", familyName: "Dao")],
+                authors: [
+                    BibAuthor(givenName: "Tri", familyName: "Dao"),
+                    BibAuthor(givenName: "", familyName: "others")
+                ],
                 year: 2022,
                 venue: "NeurIPS",
                 arxivID: "2205.14135",
@@ -57,6 +76,17 @@ struct LSPEngineAndSyncTeXTests {
         ]
     }
 
+    private func inRunVerdictsForSampleBibliography() async throws -> [String: CitationFirewallEntryVerdict] {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+        var out: [String: CitationFirewallEntryVerdict] = [:]
+        for entry in sampleBibliography() {
+            let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+            out[entry.citeKey] = verdict
+        }
+        return out
+    }
+
     // MARK: - 1. Completion Context & Firewall-Gated Completion Tests
 
     @Test("AcademicCompletionEngine detects LaTeX multi-key \\citep cluster and Typst @/#cite contexts")
@@ -78,16 +108,29 @@ struct LSPEngineAndSyncTeXTests {
     }
 
     @Test("\\cite{ completion flags smith2025hallucinated and unverified entries with ERR_UNVERIFIED_CITATION and demotes score")
-    func citationCompletionFlagsAndDemotesBlockedSmith2025AndUnverifiedEntries() throws {
+    func citationCompletionFlagsAndDemotesBlockedSmith2025AndUnverifiedEntries() async throws {
         let engine = AcademicCompletionEngine()
         let source = "Related studies \\cite{"
         let pos = TextPosition(line: 1, column: source.count + 1, utf8Offset: source.utf8.count)
+        let bib = sampleBibliography()
 
+        // Without in-run verification, stored `.verified` on `vaswani2017` is not trusted (M1 item 8 / S42/S48).
+        let offlineItems = engine.complete(
+            in: source,
+            filePath: "main.tex",
+            at: pos,
+            bibliography: bib
+        )
+        let offlineVaswani = try #require(offlineItems.first { $0.insertText == "vaswani2017" })
+        #expect(offlineVaswani.subtitle.contains("UNVERIFIED"))
+
+        let inRunVerdicts = try await inRunVerdictsForSampleBibliography()
         let items = engine.complete(
             in: source,
             filePath: "main.tex",
             at: pos,
-            bibliography: sampleBibliography()
+            bibliography: bib,
+            inRunVerdictsByKey: inRunVerdicts
         )
 
         let vaswaniItem = try #require(items.first { $0.insertText == "vaswani2017" })
@@ -198,7 +241,7 @@ struct LSPEngineAndSyncTeXTests {
     // MARK: - 2. Hover, Go-to-Definition & Find References Tests
 
     @Test("HoverDefinitionAndReferencesEngine produces APA 7th citation preview and firewall status badges")
-    func hoverCardRendersCitationAPA7PreviewAndFirewallBadge() throws {
+    func hoverCardRendersCitationAPA7PreviewAndFirewallBadge() async throws {
         let files = [
             "main.tex": """
             \\section{Related Work}
@@ -208,13 +251,15 @@ struct LSPEngineAndSyncTeXTests {
         let workspace = MultiFileIncludeGraphResolver().resolveWorkspace(rootFilePath: "main.tex", files: files)
         let nav = HoverDefinitionAndReferencesEngine()
         let bib = sampleBibliography()
+        let inRunVerdicts = try await inRunVerdictsForSampleBibliography()
 
         let verifiedHover = try #require(nav.hover(
             at: TextPosition(line: 2, column: 23),
             in: "main.tex",
             workspace: workspace,
             sourcesByFile: files,
-            bibliography: bib
+            bibliography: bib,
+            inRunVerdictsByKey: inRunVerdicts
         ))
         #expect(verifiedHover.firewallClass == .verified)
         #expect(verifiedHover.markdownBody.contains("Attention Is All You Need"))
@@ -225,7 +270,8 @@ struct LSPEngineAndSyncTeXTests {
             in: "main.tex",
             workspace: workspace,
             sourcesByFile: files,
-            bibliography: bib
+            bibliography: bib,
+            inRunVerdictsByKey: inRunVerdicts
         ))
         #expect(blockedHover.firewallClass == .notFound)
         #expect(blockedHover.markdownBody.contains("NOT_FOUND") || blockedHover.categoryBadge.contains("Not Found"))
@@ -658,7 +704,7 @@ struct LSPEngineAndSyncTeXTests {
     // MARK: - 5. Stateful ScholarLSPWorkspaceService Integration Tests
 
     @Test("ScholarLSPWorkspaceService supports incremental edits, code actions, and assertAllCitedEntriesPassFirewall")
-    func lspWorkspaceServiceIncrementalEditsCodeActionAndFirewallGate() throws {
+    func lspWorkspaceServiceIncrementalEditsCodeActionAndFirewallGate() async throws {
         let initialMain = """
         \\section{Introduction}\\label{sec:intro}
         We cite \\cite{smith2025hallucinated} in draft v1.
@@ -689,7 +735,17 @@ struct LSPEngineAndSyncTeXTests {
         #expect(!relex.tokens.isEmpty)
         #expect(service.sourceText(for: "main.tex")?.contains("\\cite{vaswani2017}") == true)
 
-        // Firewall gate now clears cleanly!
+        // Stored `.verified` on `vaswani2017` is not trusted before in-run verification (M1 item 8 / S42/S48).
+        do {
+            try service.assertAllCitedEntriesPassFirewall()
+            Issue.record("Expected ERR_UNVERIFIED_CITATION before verifyCitationsOnline runs")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
+
+        // Verify citations in this run against recorded registry fixtures; firewall gate now clears cleanly!
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        _ = await service.verifyCitationsOnline(using: replay)
         try service.assertAllCitedEntriesPassFirewall()
         #expect(service.diagnosticsReport().firewallViolationCount == 0)
     }
