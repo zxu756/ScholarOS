@@ -546,17 +546,47 @@ struct BibCSLAndFirewallTests {
         #expect(v4.firewallClass == .unverified)
         #expect(!v4.allowsManuscriptInsertion)
 
-        // 5. Sentinel / malformed DOI offline -> NOT_FOUND
+        // 5a. Placeholder prefix with syntactically valid ISO 26324 DOI offline -> UNVERIFIED (reason: offline) with sentinel finding
         let blocked = makeHallucinatedSmithEntry()
         let v5 = firewall.evaluate(blocked)
-        #expect(v5.firewallClass == .notFound)
+        #expect(v5.firewallClass == .unverified)
+        #expect(v5.reasons == ["offline"])
+        #expect(v5.findings.contains { $0.code == .blockedPlaceholderSentinel })
         #expect(!v5.allowsManuscriptInsertion)
+
+        // 5b. Malformed DOI syntax offline -> NOT_FOUND (reason: invalid_identifier)
+        let malformedDOI = BibliographyEntry(
+            citeKey: "bad2025syntax",
+            kind: .article,
+            title: "Paper With Malformed Identifier",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 2025,
+            doi: "not-a-valid-doi"
+        )
+        let vMalformed = firewall.evaluate(malformedDOI)
+        #expect(vMalformed.firewallClass == .notFound)
+        #expect(vMalformed.reasons == ["invalid_identifier"])
+        #expect(!vMalformed.allowsManuscriptInsertion)
     }
 
     @Test("Firewall hard-blocks smith2025hallucinated, retracted DOIs, and unverified entries with ERR_UNVERIFIED_CITATION")
-    func firewallHardBlocksSmith2025HallucinatedAndRetractedDOIsWithErrUnverifiedCitation() throws {
+    func firewallHardBlocksSmith2025HallucinatedAndRetractedDOIsWithErrUnverifiedCitation() async throws {
         let firewall = CitationVerificationFirewall()
-        let vaswani = makeVaswaniEntry()
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let vaswaniStoredOnly = makeVaswaniEntry()
+        let lecunClean = BibliographyEntry(
+            citeKey: "lecun2015deep",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
         let smithFake = makeHallucinatedSmithEntry()
         let wakefieldRetracted = BibliographyEntry(
             citeKey: "wakefield1998retracted",
@@ -576,20 +606,43 @@ struct BibCSLAndFirewallTests {
         )
 
         let library: [String: BibliographyEntry] = [
-            vaswani.citeKey: vaswani,
+            vaswaniStoredOnly.citeKey: vaswaniStoredOnly,
+            lecunClean.citeKey: lecunClean,
             smithFake.citeKey: smithFake,
             wakefieldRetracted.citeKey: wakefieldRetracted,
             offlineOnly.citeKey: offlineOnly
         ]
 
-        // Verified entry clears hardware gate
-        let cleared = try firewall.assertCitationAllowed(citeKey: "vaswani2017attention", in: library)
-        #expect(cleared.citeKey == "vaswani2017attention")
+        // Stored `.verified` flag on BibliographyEntry without an in-run verdict MUST NOT clear the gate (S42, S48)
+        do {
+            _ = try firewall.assertCitationAllowed(citeKey: "vaswani2017attention", in: library)
+            Issue.record("Expected stored-only firewallClass to be rejected without in-run verdict")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
 
-        // Blocked hallucinated key throws ERR_UNVERIFIED_CITATION
-        for forbiddenKey in ["smith2025hallucinated", "wakefield1998retracted", "offline2024draft", "missingKey999"] {
+        let inRunVerdicts: [String: CitationFirewallEntryVerdict] = [
+            lecunClean.citeKey: await firewall.verifyAgainstPublicRegistries(entry: lecunClean, session: replay),
+            smithFake.citeKey: await firewall.verifyAgainstPublicRegistries(entry: smithFake, session: replay),
+            wakefieldRetracted.citeKey: await firewall.verifyAgainstPublicRegistries(entry: wakefieldRetracted, session: replay)
+        ]
+
+        // Entry verified in-run against recorded registry fixtures clears the gate
+        let cleared = try firewall.assertCitationAllowed(
+            citeKey: "lecun2015deep",
+            in: library,
+            verifiedVerdicts: inRunVerdicts
+        )
+        #expect(cleared.citeKey == "lecun2015deep")
+
+        // Blocked, retracted, unverified-in-run, and missing keys all throw ERR_UNVERIFIED_CITATION
+        for forbiddenKey in ["vaswani2017attention", "smith2025hallucinated", "wakefield1998retracted", "offline2024draft", "missingKey999"] {
             do {
-                _ = try firewall.assertCitationAllowed(citeKey: forbiddenKey, in: library)
+                _ = try firewall.assertCitationAllowed(
+                    citeKey: forbiddenKey,
+                    in: library,
+                    verifiedVerdicts: inRunVerdicts
+                )
                 Issue.record("Expected ERR_UNVERIFIED_CITATION for \(forbiddenKey)")
             } catch let err as ScholarOSError {
                 #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
@@ -622,15 +675,17 @@ struct BibCSLAndFirewallTests {
 
         let report = firewall.auditLibrary(entries)
         #expect(report.totalEvaluated == 4)
+        #expect(report.complete == false)
         #expect(report.verifiedCount == 0)
         #expect(report.driftCount == 0)
         #expect(report.retractedCount == 0)
-        #expect(report.unverifiedCount == 3)
-        #expect(report.notFoundCount == 1)
+        #expect(report.unverifiedCount == 4)
+        #expect(report.notFoundCount == 0)
+        #expect(report.unverifiedByReason == ["offline": 4])
         #expect(report.manuscriptInsertionAllowedCount == 0)
         #expect(abs(report.insertionPassRate - 0.0) < 1e-9)
-        #expect(report.blockedCiteKeys == ["smith2025hallucinated"])
-        #expect(report.unverifiedCiteKeys == ["vaswani2017attention", "arxiv2023valid", "offline2022tech"])
+        #expect(report.blockedCiteKeys.isEmpty)
+        #expect(report.unverifiedCiteKeys == ["vaswani2017attention", "arxiv2023valid", "offline2022tech", "smith2025hallucinated"])
     }
 
     @Test("S2 regression: offline evaluate never returns VERIFIED even when DOI or arXiv syntax is valid")
@@ -743,9 +798,12 @@ struct BibCSLAndFirewallTests {
                 #expect(!containsChineseCharacters(finding.detail), "finding of \(entry.citeKey): \(finding.detail)")
             }
         }
-        // Both ways of reaching RETRACTED offline say that the list is built in and incomplete, in English.
+        // Built-in DOI list yields RETRACTED offline; title-only retraction prefix stays UNVERIFIED offline with warning finding (M1 item 4 / S41).
         #expect(firewall.evaluate(samples[0]).auditNote.contains("built-in list, incomplete"))
-        #expect(firewall.evaluate(samples[1]).firewallClass == .retracted)
+        let titleOnlyVerdict = firewall.evaluate(samples[1])
+        #expect(titleOnlyVerdict.firewallClass == .unverified)
+        #expect(titleOnlyVerdict.reasons == ["offline"])
+        #expect(titleOnlyVerdict.findings.contains { $0.code == .blockedRetractedWork })
     }
 
     @Test("S33 regression: notes say 'not checked' without claiming an offline mode, and a VERIFIED note never carries a not-checked clause")
@@ -949,7 +1007,7 @@ struct BibCSLAndFirewallTests {
         #expect(imported.count == 3)
         #expect(imported.contains { $0.doi == "10.5555/3295222.3295349" && $0.firewallClass == .unverified })
         #expect(imported.contains { $0.arxivID == "2305.18290" && $0.firewallClass == .unverified })
-        #expect(imported.contains { $0.firewallClass == .notFound })
+        #expect(imported.contains { $0.doi == "10.9999/hallucinated.2025.0001" && $0.firewallClass == .unverified })
 
         let dpoHits = try bridge.searchEntries(databasePath: dbPath, query: "Preference Optimization", options: importOpts)
         #expect(dpoHits.count == 1)
@@ -1841,5 +1899,82 @@ struct BibCSLAndFirewallTests {
             let reasons = (json["reasons"] as? [String]) ?? []
             #expect(reasons == [expectedReason], "Expected [\(expectedReason)], got \(reasons)")
         }
+    }
+
+    @Test("M1 item 2: 'and others' author truncation, untruncated author count mismatch, and 1-year vs >=2-year drift notes on recorded fixtures")
+    func m1Stage03AuthorTruncationCountAndYearDriftRules() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        // 1. `and others` truncation on 5-author FlashAttention arXiv record -> VERIFIED
+        let truncatedBib = """
+        @inproceedings{dao2022_etal,
+          author        = {Dao, Tri and others},
+          title         = {FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness},
+          booktitle     = {NeurIPS},
+          year          = {2022},
+          eprint        = {2205.14135},
+          archivePrefix = {arXiv}
+        }
+        """
+        let truncatedEntry = try #require(try BibTeXCodec().parse(truncatedBib).first)
+        let vTruncated = await firewall.verifyAgainstPublicRegistries(entry: truncatedEntry, session: replay)
+        #expect(vTruncated.firewallClass == .verified)
+        #expect(vTruncated.insertable == true)
+
+        // 2. Untruncated 1-author list on 5-author FlashAttention record -> DRIFT (authorCount 1 vs 5)
+        let untruncatedOneAuthor = BibliographyEntry(
+            citeKey: "dao2022_missing_coauthors",
+            kind: .inproceedings,
+            title: "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+            authors: [BibAuthor(givenName: "Tri", familyName: "Dao")],
+            year: 2022,
+            arxivID: "2205.14135"
+        )
+        let vCountMismatch = await firewall.verifyAgainstPublicRegistries(entry: untruncatedOneAuthor, session: replay)
+        #expect(vCountMismatch.firewallClass == .drift)
+        #expect(vCountMismatch.reasons.contains("author_count_mismatch"))
+        #expect(vCountMismatch.fields.contains { $0.field == "authorCount" && $0.localValue == "1" && $0.remoteValue == "5" })
+
+        // 3. Year off by 1 on LeCun 2015 -> DRIFT with online-first vs. print-issue notice (warning)
+        let yearOffBy1 = BibliographyEntry(
+            citeKey: "lecun_year_2014",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2014,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let vYear1 = await firewall.verifyAgainstPublicRegistries(entry: yearOffBy1, session: replay)
+        #expect(vYear1.firewallClass == .drift)
+        #expect(vYear1.reasons.contains("year_diff_1"))
+        let yr1Field = try #require(vYear1.fields.first { $0.field == "year" })
+        #expect(yr1Field.severity == "warning")
+        #expect((yr1Field.note ?? "").contains(CitationAuditWording.yearOnlineVsPrintNotice))
+
+        // 4. Year off by >= 2 on LeCun 2015 -> DRIFT marked as error
+        let yearOffBy3 = BibliographyEntry(
+            citeKey: "lecun_year_2012",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2012,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let vYear3 = await firewall.verifyAgainstPublicRegistries(entry: yearOffBy3, session: replay)
+        #expect(vYear3.firewallClass == .drift)
+        #expect(vYear3.reasons.contains("year_mismatch"))
+        let yr3Field = try #require(vYear3.fields.first { $0.field == "year" })
+        #expect(yr3Field.severity == "error")
     }
 }
