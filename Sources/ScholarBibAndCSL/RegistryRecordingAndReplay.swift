@@ -535,6 +535,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
     private var metaFilesSHA256: [String: String]
     private var httpRequestsSent: Int
     private var lastRequestFinishedUptime: TimeInterval?
+    private var lastCrossrefSearchFinishedUptime: TimeInterval?
     private var rateLimitAbortError: RegistryRecordingError?
     private var fatalError: RegistryRecordingError?
 
@@ -704,11 +705,19 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             throw err
         }
 
-        if minimumIntervalSeconds > 0, let lastUptime = lastRequestFinishedUptime {
-            let elapsed = ProcessInfo.processInfo.systemUptime - lastUptime
-            let remaining = minimumIntervalSeconds - elapsed
-            if remaining > 0 {
-                let nanos = UInt64((remaining * 1_000_000_000).rounded(.up))
+        let isCrossrefSearch = (service == "crossref" && canonicalURL.contains("query.bibliographic"))
+        if minimumIntervalSeconds > 0 {
+            var sleepSeconds: TimeInterval = 0
+            if let lastUptime = lastRequestFinishedUptime {
+                let elapsed = ProcessInfo.processInfo.systemUptime - lastUptime
+                sleepSeconds = max(sleepSeconds, minimumIntervalSeconds - elapsed)
+            }
+            if isCrossrefSearch, let lastSearchUptime = lastCrossrefSearchFinishedUptime {
+                let elapsedSearch = ProcessInfo.processInfo.systemUptime - lastSearchUptime
+                sleepSeconds = max(sleepSeconds, max(minimumIntervalSeconds, 1.05) - elapsedSearch)
+            }
+            if sleepSeconds > 0 {
+                let nanos = UInt64((sleepSeconds * 1_000_000_000).rounded(.up))
                 try await Task.sleep(nanoseconds: nanos)
             }
         }
@@ -722,7 +731,11 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            lastRequestFinishedUptime = ProcessInfo.processInfo.systemUptime
+            let nowUp = ProcessInfo.processInfo.systemUptime
+            lastRequestFinishedUptime = nowUp
+            if isCrossrefSearch {
+                lastCrossrefSearchFinishedUptime = nowUp
+            }
             let err = RegistryRecordingError.transportFailed(
                 url: canonicalURL,
                 detail: error.localizedDescription
@@ -730,7 +743,11 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             fatalError = err
             throw err
         }
-        lastRequestFinishedUptime = ProcessInfo.processInfo.systemUptime
+        let finishedUp = ProcessInfo.processInfo.systemUptime
+        lastRequestFinishedUptime = finishedUp
+        if isCrossrefSearch {
+            lastCrossrefSearchFinishedUptime = finishedUp
+        }
 
         if response.statusCode == 429 {
             let err = RegistryRecordingError.rateLimited(

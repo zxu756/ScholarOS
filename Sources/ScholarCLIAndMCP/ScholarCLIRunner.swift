@@ -1169,6 +1169,7 @@ public struct ScholarCLIRunner: Sendable {
             let parts = verdict.fields.map { f -> String in
                 let fieldZH: String
                 switch f.field {
+                case "doi": fieldZH = "DOI"
                 case "title": fieldZH = "标题"
                 case "firstAuthor": fieldZH = "第一作者"
                 case "authorCount": fieldZH = "作者数"
@@ -1189,12 +1190,15 @@ public struct ScholarCLIRunner: Sendable {
             return parts.joined(separator: "；") + "。" + untrustedSuffix
 
         case .notFound:
+            let idLabel = verdict.auditedEntry.doi
+                ?? verdict.auditedEntry.arxivID
+                ?? verdict.auditedEntry.pmid
+                ?? verdict.citeKey
+            if verdict.reasons.contains("doi_not_registered") {
+                return "doi.org 说这个 DOI 没有注册（\(idLabel)）。" + untrustedSuffix
+            }
             if !verdict.sources.isEmpty {
                 let sourceNames = verdict.sources.map(\.source).joined(separator: "、")
-                let idLabel = verdict.auditedEntry.doi
-                    ?? verdict.auditedEntry.arxivID
-                    ?? verdict.auditedEntry.pmid
-                    ?? verdict.citeKey
                 return "\(sourceNames) 报告标识符 '\(idLabel)' 不存在。" + untrustedSuffix
             }
             return verdict.auditedEntry.localizedFirewallAuditNote(lang)
@@ -1202,6 +1206,30 @@ public struct ScholarCLIRunner: Sendable {
         case .retracted:
             if verdict.reasons.contains("retracted_builtin_list") {
                 return verdict.auditedEntry.localizedFirewallAuditNote(lang)
+            }
+            let upstreamRetractionFindings = verdict.findings.filter {
+                $0.code == .blockedRetractedWork
+                    && $0.severity == .criticalBlock
+                    && !$0.detail.contains(CitationAuditWording.builtInRetractionListNotice)
+            }
+            if !upstreamRetractionFindings.isEmpty {
+                let clauses = upstreamRetractionFindings.map { finding -> String in
+                    let src: String
+                    if finding.detail.hasPrefix("Crossref") {
+                        src = "Crossref"
+                    } else if finding.detail.hasPrefix("OpenAlex") {
+                        src = "OpenAlex"
+                    } else if finding.detail.hasPrefix("arXiv") {
+                        src = "arXiv"
+                    } else if finding.detail.hasPrefix("PubMed") {
+                        src = "PubMed"
+                    } else {
+                        src = verdict.sources.first(where: { $0.status == 200 })?.source ?? "注册库"
+                    }
+                    let fld = finding.field.isEmpty ? "retraction" : finding.field
+                    return "\(src) 标明该文献已撤稿（撤稿字段：\(fld)）"
+                }
+                return clauses.joined(separator: "；") + "。" + untrustedSuffix
             }
             let primarySource = verdict.sources.first(where: { $0.status == 200 })?.source
                 ?? verdict.sources.first?.source
@@ -1229,7 +1257,7 @@ public struct ScholarCLIRunner: Sendable {
                 case CitationUnverifiedReasonCode.budgetExhausted.rawValue: return "请求配额已用尽"
                 case CitationUnverifiedReasonCode.unparseable.rawValue: return "响应解析失败"
                 case CitationUnverifiedReasonCode.ambiguous.rawValue: return "检索结果存在歧义"
-                case CitationUnverifiedReasonCode.registeredNoMetadata.rawValue: return "标识符已注册但缺少题录元数据"
+                case CitationUnverifiedReasonCode.registeredNoMetadata.rawValue: return "doi.org 表明该 DOI 已注册，但两个元数据源里都没有"
                 case CitationUnverifiedReasonCode.noMatchInSearch.rawValue: return "检索未找到匹配记录"
                 default: return code
                 }

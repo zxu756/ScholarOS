@@ -671,12 +671,14 @@ public struct CitationVerificationFirewall: Sendable {
     public let minAllowedPublicationYear: Int
 
     public init(
+        includeBuiltInRetractedDOIs: Bool = true,
         additionalRetractedDOIs: Set<String> = [],
         additionalSentinelDOIs: Set<String> = [],
         minAllowedPublicationYear: Int = 1450,
         maxAllowedPublicationYear: Int = 2030
     ) {
-        self.retractedDOIs = Self.defaultRetractedDOIs.union(additionalRetractedDOIs.map { $0.lowercased() })
+        let baseRetracted = includeBuiltInRetractedDOIs ? Self.defaultRetractedDOIs : []
+        self.retractedDOIs = baseRetracted.union(additionalRetractedDOIs.map { $0.lowercased() })
         self.sentinelDOIs = Self.defaultSentinelDOIs.union(additionalSentinelDOIs.map { $0.lowercased() })
         self.minAllowedPublicationYear = minAllowedPublicationYear
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
@@ -1174,248 +1176,16 @@ public struct CitationVerificationFirewall: Sendable {
         var findings = offlineVerdict.findings
         var sources: [CitationVerdictSourceRecord] = []
 
-        // Path A: Resolve DOI via Crossref -> fallback to OpenAlex
+        // Path A: Resolve non-arXiv DOI via Crossref -> OpenAlex -> doi.org handle -> Crossref bibliographic search
         if let normDOI = ReferenceIdentifierNormalizer.normalizeDOI(entry.doi),
            !normDOI.hasPrefix("10.48550/arxiv.") {
-            var crossrefReturned404 = false
-            var openAlexReturned404 = false
-            var failureReasons: [CitationUnverifiedReasonCode] = []
-
-            if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normDOI) {
-                do {
-                    let response = try await session.send(URLRequest(url: crossrefURL))
-                    let fetchedAt = resolvedFetchedAt(from: response)
-                    let sourceRecord = CitationVerdictSourceRecord(
-                        source: "Crossref",
-                        url: crossrefURL.absoluteString,
-                        status: response.statusCode,
-                        fetchedAt: fetchedAt,
-                        origin: response.origin
-                    )
-                    sources.append(sourceRecord)
-
-                    if response.statusCode == 200 {
-                        switch parseCrossrefWorkPayload(response.body) {
-                        case .parsed(let remote):
-                            return reconcileRemoteRegistryMetadata(
-                                entry: entry,
-                                remote: remote,
-                                primarySource: sourceRecord,
-                                allSources: sources,
-                                existingFindings: findings,
-                                isBuiltInRetracted: isBuiltInRetracted
-                            )
-                        case .registeredNoMetadata:
-                            failureReasons.append(.registeredNoMetadata)
-                            findings.append(
-                                FirewallFinding(
-                                    code: .registryTransportUnavailable,
-                                    severity: .warning,
-                                    field: "doi",
-                                    detail: "Crossref registered DOI '\(normDOI)' without title metadata."
-                                )
-                            )
-                        case .unparseable:
-                            failureReasons.append(.unparseable)
-                            findings.append(
-                                FirewallFinding(
-                                    code: .registryTransportUnavailable,
-                                    severity: .warning,
-                                    field: "network",
-                                    detail: "Crossref payload for DOI '\(normDOI)' could not be parsed."
-                                )
-                            )
-                        }
-                    } else if response.statusCode == 404 {
-                        crossrefReturned404 = true
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryLookupNotFound,
-                                severity: .warning,
-                                field: "doi",
-                                detail: "Crossref reported DOI '\(normDOI)' not found (status 404); checking OpenAlex."
-                            )
-                        )
-                    } else {
-                        let code = classifyHTTPFailureStatus(response.statusCode)
-                        failureReasons.append(code)
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryTransportUnavailable,
-                                severity: .warning,
-                                field: "network",
-                                detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: normDOI)
-                            )
-                        )
-                    }
-                } catch is any FatalRegistrySessionError {
-                    return offlineVerdict
-                } catch {
-                    let code = classifyThrownTransportError(error)
-                    failureReasons.append(code)
-                    sources.append(
-                        CitationVerdictSourceRecord(
-                            source: "Crossref",
-                            url: crossrefURL.absoluteString,
-                            status: nil,
-                            fetchedAt: currentISO8601Timestamp(),
-                            origin: .network
-                        )
-                    )
-                    findings.append(
-                        FirewallFinding(
-                            code: .registryTransportUnavailable,
-                            severity: .warning,
-                            field: "network",
-                            detail: describeTransportError(source: "Crossref", code: code, error: error) + " Attempting OpenAlex fallback."
-                        )
-                    )
-                }
-            }
-
-            if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normDOI) {
-                do {
-                    let response = try await session.send(URLRequest(url: openAlexURL))
-                    let fetchedAt = resolvedFetchedAt(from: response)
-                    let sourceRecord = CitationVerdictSourceRecord(
-                        source: "OpenAlex",
-                        url: openAlexURL.absoluteString,
-                        status: response.statusCode,
-                        fetchedAt: fetchedAt,
-                        origin: response.origin
-                    )
-                    sources.append(sourceRecord)
-
-                    if response.statusCode == 200 {
-                        switch parseOpenAlexWorkPayload(response.body) {
-                        case .parsed(let remote):
-                            return reconcileRemoteRegistryMetadata(
-                                entry: entry,
-                                remote: remote,
-                                primarySource: sourceRecord,
-                                allSources: sources,
-                                existingFindings: findings,
-                                isBuiltInRetracted: isBuiltInRetracted
-                            )
-                        case .registeredNoMetadata:
-                            failureReasons.append(.registeredNoMetadata)
-                            findings.append(
-                                FirewallFinding(
-                                    code: .registryTransportUnavailable,
-                                    severity: .warning,
-                                    field: "doi",
-                                    detail: "OpenAlex registered DOI '\(normDOI)' without title metadata."
-                                )
-                            )
-                        case .unparseable:
-                            failureReasons.append(.unparseable)
-                            findings.append(
-                                FirewallFinding(
-                                    code: .registryTransportUnavailable,
-                                    severity: .warning,
-                                    field: "network",
-                                    detail: "OpenAlex payload for DOI '\(normDOI)' could not be parsed."
-                                )
-                            )
-                        }
-                    } else if response.statusCode == 404 {
-                        openAlexReturned404 = true
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryLookupNotFound,
-                                severity: .warning,
-                                field: "doi",
-                                detail: "OpenAlex reported DOI '\(normDOI)' not found (status 404)."
-                            )
-                        )
-                    } else {
-                        let code = classifyHTTPFailureStatus(response.statusCode)
-                        failureReasons.append(code)
-                        findings.append(
-                            FirewallFinding(
-                                code: .registryTransportUnavailable,
-                                severity: .warning,
-                                field: "network",
-                                detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: normDOI)
-                            )
-                        )
-                    }
-                } catch is any FatalRegistrySessionError {
-                    return offlineVerdict
-                } catch {
-                    let code = classifyThrownTransportError(error)
-                    failureReasons.append(code)
-                    sources.append(
-                        CitationVerdictSourceRecord(
-                            source: "OpenAlex",
-                            url: openAlexURL.absoluteString,
-                            status: nil,
-                            fetchedAt: currentISO8601Timestamp(),
-                            origin: .network
-                        )
-                    )
-                    findings.append(
-                        FirewallFinding(
-                            code: .registryTransportUnavailable,
-                            severity: .warning,
-                            field: "network",
-                            detail: describeTransportError(source: "OpenAlex", code: code, error: error)
-                        )
-                    )
-                }
-            }
-
-            if isBuiltInRetracted {
-                return buildUpdatedVerdict(
-                    for: entry,
-                    assignedClass: .retracted,
-                    reasons: ["retracted_builtin_list"],
-                    sources: sources,
-                    fields: [],
-                    findings: findings
-                )
-            }
-
-            // Hard rule (M1 item 1): ANY failure prevents returning NOT_FOUND or VERIFIED.
-            if !failureReasons.isEmpty {
-                return buildUpdatedVerdict(
-                    for: entry,
-                    assignedClass: .unverified,
-                    reasons: deduplicatedReasons(failureReasons),
-                    sources: sources,
-                    fields: [],
-                    findings: findings
-                )
-            }
-
-            if crossrefReturned404 && openAlexReturned404 {
-                let notFoundNote = "[NOT_FOUND] Crossref and OpenAlex reported that DOI '\(normDOI)' does not exist."
-                findings.append(
-                    FirewallFinding(
-                        code: .registryLookupNotFound,
-                        severity: .criticalBlock,
-                        field: "doi",
-                        detail: "Crossref and OpenAlex reported that DOI '\(normDOI)' does not exist."
-                    )
-                )
-                return buildUpdatedVerdict(
-                    for: entry,
-                    assignedClass: .notFound,
-                    reasons: ["not_found_in_registries"],
-                    sources: sources,
-                    fields: [],
-                    findings: findings,
-                    overrideNote: notFoundNote
-                )
-            }
-
-            return buildUpdatedVerdict(
-                for: entry,
-                assignedClass: .unverified,
-                reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
-                sources: sources,
-                fields: [],
-                findings: findings
+            return await verifyNonArXivDOIEntry(
+                entry: entry,
+                normalizedDOI: normDOI,
+                offlineVerdict: offlineVerdict,
+                initialFindings: findings,
+                isBuiltInRetracted: isBuiltInRetracted,
+                session: session
             )
         }
 
@@ -1467,7 +1237,7 @@ public struct CitationVerificationFirewall: Sendable {
                         return buildUpdatedVerdict(
                             for: entry,
                             assignedClass: .notFound,
-                            reasons: ["not_found_in_registries"],
+                            reasons: ["arxiv_not_found"],
                             sources: sources,
                             fields: [],
                             findings: findings,
@@ -1503,7 +1273,7 @@ public struct CitationVerificationFirewall: Sendable {
                     return buildUpdatedVerdict(
                         for: entry,
                         assignedClass: .notFound,
-                        reasons: ["not_found_in_registries"],
+                        reasons: ["arxiv_not_found"],
                         sources: sources,
                         fields: [],
                         findings: findings,
@@ -1560,14 +1330,898 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
-        // Entries without a DOI/arXiv lookup path in Stage 03 remain UNVERIFIED with reason `offline`.
+        // Entries without a DOI/arXiv lookup path remain UNVERIFIED with reason `offline`.
         return offlineVerdict
+    }
+
+    // MARK: - Non-arXiv DOI Lookup Order, Retraction Cross-Check & Handle Resolution (M1 Item 3)
+
+    private func verifyNonArXivDOIEntry(
+        entry: BibliographyEntry,
+        normalizedDOI: String,
+        offlineVerdict: CitationFirewallEntryVerdict,
+        initialFindings: [FirewallFinding],
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var findings = initialFindings
+        var sources: [CitationVerdictSourceRecord] = []
+        var crossrefReturned404 = false
+        var openAlexReturned404 = false
+        var failureReasons: [CitationUnverifiedReasonCode] = []
+
+        // 1. Crossref single-work lookup (`/works/<DOI>`)
+        if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normalizedDOI) {
+            do {
+                let response = try await session.send(URLRequest(url: crossrefURL))
+                let fetchedAt = resolvedFetchedAt(from: response)
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "Crossref",
+                    url: crossrefURL.absoluteString,
+                    status: response.statusCode,
+                    fetchedAt: fetchedAt,
+                    origin: response.origin
+                )
+                sources.append(sourceRecord)
+
+                if response.statusCode == 200 {
+                    switch parseCrossrefWorkPayload(response.body) {
+                    case .parsed(let crossrefRemote):
+                        return await crossCheckOpenAlexRetractionAndReconcile(
+                            entry: entry,
+                            normalizedDOI: normalizedDOI,
+                            crossrefRemote: crossrefRemote,
+                            crossrefSource: sourceRecord,
+                            existingSources: sources,
+                            existingFindings: findings,
+                            offlineVerdict: offlineVerdict,
+                            isBuiltInRetracted: isBuiltInRetracted,
+                            session: session
+                        )
+                    case .registeredNoMetadata:
+                        failureReasons.append(.registeredNoMetadata)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "doi",
+                                detail: "Crossref registered DOI '\(normalizedDOI)' without title metadata."
+                            )
+                        )
+                    case .unparseable:
+                        failureReasons.append(.unparseable)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "Crossref payload for DOI '\(normalizedDOI)' could not be parsed."
+                            )
+                        )
+                    }
+                } else if response.statusCode == 404 {
+                    crossrefReturned404 = true
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryLookupNotFound,
+                            severity: .warning,
+                            field: "doi",
+                            detail: "Crossref reported DOI '\(normalizedDOI)' not found (status 404); checking OpenAlex."
+                        )
+                    )
+                } else {
+                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    failureReasons.append(code)
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .warning,
+                            field: "network",
+                            detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: normalizedDOI)
+                        )
+                    )
+                }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
+            } catch {
+                let code = classifyThrownTransportError(error)
+                failureReasons.append(code)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "Crossref",
+                        url: crossrefURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeTransportError(source: "Crossref", code: code, error: error) + " Attempting OpenAlex fallback."
+                    )
+                )
+            }
+        }
+
+        // 2. OpenAlex single-work lookup (`/works/https://doi.org/<DOI>`) when Crossref did not return a valid 200 record
+        if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normalizedDOI) {
+            do {
+                let response = try await session.send(URLRequest(url: openAlexURL))
+                let fetchedAt = resolvedFetchedAt(from: response)
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "OpenAlex",
+                    url: openAlexURL.absoluteString,
+                    status: response.statusCode,
+                    fetchedAt: fetchedAt,
+                    origin: response.origin
+                )
+                sources.append(sourceRecord)
+
+                if response.statusCode == 200 {
+                    switch parseOpenAlexWorkPayload(response.body) {
+                    case .parsed(let oaRemote):
+                        return reconcileRemoteRegistryMetadata(
+                            entry: entry,
+                            remote: oaRemote,
+                            primarySource: sourceRecord,
+                            allSources: sources,
+                            existingFindings: findings,
+                            isBuiltInRetracted: isBuiltInRetracted
+                        )
+                    case .registeredNoMetadata:
+                        failureReasons.append(.registeredNoMetadata)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "doi",
+                                detail: "OpenAlex registered DOI '\(normalizedDOI)' without title metadata."
+                            )
+                        )
+                    case .unparseable:
+                        failureReasons.append(.unparseable)
+                        findings.append(
+                            FirewallFinding(
+                                code: .registryTransportUnavailable,
+                                severity: .warning,
+                                field: "network",
+                                detail: "OpenAlex payload for DOI '\(normalizedDOI)' could not be parsed."
+                            )
+                        )
+                    }
+                } else if response.statusCode == 404 {
+                    openAlexReturned404 = true
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryLookupNotFound,
+                            severity: .warning,
+                            field: "doi",
+                            detail: "OpenAlex reported DOI '\(normalizedDOI)' not found (status 404); checking doi.org handle."
+                        )
+                    )
+                } else {
+                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    failureReasons.append(code)
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .warning,
+                            field: "network",
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: normalizedDOI)
+                        )
+                    )
+                }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
+            } catch {
+                let code = classifyThrownTransportError(error)
+                failureReasons.append(code)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "OpenAlex",
+                        url: openAlexURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeTransportError(source: "OpenAlex", code: code, error: error)
+                    )
+                )
+            }
+        }
+
+        // Hard rule (M1 item 1): ANY failure prevents returning NOT_FOUND or VERIFIED.
+        if !failureReasons.isEmpty {
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: deduplicatedReasons(failureReasons),
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        // 3. Both Crossref and OpenAlex returned 404: ask doi.org Handle API (`/api/handles/<DOI>`)
+        if crossrefReturned404 && openAlexReturned404 {
+            return await resolveUnmatchedDOIViaHandleAndBibliographicSearch(
+                entry: entry,
+                normalizedDOI: normalizedDOI,
+                existingSources: sources,
+                existingFindings: findings,
+                offlineVerdict: offlineVerdict,
+                isBuiltInRetracted: isBuiltInRetracted,
+                session: session
+            )
+        }
+
+        if isBuiltInRetracted {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .retracted,
+                reasons: ["retracted_builtin_list"],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: .unverified,
+            reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
+            sources: sources,
+            fields: [],
+            findings: findings
+        )
+    }
+
+    /// After obtaining a Crossref 200 record by DOI, always query OpenAlex single-work (0 credits)
+    /// to cross-check `is_retracted` before finalizing the verdict.
+    private func crossCheckOpenAlexRetractionAndReconcile(
+        entry: BibliographyEntry,
+        normalizedDOI: String,
+        crossrefRemote: RemoteWorkRecord,
+        crossrefSource: CitationVerdictSourceRecord,
+        existingSources: [CitationVerdictSourceRecord],
+        existingFindings: [FirewallFinding],
+        offlineVerdict: CitationFirewallEntryVerdict,
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var sources = existingSources
+        var findings = existingFindings
+        var openAlexRetractionField: String?
+
+        if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normalizedDOI) {
+            do {
+                let oaResponse = try await session.send(URLRequest(url: openAlexURL))
+                let oaFetchedAt = resolvedFetchedAt(from: oaResponse)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "OpenAlex",
+                        url: openAlexURL.absoluteString,
+                        status: oaResponse.statusCode,
+                        fetchedAt: oaFetchedAt,
+                        origin: oaResponse.origin
+                    )
+                )
+                if oaResponse.statusCode == 200 {
+                    openAlexRetractionField = extractOpenAlexRetractionField(oaResponse.body)
+                } else if oaResponse.statusCode != 404 {
+                    findings.append(
+                        FirewallFinding(
+                            code: .registryTransportUnavailable,
+                            severity: .advisory,
+                            field: "network",
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: oaResponse.statusCode, identifier: normalizedDOI)
+                        )
+                    )
+                }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
+            } catch {
+                let code = classifyThrownTransportError(error)
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "OpenAlex",
+                        url: openAlexURL.absoluteString,
+                        status: nil,
+                        fetchedAt: currentISO8601Timestamp(),
+                        origin: .network
+                    )
+                )
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .advisory,
+                        field: "network",
+                        detail: describeTransportError(source: "OpenAlex", code: code, error: error)
+                    )
+                )
+            }
+        }
+
+        var retractionSignals: [(sourceName: String, field: String)] = []
+        if let cfField = crossrefRemote.retractionField {
+            retractionSignals.append(("Crossref", cfField))
+        }
+        if let oaField = openAlexRetractionField {
+            retractionSignals.append(("OpenAlex", oaField))
+        }
+
+        if !retractionSignals.isEmpty {
+            findings.removeAll { $0.code == .blockedRetractedWork }
+            for signal in retractionSignals {
+                findings.append(
+                    FirewallFinding(
+                        code: .blockedRetractedWork,
+                        severity: .criticalBlock,
+                        field: signal.field,
+                        detail: "\(signal.sourceName) marks this publication as retracted (field: \(signal.field))."
+                    )
+                )
+            }
+            let reasons = retractionSignals.map { "retracted_\($0.sourceName.lowercased())" }
+            let detailSummary = retractionSignals
+                .map { "\($0.sourceName) marks this publication as retracted (field: \($0.field))." }
+                .joined(separator: " ")
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .retracted,
+                reasons: reasons,
+                sources: sources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[RETRACTED] \(detailSummary)"
+            )
+        }
+
+        return reconcileRemoteRegistryMetadata(
+            entry: entry,
+            remote: crossrefRemote,
+            primarySource: crossrefSource,
+            allSources: sources,
+            existingFindings: findings,
+            isBuiltInRetracted: isBuiltInRetracted
+        )
+    }
+
+    private func resolveUnmatchedDOIViaHandleAndBibliographicSearch(
+        entry: BibliographyEntry,
+        normalizedDOI: String,
+        existingSources: [CitationVerdictSourceRecord],
+        existingFindings: [FirewallFinding],
+        offlineVerdict: CitationFirewallEntryVerdict,
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var sources = existingSources
+        var findings = existingFindings
+
+        guard let handleURL = RegistryURLBuilder.doiHandleURL(doi: normalizedDOI) else {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.transportError.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        let handleResponse: RegistryHTTPResponse
+        do {
+            handleResponse = try await session.send(URLRequest(url: handleURL))
+        } catch is any FatalRegistrySessionError {
+            return offlineVerdict
+        } catch {
+            let code = classifyThrownTransportError(error)
+            sources.append(
+                CitationVerdictSourceRecord(
+                    source: "doi.org",
+                    url: handleURL.absoluteString,
+                    status: nil,
+                    fetchedAt: currentISO8601Timestamp(),
+                    origin: .network
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeTransportError(source: "doi.org", code: code, error: error)
+                )
+            )
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        sources.append(
+            CitationVerdictSourceRecord(
+                source: "doi.org",
+                url: handleURL.absoluteString,
+                status: handleResponse.statusCode,
+                fetchedAt: resolvedFetchedAt(from: handleResponse),
+                origin: handleResponse.origin
+            )
+        )
+
+        guard handleResponse.statusCode == 200 || handleResponse.statusCode == 404 else {
+            let code = classifyHTTPFailureStatus(handleResponse.statusCode)
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeHTTPFailure(source: "doi.org", statusCode: handleResponse.statusCode, identifier: normalizedDOI)
+                )
+            )
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        switch parseDOIHandlePayload(handleResponse.body) {
+        case .registered:
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            let detail = "doi.org reported DOI '\(normalizedDOI)' is registered (responseCode 1), but neither Crossref nor OpenAlex has bibliographic metadata."
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "doi",
+                    detail: detail
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.registeredNoMetadata.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[UNVERIFIED] \(detail)"
+            )
+
+        case .serverError:
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: "doi.org returned an internal handle error for DOI '\(normalizedDOI)'."
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.serverError.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+
+        case .unparseable:
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: "doi.org handle payload for DOI '\(normalizedDOI)' could not be parsed."
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+
+        case .notRegistered:
+            return await searchCrossrefForTypoDOICandidate(
+                entry: entry,
+                normalizedDOI: normalizedDOI,
+                existingSources: sources,
+                existingFindings: findings,
+                offlineVerdict: offlineVerdict,
+                isBuiltInRetracted: isBuiltInRetracted,
+                session: session
+            )
+        }
+    }
+
+    private func searchCrossrefForTypoDOICandidate(
+        entry: BibliographyEntry,
+        normalizedDOI: String,
+        existingSources: [CitationVerdictSourceRecord],
+        existingFindings: [FirewallFinding],
+        offlineVerdict: CitationFirewallEntryVerdict,
+        isBuiltInRetracted: Bool,
+        session: any CitationRegistrySession
+    ) async -> CitationFirewallEntryVerdict {
+        var sources = existingSources
+        var findings = existingFindings
+
+        func makeDOINotRegisteredVerdict() -> CitationFirewallEntryVerdict {
+            if isBuiltInRetracted {
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .retracted,
+                    reasons: ["retracted_builtin_list"],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            let detail = "doi.org reported that DOI '\(normalizedDOI)' is not registered."
+            findings.append(
+                FirewallFinding(
+                    code: .registryLookupNotFound,
+                    severity: .criticalBlock,
+                    field: "doi",
+                    detail: detail
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .notFound,
+                reasons: ["doi_not_registered"],
+                sources: sources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[NOT_FOUND] \(detail)"
+            )
+        }
+
+        guard let searchQuery = buildBibliographicSearchQuery(for: entry),
+              let searchURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: searchQuery, rows: 5) else {
+            return makeDOINotRegisteredVerdict()
+        }
+
+        let searchResponse: RegistryHTTPResponse
+        do {
+            searchResponse = try await session.send(URLRequest(url: searchURL))
+        } catch is any FatalRegistrySessionError {
+            return offlineVerdict
+        } catch {
+            let code = classifyThrownTransportError(error)
+            sources.append(
+                CitationVerdictSourceRecord(
+                    source: "Crossref",
+                    url: searchURL.absoluteString,
+                    status: nil,
+                    fetchedAt: currentISO8601Timestamp(),
+                    origin: .network
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeTransportError(source: "Crossref", code: code, error: error)
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        sources.append(
+            CitationVerdictSourceRecord(
+                source: "Crossref",
+                url: searchURL.absoluteString,
+                status: searchResponse.statusCode,
+                fetchedAt: resolvedFetchedAt(from: searchResponse),
+                origin: searchResponse.origin
+            )
+        )
+
+        guard searchResponse.statusCode == 200 else {
+            let code = classifyHTTPFailureStatus(searchResponse.statusCode)
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: describeHTTPFailure(source: "Crossref", statusCode: searchResponse.statusCode, identifier: searchQuery)
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [code.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        let candidates: [RemoteWorkRecord]
+        switch parseCrossrefSearchPayload(searchResponse.body) {
+        case .parsed(let parsed):
+            candidates = parsed
+        case .unparseable:
+            findings.append(
+                FirewallFinding(
+                    code: .registryTransportUnavailable,
+                    severity: .warning,
+                    field: "network",
+                    detail: "Crossref bibliographic search payload for '\(searchQuery)' could not be parsed."
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .unverified,
+                reasons: [CitationUnverifiedReasonCode.unparseable.rawValue],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        var uniqueMatches: [RemoteWorkRecord] = []
+        var seenDOIs: Set<String> = []
+        for candidate in candidates {
+            guard let candDOI = candidate.doi, !candDOI.isEmpty, !seenDOIs.contains(candDOI) else {
+                continue
+            }
+            guard compareTitle(localTitle: entry.title, remoteTitle: candidate.title, sourceName: "Crossref").discrepancy == nil else {
+                continue
+            }
+            guard compareFirstAuthor(localAuthors: entry.authors, remote: candidate).discrepancy == nil else {
+                continue
+            }
+            guard let localYear = entry.year,
+                  let minYearDiff = candidate.publicationYears.map({ abs($0 - localYear) }).min(),
+                  minYearDiff <= 1 else {
+                continue
+            }
+            seenDOIs.insert(candDOI)
+            uniqueMatches.append(candidate)
+        }
+
+        guard !uniqueMatches.isEmpty else {
+            return makeDOINotRegisteredVerdict()
+        }
+
+        let matchedCandidate: RemoteWorkRecord
+        if uniqueMatches.count == 1 {
+            matchedCandidate = uniqueMatches[0]
+        } else {
+            // Disambiguate using remaining local fields (authorCount, exact year, venue); if tied, report `ambiguous`.
+            let scored: [(record: RemoteWorkRecord, secondaryMismatches: Int)] = uniqueMatches.map { cand in
+                var mismatches = 0
+                if compareAuthorCount(localAuthors: entry.authors, remote: cand).discrepancy != nil {
+                    mismatches += 1
+                }
+                if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: "Crossref").discrepancy != nil {
+                    mismatches += 1
+                }
+                if compareVenue(localVenue: entry.venue, remoteVenues: cand.venues, sourceName: "Crossref").discrepancy != nil {
+                    mismatches += 1
+                }
+                return (cand, mismatches)
+            }
+            let minMismatches = scored.map(\.secondaryMismatches).min() ?? 0
+            let best = scored.filter { $0.secondaryMismatches == minMismatches }
+            guard best.count == 1 else {
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "doi",
+                        detail: "Crossref bibliographic search returned \(best.count) equally matching works for '\(entry.title)'."
+                    )
+                )
+                return buildUpdatedVerdict(
+                    for: entry,
+                    assignedClass: .unverified,
+                    reasons: [CitationUnverifiedReasonCode.ambiguous.rawValue],
+                    sources: sources,
+                    fields: [],
+                    findings: findings
+                )
+            }
+            matchedCandidate = best[0].record
+        }
+
+        let matchedDOI = matchedCandidate.doi ?? ""
+        if let retField = matchedCandidate.retractionField {
+            findings.removeAll { $0.code == .blockedRetractedWork }
+            let detail = "Crossref marks this publication as retracted (field: \(retField))."
+            findings.append(
+                FirewallFinding(
+                    code: .blockedRetractedWork,
+                    severity: .criticalBlock,
+                    field: retField,
+                    detail: detail
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .retracted,
+                reasons: ["retracted_crossref"],
+                sources: sources,
+                fields: [],
+                findings: findings,
+                overrideNote: "[RETRACTED] \(detail)"
+            )
+        }
+        if retractedDOIs.contains(matchedDOI) {
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .retracted,
+                reasons: ["retracted_builtin_list"],
+                sources: sources,
+                fields: [],
+                findings: findings
+            )
+        }
+
+        let localDOIDisplay = nonEmpty(entry.doi) ?? normalizedDOI
+        var discrepancies: [CitationFieldDiscrepancy] = [
+            CitationFieldDiscrepancy(
+                field: "doi",
+                localValue: localDOIDisplay,
+                remoteValue: matchedDOI,
+                source: "Crossref",
+                severity: "error",
+                note: "doi.org reported local DOI '\(normalizedDOI)' is not registered; Crossref bibliographic search matched DOI '\(matchedDOI)'."
+            )
+        ]
+        var driftReasons: [String] = ["doi_mismatch"]
+
+        let secondaryChecks: [(CitationFieldDiscrepancy?, String?)] = [
+            compareAuthorCount(localAuthors: entry.authors, remote: matchedCandidate),
+            comparePublicationYear(localYear: entry.year, remoteYears: matchedCandidate.publicationYears, sourceName: "Crossref"),
+            compareVenue(localVenue: entry.venue, remoteVenues: matchedCandidate.venues, sourceName: "Crossref")
+        ]
+        for (disc, reason) in secondaryChecks {
+            if let disc {
+                discrepancies.append(disc)
+            }
+            if let reason, !driftReasons.contains(reason) {
+                driftReasons.append(reason)
+            }
+        }
+
+        let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: "Crossref")
+        findings.append(
+            FirewallFinding(
+                code: .metadataDriftDetected,
+                severity: .warning,
+                field: "doi",
+                detail: driftSummary
+            )
+        )
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: .drift,
+            reasons: driftReasons,
+            sources: sources,
+            fields: discrepancies,
+            findings: findings,
+            overrideNote: "[DRIFT] \(driftSummary)"
+        )
+    }
+
+    private func buildBibliographicSearchQuery(for entry: BibliographyEntry) -> String? {
+        guard !Self.normalizeTitleTokensForComparison(entry.title).isEmpty else {
+            return nil
+        }
+        let namedAuthors = entry.authors.filter { !Self.isEtAlTruncationAuthor($0) }
+        guard let firstAuthor = namedAuthors.first else {
+            return nil
+        }
+        let cleanTitle = Self.stripOuterRetractionMarkers(
+            LaTeXTextCodec().decode(Self.stripHTMLTagsAndEntities(entry.title))
+        )
+        let cleanSurname = LaTeXTextCodec().decode(Self.stripHTMLTagsAndEntities(firstAuthor.familyName))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty, !cleanSurname.isEmpty else {
+            return nil
+        }
+        let combined = "\(cleanTitle) \(cleanSurname)"
+            .replacingOccurrences(of: "@", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return combined.isEmpty ? nil : combined
     }
 
     // MARK: - Deterministic Field Comparison Rules (M1 Item 2: S36, S37, S38, S50)
 
     struct RemoteWorkRecord: Sendable {
         let sourceName: String
+        let doi: String?
         let title: String
         let firstAuthorDisplay: String?
         let firstAuthorSurname: String?
@@ -1583,6 +2237,18 @@ public struct CitationVerificationFirewall: Sendable {
     private enum RegistryPayloadParseOutcome {
         case parsed(RemoteWorkRecord)
         case registeredNoMetadata
+        case unparseable
+    }
+
+    private enum DOIHandleParseOutcome {
+        case registered
+        case notRegistered
+        case serverError
+        case unparseable
+    }
+
+    private enum CrossrefSearchParseOutcome {
+        case parsed([RemoteWorkRecord])
         case unparseable
     }
 
@@ -2103,7 +2769,7 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
-    // MARK: - Private Registry Payload Parsers (Crossref, OpenAlex, arXiv)
+    // MARK: - Private Registry Payload Parsers (Crossref, OpenAlex, doi.org, arXiv)
 
     private func parseCrossrefWorkPayload(_ data: Data) -> RegistryPayloadParseOutcome {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -2117,7 +2783,26 @@ public struct CitationVerificationFirewall: Sendable {
         } else {
             return .unparseable
         }
+        return parseCrossrefWorkObject(message)
+    }
 
+    private func parseCrossrefSearchPayload(_ data: Data) -> CrossrefSearchParseOutcome {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let message = root["message"] as? [String: Any],
+              let items = message["items"] as? [[String: Any]] else {
+            return .unparseable
+        }
+        var records: [RemoteWorkRecord] = []
+        records.reserveCapacity(items.count)
+        for item in items {
+            if case .parsed(let record) = parseCrossrefWorkObject(item) {
+                records.append(record)
+            }
+        }
+        return .parsed(records)
+    }
+
+    private func parseCrossrefWorkObject(_ message: [String: Any]) -> RegistryPayloadParseOutcome {
         let title: String = {
             if let titles = message["title"] as? [String], let first = titles.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
                 return first.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2130,6 +2815,8 @@ public struct CitationVerificationFirewall: Sendable {
         guard !title.isEmpty else {
             return .registeredNoMetadata
         }
+
+        let normalizedDOI = ReferenceIdentifierNormalizer.normalizeDOI(message["DOI"] as? String)
 
         var firstAuthorDisplay: String?
         var firstAuthorSurname: String?
@@ -2214,12 +2901,15 @@ public struct CitationVerificationFirewall: Sendable {
                 retractionField = "relation.is-retracted-by"
             } else if let dict = retractedBy as? [String: Any], !dict.isEmpty {
                 retractionField = "relation.is-retracted-by"
+            } else if nonEmpty(retractedBy as? String) != nil {
+                retractionField = "relation.is-retracted-by"
             }
         }
 
         return .parsed(
             RemoteWorkRecord(
                 sourceName: "Crossref",
+                doi: normalizedDOI,
                 title: title,
                 firstAuthorDisplay: firstAuthorDisplay,
                 firstAuthorSurname: firstAuthorSurname,
@@ -2234,6 +2924,47 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
+    private func parseDOIHandlePayload(_ data: Data) -> DOIHandleParseOutcome {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return .unparseable
+        }
+        let code: Int? = {
+            if let intVal = root["responseCode"] as? Int {
+                return intVal
+            }
+            if let numVal = root["responseCode"] as? NSNumber {
+                return numVal.intValue
+            }
+            return nil
+        }()
+        guard let code else {
+            return .unparseable
+        }
+        switch code {
+        case 100:
+            return .notRegistered
+        case 1, 200:
+            return .registered
+        case 2, 300, 301:
+            return .serverError
+        default:
+            return .unparseable
+        }
+    }
+
+    private func extractOpenAlexRetractionField(_ data: Data) -> String? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        if (root["is_retracted"] as? Bool) == true {
+            return "is_retracted"
+        }
+        if let num = root["is_retracted"] as? NSNumber, num.boolValue {
+            return "is_retracted"
+        }
+        return nil
+    }
+
     private func parseOpenAlexWorkPayload(_ data: Data) -> RegistryPayloadParseOutcome {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return .unparseable
@@ -2245,6 +2976,8 @@ public struct CitationVerificationFirewall: Sendable {
         guard !title.isEmpty else {
             return .registeredNoMetadata
         }
+
+        let normalizedDOI = ReferenceIdentifierNormalizer.normalizeDOI(root["doi"] as? String)
 
         var publicationYears: [Int] = []
         if let yr = root["publication_year"] as? Int {
@@ -2312,6 +3045,7 @@ public struct CitationVerificationFirewall: Sendable {
         return .parsed(
             RemoteWorkRecord(
                 sourceName: "OpenAlex",
+                doi: normalizedDOI,
                 title: title,
                 firstAuthorDisplay: firstAuthorDisplay,
                 firstAuthorSurname: firstAuthorSurname,
@@ -2399,9 +3133,12 @@ public struct CitationVerificationFirewall: Sendable {
             retractionField = "summary"
         }
 
+        let arxivDOI = ReferenceIdentifierNormalizer.normalizeDOI(extractXMLTagValue("arxiv:doi", in: entrySlice))
+
         return .parsed(
             RemoteWorkRecord(
                 sourceName: "arXiv",
+                doi: arxivDOI,
                 title: cleanTitle,
                 firstAuthorDisplay: firstSurname,
                 firstAuthorSurname: firstSurname,

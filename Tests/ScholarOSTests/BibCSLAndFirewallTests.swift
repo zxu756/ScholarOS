@@ -954,7 +954,8 @@ struct BibCSLAndFirewallTests {
             entry: entry,
             session: FailingRegistrySession(mode: .status(404))
         )
-        #expect(notFoundVerdict.firewallClass.rawValue == "NOT_FOUND")
+        #expect(notFoundVerdict.firewallClass.rawValue == "UNVERIFIED")
+        #expect(notFoundVerdict.reasons == ["unparseable"])
         #expect(!notFoundVerdict.allowsManuscriptInsertion)
     }
 
@@ -1391,7 +1392,7 @@ struct BibCSLAndFirewallTests {
         )
 
         let urls = await recorder.urls
-        #expect(urls.count == 2)
+        #expect(urls.count == 3)
         for url in urls {
             #expect(url.query == nil, "Unexpected query in \(url.absoluteString)")
             #expect(url.fragment == nil, "Unexpected fragment in \(url.absoluteString)")
@@ -1810,10 +1811,11 @@ struct BibCSLAndFirewallTests {
         let fields = try #require(json["fields"] as? [[String: Any]])
         #expect(fields.isEmpty)
         let sources = try #require(json["sources"] as? [[String: Any]])
-        #expect(sources.count == 1)
+        #expect(sources.count == 2)
         #expect(sources.first?["origin"] as? String == "replay")
         #expect(sources.first?["status"] as? Int == 200)
         #expect((sources.first?["url"] as? String) == "https://api.crossref.org/works/10.1038/nature14539")
+        #expect((sources.last?["url"] as? String) == "https://api.openalex.org/works/https://doi.org/10.1038/nature14539")
 
         // Abbreviated venue "Neural Comput." matches "Neural Computation"
         let cleanLSTM = BibliographyEntry(
@@ -1976,5 +1978,248 @@ struct BibCSLAndFirewallTests {
         #expect(vYear3.reasons.contains("year_mismatch"))
         let yr3Field = try #require(vYear3.fields.first { $0.field == "year" })
         #expect(yr3Field.severity == "error")
+    }
+
+    // MARK: - 10. M1 Stage 04 DOI Lookup Order, doi.org Handle & Retraction Tests
+
+    @Test("M1 item 3 (Stage 04): fabricated DOI with real prefix + fake suffix queries doi.org handle + Crossref search and returns NOT_FOUND without not_found_in_registries")
+    func m1Stage04FabricatedDOIVerifiesViaDOIHandleAndRemovesNotFoundInRegistries() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let fabricated = BibliographyEntry(
+            citeKey: "fake_nonsentinel",
+            kind: .article,
+            title: "Quantum Gradient Descent in Biological Neural Networks",
+            authors: [
+                BibAuthor(givenName: "Eleanor", familyName: "Whitfield"),
+                BibAuthor(givenName: "Raj", familyName: "Patel")
+            ],
+            year: 2025,
+            venue: "Nature Machine Intelligence",
+            doi: "10.1038/fake.2026.99999"
+        )
+
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: fabricated, session: replay)
+        #expect(verdict.firewallClass == .notFound)
+        #expect(verdict.insertable == false)
+        #expect(!verdict.reasons.contains("not_found_in_registries"))
+        #expect(verdict.reasons == ["doi_not_registered"])
+        #expect(verdict.auditNote.contains("doi.org"))
+        #expect(verdict.auditNote.contains("not registered"))
+        #expect(verdict.sources.contains {
+            $0.source == "doi.org" && $0.url == "https://doi.org/api/handles/10.1038/fake.2026.99999"
+        })
+        #expect(verdict.sources.contains {
+            $0.source == "Crossref" && $0.url.contains("query.bibliographic=") && $0.url.contains("rows=5")
+        })
+    }
+
+    @Test("M1 item 3 (Stage 04): real publication paired with unregistered DOI is upgraded to DRIFT with true remote DOI in fields")
+    func m1Stage04RealPaperWithUnregisteredDOIRecoversTrueDOIViaBibliographicSearchAsDrift() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let typoDOIEntry = BibliographyEntry(
+            citeKey: "lstm_wrong_doi",
+            kind: .article,
+            title: "Long Short-Term Memory",
+            authors: [
+                BibAuthor(givenName: "Sepp", familyName: "Hochreiter"),
+                BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber")
+            ],
+            year: 1997,
+            venue: "Neural Computation",
+            doi: "10.1162/neco.1997.99999"
+        )
+
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: typoDOIEntry, session: replay)
+        #expect(verdict.firewallClass == .drift)
+        #expect(verdict.insertable == false)
+        #expect(verdict.sources.contains {
+            $0.source == "doi.org" && $0.url == "https://doi.org/api/handles/10.1162/neco.1997.99999"
+        })
+        #expect(verdict.sources.contains {
+            $0.source == "Crossref" && $0.url.contains("query.bibliographic=") && $0.url.contains("rows=5")
+        })
+        let doiField = try #require(verdict.fields.first { $0.field == "doi" })
+        #expect(doiField.localValue == "10.1162/neco.1997.99999")
+        #expect(doiField.remoteValue == "10.1162/neco.1997.9.8.1735")
+        #expect(doiField.source == "Crossref")
+    }
+
+    @Test("M1 item 3 (Stage 04): real DataCite DOI missing from Crossref and OpenAlex returns UNVERIFIED with registered_no_metadata")
+    func m1Stage04DataCiteRegisteredDOIWithoutMetadataReturnsUnverifiedRegisteredNoMetadata() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        let dataCiteEntry = BibliographyEntry(
+            citeKey: "lipics_icalp_2015",
+            kind: .inproceedings,
+            title: "ICALP 2015 Frontmatter",
+            authors: [BibAuthor(givenName: "Magnús M.", familyName: "Halldórsson")],
+            year: 2015,
+            venue: "LIPIcs",
+            doi: "10.4230/LIPIcs.ICALP.2015.1"
+        )
+
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: dataCiteEntry, session: replay)
+        #expect(verdict.firewallClass == .unverified)
+        #expect(verdict.insertable == false)
+        #expect(verdict.reasons == [CitationUnverifiedReasonCode.registeredNoMetadata.rawValue])
+        #expect(verdict.sources.count == 3)
+        #expect(verdict.sources.contains {
+            $0.source == "doi.org"
+                && $0.url == "https://doi.org/api/handles/10.4230/lipics.icalp.2015.1"
+                && $0.status == 200
+        })
+    }
+
+    @Test("M1 item 1 & 3 (Stage 04): injected doi.org disconnect, timeout, 500, 429, and corrupt JSON return UNVERIFIED and never NOT_FOUND")
+    func m1Stage04InjectedDOIHandleFailuresReturnUnverifiedNeverNotFound() async throws {
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "doi_handle_fail_probe",
+            kind: .article,
+            title: "Synthetic Probe Entry for Handle Failure Modes",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 2024,
+            venue: "Journal of Probes",
+            doi: "10.1038/probe.2024.99999"
+        )
+
+        let failureModes: [(String, @Sendable (URLRequest) async throws -> RegistryHTTPResponse)] = [
+            ("transport_error", { req in
+                if req.url?.host == "doi.org" {
+                    throw URLError(.notConnectedToInternet)
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("timeout", { req in
+                if req.url?.host == "doi.org" {
+                    throw URLError(.timedOut)
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("server_error", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 500, body: Data("internal error".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("rate_limited", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 429, body: Data("slow down".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            }),
+            ("unparseable", { req in
+                if req.url?.host == "doi.org" {
+                    return RegistryHTTPResponse(statusCode: 404, body: Data("plain text 404 without handle json".utf8))
+                }
+                return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+            })
+        ]
+
+        for (expectedReason, handler) in failureModes {
+            let verdict = await firewall.verifyAgainstPublicRegistries(
+                entry: entry,
+                session: ClosureRegistrySession(handler)
+            )
+            #expect(verdict.firewallClass == .unverified, "Expected UNVERIFIED when doi.org fails with \(expectedReason), got \(verdict.firewallClass)")
+            #expect(verdict.firewallClass != .notFound)
+            #expect(verdict.insertable == false)
+            #expect(verdict.reasons == [expectedReason], "Expected [\(expectedReason)], got \(verdict.reasons)")
+            #expect(verdict.sources.contains { $0.source == "doi.org" })
+        }
+    }
+
+    @Test("M1 item 2 & 3 (Stage 04): Wakefield without built-in list, Séralini 2012, OpenAlex cross-check, and RETRACTED: title prefix")
+    func m1Stage04RetractionChecksWakefieldWithoutBuiltInListSeraliniOpenAlexCrossCheckAndRetractedPrefix() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let defaultFirewall = CitationVerificationFirewall()
+
+        let wakefield = BibliographyEntry(
+            citeKey: "retracted_wakefield",
+            kind: .article,
+            title: "Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+            authors: [
+                BibAuthor(givenName: "AJ", familyName: "Wakefield"),
+                BibAuthor(givenName: "", familyName: "others")
+            ],
+            year: 1998,
+            venue: "The Lancet",
+            doi: "10.1016/S0140-6736(97)11096-0"
+        )
+
+        // Default offline check still honors built-in list and states "built-in list, incomplete"
+        let offlineWakefield = defaultFirewall.evaluate(wakefield)
+        #expect(offlineWakefield.firewallClass == .retracted)
+        #expect(offlineWakefield.reasons == ["retracted_builtin_list"])
+        #expect(offlineWakefield.auditNote.contains(CitationAuditWording.builtInRetractionListNotice))
+
+        // With built-in retraction list disabled, Wakefield is UNVERIFIED offline, yet STILL RETRACTED online from upstream fields
+        let noBuiltInFirewall = CitationVerificationFirewall(includeBuiltInRetractedDOIs: false)
+        #expect(noBuiltInFirewall.evaluate(wakefield).firewallClass == .unverified)
+
+        let wakefieldWithoutBuiltIn = await noBuiltInFirewall.verifyAgainstPublicRegistries(entry: wakefield, session: replay)
+        #expect(wakefieldWithoutBuiltIn.firewallClass == .retracted)
+        #expect(wakefieldWithoutBuiltIn.firewallClass != .drift)
+        #expect(wakefieldWithoutBuiltIn.fields.isEmpty)
+        #expect(!wakefieldWithoutBuiltIn.auditNote.contains(CitationAuditWording.builtInRetractionListNotice))
+        #expect(wakefieldWithoutBuiltIn.reasons == ["retracted_crossref", "retracted_openalex"])
+        #expect(wakefieldWithoutBuiltIn.auditNote.contains("Crossref"))
+        #expect(wakefieldWithoutBuiltIn.auditNote.contains("updated-by"))
+        #expect(wakefieldWithoutBuiltIn.auditNote.contains("OpenAlex"))
+        #expect(wakefieldWithoutBuiltIn.auditNote.contains("is_retracted"))
+        #expect(wakefieldWithoutBuiltIn.sources.contains { $0.source == "Crossref" && $0.status == 200 })
+        #expect(wakefieldWithoutBuiltIn.sources.contains { $0.source == "OpenAlex" && $0.status == 200 })
+
+        // Default firewall online check also cross-checks OpenAlex single-work after Crossref 200 and names upstream source + field
+        let onlineWakefield = await defaultFirewall.verifyAgainstPublicRegistries(entry: wakefield, session: replay)
+        #expect(onlineWakefield.firewallClass == .retracted)
+        #expect(onlineWakefield.firewallClass != .drift)
+        #expect(onlineWakefield.fields.isEmpty)
+        #expect(!onlineWakefield.auditNote.contains(CitationAuditWording.builtInRetractionListNotice))
+        #expect(onlineWakefield.auditNote.contains("Crossref"))
+        #expect(onlineWakefield.auditNote.contains("updated-by"))
+        #expect(onlineWakefield.auditNote.contains("OpenAlex"))
+        #expect(onlineWakefield.auditNote.contains("is_retracted"))
+        #expect(onlineWakefield.sources.contains { $0.source == "Crossref" && $0.status == 200 })
+        #expect(onlineWakefield.sources.contains { $0.source == "OpenAlex" && $0.status == 200 })
+
+        // Séralini 2012 (not in built-in list; upstream Crossref title starts with "RETRACTED:") -> RETRACTED, not DRIFT
+        let seralini = BibliographyEntry(
+            citeKey: "retracted_seralini",
+            kind: .article,
+            title: "Long term toxicity of a Roundup herbicide and a Roundup-tolerant genetically modified maize",
+            authors: [
+                BibAuthor(givenName: "Gilles-Eric", familyName: "Séralini"),
+                BibAuthor(givenName: "", familyName: "others")
+            ],
+            year: 2012,
+            venue: "Food and Chemical Toxicology",
+            doi: "10.1016/j.fct.2012.08.005"
+        )
+        #expect(defaultFirewall.evaluate(seralini).firewallClass == .unverified)
+
+        let onlineSeralini = await defaultFirewall.verifyAgainstPublicRegistries(entry: seralini, session: replay)
+        #expect(onlineSeralini.firewallClass == .retracted)
+        #expect(onlineSeralini.firewallClass != .drift)
+        #expect(onlineSeralini.fields.isEmpty)
+        #expect(onlineSeralini.auditNote.contains("Crossref"))
+        #expect(onlineSeralini.auditNote.contains("OpenAlex"))
+        #expect(onlineSeralini.auditNote.contains("is_retracted"))
+        #expect(onlineSeralini.sources.contains { $0.source == "Crossref" && $0.status == 200 })
+        #expect(onlineSeralini.sources.contains { $0.source == "OpenAlex" && $0.status == 200 })
+
+        // Upstream "RETRACTED:" title prefix never produces a title mismatch discrepancy
+        let titleCheck = defaultFirewall.compareTitle(
+            localTitle: wakefield.title,
+            remoteTitle: "RETRACTED: Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+            sourceName: "Crossref"
+        )
+        #expect(titleCheck.discrepancy == nil)
+        #expect(titleCheck.reason == nil)
     }
 }

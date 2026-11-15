@@ -1268,18 +1268,21 @@ struct PluginSDKMCPAndShellTests {
         """.write(to: fakeBibURL, atomically: true, encoding: .utf8)
 
         let recDir = tempDir.appendingPathComponent("recorded-404", isDirectory: true)
-        let stub404Transport = ClosureRegistrySession { _ in
-            RegistryHTTPResponse(
-                statusCode: 404,
-                body: Data("Resource not found.".utf8),
-                headers: [
-                    "Content-Type": "text/plain",
-                    "Date": "Sun, 15 Nov 2026 11:30:00 GMT"
-                ]
+        let fixtureReplay = try RegistryReplaySession(
+            directoryURL: repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        )
+        let recordedFixtureTransport = ClosureRegistrySession { req in
+            let replayed = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(
+                statusCode: replayed.statusCode,
+                body: replayed.body,
+                headers: replayed.headers,
+                origin: .network,
+                fetchedAt: replayed.fetchedAt
             )
         }
 
-        let recordRunner = ScholarCLIRunner(registryTransport: stub404Transport)
+        let recordRunner = ScholarCLIRunner(registryTransport: recordedFixtureTransport)
         let recResult = await recordRunner.runWithExitStatus(
             arguments: ["verify-citations", fakeBibURL.path, "--registry-record", recDir.path, "--lang", "en"]
         )
@@ -1290,7 +1293,7 @@ struct PluginSDKMCPAndShellTests {
             RegistryRecordingManifest.self,
             from: Data(contentsOf: recDir.appendingPathComponent("manifest.json"))
         )
-        #expect(recordedManifest.count == 2)
+        #expect(recordedManifest.count == 4)
 
         actor SpyCounter {
             var calls = 0
@@ -1633,5 +1636,63 @@ struct PluginSDKMCPAndShellTests {
         #expect(mcpCall["isError"] as? Bool == true)
         let mcpText = ((mcpCall["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
         #expect(mcpText.contains("ERR_UNVERIFIED_CITATION"))
+    }
+
+    @Test("M1 item 1, 2 & 3 (Stage 04): CLI verify-citations replay formats doi.org NOT_FOUND, wrong-DOI DRIFT, DataCite registered_no_metadata, and Crossref+OpenAlex RETRACTED in en and zh")
+    func m1Stage04CLIVerifyCitationsLocalizationAndLookupOrderReplay() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m1-stage04-cli")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let stage04BibURL = tempDir.appendingPathComponent("stage04.bib")
+        try """
+        @article{fake_nonsentinel,
+          author  = {Whitfield, Eleanor and Patel, Raj},
+          title   = {Quantum Gradient Descent in Biological Neural Networks},
+          journal = {Nature Machine Intelligence},
+          year    = {2025},
+          doi     = {10.1038/fake.2026.99999}
+        }
+        @article{lstm_wrong_doi,
+          author  = {Hochreiter, Sepp and Schmidhuber, J{\\"u}rgen},
+          title   = {Long Short-Term Memory},
+          journal = {Neural Computation},
+          year    = {1997},
+          doi     = {10.1162/neco.1997.99999}
+        }
+        @inproceedings{lipics_icalp_2015,
+          author    = {Halld{\\'o}rsson, Magn{\\'u}s M.},
+          title     = {ICALP 2015 Frontmatter},
+          booktitle = {LIPIcs},
+          year      = {2015},
+          doi       = {10.4230/LIPIcs.ICALP.2015.1}
+        }
+        @article{retracted_wakefield,
+          author  = {Wakefield, AJ and others},
+          title   = {Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children},
+          journal = {The Lancet},
+          year    = {1998},
+          doi     = {10.1016/S0140-6736(97)11096-0}
+        }
+        """.write(to: stage04BibURL, atomically: true, encoding: .utf8)
+
+        let runner = ScholarCLIRunner()
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+
+        let zhRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage04BibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(zhRun.exitCode == 1)
+        #expect(zhRun.stdout.contains("doi.org 说这个 DOI 没有注册"))
+        #expect(zhRun.stdout.contains("DOI错误（本地：10.1162/neco.1997.99999，Crossref：10.1162/neco.1997.9.8.1735）"))
+        #expect(zhRun.stdout.contains("OpenAlex 标明该文献已撤稿（撤稿字段：is_retracted）"))
+        #expect(!zhRun.stdout.contains("内置名单，不完整"))
+
+        let enRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage04BibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(enRun.exitCode == 1)
+        #expect(enRun.stdout.contains("doi.org reported that DOI '10.1038/fake.2026.99999' is not registered"))
+        #expect(enRun.stdout.contains("10.1162/neco.1997.9.8.1735"))
+        #expect(enRun.stdout.contains("registered_no_metadata"))
     }
 }
