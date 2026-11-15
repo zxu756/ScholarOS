@@ -918,7 +918,7 @@ struct BibCSLAndFirewallTests {
             }
         }
 
-        let firewall = CitationVerificationFirewall()
+        let firewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
         let entry = BibliographyEntry(
             citeKey: "lecun2015deep",
             kind: .article,
@@ -1870,7 +1870,7 @@ struct BibCSLAndFirewallTests {
 
     @Test("M1 item 1: injected disconnect, timeout, 429, 500, and malformed 200 JSON return UNVERIFIED with corresponding reason codes")
     func m1Stage03InjectedFailuresReturnUnverifiedWithExactReasonCodes() async throws {
-        let firewall = CitationVerificationFirewall()
+        let firewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
         let entry = BibliographyEntry(
             citeKey: "lecun2015",
             kind: .article,
@@ -2117,7 +2117,7 @@ struct BibCSLAndFirewallTests {
 
     @Test("M1 item 1 & 3 (Stage 04): injected doi.org disconnect, timeout, 500, 503, handle error code 2, 429, and corrupt JSON return UNVERIFIED and never NOT_FOUND")
     func m1Stage04InjectedDOIHandleFailuresReturnUnverifiedNeverNotFound() async throws {
-        let firewall = CitationVerificationFirewall()
+        let firewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
         let entry = BibliographyEntry(
             citeKey: "doi_handle_fail_probe",
             kind: .article,
@@ -2147,7 +2147,7 @@ struct BibCSLAndFirewallTests {
                 }
                 return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
             }),
-            ("server_error", { req in
+            ("rate_limited", { req in
                 if req.url?.host == "doi.org" {
                     return RegistryHTTPResponse(statusCode: 503, body: Data("service unavailable".utf8))
                 }
@@ -2359,7 +2359,9 @@ struct BibCSLAndFirewallTests {
         let html404Session = ClosureRegistrySession { _ in
             RegistryHTTPResponse(statusCode: 404, body: Data("<html><body>404 Gateway Not Found</body></html>".utf8))
         }
-        let vHtml404 = await firewall.verifyAgainstPublicRegistries(entry: cleanArXiv, session: html404Session)
+        let vHtml404 = await CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: .immediate)
+        ).verifyAgainstPublicRegistries(entry: cleanArXiv, session: html404Session)
         #expect(vHtml404.firewallClass == .unverified)
         #expect(vHtml404.firewallClass != .notFound)
         #expect(vHtml404.reasons == [CitationUnverifiedReasonCode.unparseable.rawValue])
@@ -2546,7 +2548,7 @@ struct BibCSLAndFirewallTests {
         }
     }
 
-    @Test("M1 item 3 & 5 (Stage 05): injectable ArXivRequestPacer enforces >= 3s spacing between arXiv requests without sleeping in real wall-clock time")
+    @Test("M1 item 3, 5 & 6 (Stage 05/06): unified RegistryRateLimiter enforces >= 3s spacing between arXiv requests via injectable RegistryClock without real sleep")
     func m1Stage05ArXivInjectableRateLimiterEnforcesThreeSecondSpacingWithoutRealSleep() async throws {
         final class MockClockState: @unchecked Sendable {
             private let lock = NSLock()
@@ -2573,14 +2575,14 @@ struct BibCSLAndFirewallTests {
             }
         }
 
-        let clock = MockClockState()
-        let pacer = ArXivRequestPacer(
-            minimumIntervalSeconds: 3.0,
-            nowSeconds: { clock.currentTime() },
-            sleepSeconds: { seconds in clock.recordSleep(seconds) }
+        let clockState = MockClockState()
+        let clock = ClosureRegistryClock(
+            now: { clockState.currentTime() },
+            sleep: { seconds in clockState.recordSleep(seconds) }
         )
+        let limiter = RegistryRateLimiter(clock: clock)
         let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
-        let firewall = CitationVerificationFirewall(arXivPacer: pacer)
+        let firewall = CitationVerificationFirewall(rateLimiter: limiter)
         let entry = BibliographyEntry(
             citeKey: "vaswani2017_paced",
             kind: .misc,
@@ -2597,20 +2599,20 @@ struct BibCSLAndFirewallTests {
         // 1st arXiv call at t=100.0 -> 0s sleep
         _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
         // 2nd arXiv call 1.2s later at t=101.2 -> must sleep 1.8s (advancing mock clock to 103.0)
-        clock.advance(1.2)
+        clockState.advance(1.2)
         _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
         // 3rd arXiv call immediately at t=103.0 -> must sleep full 3.0s (advancing mock clock to 106.0)
         _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
         // 4th arXiv call 3.5s later at t=109.5 -> >=3.0s elapsed, 0s sleep
-        clock.advance(3.5)
+        clockState.advance(3.5)
         _ = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
         let wallElapsed = ProcessInfo.processInfo.systemUptime - wallStart
 
         #expect(wallElapsed < 1.0, "Unit test must never sleep real 3 seconds (took \(wallElapsed)s)")
-        #expect(clock.recordedSleeps.count == 2)
-        if clock.recordedSleeps.count == 2 {
-            #expect(abs(clock.recordedSleeps[0] - 1.8) < 0.001)
-            #expect(abs(clock.recordedSleeps[1] - 3.0) < 0.001)
+        #expect(clockState.recordedSleeps.count == 2)
+        if clockState.recordedSleeps.count == 2 {
+            #expect(abs(clockState.recordedSleeps[0] - 1.8) < 0.001)
+            #expect(abs(clockState.recordedSleeps[1] - 3.0) < 0.001)
         }
     }
 
@@ -2619,7 +2621,7 @@ struct BibCSLAndFirewallTests {
         // 8-digit PMID (e.g. 99999999) is syntactically valid so online PubMed esummary is queried
         #expect(ScholarlyIdentifierValidator.validatePMID("99999999").isValid)
 
-        let firewall = CitationVerificationFirewall()
+        let firewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
         let arxivEntry = BibliographyEntry(
             citeKey: "arxiv_fail_probe",
             kind: .misc,
@@ -2692,7 +2694,7 @@ struct BibCSLAndFirewallTests {
 
     @Test("M1 item 3 (Stage 05, synthetic search response): identifierless search with >=2 equally matching candidates returns UNVERIFIED with reason ambiguous")
     func m1Stage05SyntheticSearchResponseAmbiguousIdentifierlessCandidatesReturnUnverifiedAmbiguous() async throws {
-        let firewall = CitationVerificationFirewall()
+        let firewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
         let entry = BibliographyEntry(
             citeKey: "ambiguous_nodoi",
             kind: .article,
@@ -2760,5 +2762,455 @@ struct BibCSLAndFirewallTests {
         #expect(vOpenAlexTied.insertable == false)
         #expect(vOpenAlexTied.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
         #expect(vOpenAlexTied.sources.map(\.source) == ["Crossref", "OpenAlex"])
+    }
+
+    // MARK: - 12. M1 Stage 06 Rate Limiting, Retry, OpenAlex Budget & Injectable Clock Tests (TDD)
+
+    @Test("M1 row 14 (Stage 06): 1st & 2nd 429 (Retry-After: 2) then 3rd 200 matches replay with [2.0, 2.0] sleeps; 4 consecutive 429s stop at 4 requests with UNVERIFIED rate_limited")
+    func m1Stage06Row14RetryAfterAndFourConsecutive429sAnd5xxRetryPolicy() async throws {
+        final class RecordedClock: @unchecked Sendable {
+            private let lock = NSLock()
+            var now: TimeInterval = 50.0
+            var sleeps: [TimeInterval] = []
+
+            func current() -> TimeInterval {
+                lock.lock()
+                defer { lock.unlock() }
+                return now
+            }
+
+            func sleep(_ s: TimeInterval) {
+                lock.lock()
+                defer { lock.unlock() }
+                sleeps.append(s)
+                now += s
+            }
+
+            func reset() {
+                lock.lock()
+                defer { lock.unlock() }
+                now = 50.0
+                sleeps.removeAll()
+            }
+        }
+
+        actor AttemptCounter {
+            var total: Int = 0
+            var byHost: [String: Int] = [:]
+            func next(for host: String) -> Int {
+                total += 1
+                let n = (byHost[host] ?? 0) + 1
+                byHost[host] = n
+                return n
+            }
+        }
+
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let lecunEntry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let baselineReplayVerdict = await CitationVerificationFirewall().verifyAgainstPublicRegistries(
+            entry: lecunEntry,
+            session: replay
+        )
+        #expect(baselineReplayVerdict.firewallClass == .verified)
+
+        // 1. Row 14a: 1st & 2nd attempt 429 (Retry-After: 2), 3rd attempt 200 from replay -> verdict matches replay, sleeps == [2.0, 2.0]
+        let clockStateA = RecordedClock()
+        let limiterA = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { clockStateA.current() }, sleep: { clockStateA.sleep($0) })
+        )
+        let counterA = AttemptCounter()
+        let retryThen200Session = ClosureRegistrySession { req in
+            let host = req.url?.host ?? ""
+            let attempt = await counterA.next(for: host)
+            if host == "api.crossref.org" && attempt <= 2 {
+                return RegistryHTTPResponse(
+                    statusCode: 429,
+                    body: Data("Too Many Requests".utf8),
+                    headers: ["Retry-After": "2"]
+                )
+            }
+            return try await replay.send(req)
+        }
+        let wallStart = ProcessInfo.processInfo.systemUptime
+        let retriedVerdict = await CitationVerificationFirewall(rateLimiter: limiterA).verifyAgainstPublicRegistries(
+            entry: lecunEntry,
+            session: retryThen200Session
+        )
+        let wallElapsed = ProcessInfo.processInfo.systemUptime - wallStart
+        #expect(wallElapsed < 1.0, "Retry test must use injected clock without real sleep")
+        #expect(retriedVerdict.firewallClass == baselineReplayVerdict.firewallClass)
+        #expect(retriedVerdict.insertable == baselineReplayVerdict.insertable)
+        #expect(retriedVerdict.reasons == baselineReplayVerdict.reasons)
+        #expect(retriedVerdict.fields == baselineReplayVerdict.fields)
+        #expect(await counterA.byHost["api.crossref.org"] == 3)
+        #expect(clockStateA.sleeps == [2.0, 2.0])
+
+        // 2. Row 14b: 4 consecutive 429s -> UNVERIFIED, reason rate_limited, total requests sent == 4 (without Retry-After -> [1, 2, 4] exponential backoff)
+        let pmidEntry = BibliographyEntry(
+            citeKey: "pmid_real_ito2015",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [
+                BibAuthor(givenName: "Hiroshi T.", familyName: "Ito"),
+                BibAuthor(givenName: "Sheng-Jia", familyName: "Zhang"),
+                BibAuthor(givenName: "Menno P.", familyName: "Witter"),
+                BibAuthor(givenName: "Edvard I.", familyName: "Moser"),
+                BibAuthor(givenName: "May-Britt", familyName: "Moser")
+            ],
+            year: 2015,
+            venue: "Nature",
+            pmid: "26017312"
+        )
+        let clockStateB = RecordedClock()
+        let limiterB = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { clockStateB.current() }, sleep: { clockStateB.sleep($0) })
+        )
+        let counterB = AttemptCounter()
+        let four429Session = ClosureRegistrySession { req in
+            let n = await counterB.next(for: req.url?.host ?? "")
+            if n <= 4 {
+                return RegistryHTTPResponse(statusCode: 429, body: Data("rate limited".utf8))
+            }
+            // Even if a 5th request would return 200, max 3 retries (4 attempts) must stop at 4!
+            return try await replay.send(req)
+        }
+        let exhausted429 = await CitationVerificationFirewall(rateLimiter: limiterB).verifyAgainstPublicRegistries(
+            entry: pmidEntry,
+            session: four429Session
+        )
+        #expect(exhausted429.firewallClass == .unverified)
+        #expect(exhausted429.insertable == false)
+        #expect(exhausted429.reasons == [CitationUnverifiedReasonCode.rateLimited.rawValue])
+        #expect(await counterB.total == 4)
+        #expect(clockStateB.sleeps == [1.0, 2.0, 4.0])
+
+        // 3. 503 with Retry-After > 60s caps Retry-After at 60s and after 4 attempts returns UNVERIFIED + rate_limited
+        let clockState503 = RecordedClock()
+        let limiter503 = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { clockState503.current() }, sleep: { clockState503.sleep($0) })
+        )
+        let counter503 = AttemptCounter()
+        let four503Session = ClosureRegistrySession { req in
+            _ = await counter503.next(for: req.url?.host ?? "")
+            return RegistryHTTPResponse(
+                statusCode: 503,
+                body: Data("service unavailable".utf8),
+                headers: ["Retry-After": "180"]
+            )
+        }
+        let exhausted503 = await CitationVerificationFirewall(rateLimiter: limiter503).verifyAgainstPublicRegistries(
+            entry: pmidEntry,
+            session: four503Session
+        )
+        #expect(exhausted503.firewallClass == .unverified)
+        #expect(exhausted503.reasons == [CitationUnverifiedReasonCode.rateLimited.rawValue])
+        #expect(await counter503.total == 4)
+        #expect(clockState503.sleeps == [60.0, 60.0, 60.0])
+
+        // 4. Other 5xx (e.g. 500 / 502) retries exactly 1 time (2 total attempts):
+        //    - persistent 500 -> 2 total requests, UNVERIFIED, server_error
+        //    - transient 502 then 200 -> 2 total requests, VERIFIED
+        let counter500 = AttemptCounter()
+        let persistent500Verdict = await CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: .immediate)
+        ).verifyAgainstPublicRegistries(
+            entry: pmidEntry,
+            session: ClosureRegistrySession { req in
+                _ = await counter500.next(for: req.url?.host ?? "")
+                return RegistryHTTPResponse(statusCode: 500, body: Data("internal error".utf8))
+            }
+        )
+        #expect(persistent500Verdict.firewallClass == .unverified)
+        #expect(persistent500Verdict.reasons == [CitationUnverifiedReasonCode.serverError.rawValue])
+        #expect(await counter500.total == 2)
+
+        let counter502 = AttemptCounter()
+        let recovered502Verdict = await CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: .immediate)
+        ).verifyAgainstPublicRegistries(
+            entry: pmidEntry,
+            session: ClosureRegistrySession { req in
+                let n = await counter502.next(for: req.url?.host ?? "")
+                if n == 1 {
+                    return RegistryHTTPResponse(statusCode: 502, body: Data("bad gateway".utf8))
+                }
+                return try await replay.send(req)
+            }
+        )
+        #expect(recovered502Verdict.firewallClass == .verified)
+        #expect(await counter502.total == 2)
+    }
+
+    @Test("M1 item 6 (Stage 06): OpenAlex x-ratelimit-remaining < 10 halts subsequent OpenAlex searches in the run with UNVERIFIED budget_exhausted")
+    func m1Stage06OpenAlexRemainingBelowTenSkipsSearchAndReturnsBudgetExhausted() async throws {
+        actor RequestLog {
+            var openAlexSearchCount: Int = 0
+            var openAlexSingleWorkCount: Int = 0
+            var crossrefSearchCount: Int = 0
+
+            func record(_ url: URL?) {
+                guard let url, let host = url.host else { return }
+                if host == "api.openalex.org" {
+                    if (url.query ?? "").contains("search=") {
+                        openAlexSearchCount += 1
+                    } else {
+                        openAlexSingleWorkCount += 1
+                    }
+                } else if host == "api.crossref.org" && (url.query ?? "").contains("query.bibliographic=") {
+                    crossrefSearchCount += 1
+                }
+            }
+        }
+
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let sharedRunLimiter = RegistryRateLimiter(clock: .immediate)
+        let firewall = CitationVerificationFirewall(rateLimiter: sharedRunLimiter)
+        let log = RequestLog()
+
+        let session = ClosureRegistrySession { req in
+            await log.record(req.url)
+            let base = try await replay.send(req)
+            // Simulate Entry 1's OpenAlex single-work response reporting x-ratelimit-remaining: 9 (< 10)
+            if req.url?.host == "api.openalex.org" {
+                var updatedHeaders = base.headers
+                updatedHeaders["x-ratelimit-remaining"] = "9"
+                return RegistryHTTPResponse(
+                    statusCode: base.statusCode,
+                    body: base.body,
+                    headers: updatedHeaders,
+                    origin: base.origin,
+                    fetchedAt: base.fetchedAt
+                )
+            }
+            return base
+        }
+
+        // Entry 1: DOI lookup succeeds, OpenAlex cross-check returns 200 with x-ratelimit-remaining: 9
+        let doiEntry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let v1 = await firewall.verifyAgainstPublicRegistries(entry: doiEntry, session: session)
+        #expect(v1.firewallClass == .verified)
+        #expect(await log.openAlexSingleWorkCount == 1)
+        #expect(await log.openAlexSearchCount == 0)
+
+        // Entry 2: Identifierless entry where Crossref search finds 0 matches -> needs OpenAlex search,
+        // which MUST NOT be sent because x-ratelimit-remaining < 10 in this run!
+        let nodoiEntry = BibliographyEntry(
+            citeKey: "draft2024unverified",
+            kind: .misc,
+            title: "Unpublished Workshop Notes on Attention Kernels",
+            authors: [BibAuthor(givenName: "Pat", familyName: "Taylor")],
+            year: 2024
+        )
+        let v2 = await firewall.verifyAgainstPublicRegistries(entry: nodoiEntry, session: session)
+        #expect(v2.firewallClass == .unverified)
+        #expect(v2.insertable == false)
+        #expect(v2.reasons == [CitationUnverifiedReasonCode.budgetExhausted.rawValue])
+        #expect(await log.crossrefSearchCount == 1)
+        #expect(await log.openAlexSearchCount == 0, "OpenAlex search must not be sent once x-ratelimit-remaining < 10")
+
+        // Also verify direct OpenAlex 429 with x-ratelimit-remaining: 0 returns budget_exhausted immediately without retrying
+        let directLog = RequestLog()
+        let directBudgetFirewall = CitationVerificationFirewall(rateLimiter: RegistryRateLimiter(clock: .immediate))
+        let directSession = ClosureRegistrySession { req in
+            await directLog.record(req.url)
+            if req.url?.host == "api.crossref.org" {
+                return RegistryHTTPResponse(statusCode: 200, body: Data("{\"status\":\"ok\",\"message\":{\"items\":[]}}".utf8))
+            }
+            return RegistryHTTPResponse(
+                statusCode: 429,
+                body: Data("daily credit limit exceeded".utf8),
+                headers: ["x-ratelimit-remaining": "0"]
+            )
+        }
+        let vDirect = await directBudgetFirewall.verifyAgainstPublicRegistries(entry: nodoiEntry, session: directSession)
+        #expect(vDirect.firewallClass == .unverified)
+        #expect(vDirect.reasons == [CitationUnverifiedReasonCode.budgetExhausted.rawValue])
+        #expect(await directLog.openAlexSearchCount == 1)
+    }
+
+    @Test("M1 item 6 (Stage 06): Crossref in-flight concurrency never exceeds 1, respects default 5/s & 1/s and dynamic rate-limit headers, and PubMed paces at 3/s")
+    func m1Stage06CrossrefSingleInFlightDynamicHeadersAndPubMedThreePerSecondPacing() async throws {
+        final class VirtualClock: @unchecked Sendable {
+            private let lock = NSLock()
+            var now: TimeInterval = 10.0
+            var sleeps: [TimeInterval] = []
+
+            func current() -> TimeInterval {
+                lock.lock()
+                defer { lock.unlock() }
+                return now
+            }
+
+            func sleep(_ seconds: TimeInterval) {
+                lock.lock()
+                defer { lock.unlock() }
+                sleeps.append(seconds)
+                now += seconds
+            }
+        }
+
+        actor ConcurrencyProbe {
+            var currentCrossrefInFlight: Int = 0
+            var maxCrossrefInFlight: Int = 0
+            var completedCrossrefRequests: Int = 0
+
+            func enterCrossref() {
+                currentCrossrefInFlight += 1
+                if currentCrossrefInFlight > maxCrossrefInFlight {
+                    maxCrossrefInFlight = currentCrossrefInFlight
+                }
+            }
+
+            func leaveCrossref() {
+                currentCrossrefInFlight -= 1
+                completedCrossrefRequests += 1
+            }
+        }
+
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        // 1. Crossref concurrency: 6 concurrent tasks -> max in-flight on api.crossref.org is strictly 1
+        let probe = ConcurrencyProbe()
+        let concurrentClock = VirtualClock()
+        let concurrentLimiter = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { concurrentClock.current() }, sleep: { concurrentClock.sleep($0) })
+        )
+        let concurrentFirewall = CitationVerificationFirewall(rateLimiter: concurrentLimiter)
+        let concurrentSession = ClosureRegistrySession { req in
+            let isCrossref = (req.url?.host == "api.crossref.org")
+            if isCrossref {
+                await probe.enterCrossref()
+            }
+            // Yield across suspension points so any overlapping Crossref request would be caught
+            await Task.yield()
+            await Task.yield()
+            let resp = try await replay.send(req)
+            if isCrossref {
+                await probe.leaveCrossref()
+            }
+            return resp
+        }
+
+        let lecunEntry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+
+        await withTaskGroup(of: CitationFirewallEntryVerdict.self) { group in
+            for _ in 0..<6 {
+                group.addTask {
+                    await concurrentFirewall.verifyAgainstPublicRegistries(entry: lecunEntry, session: concurrentSession)
+                }
+            }
+            for await verdict in group {
+                #expect(verdict.firewallClass == .verified)
+            }
+        }
+        #expect(await probe.completedCrossrefRequests == 6)
+        #expect(await probe.maxCrossrefInFlight == 1)
+        #expect(await concurrentLimiter.maxObservedCrossrefInFlight == 1)
+
+        // 2. Crossref default intervals (0.2s single-work, 1.0s search when headers absent) + dynamic header update (2 per 1s -> 0.5s)
+        let headerClock = VirtualClock()
+        let headerLimiter = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { headerClock.current() }, sleep: { headerClock.sleep($0) })
+        )
+        let singleURL = try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539"))
+        let searchURL = try #require(RegistryURLBuilder.crossrefBibliographicSearchURL(query: "Deep learning LeCun 2015", rows: 5))
+
+        // Call 1 (single, no rate headers) -> 0s sleep
+        _ = try await headerLimiter.send(
+            URLRequest(url: singleURL),
+            source: "Crossref",
+            using: ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 200, body: Data("{}".utf8)) }
+        )
+        // Call 2 (single, uses default 5/s = 0.2s, returns headers x-rate-limit-limit: 2, x-rate-limit-interval: 1s -> next interval 0.5s)
+        _ = try await headerLimiter.send(
+            URLRequest(url: singleURL),
+            source: "Crossref",
+            using: ClosureRegistrySession { _ in
+                RegistryHTTPResponse(
+                    statusCode: 200,
+                    body: Data("{}".utf8),
+                    headers: ["x-rate-limit-limit": "2", "x-rate-limit-interval": "1s"]
+                )
+            }
+        )
+        // Call 3 (single, uses updated 0.5s interval)
+        _ = try await headerLimiter.send(
+            URLRequest(url: singleURL),
+            source: "Crossref",
+            using: ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 200, body: Data("{}".utf8)) }
+        )
+        // Call 4 (search, no search headers yet -> default 1.0s interval)
+        _ = try await headerLimiter.send(
+            URLRequest(url: searchURL),
+            source: "Crossref",
+            using: ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 200, body: Data("{}".utf8)) }
+        )
+        // Call 5 (search again -> default 1.0s interval)
+        _ = try await headerLimiter.send(
+            URLRequest(url: searchURL),
+            source: "Crossref",
+            using: ClosureRegistrySession { _ in RegistryHTTPResponse(statusCode: 200, body: Data("{}".utf8)) }
+        )
+        #expect(headerClock.sleeps.count == 4)
+        if headerClock.sleeps.count == 4 {
+            #expect(abs(headerClock.sleeps[0] - 0.2) < 0.001)
+            #expect(abs(headerClock.sleeps[1] - 0.5) < 0.001)
+            #expect(abs(headerClock.sleeps[2] - 1.0) < 0.001)
+            #expect(abs(headerClock.sleeps[3] - 1.0) < 0.001)
+        }
+
+        // 3. PubMed pacing: max 3 req/s (1/3 s between consecutive requests)
+        let pubmedClock = VirtualClock()
+        let pubmedLimiter = RegistryRateLimiter(
+            clock: ClosureRegistryClock(now: { pubmedClock.current() }, sleep: { pubmedClock.sleep($0) })
+        )
+        let pubmedURL = try #require(RegistryURLBuilder.pubMedSummaryURL(pmid: "26017312"))
+        for _ in 0..<3 {
+            _ = try await pubmedLimiter.send(
+                URLRequest(url: pubmedURL),
+                source: "PubMed",
+                using: replay
+            )
+        }
+        #expect(pubmedClock.sleeps.count == 2)
+        for s in pubmedClock.sleeps {
+            #expect(abs(s - (1.0 / 3.0)) < 0.001)
+        }
     }
 }

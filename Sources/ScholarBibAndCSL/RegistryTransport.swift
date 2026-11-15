@@ -113,6 +113,620 @@ public struct ClosureRegistrySession: CitationRegistrySession, Sendable {
     }
 }
 
+// MARK: - Injectable Clock, Telemetry & Unified Registry Rate Limiter / Retry Coordinator (M1 Item 6 & 8)
+
+public protocol RegistryClock: Sendable {
+    func now() -> TimeInterval
+    func sleep(_ seconds: TimeInterval) async throws
+}
+
+public struct SystemRegistryClock: RegistryClock, Sendable {
+    public init() {}
+
+    public func now() -> TimeInterval {
+        ProcessInfo.processInfo.systemUptime
+    }
+
+    public func sleep(_ seconds: TimeInterval) async throws {
+        guard seconds > 0 else { return }
+        let nanos = UInt64((seconds * 1_000_000_000).rounded(.up))
+        try await Task.sleep(nanoseconds: nanos)
+    }
+}
+
+public struct ClosureRegistryClock: RegistryClock, Sendable {
+    private let nowHandler: @Sendable () -> TimeInterval
+    private let sleepHandler: @Sendable (TimeInterval) async throws -> Void
+
+    public init(
+        now: @escaping @Sendable () -> TimeInterval,
+        sleep: @escaping @Sendable (TimeInterval) async throws -> Void
+    ) {
+        self.nowHandler = now
+        self.sleepHandler = sleep
+    }
+
+    public func now() -> TimeInterval {
+        nowHandler()
+    }
+
+    public func sleep(_ seconds: TimeInterval) async throws {
+        guard seconds > 0 else { return }
+        try await sleepHandler(seconds)
+    }
+}
+
+private final class InstantVirtualClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: TimeInterval = 0.0
+
+    func now() -> TimeInterval {
+        lock.lock()
+        defer { lock.unlock() }
+        return current
+    }
+
+    func advance(_ seconds: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        if seconds > 0 {
+            current += seconds
+        }
+    }
+}
+
+extension RegistryClock where Self == ClosureRegistryClock {
+    /// Non-sleeping virtual clock advancing instantaneously on `sleep(_:)`, for replay and unit tests.
+    public static var immediate: ClosureRegistryClock {
+        let state = InstantVirtualClock()
+        return ClosureRegistryClock(
+            now: { state.now() },
+            sleep: { state.advance($0) }
+        )
+    }
+}
+
+public struct RegistryBudgetExhaustedError: Error, LocalizedError, Sendable, Equatable {
+    public let remainingCredits: Double?
+    public let url: URL?
+
+    public var reasonCode: String { "budget_exhausted" }
+
+    public init(remainingCredits: Double?, url: URL? = nil) {
+        self.remainingCredits = remainingCredits
+        self.url = url
+    }
+
+    public var errorDescription: String? {
+        if let remainingCredits {
+            return "OpenAlex search skipped because x-ratelimit-remaining (\(remainingCredits)) is below 10."
+        }
+        return "OpenAlex search skipped because x-ratelimit-remaining is below 10."
+    }
+}
+
+public struct RegistryRequestTelemetryEvent: Sendable, Equatable {
+    public let source: String
+    public let url: String
+    public let statusCode: Int?
+    public let errorDescription: String?
+    public let elapsedSeconds: TimeInterval
+    public let origin: CitationVerdictSourceOrigin
+
+    public init(
+        source: String,
+        url: String,
+        statusCode: Int?,
+        errorDescription: String? = nil,
+        elapsedSeconds: TimeInterval,
+        origin: CitationVerdictSourceOrigin
+    ) {
+        self.source = source
+        self.url = url
+        self.statusCode = statusCode
+        self.errorDescription = errorDescription
+        self.elapsedSeconds = elapsedSeconds
+        self.origin = origin
+    }
+}
+
+public typealias RegistryRequestObserver = @Sendable (RegistryRequestTelemetryEvent) -> Void
+
+/// Unified per-host rate limiter, retry coordinator, and OpenAlex search budget guard (M1 item 6).
+/// - Crossref (`api.crossref.org`): at most 1 request in flight; spacing governed by
+///   `x-rate-limit-limit` / `x-rate-limit-interval` headers, defaulting to 5 req/s (0.2s) for single-work
+///   lookups and 1 req/s (1.0s) for search requests when headers are absent.
+/// - arXiv (`export.arxiv.org`): at least 3.0s between requests.
+/// - PubMed (`eutils.ncbi.nlm.nih.gov`): at most 3 req/s (1/3 s between requests).
+/// - HTTP 429 and 503: honors `Retry-After` (capped at 60s) or exponential backoff (1, 2, 4s), up to 3 retries.
+/// - Other HTTP 5xx: retries 1 time.
+/// - OpenAlex (`api.openalex.org`): once any response reports `x-ratelimit-remaining < 10`, blocks all
+///   subsequent OpenAlex search requests in this limiter's run with `RegistryBudgetExhaustedError`.
+public actor RegistryRateLimiter {
+    public static let shared = RegistryRateLimiter()
+
+    public static let defaultCrossrefSingleIntervalSeconds: TimeInterval = 0.2
+    public static let defaultCrossrefSearchIntervalSeconds: TimeInterval = 1.0
+    public static let defaultArXivIntervalSeconds: TimeInterval = 3.0
+    public static let defaultPubMedIntervalSeconds: TimeInterval = 1.0 / 3.0
+    public static let maxRetryAfterSeconds: TimeInterval = 60.0
+    public static let exponentialBackoffSeconds: [TimeInterval] = [1.0, 2.0, 4.0]
+    public static let openAlexMinimumSearchCredits: Double = 10.0
+
+    private let clock: any RegistryClock
+
+    // Crossref single-in-flight gate & dynamic intervals
+    private var isCrossrefGateHeld: Bool = false
+    private var crossrefWaiters: [CheckedContinuation<Void, Never>] = []
+    private var currentCrossrefInFlight: Int = 0
+    public private(set) var maxObservedCrossrefInFlight: Int = 0
+    private var crossrefSingleIntervalSeconds: TimeInterval = RegistryRateLimiter.defaultCrossrefSingleIntervalSeconds
+    private var crossrefSearchIntervalSeconds: TimeInterval = RegistryRateLimiter.defaultCrossrefSearchIntervalSeconds
+    private var lastCrossrefAnyTimestamp: TimeInterval?
+    private var lastCrossrefSearchTimestamp: TimeInterval?
+
+    // arXiv serial gate & 3s spacing
+    private var isArXivGateHeld: Bool = false
+    private var arXivWaiters: [CheckedContinuation<Void, Never>] = []
+    private var lastArXivTimestamp: TimeInterval?
+
+    // PubMed serial gate & 3/s spacing
+    private var isPubMedGateHeld: Bool = false
+    private var pubMedWaiters: [CheckedContinuation<Void, Never>] = []
+    private var lastPubMedTimestamp: TimeInterval?
+
+    // OpenAlex search budget state
+    public private(set) var openAlexSearchBudgetExhausted: Bool = false
+    public private(set) var lastOpenAlexRemainingCredits: Double?
+
+    public init(clock: any RegistryClock = SystemRegistryClock()) {
+        self.clock = clock
+    }
+
+    public func send(
+        _ request: URLRequest,
+        source: String,
+        using session: any CitationRegistrySession,
+        observer: RegistryRequestObserver? = nil
+    ) async throws -> RegistryHTTPResponse {
+        let host = request.url?.host?.lowercased() ?? ""
+
+        if Self.isOpenAlexSearchRequest(request, host: host), openAlexSearchBudgetExhausted {
+            throw RegistryBudgetExhaustedError(
+                remainingCredits: lastOpenAlexRemainingCredits,
+                url: request.url
+            )
+        }
+
+        switch host {
+        case "api.crossref.org":
+            await acquireCrossrefGate()
+            defer { releaseCrossrefGate() }
+            return try await executeWithRetries(
+                request: request,
+                host: host,
+                source: source,
+                using: session,
+                observer: observer
+            )
+        case "export.arxiv.org":
+            await acquireArXivGate()
+            defer { releaseArXivGate() }
+            return try await executeWithRetries(
+                request: request,
+                host: host,
+                source: source,
+                using: session,
+                observer: observer
+            )
+        case "eutils.ncbi.nlm.nih.gov":
+            await acquirePubMedGate()
+            defer { releasePubMedGate() }
+            return try await executeWithRetries(
+                request: request,
+                host: host,
+                source: source,
+                using: session,
+                observer: observer
+            )
+        default:
+            return try await executeWithRetries(
+                request: request,
+                host: host,
+                source: source,
+                using: session,
+                observer: observer
+            )
+        }
+    }
+
+    private func executeWithRetries(
+        request: URLRequest,
+        host: String,
+        source: String,
+        using session: any CitationRegistrySession,
+        observer: RegistryRequestObserver?
+    ) async throws -> RegistryHTTPResponse {
+        var attemptIndex = 0
+
+        while true {
+            if Self.isOpenAlexSearchRequest(request, host: host), openAlexSearchBudgetExhausted {
+                throw RegistryBudgetExhaustedError(
+                    remainingCredits: lastOpenAlexRemainingCredits,
+                    url: request.url
+                )
+            }
+
+            if attemptIndex == 0 {
+                try await waitHostSpacingBeforeInitialAttempt(request: request, host: host)
+            }
+
+            let isCrossref = (host == "api.crossref.org")
+            let isCrossrefSearch = isCrossref && Self.isCrossrefSearchRequest(request)
+            if isCrossref {
+                currentCrossrefInFlight += 1
+                if currentCrossrefInFlight > maxObservedCrossrefInFlight {
+                    maxObservedCrossrefInFlight = currentCrossrefInFlight
+                }
+            }
+
+            let clockStart = clock.now()
+            let wallStart = ProcessInfo.processInfo.systemUptime
+            recordHostStartTimestamp(host: host, isCrossrefSearch: isCrossrefSearch, timestamp: clockStart)
+
+            let response: RegistryHTTPResponse
+            do {
+                response = try await session.send(request)
+            } catch {
+                let clockEnd = max(clockStart, clock.now())
+                let wallElapsed = max(0, ProcessInfo.processInfo.systemUptime - wallStart)
+                if isCrossref {
+                    currentCrossrefInFlight -= 1
+                }
+                recordHostCompletionTimestamp(host: host, isCrossrefSearch: isCrossrefSearch, timestamp: clockEnd)
+
+                if !(error is CancellationError) && !(error is any FatalRegistrySessionError) {
+                    let fallbackOrigin: CitationVerdictSourceOrigin = (session is RegistryReplaySession) ? .replay : .network
+                    observer?(
+                        RegistryRequestTelemetryEvent(
+                            source: source,
+                            url: request.url?.absoluteString ?? "<nil>",
+                            statusCode: nil,
+                            errorDescription: error.localizedDescription,
+                            elapsedSeconds: wallElapsed,
+                            origin: fallbackOrigin
+                        )
+                    )
+                }
+                throw error
+            }
+
+            let clockEnd = max(clockStart, clock.now())
+            let wallElapsed = max(0, ProcessInfo.processInfo.systemUptime - wallStart)
+            if isCrossref {
+                currentCrossrefInFlight -= 1
+            }
+            recordHostCompletionTimestamp(host: host, isCrossrefSearch: isCrossrefSearch, timestamp: clockEnd)
+
+            if isCrossref {
+                updateCrossrefIntervals(from: response, isSearch: isCrossrefSearch)
+            }
+            if host == "api.openalex.org" {
+                updateOpenAlexBudget(from: response)
+            }
+
+            observer?(
+                RegistryRequestTelemetryEvent(
+                    source: source,
+                    url: request.url?.absoluteString ?? "<nil>",
+                    statusCode: response.statusCode,
+                    errorDescription: nil,
+                    elapsedSeconds: wallElapsed,
+                    origin: response.origin
+                )
+            )
+
+            // OpenAlex exhausted budget on a failed response -> stop immediately without retrying.
+            if host == "api.openalex.org",
+               let remaining = Self.parseOpenAlexRemainingHeader(from: response),
+               remaining < Self.openAlexMinimumSearchCredits,
+               response.statusCode != 200,
+               response.statusCode != 404 {
+                return response
+            }
+
+            let status = response.statusCode
+            if status == 429 || status == 503 {
+                if attemptIndex < 3 {
+                    let waitSeconds = Self.retryWaitSeconds(for: response, attemptIndex: attemptIndex)
+                    try await clock.sleep(waitSeconds)
+                    let afterSleep = clock.now()
+                    recordHostCompletionTimestamp(
+                        host: host,
+                        isCrossrefSearch: isCrossrefSearch,
+                        timestamp: max(clockEnd, afterSleep)
+                    )
+                    attemptIndex += 1
+                    continue
+                }
+                return response
+            }
+
+            if (500...599).contains(status) {
+                if attemptIndex < 1 {
+                    let waitSeconds = Self.parseRetryAfterSeconds(from: response) ?? 1.0
+                    try await clock.sleep(waitSeconds)
+                    let afterSleep = clock.now()
+                    recordHostCompletionTimestamp(
+                        host: host,
+                        isCrossrefSearch: isCrossrefSearch,
+                        timestamp: max(clockEnd, afterSleep)
+                    )
+                    attemptIndex += 1
+                    continue
+                }
+                return response
+            }
+
+            return response
+        }
+    }
+
+    private func waitHostSpacingBeforeInitialAttempt(request: URLRequest, host: String) async throws {
+        let now = clock.now()
+        switch host {
+        case "api.crossref.org":
+            let isSearch = Self.isCrossrefSearchRequest(request)
+            var requiredSleep: TimeInterval = 0
+            let poolInterval = isSearch ? crossrefSearchIntervalSeconds : crossrefSingleIntervalSeconds
+            if let lastAny = lastCrossrefAnyTimestamp {
+                requiredSleep = max(requiredSleep, poolInterval - (now - lastAny))
+            }
+            if isSearch, let lastSearch = lastCrossrefSearchTimestamp {
+                requiredSleep = max(requiredSleep, crossrefSearchIntervalSeconds - (now - lastSearch))
+            }
+            if requiredSleep > 0 {
+                try await clock.sleep(requiredSleep)
+            }
+        case "export.arxiv.org":
+            if let last = lastArXivTimestamp {
+                let remaining = Self.defaultArXivIntervalSeconds - (now - last)
+                if remaining > 0 {
+                    try await clock.sleep(remaining)
+                }
+            }
+        case "eutils.ncbi.nlm.nih.gov":
+            if let last = lastPubMedTimestamp {
+                let remaining = Self.defaultPubMedIntervalSeconds - (now - last)
+                if remaining > 0 {
+                    try await clock.sleep(remaining)
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    private func recordHostStartTimestamp(host: String, isCrossrefSearch: Bool, timestamp: TimeInterval) {
+        switch host {
+        case "api.crossref.org":
+            lastCrossrefAnyTimestamp = timestamp
+            if isCrossrefSearch {
+                lastCrossrefSearchTimestamp = timestamp
+            }
+        case "export.arxiv.org":
+            lastArXivTimestamp = timestamp
+        case "eutils.ncbi.nlm.nih.gov":
+            lastPubMedTimestamp = timestamp
+        default:
+            break
+        }
+    }
+
+    private func recordHostCompletionTimestamp(host: String, isCrossrefSearch: Bool, timestamp: TimeInterval) {
+        switch host {
+        case "api.crossref.org":
+            if let prev = lastCrossrefAnyTimestamp {
+                lastCrossrefAnyTimestamp = max(prev, timestamp)
+            } else {
+                lastCrossrefAnyTimestamp = timestamp
+            }
+            if isCrossrefSearch {
+                if let prevSearch = lastCrossrefSearchTimestamp {
+                    lastCrossrefSearchTimestamp = max(prevSearch, timestamp)
+                } else {
+                    lastCrossrefSearchTimestamp = timestamp
+                }
+            }
+        case "export.arxiv.org":
+            if let prev = lastArXivTimestamp {
+                lastArXivTimestamp = max(prev, timestamp)
+            } else {
+                lastArXivTimestamp = timestamp
+            }
+        case "eutils.ncbi.nlm.nih.gov":
+            if let prev = lastPubMedTimestamp {
+                lastPubMedTimestamp = max(prev, timestamp)
+            } else {
+                lastPubMedTimestamp = timestamp
+            }
+        default:
+            break
+        }
+    }
+
+    private func updateCrossrefIntervals(from response: RegistryHTTPResponse, isSearch: Bool) {
+        guard let rawLimit = response.headerValue(for: "x-rate-limit-limit")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let limit = Double(rawLimit),
+              limit > 0,
+              let rawInterval = response.headerValue(for: "x-rate-limit-interval"),
+              let intervalSeconds = Self.parseRateLimitIntervalSeconds(rawInterval),
+              intervalSeconds > 0 else {
+            return
+        }
+        let spacing = intervalSeconds / limit
+        if isSearch {
+            crossrefSearchIntervalSeconds = spacing
+        } else {
+            crossrefSingleIntervalSeconds = spacing
+        }
+    }
+
+    private func updateOpenAlexBudget(from response: RegistryHTTPResponse) {
+        guard let remaining = Self.parseOpenAlexRemainingHeader(from: response) else {
+            return
+        }
+        lastOpenAlexRemainingCredits = remaining
+        if remaining < Self.openAlexMinimumSearchCredits {
+            openAlexSearchBudgetExhausted = true
+        }
+    }
+
+    // MARK: - Host Gate Helpers
+
+    private func acquireCrossrefGate() async {
+        if !isCrossrefGateHeld {
+            isCrossrefGateHeld = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            crossrefWaiters.append(continuation)
+        }
+    }
+
+    private func releaseCrossrefGate() {
+        if !crossrefWaiters.isEmpty {
+            let next = crossrefWaiters.removeFirst()
+            next.resume()
+        } else {
+            isCrossrefGateHeld = false
+        }
+    }
+
+    private func acquireArXivGate() async {
+        if !isArXivGateHeld {
+            isArXivGateHeld = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            arXivWaiters.append(continuation)
+        }
+    }
+
+    private func releaseArXivGate() {
+        if !arXivWaiters.isEmpty {
+            let next = arXivWaiters.removeFirst()
+            next.resume()
+        } else {
+            isArXivGateHeld = false
+        }
+    }
+
+    private func acquirePubMedGate() async {
+        if !isPubMedGateHeld {
+            isPubMedGateHeld = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            pubMedWaiters.append(continuation)
+        }
+    }
+
+    private func releasePubMedGate() {
+        if !pubMedWaiters.isEmpty {
+            let next = pubMedWaiters.removeFirst()
+            next.resume()
+        } else {
+            isPubMedGateHeld = false
+        }
+    }
+
+    // MARK: - Header & URL Classification Helpers
+
+    public static func isCrossrefSearchRequest(_ request: URLRequest) -> Bool {
+        guard let url = request.url else { return false }
+        if let query = url.query, !query.isEmpty {
+            return true
+        }
+        let path = url.path
+        return path == "/works" || path == "/works/"
+    }
+
+    public static func isOpenAlexSearchRequest(_ request: URLRequest, host: String? = nil) -> Bool {
+        let resolvedHost = (host ?? request.url?.host?.lowercased()) ?? ""
+        guard resolvedHost == "api.openalex.org", let query = request.url?.query?.lowercased() else {
+            return false
+        }
+        return query.contains("search=") || query.contains("search%3d")
+    }
+
+    public static func parseOpenAlexRemainingHeader(from response: RegistryHTTPResponse) -> Double? {
+        guard let raw = response.headerValue(for: "x-ratelimit-remaining")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let val = Double(raw),
+              val.isFinite else {
+            return nil
+        }
+        return val
+    }
+
+    public static func parseRateLimitIntervalSeconds(_ raw: String) -> TimeInterval? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.hasSuffix("ms") {
+            guard let ms = Double(trimmed.dropLast(2)), ms > 0 else { return nil }
+            return ms / 1000.0
+        }
+        if trimmed.hasSuffix("s") {
+            guard let s = Double(trimmed.dropLast(1)), s > 0 else { return nil }
+            return s
+        }
+        if trimmed.hasSuffix("m") {
+            guard let m = Double(trimmed.dropLast(1)), m > 0 else { return nil }
+            return m * 60.0
+        }
+        if trimmed.hasSuffix("h") {
+            guard let h = Double(trimmed.dropLast(1)), h > 0 else { return nil }
+            return h * 3600.0
+        }
+        guard let val = Double(trimmed), val > 0 else { return nil }
+        return val
+    }
+
+    public static func retryWaitSeconds(for response: RegistryHTTPResponse, attemptIndex: Int) -> TimeInterval {
+        if let retryAfter = parseRetryAfterSeconds(from: response) {
+            return retryAfter
+        }
+        let idx = min(max(0, attemptIndex), exponentialBackoffSeconds.count - 1)
+        return exponentialBackoffSeconds[idx]
+    }
+
+    public static func parseRetryAfterSeconds(from response: RegistryHTTPResponse) -> TimeInterval? {
+        guard let raw = response.headerValue(for: "Retry-After")?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+        if let numeric = Double(raw), numeric.isFinite {
+            return min(maxRetryAfterSeconds, max(0.0, numeric))
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let targetDate = formatter.date(from: raw) else {
+            return nil
+        }
+        let baseDate: Date = {
+            if let rawDate = response.headerValue(for: "Date")?.trimmingCharacters(in: .whitespacesAndNewlines),
+               let parsedBase = formatter.date(from: rawDate) {
+                return parsedBase
+            }
+            return Date()
+        }()
+        let delta = targetDate.timeIntervalSince(baseDate)
+        return min(maxRetryAfterSeconds, max(0.0, delta))
+    }
+}
+
 /// Ephemeral, cache-disabled HTTP transport client for public bibliographic registries.
 public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
     public typealias RawDataLoader = @Sendable (URLRequest) async throws -> (Data, URLResponse)

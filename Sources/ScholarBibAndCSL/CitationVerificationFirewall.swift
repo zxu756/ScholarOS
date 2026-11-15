@@ -41,67 +41,6 @@ public enum CitationUnverifiedReasonCode: String, Sendable, Codable, Hashable, C
     case noMatchInSearch = "no_match_in_search"
 }
 
-/// Injectable request pacer enforcing at least `minimumIntervalSeconds` (default 3.0s) between arXiv API requests.
-public actor ArXivRequestPacer {
-    public static let shared = ArXivRequestPacer()
-
-    public nonisolated let minimumIntervalSeconds: TimeInterval
-    private let nowSeconds: @Sendable () -> TimeInterval
-    private let sleepSeconds: @Sendable (TimeInterval) async throws -> Void
-    private var lastRequestTimestamp: TimeInterval?
-    private var isExecutingRequest: Bool = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    public init(
-        minimumIntervalSeconds: TimeInterval = 3.0,
-        nowSeconds: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        sleepSeconds: @escaping @Sendable (TimeInterval) async throws -> Void = { seconds in
-            guard seconds > 0 else { return }
-            let nanos = UInt64((seconds * 1_000_000_000).rounded(.up))
-            try await Task.sleep(nanoseconds: nanos)
-        }
-    ) {
-        self.minimumIntervalSeconds = max(0, minimumIntervalSeconds)
-        self.nowSeconds = nowSeconds
-        self.sleepSeconds = sleepSeconds
-    }
-
-    public func perform<T: Sendable>(_ operation: @Sendable () async throws -> T) async throws -> T {
-        await acquireSerialSlot()
-        defer { releaseSerialSlot() }
-
-        if minimumIntervalSeconds > 0, let last = lastRequestTimestamp {
-            let elapsed = nowSeconds() - last
-            let remaining = minimumIntervalSeconds - elapsed
-            if remaining > 0 {
-                try await sleepSeconds(remaining)
-            }
-        }
-        lastRequestTimestamp = nowSeconds()
-        defer { lastRequestTimestamp = nowSeconds() }
-        return try await operation()
-    }
-
-    private func acquireSerialSlot() async {
-        if !isExecutingRequest {
-            isExecutingRequest = true
-            return
-        }
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
-        }
-    }
-
-    private func releaseSerialSlot() {
-        if !waiters.isEmpty {
-            let next = waiters.removeFirst()
-            next.resume()
-        } else {
-            isExecutingRequest = false
-        }
-    }
-}
-
 /// Per-request provenance record stored in `CitationFirewallEntryVerdict.sources`.
 public struct CitationVerdictSourceRecord: Sendable, Codable, Hashable {
     public let source: String
@@ -730,7 +669,8 @@ public struct CitationVerificationFirewall: Sendable {
     public let sentinelDOIs: Set<String>
     public let maxAllowedPublicationYear: Int
     public let minAllowedPublicationYear: Int
-    public let arXivPacer: ArXivRequestPacer?
+    public let rateLimiter: RegistryRateLimiter?
+    public let requestObserver: RegistryRequestObserver?
 
     public init(
         includeBuiltInRetractedDOIs: Bool = true,
@@ -738,14 +678,16 @@ public struct CitationVerificationFirewall: Sendable {
         additionalSentinelDOIs: Set<String> = [],
         minAllowedPublicationYear: Int = 1450,
         maxAllowedPublicationYear: Int = 2030,
-        arXivPacer: ArXivRequestPacer? = nil
+        rateLimiter: RegistryRateLimiter? = nil,
+        requestObserver: RegistryRequestObserver? = nil
     ) {
         let baseRetracted = includeBuiltInRetractedDOIs ? Self.defaultRetractedDOIs : []
         self.retractedDOIs = baseRetracted.union(additionalRetractedDOIs.map { $0.lowercased() })
         self.sentinelDOIs = Self.defaultSentinelDOIs.union(additionalSentinelDOIs.map { $0.lowercased() })
         self.minAllowedPublicationYear = minAllowedPublicationYear
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
-        self.arXivPacer = arXivPacer
+        self.rateLimiter = rateLimiter
+        self.requestObserver = requestObserver
     }
 
     // MARK: - Offline Deterministic Structural & Built-in Retraction Hint Evaluation
@@ -1313,21 +1255,33 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
-    private func sendArXivRequest(
+    private func sendRegistryRequest(
         _ request: URLRequest,
+        source: String,
         session: any CitationRegistrySession
     ) async throws -> RegistryHTTPResponse {
-        if let customPacer = arXivPacer {
-            return try await customPacer.perform {
-                try await session.send(request)
-            }
+        if let customLimiter = rateLimiter {
+            return try await customLimiter.send(
+                request,
+                source: source,
+                using: session,
+                observer: requestObserver
+            )
         }
-        if session is LiveURLSessionRegistryClient {
-            return try await ArXivRequestPacer.shared.perform {
-                try await session.send(request)
-            }
+        if session is RegistryReplaySession || session is RegistryRecordingSession {
+            return try await RegistryRateLimiter(clock: .immediate).send(
+                request,
+                source: source,
+                using: session,
+                observer: requestObserver
+            )
         }
-        return try await session.send(request)
+        return try await RegistryRateLimiter.shared.send(
+            request,
+            source: source,
+            using: session,
+            observer: requestObserver
+        )
     }
 
     // MARK: - arXiv Primary Lookup & Dual-Identifier Cross-Check (M1 Item 3)
@@ -1355,7 +1309,7 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         do {
-            let response = try await sendArXivRequest(URLRequest(url: arxivURL), session: session)
+            let response = try await sendRegistryRequest(URLRequest(url: arxivURL), source: "arXiv", session: session)
             let fetchedAt = resolvedFetchedAt(from: response)
             let sourceRecord = CitationVerdictSourceRecord(
                 source: "arXiv",
@@ -1368,7 +1322,7 @@ public struct CitationVerificationFirewall: Sendable {
 
             // Rate-limit (429), timeout (408), and server errors (5xx) always yield UNVERIFIED.
             if response.statusCode == 429 || response.statusCode == 408 || (500...599).contains(response.statusCode) {
-                let code = classifyHTTPFailureStatus(response.statusCode)
+                let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "export.arxiv.org")
                 findings.append(
                     FirewallFinding(
                         code: .registryTransportUnavailable,
@@ -1492,7 +1446,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         let response: RegistryHTTPResponse
         do {
-            response = try await sendArXivRequest(URLRequest(url: arxivURL), session: session)
+            response = try await sendRegistryRequest(URLRequest(url: arxivURL), source: "arXiv", session: session)
         } catch is any FatalRegistrySessionError {
             return offlineVerdict
         } catch {
@@ -1545,7 +1499,7 @@ public struct CitationVerificationFirewall: Sendable {
         sources.append(sourceRecord)
 
         if response.statusCode == 429 || response.statusCode == 408 || (500...599).contains(response.statusCode) {
-            let code = classifyHTTPFailureStatus(response.statusCode)
+            let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "export.arxiv.org")
             findings.append(
                 FirewallFinding(
                     code: .registryTransportUnavailable,
@@ -1782,7 +1736,7 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         do {
-            let response = try await session.send(URLRequest(url: pubmedURL))
+            let response = try await sendRegistryRequest(URLRequest(url: pubmedURL), source: "PubMed", session: session)
             let fetchedAt = resolvedFetchedAt(from: response)
             let sourceRecord = CitationVerdictSourceRecord(
                 source: "PubMed",
@@ -1794,7 +1748,7 @@ public struct CitationVerificationFirewall: Sendable {
             sources.append(sourceRecord)
 
             guard response.statusCode == 200 else {
-                let code = classifyHTTPFailureStatus(response.statusCode)
+                let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "eutils.ncbi.nlm.nih.gov")
                 findings.append(
                     FirewallFinding(
                         code: .registryTransportUnavailable,
@@ -1964,7 +1918,7 @@ public struct CitationVerificationFirewall: Sendable {
         // 1. Crossref `query.bibliographic` (title + first author surname + year, rows=5)
         if let crossrefURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: crossrefQuery, rows: 5) {
             do {
-                let response = try await session.send(URLRequest(url: crossrefURL))
+                let response = try await sendRegistryRequest(URLRequest(url: crossrefURL), source: "Crossref", session: session)
                 let sourceRecord = CitationVerdictSourceRecord(
                     source: "Crossref",
                     url: crossrefURL.absoluteString,
@@ -2021,7 +1975,7 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     }
                 } else {
-                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "api.crossref.org")
                     failureReasons.append(code)
                     findings.append(
                         FirewallFinding(
@@ -2060,7 +2014,7 @@ public struct CitationVerificationFirewall: Sendable {
         // 2. OpenAlex title search (`per-page=5`) only when Crossref did not yield a match
         if let openAlexURL = RegistryURLBuilder.openAlexSearchURL(query: openAlexQuery, perPage: 5) {
             do {
-                let response = try await session.send(URLRequest(url: openAlexURL))
+                let response = try await sendRegistryRequest(URLRequest(url: openAlexURL), source: "OpenAlex", session: session)
                 let sourceRecord = CitationVerdictSourceRecord(
                     source: "OpenAlex",
                     url: openAlexURL.absoluteString,
@@ -2117,19 +2071,29 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     }
                 } else {
-                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "api.openalex.org")
                     failureReasons.append(code)
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: openAlexQuery)
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: openAlexQuery, code: code)
                         )
                     )
                 }
             } catch is any FatalRegistrySessionError {
                 return offlineVerdict
+            } catch let budgetError as RegistryBudgetExhaustedError {
+                failureReasons.append(.budgetExhausted)
+                findings.append(
+                    FirewallFinding(
+                        code: .registryTransportUnavailable,
+                        severity: .warning,
+                        field: "network",
+                        detail: describeTransportError(source: "OpenAlex", code: .budgetExhausted, error: budgetError)
+                    )
+                )
             } catch {
                 let code = classifyThrownTransportError(error)
                 failureReasons.append(code)
@@ -2381,7 +2345,7 @@ public struct CitationVerificationFirewall: Sendable {
         // 1. Crossref single-work lookup (`/works/<DOI>`)
         if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normalizedDOI) {
             do {
-                let response = try await session.send(URLRequest(url: crossrefURL))
+                let response = try await sendRegistryRequest(URLRequest(url: crossrefURL), source: "Crossref", session: session)
                 let fetchedAt = resolvedFetchedAt(from: response)
                 let sourceRecord = CitationVerdictSourceRecord(
                     source: "Crossref",
@@ -2438,14 +2402,14 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     )
                 } else {
-                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "api.crossref.org")
                     failureReasons.append(code)
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: normalizedDOI)
+                            detail: describeHTTPFailure(source: "Crossref", statusCode: response.statusCode, identifier: normalizedDOI, code: code)
                         )
                     )
                 }
@@ -2477,7 +2441,7 @@ public struct CitationVerificationFirewall: Sendable {
         // 2. OpenAlex single-work lookup (`/works/https://doi.org/<DOI>`) when Crossref did not return a valid 200 record
         if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normalizedDOI) {
             do {
-                let response = try await session.send(URLRequest(url: openAlexURL))
+                let response = try await sendRegistryRequest(URLRequest(url: openAlexURL), source: "OpenAlex", session: session)
                 let fetchedAt = resolvedFetchedAt(from: response)
                 let sourceRecord = CitationVerdictSourceRecord(
                     source: "OpenAlex",
@@ -2531,14 +2495,14 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     )
                 } else {
-                    let code = classifyHTTPFailureStatus(response.statusCode)
+                    let code = classifyHTTPFailureStatus(response.statusCode, response: response, host: "api.openalex.org")
                     failureReasons.append(code)
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .warning,
                             field: "network",
-                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: normalizedDOI)
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: response.statusCode, identifier: normalizedDOI, code: code)
                         )
                     )
                 }
@@ -2642,7 +2606,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normalizedDOI) {
             do {
-                let oaResponse = try await session.send(URLRequest(url: openAlexURL))
+                let oaResponse = try await sendRegistryRequest(URLRequest(url: openAlexURL), source: "OpenAlex", session: session)
                 let oaFetchedAt = resolvedFetchedAt(from: oaResponse)
                 sources.append(
                     CitationVerdictSourceRecord(
@@ -2656,12 +2620,13 @@ public struct CitationVerificationFirewall: Sendable {
                 if oaResponse.statusCode == 200 {
                     openAlexRetractionField = extractOpenAlexRetractionField(oaResponse.body)
                 } else if oaResponse.statusCode != 404 {
+                    let oaCode = classifyHTTPFailureStatus(oaResponse.statusCode, response: oaResponse, host: "api.openalex.org")
                     findings.append(
                         FirewallFinding(
                             code: .registryTransportUnavailable,
                             severity: .advisory,
                             field: "network",
-                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: oaResponse.statusCode, identifier: normalizedDOI)
+                            detail: describeHTTPFailure(source: "OpenAlex", statusCode: oaResponse.statusCode, identifier: normalizedDOI, code: oaCode)
                         )
                     )
                 }
@@ -2759,7 +2724,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         let handleResponse: RegistryHTTPResponse
         do {
-            handleResponse = try await session.send(URLRequest(url: handleURL))
+            handleResponse = try await sendRegistryRequest(URLRequest(url: handleURL), source: "doi.org", session: session)
         } catch is any FatalRegistrySessionError {
             return offlineVerdict
         } catch {
@@ -2812,13 +2777,13 @@ public struct CitationVerificationFirewall: Sendable {
         )
 
         guard handleResponse.statusCode == 200 || handleResponse.statusCode == 404 else {
-            let code = classifyHTTPFailureStatus(handleResponse.statusCode)
+            let code = classifyHTTPFailureStatus(handleResponse.statusCode, response: handleResponse, host: "doi.org")
             findings.append(
                 FirewallFinding(
                     code: .registryTransportUnavailable,
                     severity: .warning,
                     field: "network",
-                    detail: describeHTTPFailure(source: "doi.org", statusCode: handleResponse.statusCode, identifier: normalizedDOI)
+                    detail: describeHTTPFailure(source: "doi.org", statusCode: handleResponse.statusCode, identifier: normalizedDOI, code: code)
                 )
             )
             if isBuiltInRetracted {
@@ -2991,7 +2956,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         let searchResponse: RegistryHTTPResponse
         do {
-            searchResponse = try await session.send(URLRequest(url: searchURL))
+            searchResponse = try await sendRegistryRequest(URLRequest(url: searchURL), source: "Crossref", session: session)
         } catch is any FatalRegistrySessionError {
             return offlineVerdict
         } catch {
@@ -3034,13 +2999,13 @@ public struct CitationVerificationFirewall: Sendable {
         )
 
         guard searchResponse.statusCode == 200 else {
-            let code = classifyHTTPFailureStatus(searchResponse.statusCode)
+            let code = classifyHTTPFailureStatus(searchResponse.statusCode, response: searchResponse, host: "api.crossref.org")
             findings.append(
                 FirewallFinding(
                     code: .registryTransportUnavailable,
                     severity: .warning,
                     field: "network",
-                    detail: describeHTTPFailure(source: "Crossref", statusCode: searchResponse.statusCode, identifier: searchQuery)
+                    detail: describeHTTPFailure(source: "Crossref", statusCode: searchResponse.statusCode, identifier: searchQuery, code: code)
                 )
             )
             return buildUpdatedVerdict(
@@ -4717,8 +4682,18 @@ public struct CitationVerificationFirewall: Sendable {
         return "Metadata drift against \(sourceName): \(items.joined(separator: "; "))."
     }
 
-    private func classifyHTTPFailureStatus(_ statusCode: Int) -> CitationUnverifiedReasonCode {
-        if statusCode == 429 {
+    private func classifyHTTPFailureStatus(
+        _ statusCode: Int,
+        response: RegistryHTTPResponse? = nil,
+        host: String? = nil
+    ) -> CitationUnverifiedReasonCode {
+        if host == "api.openalex.org",
+           let response,
+           let remaining = RegistryRateLimiter.parseOpenAlexRemainingHeader(from: response),
+           remaining < RegistryRateLimiter.openAlexMinimumSearchCredits {
+            return .budgetExhausted
+        }
+        if statusCode == 429 || statusCode == 503 {
             return .rateLimited
         }
         if (500...599).contains(statusCode) {
@@ -4731,6 +4706,9 @@ public struct CitationVerificationFirewall: Sendable {
     }
 
     private func classifyThrownTransportError(_ error: Error) -> CitationUnverifiedReasonCode {
+        if error is RegistryBudgetExhaustedError {
+            return .budgetExhausted
+        }
         if let transportErr = error as? RegistryTransportError {
             return transportErr.kind == .timeout ? .timeout : .transportError
         }
@@ -4744,9 +4722,17 @@ public struct CitationVerificationFirewall: Sendable {
         return .transportError
     }
 
-    private func describeHTTPFailure(source: String, statusCode: Int, identifier: String) -> String {
-        if statusCode == 429 {
-            return "\(source) rate-limited the lookup for '\(identifier)' (status 429)."
+    private func describeHTTPFailure(
+        source: String,
+        statusCode: Int,
+        identifier: String,
+        code: CitationUnverifiedReasonCode? = nil
+    ) -> String {
+        if code == .budgetExhausted {
+            return "\(source) budget exhausted while querying '\(identifier)' (status \(statusCode))."
+        }
+        if statusCode == 429 || statusCode == 503 {
+            return "\(source) rate-limited or unavailable for '\(identifier)' (status \(statusCode))."
         }
         if (500...599).contains(statusCode) {
             return "\(source) server error for '\(identifier)' (status \(statusCode))."
@@ -4759,6 +4745,9 @@ public struct CitationVerificationFirewall: Sendable {
         code: CitationUnverifiedReasonCode,
         error: Error
     ) -> String {
+        if code == .budgetExhausted {
+            return "\(source) search skipped due to exhausted credit budget (\(error.localizedDescription))."
+        }
         if code == .timeout {
             return "\(source) request timed out (\(error.localizedDescription))."
         }
