@@ -1470,7 +1470,13 @@ struct PluginSDKMCPAndShellTests {
         #expect(byKey["wrongtitle"]?.firewallClass == .drift)
         #expect(byKey["wrongyear"]?.firewallClass == .drift)
         #expect(byKey["wrongyear5"]?.firewallClass == .drift)
+        #expect(byKey["retracted_seralini"]?.firewallClass == .retracted)
         #expect(byKey["retracted_wakefield"]?.firewallClass == .retracted)
+        #expect(byKey["real_nodoi"]?.firewallClass == .unverified)
+        #expect(byKey["real_nodoi"]?.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+        #expect(byKey["fake_nodoi"]?.firewallClass == .unverified)
+        #expect(byKey["fake_nodoi"]?.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+        #expect(report1.unverifiedByReason == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue: 2])
 
         // Subset of the 3 real recorded entries exits 0 with Verified=3
         let tempRoot = try makeTempDirectory(prefix: "scholaros-real-fixture-checks")
@@ -1708,5 +1714,66 @@ struct PluginSDKMCPAndShellTests {
         #expect(enRun.stdout.contains("10.1162/neco.1997.9.8.1735"))
         #expect(enRun.stdout.contains("registered_no_metadata"))
         #expect(enRun.stdout.contains("doi.org reported DOI '10.13328/j.cnki.jos.006981' is registered"))
+    }
+
+    @Test("M1 item 3 (Stage 05): CLI verify-citations replay on stage05-arxiv-pmid-search.bib formats arXiv, PubMed, dual DOI+arXiv, and identifierless verdicts in en, zh, and json")
+    func m1Stage05CLIVerifyCitationsReplayFormatsArXivPubMedDualAndIdentifierlessInEnZhAndJSON() async throws {
+        let runner = ScholarCLIRunner()
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let stage05BibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib")
+
+        let jsonRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage05BibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(jsonRun.exitCode == 1)
+        let report = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(jsonRun.stdout.utf8))
+        #expect(report.totalEvaluated == 10)
+        #expect(report.verifiedCount == 5)
+        #expect(report.driftCount == 1)
+        #expect(report.notFoundCount == 2)
+        #expect(report.retractedCount == 1)
+        #expect(report.unverifiedCount == 1)
+        #expect(report.complete == false)
+        #expect(report.unverifiedByReason == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue: 1])
+
+        let byKey = Dictionary(uniqueKeysWithValues: report.verdicts.map { ($0.citeKey, $0) })
+        #expect(byKey["arxiv_real_vaswani"]?.firewallClass == .verified)
+        #expect(byKey["arxiv_nonexistent"]?.firewallClass == .notFound)
+        #expect(byKey["arxiv_nonexistent"]?.reasons == ["arxiv_not_found"])
+        #expect(byKey["arxiv_wrong_title"]?.firewallClass == .drift)
+        #expect(byKey["doi_and_arxiv_resnet"]?.firewallClass == .verified)
+        #expect(byKey["doi_and_arxiv_resnet"]?.sources.map(\.source) == ["Crossref", "OpenAlex", "arXiv"])
+        #expect(byKey["dao2022"]?.firewallClass == .verified)
+        #expect(byKey["pmid_real_ito2015"]?.firewallClass == .verified)
+        #expect(byKey["pmid_nonexistent"]?.firewallClass == .notFound)
+        #expect(byKey["pmid_nonexistent"]?.reasons == ["pmid_not_found"])
+        #expect(byKey["pmid_retracted_wakefield"]?.firewallClass == .retracted)
+        #expect(byKey["pmid_retracted_wakefield"]?.reasons == ["retracted_pubmed"])
+        #expect(byKey["nodoi_real_lecun"]?.firewallClass == .verified)
+        #expect(byKey["nodoi_real_lecun"]?.fields.contains { $0.field == "doi" && $0.remoteValue == "10.1038/nature14539" } == true)
+        #expect(byKey["draft2024unverified"]?.firewallClass == .unverified)
+        #expect(byKey["draft2024unverified"]?.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+
+        let zhRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage05BibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(zhRun.exitCode == 1)
+        #expect(zhRun.stdout.contains("arXiv 说没有这个编号（arXiv:2401.99999）"))
+        #expect(zhRun.stdout.contains("PubMed 说没有这个编号（PMID:99999999）"))
+        #expect(zhRun.stdout.contains("PubMed 标明该文献已撤稿（撤稿字段：pubtype (Retracted Publication)）"))
+        #expect(zhRun.stdout.contains("DOI：10.1038/nature14539"))
+        #expect(zhRun.stdout.contains("两个数据源都没有找到，可能文献并不存在，也可能是数据源没有收录"))
+        #expect(!zhRun.stdout.contains("编造"))
+
+        let enRun = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage05BibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(enRun.exitCode == 1)
+        #expect(enRun.stdout.contains("arXiv reported that identifier 'arXiv:2401.99999' does not exist"))
+        #expect(enRun.stdout.contains("PubMed reported that identifier 'PMID:99999999' does not exist"))
+        #expect(enRun.stdout.contains("PubMed marks this publication as retracted (field: pubtype (Retracted Publication))"))
+        #expect(enRun.stdout.contains("DOI: 10.1038/nature14539"))
+        #expect(enRun.stdout.contains("may not exist, or it may not be indexed"))
+        #expect(!enRun.stdout.lowercased().contains("fabricated"))
     }
 }

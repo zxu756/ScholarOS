@@ -2326,7 +2326,36 @@ struct BibCSLAndFirewallTests {
         #expect(vDrift.insertable == false)
         #expect(vDrift.fields.contains { $0.field == "title" && $0.remoteValue == "Attention Is All You Need" })
 
-        // 3. HTTP 404 with non-Atom HTML body MUST NOT be judged NOT_FOUND (must judge by totalResults & <entry>, not HTTP status)
+        // 3. Recorded nonexistent arXiv ID 2401.99999 (HTTP 200 with <opensearch:totalResults>0</opensearch:totalResults>) -> NOT_FOUND
+        let nonexistentEntry = BibliographyEntry(
+            citeKey: "arxiv_nonexistent",
+            kind: .misc,
+            title: "On Analytical Engines for Nonexistent Preprints",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 2024,
+            arxivID: "2401.99999"
+        )
+        let vMissing = await firewall.verifyAgainstPublicRegistries(entry: nonexistentEntry, session: replay)
+        #expect(vMissing.firewallClass == .notFound)
+        #expect(vMissing.insertable == false)
+        #expect(vMissing.reasons == ["arxiv_not_found"])
+        #expect(vMissing.sources.contains { $0.source == "arXiv" && $0.status == 200 && $0.origin == .replay })
+        #expect(vMissing.auditNote.contains("arXiv"))
+
+        // 4. DataCite arXiv DOI 10.48550/arXiv.1706.03762 routes through arXiv API -> VERIFIED
+        let dataCiteArXiv = BibliographyEntry(
+            citeKey: "vaswani2017_datacite",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: vaswaniAuthors,
+            year: 2017,
+            doi: "10.48550/arXiv.1706.03762"
+        )
+        let vDataCite = await firewall.verifyAgainstPublicRegistries(entry: dataCiteArXiv, session: replay)
+        #expect(vDataCite.firewallClass == .verified)
+        #expect(vDataCite.sources.map(\.source) == ["arXiv"])
+
+        // 5. HTTP 404 with non-Atom HTML body MUST NOT be judged NOT_FOUND (must judge by totalResults & <entry>, not HTTP status)
         let html404Session = ClosureRegistrySession { _ in
             RegistryHTTPResponse(statusCode: 404, body: Data("<html><body>404 Gateway Not Found</body></html>".utf8))
         }
@@ -2334,29 +2363,187 @@ struct BibCSLAndFirewallTests {
         #expect(vHtml404.firewallClass == .unverified)
         #expect(vHtml404.firewallClass != .notFound)
         #expect(vHtml404.reasons == [CitationUnverifiedReasonCode.unparseable.rawValue])
+    }
 
-        // 4. Atom feed with <opensearch:totalResults>0</opensearch:totalResults> -> NOT_FOUND even when HTTP status is 200
-        let emptyAtomXML = """
-        <?xml version='1.0' encoding='UTF-8'?>
-        <feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns="http://www.w3.org/2005/Atom">
-          <opensearch:totalResults>0</opensearch:totalResults>
-        </feed>
-        """
-        let emptyAtomSession = ClosureRegistrySession { _ in
-            RegistryHTTPResponse(statusCode: 200, body: Data(emptyAtomXML.utf8))
-        }
-        let nonexistentEntry = BibliographyEntry(
-            citeKey: "arxiv_missing_2401",
-            kind: .misc,
-            title: "Nonexistent Preprint",
+    @Test("M1 item 3 (Stage 05): PubMed esummary replay verifies real PMID 26017312, flags nonexistent PMID 99999999 as NOT_FOUND, and flags Wakefield PMID 9500320 as RETRACTED")
+    func m1Stage05PubMedSummaryReplayVerifiesRealFlagsNonexistentAndDetectsRetraction() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall(includeBuiltInRetractedDOIs: false)
+
+        // 1. Real PMID 26017312 (Ito et al. 2015, Nature) -> VERIFIED
+        let realPMID = BibliographyEntry(
+            citeKey: "pmid_real_ito2015",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [
+                BibAuthor(givenName: "Hiroshi T.", familyName: "Ito"),
+                BibAuthor(givenName: "Sheng-Jia", familyName: "Zhang"),
+                BibAuthor(givenName: "Menno P.", familyName: "Witter"),
+                BibAuthor(givenName: "Edvard I.", familyName: "Moser"),
+                BibAuthor(givenName: "May-Britt", familyName: "Moser")
+            ],
+            year: 2015,
+            venue: "Nature",
+            pmid: "26017312"
+        )
+        let vReal = await firewall.verifyAgainstPublicRegistries(entry: realPMID, session: replay)
+        #expect(vReal.firewallClass == .verified)
+        #expect(vReal.insertable == true)
+        #expect(vReal.sources.count == 1)
+        #expect(vReal.sources.first?.source == "PubMed")
+        #expect(vReal.sources.first?.status == 200)
+        #expect(vReal.sources.first?.origin == .replay)
+
+        // 2. Nonexistent PMID 99999999 (HTTP 200 with result[pmid].error) -> NOT_FOUND
+        let missingPMID = BibliographyEntry(
+            citeKey: "pmid_nonexistent",
+            kind: .article,
+            title: "Synthetic Nonexistent PubMed Record",
             authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
             year: 2024,
-            arxivID: "2401.99999"
+            venue: "Journal of Imaginary Medicine",
+            pmid: "99999999"
         )
-        let vMissing = await firewall.verifyAgainstPublicRegistries(entry: nonexistentEntry, session: emptyAtomSession)
+        let vMissing = await firewall.verifyAgainstPublicRegistries(entry: missingPMID, session: replay)
         #expect(vMissing.firewallClass == .notFound)
-        #expect(vMissing.reasons == ["arxiv_not_found"])
-        #expect(vMissing.auditNote.contains("arXiv"))
+        #expect(vMissing.insertable == false)
+        #expect(vMissing.reasons == ["pmid_not_found"])
+        #expect(vMissing.auditNote.contains("PubMed"))
+
+        // 3. Retracted PMID 9500320 (Wakefield 1998 without DOI, offline retraction list disabled) -> RETRACTED via PubMed pubtype
+        let retractedPMID = BibliographyEntry(
+            citeKey: "pmid_retracted_wakefield",
+            kind: .article,
+            title: "Ileal-lymphoid-nodular hyperplasia, non-specific colitis, and pervasive developmental disorder in children",
+            authors: [
+                BibAuthor(givenName: "A. J.", familyName: "Wakefield"),
+                BibAuthor(givenName: "", familyName: "others")
+            ],
+            year: 1998,
+            venue: "The Lancet",
+            pmid: "9500320"
+        )
+        let vRetracted = await firewall.verifyAgainstPublicRegistries(entry: retractedPMID, session: replay)
+        #expect(vRetracted.firewallClass == .retracted)
+        #expect(vRetracted.insertable == false)
+        #expect(vRetracted.reasons == ["retracted_pubmed"])
+        #expect(vRetracted.auditNote.contains("PubMed"))
+        #expect(vRetracted.auditNote.contains("pubtype"))
+    }
+
+    @Test("M1 item 3 (Stage 05): dual DOI + arXiv entry queries both registries with DOI authoritative and cross-checks arXiv")
+    func m1Stage05DualDOIAndArXivQueriesBothWithDOIAuthoritative() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+        let resnetAuthors = [
+            BibAuthor(givenName: "Kaiming", familyName: "He"),
+            BibAuthor(givenName: "Xiangyu", familyName: "Zhang"),
+            BibAuthor(givenName: "Shaoqing", familyName: "Ren"),
+            BibAuthor(givenName: "Jian", familyName: "Sun")
+        ]
+
+        // 1. Clean ResNet CVPR DOI (10.1109/CVPR.2016.90) + arXiv 1512.03385 -> VERIFIED, both paths queried
+        let cleanResNet = BibliographyEntry(
+            citeKey: "doi_and_arxiv_resnet",
+            kind: .inproceedings,
+            title: "Deep Residual Learning for Image Recognition",
+            authors: resnetAuthors,
+            year: 2016,
+            venue: "2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)",
+            doi: "10.1109/CVPR.2016.90",
+            arxivID: "1512.03385"
+        )
+        let vClean = await firewall.verifyAgainstPublicRegistries(entry: cleanResNet, session: replay)
+        #expect(vClean.firewallClass == .verified)
+        #expect(vClean.insertable == true)
+        #expect(vClean.sources.map(\.source) == ["Crossref", "OpenAlex", "arXiv"])
+
+        // 2. DOI is authoritative: year=2015 matches arXiv preprint year (2015) but NOT CVPR DOI record (2016) -> DRIFT from Crossref
+        var preprintYearResNet = cleanResNet
+        preprintYearResNet.year = 2015
+        let vYearDrift = await firewall.verifyAgainstPublicRegistries(entry: preprintYearResNet, session: replay)
+        #expect(vYearDrift.firewallClass == .drift)
+        #expect(vYearDrift.insertable == false)
+        #expect(vYearDrift.fields.contains { $0.field == "year" && $0.source == "Crossref" && $0.remoteValue == "2016" })
+
+        // 3. Valid DOI paired with a different paper's arXiv ID (1706.03762) -> DRIFT (arxiv_mismatch)
+        var wrongArXivResNet = cleanResNet
+        wrongArXivResNet.arxivID = "1706.03762"
+        let vMismatch = await firewall.verifyAgainstPublicRegistries(entry: wrongArXivResNet, session: replay)
+        #expect(vMismatch.firewallClass == .drift)
+        #expect(vMismatch.insertable == false)
+        #expect(vMismatch.reasons.contains("arxiv_mismatch"))
+        #expect(vMismatch.fields.contains { $0.field == "arxivID" })
+
+        // 4. Valid DOI paired with nonexistent arXiv ID (2401.99999) -> DRIFT (arxiv_not_found), NOT NOT_FOUND because DOI exists
+        var missingArXivResNet = cleanResNet
+        missingArXivResNet.arxivID = "2401.99999"
+        let vMissingArXiv = await firewall.verifyAgainstPublicRegistries(entry: missingArXivResNet, session: replay)
+        #expect(vMissingArXiv.firewallClass == .drift)
+        #expect(vMissingArXiv.insertable == false)
+        #expect(vMissingArXiv.reasons.contains("arxiv_not_found"))
+        #expect(vMissingArXiv.fields.contains { $0.field == "arxivID" })
+    }
+
+    @Test("M1 item 3 (Stage 05): identifierless search replay matches LeCun 2015 with remote DOI and returns no_match_in_search with honest explanation when absent in both sources")
+    func m1Stage05IdentifierlessSearchReplaySingleMatchAndNoMatchInSearch() async throws {
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+
+        // 1. Single match in Crossref search -> VERIFIED, remote DOI 10.1038/nature14539 surfaced in fields, OpenAlex search not called
+        let nodoiLeCun = BibliographyEntry(
+            citeKey: "nodoi_real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature"
+        )
+        let vMatched = await firewall.verifyAgainstPublicRegistries(entry: nodoiLeCun, session: replay)
+        #expect(vMatched.firewallClass == .verified)
+        #expect(vMatched.insertable == true)
+        #expect(vMatched.sources.map(\.source) == ["Crossref"])
+        #expect(vMatched.fields.contains { $0.field == "doi" && $0.localValue.isEmpty && $0.remoteValue == "10.1038/nature14539" })
+        #expect(vMatched.auditNote.contains("10.1038/nature14539"))
+
+        // 2. Neither Crossref nor OpenAlex matches -> UNVERIFIED (no_match_in_search), stating both possibilities without "fabricated"/"编造"
+        let nodoiUnpublished = BibliographyEntry(
+            citeKey: "draft2024unverified",
+            kind: .misc,
+            title: "Unpublished Workshop Notes on Attention Kernels",
+            authors: [BibAuthor(givenName: "Pat", familyName: "Taylor")],
+            year: 2024
+        )
+        let vNoMatch = await firewall.verifyAgainstPublicRegistries(entry: nodoiUnpublished, session: replay)
+        #expect(vNoMatch.firewallClass == .unverified)
+        #expect(vNoMatch.insertable == false)
+        #expect(vNoMatch.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+        #expect(vNoMatch.sources.map(\.source) == ["Crossref", "OpenAlex"])
+        #expect(vNoMatch.auditNote.contains("may not exist, or it may not be indexed"))
+        #expect(!vNoMatch.auditNote.lowercased().contains("fabricated"))
+        let zhNote = vNoMatch.auditedEntry.localizedFirewallAuditNote(.zhHans)
+        #expect(zhNote.contains("可能文献并不存在，也可能是数据源没有收录"))
+        #expect(!zhNote.contains("编造"))
+
+        // 3. Fixtures/citations-m0-recheck.bib: real_nodoi (Knuth 1968, book reviews & 1978 edition excluded) and fake_nodoi are no_match_in_search, NOT offline
+        let repoRoot = Self.recordedRegistryFixturesURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let recheckBib = try String(contentsOf: repoRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"), encoding: .utf8)
+        let recheckEntries = try BibTeXCodec().parse(recheckBib)
+        for targetKey in ["real_nodoi", "fake_nodoi"] {
+            let entry = try #require(recheckEntries.first { $0.citeKey == targetKey })
+            let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replay)
+            #expect(verdict.firewallClass == .unverified)
+            #expect(verdict.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+            #expect(verdict.reasons != [CitationUnverifiedReasonCode.offline.rawValue])
+            #expect(verdict.sources.map(\.source) == ["Crossref", "OpenAlex"])
+        }
     }
 
     @Test("M1 item 3 & 5 (Stage 05): injectable ArXivRequestPacer enforces >= 3s spacing between arXiv requests without sleeping in real wall-clock time")
@@ -2503,8 +2690,8 @@ struct BibCSLAndFirewallTests {
         #expect(partialSearchFail.sources.count == 2)
     }
 
-    @Test("M1 item 3 (Stage 05): identifierless search with >=2 equally matching candidates returns UNVERIFIED with reason ambiguous")
-    func m1Stage05AmbiguousIdentifierlessSearchCandidatesReturnUnverifiedAmbiguous() async throws {
+    @Test("M1 item 3 (Stage 05, synthetic search response): identifierless search with >=2 equally matching candidates returns UNVERIFIED with reason ambiguous")
+    func m1Stage05SyntheticSearchResponseAmbiguousIdentifierlessCandidatesReturnUnverifiedAmbiguous() async throws {
         let firewall = CitationVerificationFirewall()
         let entry = BibliographyEntry(
             citeKey: "ambiguous_nodoi",
@@ -2513,7 +2700,7 @@ struct BibCSLAndFirewallTests {
             authors: [BibAuthor(givenName: "Alan", familyName: "Turing")],
             year: 1936
         )
-        let tiedSearchJSON = """
+        let tiedCrossrefSearchJSON = """
         {
           "status": "ok",
           "message": {
@@ -2534,12 +2721,44 @@ struct BibCSLAndFirewallTests {
           }
         }
         """
-        let session = ClosureRegistrySession { _ in
-            RegistryHTTPResponse(statusCode: 200, body: Data(tiedSearchJSON.utf8))
+        let crossrefTiedSession = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 200, body: Data(tiedCrossrefSearchJSON.utf8))
         }
-        let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: session)
-        #expect(verdict.firewallClass == .unverified)
-        #expect(verdict.insertable == false)
-        #expect(verdict.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+        let vCrossrefTied = await firewall.verifyAgainstPublicRegistries(entry: entry, session: crossrefTiedSession)
+        #expect(vCrossrefTied.firewallClass == .unverified)
+        #expect(vCrossrefTied.insertable == false)
+        #expect(vCrossrefTied.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+
+        let tiedOpenAlexSearchJSON = """
+        {
+          "results": [
+            {
+              "id": "https://openalex.org/W1",
+              "doi": "https://doi.org/10.1112/plms/s2-42.1.230",
+              "title": "On Computable Numbers",
+              "publication_year": 1936,
+              "authorships": [{"raw_author_name": "Alan Turing"}]
+            },
+            {
+              "id": "https://openalex.org/W2",
+              "doi": "https://doi.org/10.2307/2268810",
+              "title": "On Computable Numbers",
+              "publication_year": 1936,
+              "authorships": [{"raw_author_name": "Alan Turing"}]
+            }
+          ]
+        }
+        """
+        let openAlexTiedSession = ClosureRegistrySession { req in
+            if req.url?.host == "api.crossref.org" {
+                return RegistryHTTPResponse(statusCode: 200, body: Data("{\"status\":\"ok\",\"message\":{\"items\":[]}}".utf8))
+            }
+            return RegistryHTTPResponse(statusCode: 200, body: Data(tiedOpenAlexSearchJSON.utf8))
+        }
+        let vOpenAlexTied = await firewall.verifyAgainstPublicRegistries(entry: entry, session: openAlexTiedSession)
+        #expect(vOpenAlexTied.firewallClass == .unverified)
+        #expect(vOpenAlexTied.insertable == false)
+        #expect(vOpenAlexTied.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+        #expect(vOpenAlexTied.sources.map(\.source) == ["Crossref", "OpenAlex"])
     }
 }
