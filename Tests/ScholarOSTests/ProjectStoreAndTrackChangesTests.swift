@@ -1,12 +1,20 @@
 import Foundation
 import Testing
 import ScholarModels
+import ScholarBibAndCSL
 import ScholarProjectStore
 
 @Suite("SQLite WAL Project Store, Myers Track Changes, Undo Journal & Archive Bundle")
 struct ProjectStoreAndTrackChangesTests {
 
     // MARK: - Helpers
+
+    private static var recordedRegistryFixturesURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/registry", isDirectory: true)
+    }
 
     private func makeTempDirectory(prefix: String = "scholaros-store") throws -> URL {
         let dir = FileManager.default.temporaryDirectory
@@ -208,7 +216,7 @@ struct ProjectStoreAndTrackChangesTests {
     }
 
     @Test("validateCitationKeyForInsertion blocks unverified demo entries, smith2025hallucinated, and missing keys, and permits verified records")
-    func validateCitationKeyForInsertionEnforcesFirewall() throws {
+    func validateCitationKeyForInsertionEnforcesFirewall() async throws {
         let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
         defer { db.close() }
 
@@ -220,16 +228,35 @@ struct ProjectStoreAndTrackChangesTests {
             #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
         }
 
-        // 2. Once marked VERIFIED (e.g. after registry verification), insertion succeeds
+        // 2a. Stored SQLite `firewall_class = VERIFIED` alone is NOT trusted without an in-run verdict (M1 item 8 / S42/S48).
         try db.updateCitationFirewallStatus(
             citeKey: "vaswani2017attention",
             firewallClass: .verified,
             auditNote: "Verified against registry"
         )
+        do {
+            _ = try db.validateCitationKeyForInsertion("vaswani2017attention")
+            Issue.record("Expected stored SQLite VERIFIED status without in-run verdict to be blocked")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
+
+        // 2b. Once verified in the current run against recorded registry fixtures, insertion succeeds.
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall()
+        let vaswaniEntry = try #require(try db.bibliographyEntry(citeKey: "vaswani2017attention"))
+        let vaswaniVerdict = await firewall.verifyAgainstPublicRegistries(entry: vaswaniEntry, session: replay)
+        #expect(vaswaniVerdict.firewallClass == .verified)
+        db.recordInRunVerdict(vaswaniVerdict)
+
         let verified = try db.validateCitationKeyForInsertion("vaswani2017attention")
         #expect(verified.firewallClass == .verified)
 
         // 3. Blocked hallucination (smith2025hallucinated) MUST throw ERR_UNVERIFIED_CITATION
+        let smithEntry = try #require(try db.bibliographyEntry(citeKey: "smith2025hallucinated"))
+        let smithVerdict = await firewall.verifyAgainstPublicRegistries(entry: smithEntry, session: replay)
+        #expect(smithVerdict.firewallClass == .notFound)
+        db.recordInRunVerdict(smithVerdict)
         do {
             _ = try db.validateCitationKeyForInsertion("smith2025hallucinated")
             Issue.record("Expected smith2025hallucinated to be blocked by Citation Firewall")
