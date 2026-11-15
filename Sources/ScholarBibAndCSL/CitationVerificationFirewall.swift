@@ -670,6 +670,7 @@ public struct CitationVerificationFirewall: Sendable {
     public let maxAllowedPublicationYear: Int
     public let minAllowedPublicationYear: Int
     public let rateLimiter: RegistryRateLimiter?
+    public let cache: RegistryResponseCache?
     public let requestObserver: RegistryRequestObserver?
 
     public init(
@@ -679,6 +680,7 @@ public struct CitationVerificationFirewall: Sendable {
         minAllowedPublicationYear: Int = 1450,
         maxAllowedPublicationYear: Int = 2030,
         rateLimiter: RegistryRateLimiter? = nil,
+        cache: RegistryResponseCache? = nil,
         requestObserver: RegistryRequestObserver? = nil
     ) {
         let baseRetracted = includeBuiltInRetractedDOIs ? Self.defaultRetractedDOIs : []
@@ -687,6 +689,7 @@ public struct CitationVerificationFirewall: Sendable {
         self.minAllowedPublicationYear = minAllowedPublicationYear
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
         self.rateLimiter = rateLimiter
+        self.cache = cache
         self.requestObserver = requestObserver
     }
 
@@ -1255,11 +1258,38 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
+    private func lookupCachedResponse(
+        for url: URL,
+        source: String
+    ) -> RegistryHTTPResponse? {
+        guard let cache else { return nil }
+        let t0 = cache.clock.now()
+        guard let hit = cache.lookup(for: url) else { return nil }
+        let t1 = cache.clock.now()
+        requestObserver?(
+            RegistryRequestTelemetryEvent(
+                source: source,
+                url: url.absoluteString,
+                statusCode: hit.statusCode,
+                errorDescription: nil,
+                elapsedSeconds: max(0.0, t1 - t0),
+                origin: .cache,
+                startedAtUptime: t0,
+                completedAtUptime: max(t0, t1)
+            )
+        )
+        return hit
+    }
+
     private func sendRegistryRequest(
         _ request: URLRequest,
         source: String,
         session: any CitationRegistrySession
     ) async throws -> RegistryHTTPResponse {
+        if let reqURL = request.url,
+           let cached = lookupCachedResponse(for: reqURL, source: source) {
+            return cached
+        }
         if let customLimiter = rateLimiter {
             return try await customLimiter.send(
                 request,
@@ -1344,6 +1374,9 @@ public struct CitationVerificationFirewall: Sendable {
             // Decide strictly from Atom `totalResults` and `<entry>` rather than HTTP status code.
             switch parseArXivAtomPayload(response.body) {
             case .parsed(let remote):
+                if response.origin != .cache, response.statusCode == 200 {
+                    cache?.store(url: arxivURL, statusCode: response.statusCode, body: response.body)
+                }
                 return reconcileRemoteRegistryMetadata(
                     entry: entry,
                     remote: remote,
@@ -1353,6 +1386,9 @@ public struct CitationVerificationFirewall: Sendable {
                     isBuiltInRetracted: isBuiltInRetracted
                 )
             case .notFound:
+                if response.origin != .cache, response.statusCode == 200 {
+                    cache?.store(url: arxivURL, statusCode: response.statusCode, body: response.body)
+                }
                 let detail = "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
                 findings.append(
                     FirewallFinding(
@@ -1531,6 +1567,9 @@ public struct CitationVerificationFirewall: Sendable {
 
         switch parseArXivAtomPayload(response.body) {
         case .parsed(let arxivRemote):
+            if response.origin != .cache, response.statusCode == 200 {
+                cache?.store(url: arxivURL, statusCode: response.statusCode, body: response.body)
+            }
             if let arxivRetField = arxivRemote.retractionField {
                 findings.removeAll {
                     $0.code == .blockedRetractedWork && $0.detail.contains(CitationAuditWording.builtInRetractionListNotice)
@@ -1635,6 +1674,9 @@ public struct CitationVerificationFirewall: Sendable {
             )
 
         case .notFound:
+            if response.origin != .cache, response.statusCode == 200 {
+                cache?.store(url: arxivURL, statusCode: response.statusCode, body: response.body)
+            }
             if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
                 var discrepancies = doiVerdict.fields
                 discrepancies.append(
@@ -1769,6 +1811,9 @@ public struct CitationVerificationFirewall: Sendable {
 
             switch parsePubMedSummaryPayload(response.body, requestedPMID: normalizedPMID) {
             case .parsed(let remote):
+                if response.origin != .cache {
+                    cache?.store(url: pubmedURL, statusCode: response.statusCode, body: response.body)
+                }
                 return reconcileRemoteRegistryMetadata(
                     entry: entry,
                     remote: remote,
@@ -1778,6 +1823,9 @@ public struct CitationVerificationFirewall: Sendable {
                     isBuiltInRetracted: isBuiltInRetracted
                 )
             case .notFound(let errDetail):
+                if response.origin != .cache {
+                    cache?.store(url: pubmedURL, statusCode: response.statusCode, body: response.body)
+                }
                 let detail = "PubMed reported that identifier 'PMID:\(normalizedPMID)' does not exist (\(errDetail))."
                 findings.append(
                     FirewallFinding(
@@ -1915,6 +1963,8 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
+        var pendingEmptyCrossrefSearch: (url: URL, response: RegistryHTTPResponse)?
+
         // 1. Crossref `query.bibliographic` (title + first author surname + year, rows=5)
         if let crossrefURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: crossrefQuery, rows: 5) {
             do {
@@ -1933,6 +1983,9 @@ public struct CitationVerificationFirewall: Sendable {
                     case .parsed(let candidates):
                         switch selectMatchingSearchCandidate(entry: entry, candidates: candidates, sourceName: "Crossref") {
                         case .single(let matched):
+                            if response.origin != .cache {
+                                cache?.store(url: crossrefURL, statusCode: response.statusCode, body: response.body)
+                            }
                             return reconcileIdentifierlessMatchedCandidate(
                                 entry: entry,
                                 remote: matched,
@@ -1961,7 +2014,7 @@ public struct CitationVerificationFirewall: Sendable {
                                 overrideNote: "[UNVERIFIED] \(detail)"
                             )
                         case .none:
-                            break
+                            pendingEmptyCrossrefSearch = (crossrefURL, response)
                         }
                     case .unparseable:
                         failureReasons.append(.unparseable)
@@ -2029,6 +2082,12 @@ public struct CitationVerificationFirewall: Sendable {
                     case .parsed(let candidates):
                         switch selectMatchingSearchCandidate(entry: entry, candidates: candidates, sourceName: "OpenAlex") {
                         case .single(let matched):
+                            if let pending = pendingEmptyCrossrefSearch, pending.response.origin != .cache {
+                                cache?.store(url: pending.url, statusCode: pending.response.statusCode, body: pending.response.body)
+                            }
+                            if response.origin != .cache {
+                                cache?.store(url: openAlexURL, statusCode: response.statusCode, body: response.body)
+                            }
                             return reconcileIdentifierlessMatchedCandidate(
                                 entry: entry,
                                 remote: matched,
@@ -2342,6 +2401,80 @@ public struct CitationVerificationFirewall: Sendable {
         var openAlexReturned404 = false
         var failureReasons: [CitationUnverifiedReasonCode] = []
 
+        // Pre-flight cache check so cached OpenAlex fallback or cached doi.org responseCode=100
+        // resolves with 0 transport requests without re-fetching uncached 404 upstream steps.
+        if cache != nil {
+            if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normalizedDOI),
+               let cachedCrossref = lookupCachedResponse(for: crossrefURL, source: "Crossref"),
+               cachedCrossref.statusCode == 200,
+               case .parsed(let crossrefRemote) = parseCrossrefWorkPayload(cachedCrossref.body) {
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "Crossref",
+                    url: crossrefURL.absoluteString,
+                    status: cachedCrossref.statusCode,
+                    fetchedAt: resolvedFetchedAt(from: cachedCrossref),
+                    origin: cachedCrossref.origin
+                )
+                sources.append(sourceRecord)
+                return await crossCheckOpenAlexRetractionAndReconcile(
+                    entry: entry,
+                    normalizedDOI: normalizedDOI,
+                    crossrefRemote: crossrefRemote,
+                    crossrefSource: sourceRecord,
+                    existingSources: sources,
+                    existingFindings: findings,
+                    offlineVerdict: offlineVerdict,
+                    isBuiltInRetracted: isBuiltInRetracted,
+                    session: session
+                )
+            }
+            if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normalizedDOI),
+               let cachedOA = lookupCachedResponse(for: openAlexURL, source: "OpenAlex"),
+               cachedOA.statusCode == 200,
+               case .parsed(let oaRemote) = parseOpenAlexWorkPayload(cachedOA.body) {
+                let sourceRecord = CitationVerdictSourceRecord(
+                    source: "OpenAlex",
+                    url: openAlexURL.absoluteString,
+                    status: cachedOA.statusCode,
+                    fetchedAt: resolvedFetchedAt(from: cachedOA),
+                    origin: cachedOA.origin
+                )
+                sources.append(sourceRecord)
+                return reconcileRemoteRegistryMetadata(
+                    entry: entry,
+                    remote: oaRemote,
+                    primarySource: sourceRecord,
+                    allSources: sources,
+                    existingFindings: findings,
+                    isBuiltInRetracted: isBuiltInRetracted
+                )
+            }
+            if let handleURL = RegistryURLBuilder.doiHandleURL(doi: normalizedDOI),
+               let cachedHandle = lookupCachedResponse(for: handleURL, source: "doi.org"),
+               (cachedHandle.statusCode == 200 || cachedHandle.statusCode == 404),
+               case .notRegistered = parseDOIHandlePayload(cachedHandle.body) {
+                sources.append(
+                    CitationVerdictSourceRecord(
+                        source: "doi.org",
+                        url: handleURL.absoluteString,
+                        status: cachedHandle.statusCode,
+                        fetchedAt: resolvedFetchedAt(from: cachedHandle),
+                        origin: cachedHandle.origin
+                    )
+                )
+                return await searchCrossrefForTypoDOICandidate(
+                    entry: entry,
+                    normalizedDOI: normalizedDOI,
+                    existingSources: sources,
+                    existingFindings: findings,
+                    offlineVerdict: offlineVerdict,
+                    isBuiltInRetracted: isBuiltInRetracted,
+                    pendingHandleResponse: nil,
+                    session: session
+                )
+            }
+        }
+
         // 1. Crossref single-work lookup (`/works/<DOI>`)
         if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normalizedDOI) {
             do {
@@ -2359,6 +2492,9 @@ public struct CitationVerificationFirewall: Sendable {
                 if response.statusCode == 200 {
                     switch parseCrossrefWorkPayload(response.body) {
                     case .parsed(let crossrefRemote):
+                        if response.origin != .cache {
+                            cache?.store(url: crossrefURL, statusCode: response.statusCode, body: response.body)
+                        }
                         return await crossCheckOpenAlexRetractionAndReconcile(
                             entry: entry,
                             normalizedDOI: normalizedDOI,
@@ -2455,6 +2591,9 @@ public struct CitationVerificationFirewall: Sendable {
                 if response.statusCode == 200 {
                     switch parseOpenAlexWorkPayload(response.body) {
                     case .parsed(let oaRemote):
+                        if response.origin != .cache {
+                            cache?.store(url: openAlexURL, statusCode: response.statusCode, body: response.body)
+                        }
                         return reconcileRemoteRegistryMetadata(
                             entry: entry,
                             remote: oaRemote,
@@ -2618,6 +2757,10 @@ public struct CitationVerificationFirewall: Sendable {
                     )
                 )
                 if oaResponse.statusCode == 200 {
+                    if oaResponse.origin != .cache,
+                       case .parsed = parseOpenAlexWorkPayload(oaResponse.body) {
+                        cache?.store(url: openAlexURL, statusCode: oaResponse.statusCode, body: oaResponse.body)
+                    }
                     openAlexRetractionField = extractOpenAlexRetractionField(oaResponse.body)
                 } else if oaResponse.statusCode != 404 {
                     let oaCode = classifyHTTPFailureStatus(oaResponse.statusCode, response: oaResponse, host: "api.openalex.org")
@@ -2894,6 +3037,8 @@ public struct CitationVerificationFirewall: Sendable {
             )
 
         case .notRegistered:
+            let pendingHandle: (url: URL, response: RegistryHTTPResponse)? =
+                (handleResponse.origin != .cache) ? (handleURL, handleResponse) : nil
             return await searchCrossrefForTypoDOICandidate(
                 entry: entry,
                 normalizedDOI: normalizedDOI,
@@ -2901,6 +3046,7 @@ public struct CitationVerificationFirewall: Sendable {
                 existingFindings: findings,
                 offlineVerdict: offlineVerdict,
                 isBuiltInRetracted: isBuiltInRetracted,
+                pendingHandleResponse: pendingHandle,
                 session: session
             )
         }
@@ -2913,10 +3059,21 @@ public struct CitationVerificationFirewall: Sendable {
         existingFindings: [FirewallFinding],
         offlineVerdict: CitationFirewallEntryVerdict,
         isBuiltInRetracted: Bool,
+        pendingHandleResponse: (url: URL, response: RegistryHTTPResponse)?,
         session: any CitationRegistrySession
     ) async -> CitationFirewallEntryVerdict {
         var sources = existingSources
         var findings = existingFindings
+
+        func commitHandleToCache() {
+            if let pending = pendingHandleResponse, pending.response.origin != .cache {
+                cache?.store(
+                    url: pending.url,
+                    statusCode: pending.response.statusCode,
+                    body: pending.response.body
+                )
+            }
+        }
 
         func makeDOINotRegisteredVerdict() -> CitationFirewallEntryVerdict {
             if isBuiltInRetracted {
@@ -2951,6 +3108,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         guard let searchQuery = buildBibliographicSearchQuery(for: entry),
               let searchURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: searchQuery, rows: 5) else {
+            commitHandleToCache()
             return makeDOINotRegisteredVerdict()
         }
 
@@ -3063,6 +3221,10 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         guard !uniqueMatches.isEmpty else {
+            commitHandleToCache()
+            if searchResponse.origin != .cache {
+                cache?.store(url: searchURL, statusCode: searchResponse.statusCode, body: searchResponse.body)
+            }
             return makeDOINotRegisteredVerdict()
         }
 
@@ -3105,6 +3267,11 @@ public struct CitationVerificationFirewall: Sendable {
                 )
             }
             matchedCandidate = best[0].record
+        }
+
+        commitHandleToCache()
+        if searchResponse.origin != .cache {
+            cache?.store(url: searchURL, statusCode: searchResponse.statusCode, body: searchResponse.body)
         }
 
         let matchedDOI = matchedCandidate.doi ?? ""
@@ -4878,5 +5045,24 @@ public struct CitationVerificationFirewall: Sendable {
             return nil
         }
         return t
+    }
+
+    internal static func isSubstantiatedArXivNotFoundPayload(_ data: Data) -> Bool {
+        if case .notFound = CitationVerificationFirewall(includeBuiltInRetractedDOIs: false).parseArXivAtomPayload(data) {
+            return true
+        }
+        return false
+    }
+
+    internal static func isSubstantiatedPubMedNotFoundPayload(_ data: Data, requestURL: URL) -> Bool {
+        guard let components = URLComponents(url: requestURL, resolvingAgainstBaseURL: false),
+              let pmid = components.queryItems?.first(where: { $0.name == "id" })?.value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !pmid.isEmpty else {
+            return false
+        }
+        if case .notFound = CitationVerificationFirewall(includeBuiltInRetractedDOIs: false).parsePubMedSummaryPayload(data, requestedPMID: pmid) {
+            return true
+        }
+        return false
     }
 }

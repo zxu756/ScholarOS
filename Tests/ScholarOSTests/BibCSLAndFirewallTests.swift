@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 import ScholarModels
 @testable import ScholarBibAndCSL
@@ -3212,5 +3213,797 @@ struct BibCSLAndFirewallTests {
         for s in pubmedClock.sleeps {
             #expect(abs(s - (1.0 / 3.0)) < 0.001)
         }
+    }
+
+    // MARK: - M1 Item 7 (Stage 07): SQLite Response Cache, TTLs, Key Normalization, Hygiene & Resilience
+
+    @Test("M1 item 7 (Stage 07): running the 22 recorded entries twice with the same SQLite cache sends 0 requests for all 19 cacheable entries on run 2, preserves identical verdicts, and records cache origin + UTC date")
+    func m1Stage07CacheReplayRunTwiceZeroRequestsIdenticalVerdictsAndProvenance() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage07-twice-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let recheckRaw = try String(
+            contentsOf: repoRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        )
+        let stage05Raw = try String(
+            contentsOf: repoRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib"),
+            encoding: .utf8
+        )
+        let entries = try BibTeXCodec().parseDocument(recheckRaw + "\n" + stage05Raw).entries
+        #expect(entries.count == 22)
+
+        let fixedDate = Date(timeIntervalSince1970: 1_794_817_800) // 2026-11-16T08:30:00Z
+        let clock = ClosureRegistryClock(
+            now: { 0.0 },
+            currentDate: { fixedDate },
+            sleep: { _ in }
+        )
+
+        let dbURL = tempDir.appendingPathComponent("caches/registry.sqlite")
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        actor SessionCounter {
+            var count: Int = 0
+            func increment() { count += 1 }
+            func resetAndRead() -> Int {
+                let current = count
+                count = 0
+                return current
+            }
+        }
+
+        final class EventBag: @unchecked Sendable {
+            private let lock = NSLock()
+            private var items: [RegistryRequestTelemetryEvent] = []
+            func append(_ e: RegistryRequestTelemetryEvent) {
+                lock.lock()
+                items.append(e)
+                lock.unlock()
+            }
+            func drain() -> [RegistryRequestTelemetryEvent] {
+                lock.lock()
+                defer { lock.unlock() }
+                let copy = items
+                items.removeAll()
+                return copy
+            }
+        }
+
+        let counter = SessionCounter()
+        let countingSession = ClosureRegistrySession { req in
+            await counter.increment()
+            return try await replay.send(req)
+        }
+
+        // Run 1: warms the SQLite cache
+        let cache1 = RegistryResponseCache(fileURL: dbURL, clock: clock)
+        let firewall1 = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: cache1
+        )
+        var run1Verdicts: [String: CitationFirewallEntryVerdict] = [:]
+        for entry in entries {
+            run1Verdicts[entry.citeKey] = await firewall1.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+        }
+        let run1TotalRequests = await counter.resetAndRead()
+        #expect(run1TotalRequests > 30)
+        #expect(FileManager.default.fileExists(atPath: dbURL.path))
+
+        // Run 2: opens a brand-new RegistryResponseCache on the same SQLite file
+        let events = EventBag()
+        final class SleepCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            var sleeps: Int = 0
+            func record() {
+                lock.lock()
+                sleeps += 1
+                lock.unlock()
+            }
+        }
+        let sleepCounter = SleepCounter()
+        let run2Clock = ClosureRegistryClock(
+            now: { 100.0 },
+            currentDate: { fixedDate },
+            sleep: { _ in sleepCounter.record() }
+        )
+        let cache2 = RegistryResponseCache(fileURL: dbURL, clock: run2Clock)
+        let firewall2 = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: run2Clock),
+            cache: cache2,
+            requestObserver: { events.append($0) }
+        )
+
+        let uncachedNoMatchKeys: Set<String> = ["real_nodoi", "fake_nodoi", "draft2024unverified"]
+
+        for entry in entries {
+            _ = events.drain()
+            _ = await counter.resetAndRead()
+            let v2 = await firewall2.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            let entryRequests = await counter.resetAndRead()
+            let entryEvents = events.drain()
+            let v1 = try #require(run1Verdicts[entry.citeKey])
+
+            #expect(v2.firewallClass == v1.firewallClass, "Class mismatch on \(entry.citeKey)")
+            #expect(v2.insertable == v1.insertable, "Insertable mismatch on \(entry.citeKey)")
+            #expect(v2.reasons == v1.reasons, "Reasons mismatch on \(entry.citeKey)")
+            #expect(v2.fields == v1.fields, "Fields mismatch on \(entry.citeKey)")
+
+            if uncachedNoMatchKeys.contains(entry.citeKey) {
+                #expect(entryRequests == 2, "no_match_in_search entry \(entry.citeKey) must not be cached")
+            } else {
+                #expect(entryRequests == 0, "Cached entry \(entry.citeKey) must send 0 transport requests on run 2 (got \(entryRequests))")
+                #expect(!v2.sources.isEmpty, "Cached entry \(entry.citeKey) must record sources")
+                for src in v2.sources {
+                    #expect(src.origin == .cache, "Expected origin == .cache for \(entry.citeKey) source \(src.source)")
+                    #expect(src.fetchedAt == "2026-11-16", "Expected UTC date 2026-11-16 on \(entry.citeKey), got \(src.fetchedAt)")
+                }
+                #expect(!entryEvents.isEmpty, "Expected --verbose observer events for cached entry \(entry.citeKey)")
+                #expect(entryEvents.allSatisfy { $0.origin == .cache })
+                if v2.firewallClass == .verified {
+                    #expect(v2.auditNote.contains("fetched 2026-11-16 (cache)"))
+                }
+            }
+        }
+    }
+
+    @Test("M1 item 7 (Stage 07): HTTP 500, 429, timeout, disconnect, bad JSON, ambiguous, no_match_in_search, and registered_no_metadata never enter cache")
+    func m1Stage07TransientFailuresAmbiguousAndNoMatchNeverEnterCache() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage07-nocache-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbURL = tempDir.appendingPathComponent("registry.sqlite")
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let clock = ClosureRegistryClock.immediate
+
+        let cache = RegistryResponseCache(fileURL: dbURL, clock: clock)
+        let firewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: cache
+        )
+
+        let lecunEntry = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let arxivEntry = BibliographyEntry(
+            citeKey: "arxiv_real_vaswani",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [
+                BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+                BibAuthor(givenName: "Niki", familyName: "Parmar"),
+                BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+                BibAuthor(givenName: "Llion", familyName: "Jones"),
+                BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+                BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+                BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+            ],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        let pmidEntry = BibliographyEntry(
+            citeKey: "pmid_real_ito2015",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [
+                BibAuthor(givenName: "Hiroshi T.", familyName: "Ito"),
+                BibAuthor(givenName: "Sheng-Jia", familyName: "Zhang"),
+                BibAuthor(givenName: "Menno P.", familyName: "Witter"),
+                BibAuthor(givenName: "Edvard I.", familyName: "Moser"),
+                BibAuthor(givenName: "May-Britt", familyName: "Moser")
+            ],
+            year: 2015,
+            venue: "Nature",
+            pmid: "26017312"
+        )
+
+        // 1. Inject 500, 429, timeout, transport error, and unparseable 200 JSON/XML on run 1
+        let fail500 = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 500, body: Data("Internal Server Error".utf8))
+        }
+        let fail429 = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 429, body: Data("Too Many Requests".utf8), headers: ["Retry-After": "1"])
+        }
+        let failTimeout = ClosureRegistrySession { req in
+            throw RegistryTransportError(kind: .timeout, detail: "Simulated timeout", url: req.url)
+        }
+        let failDisconnect = ClosureRegistrySession { req in
+            throw RegistryTransportError(kind: .transportError, detail: "Simulated offline", url: req.url)
+        }
+        let failBadPayload = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(statusCode: 200, body: Data("{corrupt-json-not-valid".utf8))
+        }
+
+        for session in [fail500, fail429, failTimeout, failDisconnect, failBadPayload] {
+            let vDOI = await firewall.verifyAgainstPublicRegistries(entry: lecunEntry, session: session)
+            let vArXiv = await firewall.verifyAgainstPublicRegistries(entry: arxivEntry, session: session)
+            let vPMID = await firewall.verifyAgainstPublicRegistries(entry: pmidEntry, session: session)
+            #expect(vDOI.firewallClass == .unverified)
+            #expect(vArXiv.firewallClass == .unverified)
+            #expect(vPMID.firewallClass == .unverified)
+        }
+
+        // 2. Ambiguous (both identifierless search and typo-DOI search), no_match_in_search, and registered_no_metadata
+        let ambiguousTiedPayload = Data("""
+        {
+          "status": "ok",
+          "message": {
+            "items": [
+              {
+                "DOI": "10.1000/ambig.1",
+                "title": ["Identical Ambiguous Title"],
+                "author": [{"given": "Alice", "family": "chen"}],
+                "issued": {"date-parts": [[2022]]},
+                "container-title": ["Journal of Testing"]
+              },
+              {
+                "DOI": "10.1000/ambig.2",
+                "title": ["Identical Ambiguous Title"],
+                "author": [{"given": "Alice", "family": "Chen"}],
+                "issued": {"date-parts": [[2022]]},
+                "container-title": ["Journal of Testing"]
+              }
+            ]
+          }
+        }
+        """.utf8)
+
+        let ambigNoPID = BibliographyEntry(
+            citeKey: "ambig_nopid",
+            kind: .article,
+            title: "Identical Ambiguous Title",
+            authors: [BibAuthor(givenName: "Alice", familyName: "Chen")],
+            year: 2022,
+            venue: "Journal of Testing"
+        )
+        let ambigTypoDOI = BibliographyEntry(
+            citeKey: "ambig_typodoi",
+            kind: .article,
+            title: "Identical Ambiguous Title",
+            authors: [BibAuthor(givenName: "Alice", familyName: "Chen")],
+            year: 2022,
+            venue: "Journal of Testing",
+            doi: "10.1000/nonexistent.9999"
+        )
+        let ambigSession = ClosureRegistrySession { req in
+            let host = req.url?.host ?? ""
+            let query = req.url?.query ?? ""
+            if host == "api.crossref.org" && query.contains("query.bibliographic=") {
+                return RegistryHTTPResponse(statusCode: 200, body: ambiguousTiedPayload)
+            }
+            if host == "doi.org" {
+                return RegistryHTTPResponse(statusCode: 404, body: Data("{\"responseCode\":100}".utf8))
+            }
+            return RegistryHTTPResponse(statusCode: 404, body: Data("Not Found".utf8))
+        }
+
+        let vAmbig1 = await firewall.verifyAgainstPublicRegistries(entry: ambigNoPID, session: ambigSession)
+        let vAmbig2 = await firewall.verifyAgainstPublicRegistries(entry: ambigTypoDOI, session: ambigSession)
+        #expect(vAmbig1.firewallClass == .unverified)
+        #expect(vAmbig1.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+        #expect(vAmbig2.firewallClass == .unverified)
+        #expect(vAmbig2.reasons == [CitationUnverifiedReasonCode.ambiguous.rawValue])
+
+        let noMatchEntry = BibliographyEntry(
+            citeKey: "draft2024unverified",
+            kind: .misc,
+            title: "Unpublished Workshop Notes on Attention Kernels",
+            authors: [BibAuthor(givenName: "Pat", familyName: "Taylor")],
+            year: 2024
+        )
+        let cnkiRegisteredNoMeta = BibliographyEntry(
+            citeKey: "yang2024jos",
+            kind: .article,
+            title: "Deep Learning Based Code Generation Methods: Literature Review",
+            authors: [BibAuthor(givenName: "Zezhou", familyName: "Yang")],
+            year: 2024,
+            venue: "Journal of Software",
+            doi: "10.13328/j.cnki.jos.006981"
+        )
+        let vNoMatch = await firewall.verifyAgainstPublicRegistries(entry: noMatchEntry, session: replay)
+        let vRegNoMeta = await firewall.verifyAgainstPublicRegistries(entry: cnkiRegisteredNoMeta, session: replay)
+        #expect(vNoMatch.firewallClass == .unverified)
+        #expect(vNoMatch.reasons == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue])
+        #expect(vRegNoMeta.firewallClass == .unverified)
+        #expect(vRegNoMeta.reasons == [CitationUnverifiedReasonCode.registeredNoMetadata.rawValue])
+
+        // Assert zero rows were written to SQLite across all failure/ambiguous/no_match_in_search runs!
+        if FileManager.default.fileExists(atPath: dbURL.path) {
+            var db: OpaquePointer?
+            #expect(sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+            defer { sqlite3_close_v2(db) }
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM registry_cache;", -1, &stmt, nil) == SQLITE_OK {
+                defer { sqlite3_finalize(stmt) }
+                if sqlite3_step(stmt) == SQLITE_ROW {
+                    #expect(sqlite3_column_int64(stmt, 0) == 0)
+                }
+            }
+        }
+
+        // 3. Second run with normal replay session sends normal requests and gets the true VERIFIED verdicts
+        actor RecoveryCounter {
+            var count = 0
+            func inc() { count += 1 }
+        }
+        let recoveryCounter = RecoveryCounter()
+        let normalSession = ClosureRegistrySession { req in
+            await recoveryCounter.inc()
+            return try await replay.send(req)
+        }
+        let recoveredDOI = await firewall.verifyAgainstPublicRegistries(entry: lecunEntry, session: normalSession)
+        let recoveredArXiv = await firewall.verifyAgainstPublicRegistries(entry: arxivEntry, session: normalSession)
+        let recoveredPMID = await firewall.verifyAgainstPublicRegistries(entry: pmidEntry, session: normalSession)
+        #expect(recoveredDOI.firewallClass == .verified)
+        #expect(recoveredArXiv.firewallClass == .verified)
+        #expect(recoveredPMID.firewallClass == .verified)
+        #expect(await recoveryCounter.count == 4) // 2 (Crossref + OpenAlex) + 1 (arXiv) + 1 (PubMed)
+    }
+
+    @Test("M1 item 7 (Stage 07): injectable clock expires all 3 substantiated not-found types after 1 day and valid 200 records after 30 days (not at 29 days)")
+    func m1Stage07InjectableClockExpiration1DayNotFoundAnd30DayValidRecords() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage07-ttl-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        final class SteppableClock: @unchecked Sendable {
+            private let lock = NSLock()
+            private var offsetSeconds: TimeInterval = 0
+            let baseEpoch: TimeInterval = 1_794_787_200 // 2026-11-16T00:00:00Z
+
+            func setOffset(_ seconds: TimeInterval) {
+                lock.lock()
+                offsetSeconds = seconds
+                lock.unlock()
+            }
+
+            func now() -> TimeInterval {
+                lock.lock()
+                defer { lock.unlock() }
+                return offsetSeconds
+            }
+
+            func currentDate() -> Date {
+                lock.lock()
+                defer { lock.unlock() }
+                return Date(timeIntervalSince1970: baseEpoch + offsetSeconds)
+            }
+        }
+
+        actor Counter {
+            var count = 0
+            func inc() { count += 1 }
+            func drain() -> Int {
+                let c = count
+                count = 0
+                return c
+            }
+        }
+
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let counter = Counter()
+        let countingSession = ClosureRegistrySession { req in
+            await counter.inc()
+            return try await replay.send(req)
+        }
+
+        // Part A: Three substantiated "not found" types (doi.org 100, arXiv totalResults 0, PubMed error) -> 1-day TTL
+        let notFoundClockState = SteppableClock()
+        let notFoundClock = ClosureRegistryClock(
+            now: { notFoundClockState.now() },
+            currentDate: { notFoundClockState.currentDate() },
+            sleep: { _ in }
+        )
+        let notFoundDB = tempDir.appendingPathComponent("notfound.sqlite")
+        let notFoundCache = RegistryResponseCache(fileURL: notFoundDB, clock: notFoundClock)
+        let notFoundFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: notFoundClock),
+            cache: notFoundCache
+        )
+
+        let doiNotFound = BibliographyEntry(
+            citeKey: "fake_nonsentinel",
+            kind: .article,
+            title: "Quantum Gradient Descent in Biological Neural Networks",
+            authors: [
+                BibAuthor(givenName: "Eleanor", familyName: "Whitfield"),
+                BibAuthor(givenName: "Raj", familyName: "Patel")
+            ],
+            year: 2026,
+            venue: "Nature Machine Intelligence",
+            doi: "10.1038/fake.2026.99999"
+        )
+        let arxivNotFound = BibliographyEntry(
+            citeKey: "arxiv_nonexistent",
+            kind: .misc,
+            title: "Synthetic Nonexistent Preprint",
+            authors: [BibAuthor(givenName: "Alex", familyName: "Rivera")],
+            year: 2024,
+            arxivID: "2401.99999"
+        )
+        let pmidNotFound = BibliographyEntry(
+            citeKey: "pmid_nonexistent",
+            kind: .article,
+            title: "Synthetic Nonexistent PubMed Study",
+            authors: [BibAuthor(givenName: "Jordan", familyName: "Lee")],
+            year: 2024,
+            pmid: "99999999"
+        )
+
+        for entry in [doiNotFound, arxivNotFound, pmidNotFound] {
+            let v = await notFoundFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .notFound)
+        }
+        #expect(await counter.drain() == 6) // 4 (Crossref, OpenAlex, doi.org, CrossrefSearch) + 1 (arXiv) + 1 (PubMed)
+
+        // At +23 hours (< 1 day): all 3 hit cache -> 0 requests
+        notFoundClockState.setOffset(23 * 3600)
+        for entry in [doiNotFound, arxivNotFound, pmidNotFound] {
+            let v = await notFoundFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .notFound)
+            #expect(v.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+        }
+        #expect(await counter.drain() == 0)
+
+        // At +1 day + 1 second (86_401s -> 2026-11-17T00:00:01Z): all 3 expire and re-send requests, overwriting expired rows
+        notFoundClockState.setOffset(86_401)
+        _ = await counter.drain()
+        let vDOIAfter1d = await notFoundFirewall.verifyAgainstPublicRegistries(entry: doiNotFound, session: countingSession)
+        let doiReqsAfter1d = await counter.drain()
+        let vArXivAfter1d = await notFoundFirewall.verifyAgainstPublicRegistries(entry: arxivNotFound, session: countingSession)
+        let arxivReqsAfter1d = await counter.drain()
+        let vPMIDAfter1d = await notFoundFirewall.verifyAgainstPublicRegistries(entry: pmidNotFound, session: countingSession)
+        let pmidReqsAfter1d = await counter.drain()
+
+        #expect(vDOIAfter1d.firewallClass == .notFound)
+        #expect(doiReqsAfter1d >= 3, "Expired doi.org 100 entry must re-query registries after 1 day")
+        #expect(vArXivAfter1d.firewallClass == .notFound)
+        #expect(arxivReqsAfter1d == 1, "Expired arXiv totalResults=0 entry must re-query arXiv after 1 day")
+        #expect(vPMIDAfter1d.firewallClass == .notFound)
+        #expect(pmidReqsAfter1d == 1, "Expired PubMed error entry must re-query PubMed after 1 day")
+
+        // Confirm overwritten timestamp is 2026-11-17 on immediate subsequent lookup
+        notFoundClockState.setOffset(86_460)
+        for entry in [doiNotFound, arxivNotFound, pmidNotFound] {
+            let v = await notFoundFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .notFound)
+            #expect(v.sources.contains { $0.origin == .cache && $0.fetchedAt == "2026-11-17" })
+        }
+        #expect(await counter.drain() == 0)
+
+        // Part B: Valid 200 records -> 30-day TTL (29 days: 0 requests; >30 days: re-sends & overwrites)
+        let validClockState = SteppableClock()
+        let validClock = ClosureRegistryClock(
+            now: { validClockState.now() },
+            currentDate: { validClockState.currentDate() },
+            sleep: { _ in }
+        )
+        let validDB = tempDir.appendingPathComponent("valid.sqlite")
+        let validCache = RegistryResponseCache(fileURL: validDB, clock: validClock)
+        let validFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: validClock),
+            cache: validCache
+        )
+
+        let lecun = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let vaswani = BibliographyEntry(
+            citeKey: "arxiv_real_vaswani",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [
+                BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+                BibAuthor(givenName: "Niki", familyName: "Parmar"),
+                BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+                BibAuthor(givenName: "Llion", familyName: "Jones"),
+                BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+                BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+                BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+            ],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        let ito = BibliographyEntry(
+            citeKey: "pmid_real_ito2015",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [
+                BibAuthor(givenName: "Hiroshi T.", familyName: "Ito"),
+                BibAuthor(givenName: "Sheng-Jia", familyName: "Zhang"),
+                BibAuthor(givenName: "Menno P.", familyName: "Witter"),
+                BibAuthor(givenName: "Edvard I.", familyName: "Moser"),
+                BibAuthor(givenName: "May-Britt", familyName: "Moser")
+            ],
+            year: 2015,
+            venue: "Nature",
+            pmid: "26017312"
+        )
+
+        for entry in [lecun, vaswani, ito] {
+            let v = await validFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .verified)
+        }
+        #expect(await counter.drain() == 4)
+
+        // At +29 days: 0 requests sent
+        validClockState.setOffset(29 * 86_400)
+        for entry in [lecun, vaswani, ito] {
+            let v = await validFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .verified)
+            #expect(v.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+        }
+        #expect(await counter.drain() == 0)
+
+        // At +30 days + 1 second (2026-12-16T00:00:01Z): all 3 expire, re-send requests, and overwrite rows
+        validClockState.setOffset(30 * 86_400 + 1)
+        for entry in [lecun, vaswani, ito] {
+            let v = await validFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .verified)
+        }
+        #expect(await counter.drain() == 4)
+
+        // Subsequent check at +30 days + 60 seconds hits refreshed rows (2026-12-16) with 0 requests
+        validClockState.setOffset(30 * 86_400 + 60)
+        for entry in [lecun, vaswani, ito] {
+            let v = await validFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
+            #expect(v.firewallClass == .verified)
+            #expect(v.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-12-16" })
+        }
+        #expect(await counter.drain() == 0)
+    }
+
+    @Test("M1 item 7 (Stage 07): canonical URL key normalizes parameter order, case, and percent-escapes while SQLite stores only url, status, body, and fetched_at")
+    func m1Stage07CanonicalURLKeyNormalizationAndSQLiteSchemaHygiene() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage07-schema-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbURL = tempDir.appendingPathComponent("registry.sqlite")
+        let fixedDate = Date(timeIntervalSince1970: 1_794_787_200) // 2026-11-16T00:00:00Z
+        let clock = ClosureRegistryClock(now: { 0 }, currentDate: { fixedDate }, sleep: { _ in })
+        let cache = RegistryResponseCache(fileURL: dbURL, clock: clock)
+
+        // 1. Query parameter order, host/scheme case, default port, fragment, and percent-encoding normalization
+        let unnormalizedPubMed = try #require(
+            URL(string: "HTTPS://EUTILS.NCBI.NLM.NIH.GOV:443/entrez/eutils/esummary.fcgi?retmode=json&id=26017312&db=%70ubmed#frag")
+        )
+        let canonicalPubMed = try #require(
+            URL(string: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=26017312&retmode=json")
+        )
+        #expect(RegistryResponseCache.canonicalKey(for: unnormalizedPubMed) == RegistryResponseCache.canonicalKey(for: canonicalPubMed))
+
+        let unnormalizedCrossrefSearch = try #require(
+            URL(string: "HTTPS://API.Crossref.ORG:443/works?rows=5&query.bibliographic=ICALP%202015%20Halld%c3%b3rsson")
+        )
+        let canonicalCrossrefSearch = try #require(
+            URL(string: "https://api.crossref.org/works?query.bibliographic=ICALP%202015%20Halld%C3%B3rsson&rows=5")
+        )
+        #expect(RegistryResponseCache.canonicalKey(for: unnormalizedCrossrefSearch) == RegistryResponseCache.canonicalKey(for: canonicalCrossrefSearch))
+
+        let unnormalizedDOI = try #require(
+            URL(string: "HTTPS://API.CROSSREF.ORG:443/works/10.1038/Nature14539#section")
+        )
+        let canonicalDOI = try #require(
+            URL(string: "https://api.crossref.org/works/10.1038/nature14539")
+        )
+        #expect(RegistryResponseCache.canonicalKey(for: unnormalizedDOI) == RegistryResponseCache.canonicalKey(for: canonicalDOI))
+
+        // Store via unnormalized URL, lookup via canonical URL (and confirm headers play no part)
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let firewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: cache
+        )
+        let secretBibEntry = try #require(
+            BibTeXCodec().parseDocument("""
+            @article{secret_local_citekey_never_stored,
+              author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+              title   = {Deep learning},
+              journal = {Nature},
+              year    = {2015},
+              doi     = {10.1038/nature14539},
+              note    = {private_bib_note_never_stored}
+            }
+            """).entries.first
+        )
+        let headerInjectedSession = ClosureRegistrySession { req in
+            let base = try await replay.send(req)
+            return RegistryHTTPResponse(
+                statusCode: base.statusCode,
+                body: base.body,
+                headers: [
+                    "User-Agent": "ScholarOS/1.2.0",
+                    "X-Secret-Test-Header": "must-never-be-persisted-in-sqlite"
+                ],
+                origin: .network,
+                fetchedAt: base.fetchedAt
+            )
+        }
+        let v = await firewall.verifyAgainstPublicRegistries(entry: secretBibEntry, session: headerInjectedSession)
+        #expect(v.firewallClass == .verified)
+
+        // Lookup using uppercase host/DOI URL hits the exact cached record
+        let hitViaUnnormalized = try #require(cache.lookup(for: unnormalizedDOI))
+        #expect(hitViaUnnormalized.origin == .cache)
+        #expect(hitViaUnnormalized.statusCode == 200)
+        #expect(hitViaUnnormalized.fetchedAt == "2026-11-16")
+        #expect(hitViaUnnormalized.headers.isEmpty)
+
+        // 2. Inspect SQLite schema & raw bytes for strict data hygiene (Item 7)
+        var db: OpaquePointer?
+        #expect(sqlite3_open_v2(dbURL.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close_v2(db) }
+
+        var colNames: [String] = []
+        var pragmaStmt: OpaquePointer?
+        #expect(sqlite3_prepare_v2(db, "PRAGMA table_info(registry_cache);", -1, &pragmaStmt, nil) == SQLITE_OK)
+        while sqlite3_step(pragmaStmt) == SQLITE_ROW {
+            if let cName = sqlite3_column_text(pragmaStmt, 1) {
+                colNames.append(String(cString: cName))
+            }
+        }
+        sqlite3_finalize(pragmaStmt)
+        #expect(colNames == ["url", "status", "body", "fetched_at"])
+
+        // Checkpoint WAL or read all SQLite artifacts to ensure zero headers, local paths, or .bib content
+        for suffix in ["", "-wal", "-shm"] {
+            let fileURL = URL(fileURLWithPath: dbURL.path + suffix)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else { continue }
+            let rawBytes = try Data(contentsOf: fileURL)
+            let latin1 = String(decoding: rawBytes, as: UTF8.self)
+            #expect(!latin1.contains("X-Secret-Test-Header"))
+            #expect(!latin1.contains("must-never-be-persisted-in-sqlite"))
+            #expect(!latin1.contains("ScholarOS/1.2.0"))
+            #expect(!latin1.contains("secret_local_citekey_never_stored"))
+            #expect(!latin1.contains("private_bib_note_never_stored"))
+            #expect(!latin1.contains(tempDir.path))
+        }
+    }
+
+    @Test("M1 item 7 (Stage 07): corrupt SQLite bytes and unwritable cache paths emit one warning without failing verification, and concurrent connections succeed")
+    func m1Stage07CorruptDatabaseAndConcurrentConnectionsResilience() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage07-corrupt-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        final class WarningCollector: @unchecked Sendable {
+            private let lock = NSLock()
+            var messages: [String] = []
+            func append(_ msg: String) {
+                lock.lock()
+                messages.append(msg)
+                lock.unlock()
+            }
+        }
+
+        // 1. Corrupt registry.sqlite containing random non-SQLite bytes
+        let corruptDBURL = tempDir.appendingPathComponent("corrupt.sqlite")
+        var garbage = Data([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0xFF, 0x42, 0x13, 0x7F, 0x80])
+        garbage.append(Data("corrupt-not-a-sqlite-header-at-all".utf8))
+        try garbage.write(to: corruptDBURL)
+
+        let corruptWarnings = WarningCollector()
+        let corruptCache = RegistryResponseCache(
+            fileURL: corruptDBURL,
+            clock: .immediate,
+            warningHandler: { corruptWarnings.append($0) }
+        )
+        let corruptFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: .immediate),
+            cache: corruptCache
+        )
+
+        let lecun = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let vaswani = BibliographyEntry(
+            citeKey: "arxiv_real_vaswani",
+            kind: .misc,
+            title: "Attention Is All You Need",
+            authors: [
+                BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+                BibAuthor(givenName: "Niki", familyName: "Parmar"),
+                BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+                BibAuthor(givenName: "Llion", familyName: "Jones"),
+                BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+                BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+                BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+            ],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+
+        let v1 = await corruptFirewall.verifyAgainstPublicRegistries(entry: lecun, session: replay)
+        let v2 = await corruptFirewall.verifyAgainstPublicRegistries(entry: vaswani, session: replay)
+        #expect(v1.firewallClass == .verified)
+        #expect(v2.firewallClass == .verified)
+        #expect(corruptWarnings.messages.count == 1)
+        #expect(corruptWarnings.messages.first?.contains("\n") == false)
+
+        // 2. Unwritable cache path (regular file blocking directory creation)
+        let blockingFileURL = tempDir.appendingPathComponent("not-a-directory")
+        try Data("file".utf8).write(to: blockingFileURL)
+        let unwritableDBURL = blockingFileURL.appendingPathComponent("registry.sqlite")
+        let unwritableWarnings = WarningCollector()
+        let unwritableCache = RegistryResponseCache(
+            fileURL: unwritableDBURL,
+            clock: .immediate,
+            warningHandler: { unwritableWarnings.append($0) }
+        )
+        let unwritableFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: .immediate),
+            cache: unwritableCache
+        )
+        let vUnwritable = await unwritableFirewall.verifyAgainstPublicRegistries(entry: lecun, session: replay)
+        #expect(vUnwritable.firewallClass == .verified)
+        #expect(unwritableWarnings.messages.count == 1)
+
+        // 3. Multi-connection concurrent reads & writes on the same SQLite database (busy_timeout + WAL)
+        let concurrentDBURL = tempDir.appendingPathComponent("concurrent/registry.sqlite")
+        let concurrentWarnings = WarningCollector()
+        await withTaskGroup(of: CitationFirewallEntryVerdict.self) { group in
+            for idx in 0..<16 {
+                let targetEntry = (idx % 2 == 0) ? lecun : vaswani
+                group.addTask {
+                    let workerCache = RegistryResponseCache(
+                        fileURL: concurrentDBURL,
+                        clock: .immediate,
+                        warningHandler: { concurrentWarnings.append($0) }
+                    )
+                    let workerFirewall = CitationVerificationFirewall(
+                        rateLimiter: RegistryRateLimiter(clock: .immediate),
+                        cache: workerCache
+                    )
+                    return await workerFirewall.verifyAgainstPublicRegistries(entry: targetEntry, session: replay)
+                }
+            }
+            for await verdict in group {
+                #expect(verdict.firewallClass == .verified)
+            }
+        }
+        #expect(concurrentWarnings.messages.isEmpty)
     }
 }

@@ -117,7 +117,14 @@ public struct ClosureRegistrySession: CitationRegistrySession, Sendable {
 
 public protocol RegistryClock: Sendable {
     func now() -> TimeInterval
+    func currentDate() -> Date
     func sleep(_ seconds: TimeInterval) async throws
+}
+
+extension RegistryClock {
+    public func currentDate() -> Date {
+        Date()
+    }
 }
 
 public struct SystemRegistryClock: RegistryClock, Sendable {
@@ -125,6 +132,10 @@ public struct SystemRegistryClock: RegistryClock, Sendable {
 
     public func now() -> TimeInterval {
         ProcessInfo.processInfo.systemUptime
+    }
+
+    public func currentDate() -> Date {
+        Date()
     }
 
     public func sleep(_ seconds: TimeInterval) async throws {
@@ -135,19 +146,29 @@ public struct SystemRegistryClock: RegistryClock, Sendable {
 }
 
 public struct ClosureRegistryClock: RegistryClock, Sendable {
+    /// Default anchor timestamp (`2026-11-16T00:00:00Z`) when no explicit `currentDate` closure is provided.
+    public static let defaultVirtualEpoch: TimeInterval = 1_794_787_200
+
     private let nowHandler: @Sendable () -> TimeInterval
+    private let dateHandler: @Sendable () -> Date
     private let sleepHandler: @Sendable (TimeInterval) async throws -> Void
 
     public init(
         now: @escaping @Sendable () -> TimeInterval,
+        currentDate: (@Sendable () -> Date)? = nil,
         sleep: @escaping @Sendable (TimeInterval) async throws -> Void
     ) {
         self.nowHandler = now
+        self.dateHandler = currentDate ?? { Date(timeIntervalSince1970: Self.defaultVirtualEpoch + now()) }
         self.sleepHandler = sleep
     }
 
     public func now() -> TimeInterval {
         nowHandler()
+    }
+
+    public func currentDate() -> Date {
+        dateHandler()
     }
 
     public func sleep(_ seconds: TimeInterval) async throws {
