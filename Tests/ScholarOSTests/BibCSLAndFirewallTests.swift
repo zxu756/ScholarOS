@@ -3320,6 +3320,7 @@ struct BibCSLAndFirewallTests {
         )
 
         let uncachedNoMatchKeys: Set<String> = ["real_nodoi", "fake_nodoi", "draft2024unverified"]
+        let typoDOINotFoundKeys: Set<String> = ["fake_nonsentinel", "fake_sentinel"]
 
         for entry in entries {
             _ = events.drain()
@@ -3336,6 +3337,13 @@ struct BibCSLAndFirewallTests {
 
             if uncachedNoMatchKeys.contains(entry.citeKey) {
                 #expect(entryRequests == 2, "no_match_in_search entry \(entry.citeKey) must not be cached")
+            } else if typoDOINotFoundKeys.contains(entry.citeKey) {
+                #expect(entryRequests == 1, "Unmatched Crossref title search on \(entry.citeKey) must not be cached (got \(entryRequests))")
+                let handleSrc = try #require(v2.sources.first { $0.source == "doi.org" })
+                #expect(handleSrc.origin == .cache)
+                #expect(handleSrc.fetchedAt == "2026-11-16")
+                let searchSrc = try #require(v2.sources.first { $0.source == "Crossref" })
+                #expect(searchSrc.origin == .replay)
             } else {
                 #expect(entryRequests == 0, "Cached entry \(entry.citeKey) must send 0 transport requests on run 2 (got \(entryRequests))")
                 #expect(!v2.sources.isEmpty, "Cached entry \(entry.citeKey) must record sources")
@@ -3653,14 +3661,19 @@ struct BibCSLAndFirewallTests {
         }
         #expect(await counter.drain() == 6) // 4 (Crossref, OpenAlex, doi.org, CrossrefSearch) + 1 (arXiv) + 1 (PubMed)
 
-        // At +23 hours (< 1 day): all 3 hit cache -> 0 requests
+        // At +23 hours (< 1 day): doi.org/arXiv/PubMed 1d rows hit cache; only doiNotFound's unmatched Crossref title search re-sends (1 request)
         notFoundClockState.setOffset(23 * 3600)
         for entry in [doiNotFound, arxivNotFound, pmidNotFound] {
             let v = await notFoundFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
             #expect(v.firewallClass == .notFound)
-            #expect(v.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+            if entry.citeKey == "fake_nonsentinel" {
+                #expect(v.sources.contains { $0.source == "doi.org" && $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+                #expect(v.sources.contains { $0.source == "Crossref" && $0.origin == .replay })
+            } else {
+                #expect(v.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+            }
         }
-        #expect(await counter.drain() == 0)
+        #expect(await counter.drain() == 1)
 
         // At +1 day + 1 second (86_401s -> 2026-11-17T00:00:01Z): all 3 expire and re-send requests, overwriting expired rows
         notFoundClockState.setOffset(86_401)
@@ -3673,20 +3686,20 @@ struct BibCSLAndFirewallTests {
         let pmidReqsAfter1d = await counter.drain()
 
         #expect(vDOIAfter1d.firewallClass == .notFound)
-        #expect(doiReqsAfter1d >= 3, "Expired doi.org 100 entry must re-query registries after 1 day")
+        #expect(doiReqsAfter1d == 4, "Expired doi.org 100 entry must re-query Crossref + OpenAlex + doi.org + Crossref title search after 1 day")
         #expect(vArXivAfter1d.firewallClass == .notFound)
         #expect(arxivReqsAfter1d == 1, "Expired arXiv totalResults=0 entry must re-query arXiv after 1 day")
         #expect(vPMIDAfter1d.firewallClass == .notFound)
         #expect(pmidReqsAfter1d == 1, "Expired PubMed error entry must re-query PubMed after 1 day")
 
-        // Confirm overwritten timestamp is 2026-11-17 on immediate subsequent lookup
+        // Confirm overwritten timestamp is 2026-11-17 on immediate subsequent lookup (only doiNotFound's unmatched Crossref search re-sends)
         notFoundClockState.setOffset(86_460)
         for entry in [doiNotFound, arxivNotFound, pmidNotFound] {
             let v = await notFoundFirewall.verifyAgainstPublicRegistries(entry: entry, session: countingSession)
             #expect(v.firewallClass == .notFound)
             #expect(v.sources.contains { $0.origin == .cache && $0.fetchedAt == "2026-11-17" })
         }
-        #expect(await counter.drain() == 0)
+        #expect(await counter.drain() == 1)
 
         // Part B: Valid 200 records -> 30-day TTL (29 days: 0 requests; >30 days: re-sends & overwrites)
         let validClockState = SteppableClock()
@@ -4005,5 +4018,173 @@ struct BibCSLAndFirewallTests {
             }
         }
         #expect(concurrentWarnings.messages.isEmpty)
+    }
+
+    // MARK: - M1 Item 7 (Stage 08 Follow-up Fix 1): Unmatched Search Responses Never Cached
+
+    @Test("M1 item 7 (Stage 08 Fix 1): unmatched search responses in typo-DOI and identifierless fallback are never cached; run 2 sends only that 1 search and +2 days re-sends both doi.org and title search")
+    func m1Stage08Fix1UnmatchedSearchResponsesNeverCachedAcrossTypoDOIAndIdentifierless() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-stage08-fix1-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let recheckRaw = try String(
+            contentsOf: repoRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        )
+        let recheckEntries = try BibTeXCodec().parseDocument(recheckRaw).entries
+        let fakeNonSentinel = try #require(recheckEntries.first { $0.citeKey == "fake_nonsentinel" })
+        let fakeSentinel = try #require(recheckEntries.first { $0.citeKey == "fake_sentinel" })
+
+        let baseDate = Date(timeIntervalSince1970: 1_794_787_200) // 2026-11-16T00:00:00Z
+        let clock = ClosureRegistryClock(now: { 0 }, currentDate: { baseDate }, sleep: { _ in })
+
+        actor RequestRecorder {
+            var urls: [String] = []
+            func record(_ url: String) { urls.append(url) }
+            func drain() -> [String] {
+                let copy = urls
+                urls.removeAll()
+                return copy
+            }
+        }
+
+        // Part 1: Typo-DOI fallback on fake_nonsentinel and fake_sentinel (doi.org 100 -> Crossref title search with 0 matching candidates)
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let recorder = RequestRecorder()
+        let recordingSession = ClosureRegistrySession { req in
+            await recorder.record(req.url?.absoluteString ?? "")
+            return try await replay.send(req)
+        }
+
+        let typoDB = tempDir.appendingPathComponent("typo-search.sqlite")
+        let typoCache = RegistryResponseCache(fileURL: typoDB, clock: clock)
+        let typoFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: typoCache
+        )
+
+        // Run 1: populates doi.org 100 (1-day TTL), must NOT store unmatched Crossref title search
+        for entry in recheckEntries {
+            _ = await typoFirewall.verifyAgainstPublicRegistries(entry: entry, session: recordingSession)
+        }
+        _ = await recorder.drain()
+
+        // Run 2 immediately (< 1 day): doi.org hits cache, only the 1 unmatched Crossref title search is sent per entry
+        for fakeEntry in [fakeNonSentinel, fakeSentinel] {
+            let v2 = await typoFirewall.verifyAgainstPublicRegistries(entry: fakeEntry, session: recordingSession)
+            let sentURLs = await recorder.drain()
+            #expect(v2.firewallClass == .notFound)
+            #expect(
+                sentURLs.count == 1,
+                "Expected run 2 on \(fakeEntry.citeKey) to send only the 1 unmatched Crossref title search, got \(sentURLs.count): \(sentURLs)"
+            )
+            #expect(sentURLs.first?.contains("api.crossref.org/works?query.bibliographic=") == true)
+            #expect(v2.sources.first { $0.source == "doi.org" }?.origin == .cache)
+            #expect(v2.sources.first { $0.source == "Crossref" }?.origin == .replay)
+        }
+
+        // Dial ALL cached rows back by 2 days (2026-11-14T00:00:00Z): 1-day doi.org expires, and title search must STILL re-send (not hit a 30d cache!)
+        do {
+            var db: OpaquePointer?
+            #expect(sqlite3_open_v2(typoDB.path, &db, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+            defer { sqlite3_close_v2(db) }
+            #expect(sqlite3_exec(db, "UPDATE registry_cache SET fetched_at = '2026-11-14T00:00:00Z';", nil, nil, nil) == SQLITE_OK)
+        }
+
+        let freshCacheAfter2d = RegistryResponseCache(fileURL: typoDB, clock: clock)
+        let firewallAfter2d = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: freshCacheAfter2d
+        )
+        for fakeEntry in [fakeNonSentinel, fakeSentinel] {
+            let vAfter2d = await firewallAfter2d.verifyAgainstPublicRegistries(entry: fakeEntry, session: recordingSession)
+            let sentAfter2d = await recorder.drain()
+            #expect(vAfter2d.firewallClass == .notFound)
+            #expect(
+                sentAfter2d.count == 4,
+                "After 2 days on \(fakeEntry.citeKey), Crossref single + OpenAlex single + doi.org + Crossref title search must all be sent (got \(sentAfter2d.count): \(sentAfter2d))"
+            )
+            #expect(sentAfter2d.contains { $0.contains("doi.org/api/handles/") })
+            #expect(
+                sentAfter2d.contains { $0.contains("api.crossref.org/works?query.bibliographic=") },
+                "After 2 days on \(fakeEntry.citeKey), Crossref title search must be re-sent rather than served from 30d cache"
+            )
+        }
+
+        // Part 2: Identifierless entry where Crossref search has 0 matches and OpenAlex search matches a candidate (using real recorded Knuth payloads)
+        let knuthCrossrefRaw = try Data(
+            contentsOf: Self.recordedRegistryFixturesURL.appendingPathComponent(
+                "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787.raw"
+            )
+        )
+        let knuthOpenAlexRaw = try Data(
+            contentsOf: Self.recordedRegistryFixturesURL.appendingPathComponent(
+                "openalex_title_The_Art_of_Computer_Programming_Volume_1_Fundame_5209a5b41f.raw"
+            )
+        )
+        let knuth2011 = BibliographyEntry(
+            citeKey: "knuth2011taocp4a",
+            kind: .book,
+            title: "The Art of Computer Programming: Combinatorial Algorithms, Part 1",
+            authors: [BibAuthor(givenName: "Donald E.", familyName: "Knuth")],
+            year: 2011
+        )
+        let oaRecorder = RequestRecorder()
+        let knuthSession = ClosureRegistrySession { req in
+            let urlStr = req.url?.absoluteString ?? ""
+            await oaRecorder.record(urlStr)
+            let host = req.url?.host ?? ""
+            if host == "api.crossref.org" {
+                return RegistryHTTPResponse(statusCode: 200, body: knuthCrossrefRaw, origin: .replay, fetchedAt: "2026-11-15")
+            }
+            if host == "api.openalex.org" {
+                return RegistryHTTPResponse(statusCode: 200, body: knuthOpenAlexRaw, origin: .replay, fetchedAt: "2026-11-15")
+            }
+            return RegistryHTTPResponse(statusCode: 404, body: Data("Not Found".utf8), origin: .replay)
+        }
+
+        let noPIDDB = tempDir.appendingPathComponent("identifierless-oa.sqlite")
+        let noPIDCache = RegistryResponseCache(fileURL: noPIDDB, clock: clock)
+        let noPIDFirewall = CitationVerificationFirewall(
+            rateLimiter: RegistryRateLimiter(clock: clock),
+            cache: noPIDCache
+        )
+
+        let knuthV1 = await noPIDFirewall.verifyAgainstPublicRegistries(entry: knuth2011, session: knuthSession)
+        let knuthRun1URLs = await oaRecorder.drain()
+        #expect(knuthV1.firewallClass == .verified || knuthV1.firewallClass == .drift)
+        #expect(knuthRun1URLs.count == 2)
+
+        // Inspect SQLite: ONLY OpenAlex's matched search URL may be stored; Crossref's unmatched search URL must NOT be stored
+        do {
+            var db: OpaquePointer?
+            #expect(sqlite3_open_v2(noPIDDB.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+            defer { sqlite3_close_v2(db) }
+            var cachedURLs: [String] = []
+            var stmt: OpaquePointer?
+            #expect(sqlite3_prepare_v2(db, "SELECT url FROM registry_cache;", -1, &stmt, nil) == SQLITE_OK)
+            defer { sqlite3_finalize(stmt) }
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let cStr = sqlite3_column_text(stmt, 0) {
+                    cachedURLs.append(String(cString: cStr))
+                }
+            }
+            #expect(cachedURLs.count == 1, "Expected only the matched OpenAlex search response in cache, got: \(cachedURLs)")
+            #expect(cachedURLs.allSatisfy { $0.contains("api.openalex.org") })
+            #expect(!cachedURLs.contains { $0.contains("api.crossref.org") })
+        }
+
+        // Run 2 on knuth2011: sends ONLY the 1 unmatched Crossref search; OpenAlex search comes from cache
+        let knuthV2 = await noPIDFirewall.verifyAgainstPublicRegistries(entry: knuth2011, session: knuthSession)
+        let knuthRun2URLs = await oaRecorder.drain()
+        #expect(knuthV2.firewallClass == knuthV1.firewallClass)
+        #expect(knuthRun2URLs.count == 1, "Expected run 2 to send only the 1 unmatched Crossref search, got: \(knuthRun2URLs)")
+        #expect(knuthRun2URLs.first?.contains("api.crossref.org") == true)
+        #expect(knuthV2.sources.first { $0.source == "OpenAlex" }?.origin == .cache)
     }
 }

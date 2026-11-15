@@ -2503,8 +2503,8 @@ struct PluginSDKMCPAndShellTests {
         #expect(FileManager.default.fileExists(atPath: explicitCacheDir.appendingPathComponent("registry.sqlite").path))
         #expect(!FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("untouched-home/Library/Caches/ScholarOS").path))
 
-        // Run 2 on the same .bib and same SCHOLAR_CACHE_DIR (even pointing --registry-replay at an empty manifest so any miss would exit 2!):
-        // Wait: RegistryReplaySession requires manifest.json; let's create a valid empty manifest.json to prove ZERO replay lookups happen!
+        // Run 2 on fully cacheable entries against an empty manifest proves ZERO replay lookups happen for cached entries,
+        // while fake_nonsentinel's unmatched Crossref title search is NOT cached and therefore sends 1 replay lookup!
         let emptyReplayDir = tempDir.appendingPathComponent("empty-replay", isDirectory: true)
         try FileManager.default.createDirectory(at: emptyReplayDir, withIntermediateDirectories: true)
         let emptyManifest = RegistryRecordingManifest(
@@ -2518,8 +2518,36 @@ struct PluginSDKMCPAndShellTests {
         )
         try JSONEncoder().encode(emptyManifest).write(to: emptyReplayDir.appendingPathComponent("manifest.json"))
 
+        let cacheableOnlyBibURL = tempDir.appendingPathComponent("replay_cacheable_only.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        """.write(to: cacheableOnlyBibURL, atomically: true, encoding: .utf8)
+
+        let zeroReplayCheck = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", cacheableOnlyBibURL.path, "--registry-replay", emptyReplayDir.path, "--verbose", "--lang", "en"]
+        )
+        #expect(zeroReplayCheck.exitCode == 0)
+        let zeroReplayLines = zeroReplayCheck.stderr.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(zeroReplayLines.count == 3)
+        #expect(zeroReplayLines.allSatisfy { $0.contains("origin=cache") })
+
         let run2TextZH = await cachedReplayRunner.runWithExitStatus(
-            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--verbose", "--lang", "zh"]
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--verbose", "--lang", "zh"]
         )
         #expect(run2TextZH.exitCode == 1)
         let firstLineZH = run2TextZH.stdout.split(separator: "\n").first.map(String.init) ?? ""
@@ -2528,12 +2556,12 @@ struct PluginSDKMCPAndShellTests {
         #expect(firstLineZH.contains("缓存"))
         #expect(run2TextZH.stdout.contains("2026-11-16 取得（缓存）"))
         let run2VerboseLines = run2TextZH.stderr.split(separator: "\n", omittingEmptySubsequences: true)
-        #expect(run2VerboseLines.count == 5) // 2 (LeCun) + 1 (Vaswani) + 2 (fake_nonsentinel: doi.org + Crossref search)
-        #expect(!run2VerboseLines.isEmpty)
-        #expect(run2VerboseLines.allSatisfy { $0.contains("origin=cache") })
+        #expect(run2VerboseLines.count == 5) // 2 (LeCun cache) + 1 (Vaswani cache) + 1 (fake_nonsentinel doi.org cache) + 1 (fake_nonsentinel Crossref search replay)
+        #expect(run2VerboseLines.filter { $0.contains("origin=cache") }.count == 4)
+        #expect(run2VerboseLines.filter { $0.contains("origin=replay") }.count == 1)
 
         let run2TextEN = await cachedReplayRunner.runWithExitStatus(
-            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--lang", "en"]
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
         )
         #expect(run2TextEN.exitCode == 1)
         #expect(run2TextEN.stdout.contains("fetched 2026-11-16 (cache)"))
@@ -2542,7 +2570,7 @@ struct PluginSDKMCPAndShellTests {
             arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
         )
         let run2JSON = await cachedReplayRunner.runWithExitStatus(
-            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--json", "--lang", "en"]
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
         )
         #expect(run1JSON.exitCode == 1)
         #expect(run2JSON.exitCode == 1)
@@ -2556,7 +2584,12 @@ struct PluginSDKMCPAndShellTests {
             #expect(v2.reasons == v1.reasons)
             #expect(v2.fields == v1.fields)
             #expect(!v2.sources.isEmpty)
-            #expect(v2.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+            if v2.citeKey == "fake_nonsentinel" {
+                #expect(v2.sources.contains { $0.source == "doi.org" && $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+                #expect(v2.sources.contains { $0.source == "Crossref" && $0.origin == .replay })
+            } else {
+                #expect(v2.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+            }
         }
 
         // 3. --registry-replay WITH SCHOLAR_CACHE_DIR AND --no-cache: banner says "no cache" and does NOT read cache

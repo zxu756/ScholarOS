@@ -1963,8 +1963,6 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        var pendingEmptyCrossrefSearch: (url: URL, response: RegistryHTTPResponse)?
-
         // 1. Crossref `query.bibliographic` (title + first author surname + year, rows=5)
         if let crossrefURL = RegistryURLBuilder.crossrefBibliographicSearchURL(query: crossrefQuery, rows: 5) {
             do {
@@ -2014,7 +2012,7 @@ public struct CitationVerificationFirewall: Sendable {
                                 overrideNote: "[UNVERIFIED] \(detail)"
                             )
                         case .none:
-                            pendingEmptyCrossrefSearch = (crossrefURL, response)
+                            break
                         }
                     case .unparseable:
                         failureReasons.append(.unparseable)
@@ -2082,9 +2080,6 @@ public struct CitationVerificationFirewall: Sendable {
                     case .parsed(let candidates):
                         switch selectMatchingSearchCandidate(entry: entry, candidates: candidates, sourceName: "OpenAlex") {
                         case .single(let matched):
-                            if let pending = pendingEmptyCrossrefSearch, pending.response.origin != .cache {
-                                cache?.store(url: pending.url, statusCode: pending.response.statusCode, body: pending.response.body)
-                            }
                             if response.origin != .cache {
                                 cache?.store(url: openAlexURL, statusCode: response.statusCode, body: response.body)
                             }
@@ -3222,9 +3217,6 @@ public struct CitationVerificationFirewall: Sendable {
 
         guard !uniqueMatches.isEmpty else {
             commitHandleToCache()
-            if searchResponse.origin != .cache {
-                cache?.store(url: searchURL, statusCode: searchResponse.statusCode, body: searchResponse.body)
-            }
             return makeDOINotRegisteredVerdict()
         }
 
