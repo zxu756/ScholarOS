@@ -63,6 +63,32 @@ private final class VerboseTelemetryCollector: @unchecked Sendable {
     }
 }
 
+private final class CacheWarningCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [String] = []
+    private let lang: ScholarLanguage
+
+    init(lang: ScholarLanguage) {
+        self.lang = lang
+    }
+
+    func record(_ message: String) {
+        let singleLine = message
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        let prefix = lang.L("[CACHE]", "[CACHE / 缓存]")
+        lock.lock()
+        lines.append("\(prefix) \(singleLine)")
+        lock.unlock()
+    }
+
+    func allLines() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return lines
+    }
+}
+
 private struct ReplayAuditReportEnvelope: Encodable {
     let mode: String = "REPLAY"
     let replay: Bool = true
@@ -84,15 +110,22 @@ private struct ReplayAuditReportEnvelope: Encodable {
 public struct ScholarCLIRunner: Sendable {
     public let registryTransport: any CitationRegistrySession
     public let registryClock: any RegistryClock
+    public let environment: [String: String]?
+
+    private var effectiveEnvironment: [String: String] {
+        environment ?? ProcessInfo.processInfo.environment
+    }
 
     public init(
         registryTransport: any CitationRegistrySession = LiveURLSessionRegistryClient(
             capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
         ),
-        registryClock: any RegistryClock = SystemRegistryClock()
+        registryClock: any RegistryClock = SystemRegistryClock(),
+        environment: [String: String]? = nil
     ) {
         self.registryTransport = registryTransport
         self.registryClock = registryClock
+        self.environment = environment
     }
 
     public func execute(arguments: [String]) async throws -> String {
@@ -101,7 +134,7 @@ public struct ScholarCLIRunner: Sendable {
 
     public func runWithExitStatus(arguments: [String]) async -> CLIProcessResult {
         let cliLang = (try? resolveCLILanguage(arguments: arguments))
-            ?? ProcessInfo.processInfo.environment["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse)
+            ?? effectiveEnvironment["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse)
             ?? .en
         do {
             let output = try await run(arguments: arguments)
@@ -326,12 +359,13 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--registry-record", "--registry-replay"],
-                boolFlags: ["--demo", "--offline", "--json", "--strict", "--verbose"],
+                boolFlags: ["--demo", "--offline", "--no-cache", "--json", "--strict", "--verbose"],
                 maxPositionals: 1,
                 lang: lang
             )
             let emitJSON = parsed.bools.contains("--json")
             let isOffline = parsed.bools.contains("--offline")
+            let noCache = parsed.bools.contains("--no-cache")
             let verbose = parsed.bools.contains("--verbose")
             let recordDir = parsed.values["--registry-record"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -409,8 +443,8 @@ public struct ScholarCLIRunner: Sendable {
                 let opened = try openReadDatabase(
                     parsed: parsed,
                     usage: lang.L(
-                        "Usage: scholaros verify-citations <refs.bib> [--offline | --registry-record <dir> | --registry-replay <dir>] [--verbose] [--json] | --project <dir.scholarproj> | --demo",
-                        "用法：scholaros verify-citations <refs.bib> [--offline | --registry-record <目录> | --registry-replay <目录>] [--verbose] [--json] | --project <dir.scholarproj> | --demo"
+                        "Usage: scholaros verify-citations <refs.bib> [--offline | --registry-record <dir> | --registry-replay <dir>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo",
+                        "用法：scholaros verify-citations <refs.bib> [--offline | --registry-record <目录> | --registry-replay <目录>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo"
                     ),
                     lang: lang
                 )
@@ -419,6 +453,7 @@ public struct ScholarCLIRunner: Sendable {
                 isDemo = opened.isDemo
             }
 
+            let cacheWarningCollector = CacheWarningCollector(lang: lang)
             let verboseCollector: VerboseTelemetryCollector? = verbose ? VerboseTelemetryCollector() : nil
             let observer: RegistryRequestObserver?
             if let collector = verboseCollector {
@@ -429,14 +464,29 @@ public struct ScholarCLIRunner: Sendable {
                 observer = nil
             }
 
+            let env = effectiveEnvironment
+            let baseClock = registryClock
+            let makeStandardCache: () -> RegistryResponseCache? = {
+                guard !noCache else { return nil }
+                return RegistryResponseCache(
+                    fileURL: RegistryResponseCache.resolveDatabaseURL(environment: env),
+                    clock: baseClock,
+                    warningHandler: { message in
+                        cacheWarningCollector.record(message)
+                    }
+                )
+            }
+
             let firewall: CitationVerificationFirewall
             let rawAudit: CitationFirewallAuditReport
             let isReplayMode: Bool
+            let replayUsesCache: Bool
             let performedRegistryLookup: Bool
 
             if let recordDir {
                 firewall = CitationVerificationFirewall(
                     rateLimiter: RegistryRateLimiter(clock: registryClock),
+                    cache: makeStandardCache(),
                     requestObserver: observer
                 )
                 let recordingSession = try RegistryRecordingSession(
@@ -456,10 +506,35 @@ public struct ScholarCLIRunner: Sendable {
                 _ = try await recordingSession.finalize()
                 rawAudit = firewall.summarizeVerdicts(verdicts)
                 isReplayMode = false
+                replayUsesCache = false
                 performedRegistryLookup = true
             } else if let replayDir {
+                let explicitCacheDir = env["SCHOLAR_CACHE_DIR"]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let replayCache: RegistryResponseCache?
+                if !noCache, let explicitCacheDir, !explicitCacheDir.isEmpty {
+                    let explicitSQLiteURL = URL(fileURLWithPath: explicitCacheDir, isDirectory: true)
+                        .appendingPathComponent("registry.sqlite", isDirectory: false)
+                    replayCache = RegistryResponseCache(
+                        fileURL: explicitSQLiteURL,
+                        clock: baseClock,
+                        warningHandler: { message in
+                            cacheWarningCollector.record(message)
+                        }
+                    )
+                    replayUsesCache = true
+                } else {
+                    replayCache = nil
+                    replayUsesCache = false
+                }
+                let replayLimiterClock = ClosureRegistryClock(
+                    now: { baseClock.now() },
+                    currentDate: { baseClock.currentDate() },
+                    sleep: { _ in }
+                )
                 firewall = CitationVerificationFirewall(
-                    rateLimiter: RegistryRateLimiter(clock: .immediate),
+                    rateLimiter: RegistryRateLimiter(clock: replayLimiterClock),
+                    cache: replayCache,
                     requestObserver: observer
                 )
                 let replaySession = try RegistryReplaySession(
@@ -482,10 +557,12 @@ public struct ScholarCLIRunner: Sendable {
                 firewall = CitationVerificationFirewall()
                 rawAudit = firewall.auditLibrary(entries)
                 isReplayMode = false
+                replayUsesCache = false
                 performedRegistryLookup = false
             } else {
                 firewall = CitationVerificationFirewall(
                     rateLimiter: RegistryRateLimiter(clock: registryClock),
+                    cache: makeStandardCache(),
                     requestObserver: observer
                 )
                 var verdicts: [CitationFirewallEntryVerdict] = []
@@ -499,6 +576,7 @@ public struct ScholarCLIRunner: Sendable {
                 }
                 rawAudit = firewall.summarizeVerdicts(verdicts)
                 isReplayMode = false
+                replayUsesCache = false
                 performedRegistryLookup = true
             }
 
@@ -513,7 +591,11 @@ public struct ScholarCLIRunner: Sendable {
                 exitCode = 0
             }
 
-            let collectedStderr = verboseCollector?.joinedStderr() ?? ""
+            var stderrParts = cacheWarningCollector.allLines()
+            if let verboseText = verboseCollector?.joinedStderr(), !verboseText.isEmpty {
+                stderrParts.append(verboseText)
+            }
+            let collectedStderr = stderrParts.joined(separator: "\n")
 
             if emitJSON {
                 if isDemo {
@@ -545,12 +627,21 @@ public struct ScholarCLIRunner: Sendable {
                 lines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
             }
             if isReplayMode {
-                lines.append(
-                    lang.L(
-                        "[REPLAY] Recorded registry replay (no live network requests, no cache)",
-                        "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求、不读写缓存）"
+                if replayUsesCache {
+                    lines.append(
+                        lang.L(
+                            "[REPLAY] Recorded registry replay (no live network requests; reading/writing SCHOLAR_CACHE_DIR cache)",
+                            "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求，读写 SCHOLAR_CACHE_DIR 缓存）"
+                        )
                     )
-                )
+                } else {
+                    lines.append(
+                        lang.L(
+                            "[REPLAY] Recorded registry replay (no live network requests, no cache)",
+                            "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求、不读写缓存）"
+                        )
+                    )
+                }
             }
             lines.append(
                 "Evaluated=\(audit.totalEvaluated) Verified=\(audit.verifiedCount) Drift=\(audit.driftCount) NotFound=\(audit.notFoundCount) Retracted=\(audit.retractedCount) Unverified=\(audit.unverifiedCount)"
@@ -573,6 +664,46 @@ public struct ScholarCLIRunner: Sendable {
                 stderr: collectedStderr,
                 exitCode: exitCode
             )
+
+        case "cache":
+            let parsed = try parseArgs(
+                rest,
+                subcommand: subcommand,
+                valueFlags: [],
+                boolFlags: [],
+                maxPositionals: 1,
+                lang: lang
+            )
+            guard parsed.positionals.first == "clear" else {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Usage: scholaros cache clear",
+                        "用法：scholaros cache clear"
+                    )
+                )
+            }
+            let dbURL = RegistryResponseCache.resolveDatabaseURL(environment: effectiveEnvironment)
+            let removed = try RegistryResponseCache.clearCacheFiles(at: dbURL)
+            if removed.isEmpty {
+                return CLIExecutionOutput(
+                    stdout: lang.L(
+                        "No cache file to remove (\(dbURL.path)).",
+                        "缓存文件不存在，无需删除（\(dbURL.path)）。"
+                    ),
+                    exitCode: 0
+                )
+            } else {
+                let outLines = removed.map { url in
+                    lang.L(
+                        "Removed cache file: \(url.path)",
+                        "已删除缓存文件：\(url.path)"
+                    )
+                }
+                return CLIExecutionOutput(
+                    stdout: outLines.joined(separator: "\n"),
+                    exitCode: 0
+                )
+            }
 
         case "cite":
             let parsed = try parseArgs(
@@ -954,7 +1085,7 @@ public struct ScholarCLIRunner: Sendable {
             }
             idx += 1
         }
-        if let envRaw = ProcessInfo.processInfo.environment["SCHOLAROS_LANG"],
+        if let envRaw = effectiveEnvironment["SCHOLAROS_LANG"],
            let envLang = ScholarLanguage.parse(envRaw)
         {
             return envLang
@@ -1507,11 +1638,13 @@ public struct ScholarCLIRunner: Sendable {
               outline <paper.tex> [--json]                           Print numbered section/subsection outline
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    Run LaTeX CST, cross-reference & citation lints
               verify-citations <refs.bib> [options]                  Verify citations online (exit 0 all VERIFIED, 1 DRIFT/NOT_FOUND/RETRACTED, 3 UNVERIFIED, 2 error)
-                --offline                                            Check identifier syntax & built-in retraction hints without network lookups
-                --registry-record <dir>                              Query live registries and record raw responses + SHA-256 manifest into <dir>
-                --registry-replay <dir>                              Replay recorded responses from <dir> with no network or cache access (marks REPLAY)
-                --verbose                                            Log one telemetry line per HTTP request to stderr (source, URL, status, elapsed, origin)
+                --offline                                            Check identifier syntax & built-in retraction hints without network or cache access
+                --no-cache                                           Skip reading and writing the SQLite response cache for this run
+                --registry-record <dir>                              Query live registries (using cache unless --no-cache) and record network responses + SHA-256 manifest into <dir>
+                --registry-replay <dir>                              Replay recorded responses from <dir> (no network; uses cache only when SCHOLAR_CACHE_DIR is set)
+                --verbose                                            Log one telemetry line per lookup to stderr (source, URL, status, elapsed, origin)
                 --json                                               Emit structured JSON audit report
+              cache clear                                            Remove registry.sqlite (-wal/-shm) in SCHOLAR_CACHE_DIR or ~/Library/Caches/ScholarOS
               format-bib <refs.bib> [--style apa|ieee] [--json]      Format BibTeX entries in APA 7th or IEEE style
 
             Project Bundle & Demo Commands (require --project <dir.scholarproj> or explicit --demo):
@@ -1539,11 +1672,13 @@ public struct ScholarCLIRunner: Sendable {
               outline <paper.tex> [--json]                           提取 LaTeX 章节与子章节编号大纲
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    执行 LaTeX 语法树、交叉引用与引文静态诊断
               verify-citations <refs.bib> [选项]                     默认联网核查参考文献（退出码：全 VERIFIED 为 0，含 DRIFT/NOT_FOUND/RETRACTED 为 1，仅余 UNVERIFIED 为 3，错误为 2）
-                --offline                                            仅检查标识符语法与内置撤稿名单，不发任何网络请求
-                --registry-record <目录>                             联网查询公开注册库并将原始响应与 SHA-256 清单录制到 <目录>
-                --registry-replay <目录>                             从 <目录> 离线回放录制响应，不发网络请求且不读写缓存（输出带 REPLAY 标记）
-                --verbose                                            每发一个请求往标准错误输出一行（数据源、地址、状态码、耗时、来源）
+                --offline                                            仅检查标识符语法与内置撤稿名单，不发任何网络请求且不读写缓存
+                --no-cache                                           本次运行不读取也不写入 SQLite 响应缓存
+                --registry-record <目录>                             联网查询公开注册库（默认读写缓存）并将发出的响应与 SHA-256 清单录制到 <目录>
+                --registry-replay <目录>                             从 <目录> 离线回放录制响应（不发网络请求；仅显式设置 SCHOLAR_CACHE_DIR 时读写该缓存）
+                --verbose                                            每查一次往标准错误输出一行（数据源、地址、状态码、耗时、来源）
                 --json                                               输出结构化 JSON 核查报告
+              cache clear                                            删除当前生效缓存目录（SCHOLAR_CACHE_DIR 或 ~/Library/Caches/ScholarOS）下的 registry.sqlite
               format-bib <refs.bib> [--style apa|ieee] [--json]      按 APA 7th 或 IEEE 格式输出参考文献列表
 
             工程包与演示命令（必须显式指定 --project <dir.scholarproj> 或 --demo）：

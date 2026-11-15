@@ -1,5 +1,7 @@
 import CryptoKit
+import Darwin
 import Foundation
+import SQLite3
 import Testing
 import ScholarBibAndCSL
 import ScholarModels
@@ -7,6 +9,22 @@ import ScholarProjectStore
 import ScholarPluginSDK
 import ScholarCLIAndMCP
 import ScholarWorkbenchShell
+
+private enum RealHomeCacheGuard {
+    static let realAccountHomePath: String? = {
+        guard let pw = getpwuid(getuid()), let cDir = pw.pointee.pw_dir else {
+            return nil
+        }
+        return String(cString: cDir)
+    }()
+
+    static let realAccountCacheExistedAtLoad: Bool = {
+        guard let home = realAccountHomePath else { return false }
+        let path = URL(fileURLWithPath: home, isDirectory: true)
+            .appendingPathComponent("Library/Caches/ScholarOS", isDirectory: true).path
+        return FileManager.default.fileExists(atPath: path)
+    }()
+}
 
 /// In-memory stand-in for `UserDefaults`, so that tests of language persistence never create a
 /// preferences domain on disk. (A temporary `UserDefaults(suiteName:)` followed by
@@ -1287,7 +1305,11 @@ struct PluginSDKMCPAndShellTests {
             )
         }
 
-        let recordRunner = ScholarCLIRunner(registryTransport: recordedFixtureTransport, registryClock: .immediate)
+        let recordRunner = ScholarCLIRunner(
+            registryTransport: recordedFixtureTransport,
+            registryClock: .immediate,
+            environment: ["HOME": tempDir.appendingPathComponent("home-record", isDirectory: true).path]
+        )
         let recResult = await recordRunner.runWithExitStatus(
             arguments: ["verify-citations", fakeBibURL.path, "--registry-record", recDir.path, "--lang", "en"]
         )
@@ -1825,7 +1847,10 @@ struct PluginSDKMCPAndShellTests {
             )
         }
 
-        let onlineRunner = ScholarCLIRunner(registryTransport: mockNetworkTransport)
+        let onlineRunner = ScholarCLIRunner(
+            registryTransport: mockNetworkTransport,
+            environment: ["HOME": tempDir.appendingPathComponent("home-online", isDirectory: true).path]
+        )
 
         let helpEN = try await onlineRunner.execute(arguments: ["--help", "--lang", "en"])
         let helpZH = try await onlineRunner.execute(arguments: ["--help", "--lang", "zh"])
@@ -1916,7 +1941,11 @@ struct PluginSDKMCPAndShellTests {
                 fetchedAt: replayed.fetchedAt
             )
         }
-        let retryRunner = ScholarCLIRunner(registryTransport: retryTransport, registryClock: .immediate)
+        let retryRunner = ScholarCLIRunner(
+            registryTransport: retryTransport,
+            registryClock: .immediate,
+            environment: ["HOME": tempDir.appendingPathComponent("home-retry", isDirectory: true).path]
+        )
         let retryVerbose = await retryRunner.runWithExitStatus(
             arguments: ["verify-citations", singleBibURL.path, "--verbose", "--lang", "en"]
         )
@@ -1968,7 +1997,11 @@ struct PluginSDKMCPAndShellTests {
                 url: req.url
             )
         }
-        let runner = ScholarCLIRunner(registryTransport: deniedTransport, registryClock: .immediate)
+        let runner = ScholarCLIRunner(
+            registryTransport: deniedTransport,
+            registryClock: .immediate,
+            environment: ["HOME": tempDir.appendingPathComponent("home-denied", isDirectory: true).path]
+        )
 
         // 1. --offline on the 13-entry list (12 recheck + 1 syntactically invalid DOI)
         let offlineJSONRun = await runner.runWithExitStatus(
@@ -2353,5 +2386,474 @@ struct PluginSDKMCPAndShellTests {
         )
         #expect(twoOffline.exitCode == 3)
         #expect(twoOffline.stdout.contains("2 entries could not be verified, reasons: offline=2; results are incomplete."))
+    }
+
+    @Test("M1 item 7 (Stage 07): --registry-replay uses cache ONLY when SCHOLAR_CACHE_DIR is explicitly set, updates REPLAY banner honestly, sends 0 replay requests on run 2, and never touches default HOME cache")
+    func m1Stage07CLIReplayWithScholarCacheDirBannerZeroRequestsAndDefaultReplayIsolation() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage07-replay-cache")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let isolatedHome = tempDir.appendingPathComponent("isolated-home", isDirectory: true)
+        let explicitCacheDir = tempDir.appendingPathComponent("explicit-cache", isDirectory: true)
+
+        let bibURL = tempDir.appendingPathComponent("replay_cache.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        @article{fake_nonsentinel,
+          author  = {Whitfield, Eleanor and Patel, Raj},
+          title   = {Quantum Gradient Descent in Biological Neural Networks},
+          journal = {Nature Machine Intelligence},
+          year    = {2026},
+          doi     = {10.1038/fake.2026.99999}
+        }
+        """.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let fixedDate = Date(timeIntervalSince1970: 1_794_817_800) // 2026-11-16T08:30:00Z
+        let clock = ClosureRegistryClock(now: { 0 }, currentDate: { fixedDate }, sleep: { _ in })
+
+        let failTransport = ClosureRegistrySession { req in
+            throw RegistryTransportError(kind: .transportError, detail: "Replay must not hit live network", url: req.url)
+        }
+
+        // 1. Default --registry-replay WITHOUT SCHOLAR_CACHE_DIR: banner says "no cache", creates zero cache files
+        let defaultReplayRunner = ScholarCLIRunner(
+            registryTransport: failTransport,
+            registryClock: clock,
+            environment: ["HOME": isolatedHome.path]
+        )
+        let plainEN = await defaultReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--verbose", "--lang", "en"]
+        )
+        let plainZH = await defaultReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(plainEN.exitCode == 1)
+        #expect(plainZH.exitCode == 1)
+        #expect(plainEN.stdout.contains("no live network requests, no cache"))
+        #expect(plainZH.stdout.contains("不发网络请求、不读写缓存"))
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: isolatedHome.appendingPathComponent("Library/Caches/ScholarOS").path
+            ),
+            "--registry-replay without SCHOLAR_CACHE_DIR must not create default HOME cache directory"
+        )
+
+        // Even if default HOME cache ALREADY has rows from an online run, --registry-replay without SCHOLAR_CACHE_DIR ignores it!
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+        let mockOnlineTransport = ClosureRegistrySession { req in
+            let r = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(statusCode: r.statusCode, body: r.body, headers: r.headers, origin: .network, fetchedAt: r.fetchedAt)
+        }
+        let onlineWarmRunner = ScholarCLIRunner(
+            registryTransport: mockOnlineTransport,
+            registryClock: clock,
+            environment: ["HOME": isolatedHome.path]
+        )
+        let warmDefaultRes = await onlineWarmRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--lang", "en"]
+        )
+        #expect(warmDefaultRes.exitCode == 1)
+        #expect(FileManager.default.fileExists(atPath: isolatedHome.appendingPathComponent("Library/Caches/ScholarOS/registry.sqlite").path))
+
+        let replayIgnoringDefaultCache = await defaultReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--verbose", "--lang", "en"]
+        )
+        #expect(replayIgnoringDefaultCache.exitCode == 1)
+        let ignoreLines = replayIgnoringDefaultCache.stderr.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(!ignoreLines.isEmpty)
+        #expect(ignoreLines.allSatisfy { $0.contains("origin=replay") })
+
+        // 2. --registry-replay WITH explicit SCHOLAR_CACHE_DIR: Run 1 warms cache, banner states cache is active (NOT "no cache" / "不读写缓存")
+        let cachedReplayRunner = ScholarCLIRunner(
+            registryTransport: failTransport,
+            registryClock: clock,
+            environment: [
+                "HOME": tempDir.appendingPathComponent("untouched-home", isDirectory: true).path,
+                "SCHOLAR_CACHE_DIR": explicitCacheDir.path
+            ]
+        )
+
+        let run1BannerEN = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--verbose", "--lang", "en"]
+        )
+        #expect(run1BannerEN.exitCode == 1)
+        let firstLineEN = run1BannerEN.stdout.split(separator: "\n").first.map(String.init) ?? ""
+        #expect(firstLineEN.hasPrefix("[REPLAY]"))
+        #expect(!firstLineEN.contains("no cache"), "Cached replay banner must not claim 'no cache': \(firstLineEN)")
+        #expect(firstLineEN.contains("cache"))
+        let run1VerboseLines = run1BannerEN.stderr.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(run1VerboseLines.count == 7) // 2 (LeCun) + 1 (Vaswani) + 4 (fake_nonsentinel)
+        #expect(run1VerboseLines.allSatisfy { $0.contains("origin=replay") })
+        #expect(FileManager.default.fileExists(atPath: explicitCacheDir.appendingPathComponent("registry.sqlite").path))
+        #expect(!FileManager.default.fileExists(atPath: tempDir.appendingPathComponent("untouched-home/Library/Caches/ScholarOS").path))
+
+        // Run 2 on the same .bib and same SCHOLAR_CACHE_DIR (even pointing --registry-replay at an empty manifest so any miss would exit 2!):
+        // Wait: RegistryReplaySession requires manifest.json; let's create a valid empty manifest.json to prove ZERO replay lookups happen!
+        let emptyReplayDir = tempDir.appendingPathComponent("empty-replay", isDirectory: true)
+        try FileManager.default.createDirectory(at: emptyReplayDir, withIntermediateDirectories: true)
+        let emptyManifest = RegistryRecordingManifest(
+            startedAt: "2026-11-16T00:00:00Z",
+            completedAt: "2026-11-16T00:00:00Z",
+            userAgent: "ScholarOS/1.2.0",
+            count: 0,
+            totalHTTPRequestsSent: 0,
+            items: [],
+            metaFilesSHA256: [:]
+        )
+        try JSONEncoder().encode(emptyManifest).write(to: emptyReplayDir.appendingPathComponent("manifest.json"))
+
+        let run2TextZH = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--verbose", "--lang", "zh"]
+        )
+        #expect(run2TextZH.exitCode == 1)
+        let firstLineZH = run2TextZH.stdout.split(separator: "\n").first.map(String.init) ?? ""
+        #expect(firstLineZH.hasPrefix("[REPLAY"))
+        #expect(!firstLineZH.contains("不读写缓存"), "Cached ZH replay banner must not claim '不读写缓存': \(firstLineZH)")
+        #expect(firstLineZH.contains("缓存"))
+        #expect(run2TextZH.stdout.contains("2026-11-16 取得（缓存）"))
+        let run2VerboseLines = run2TextZH.stderr.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(run2VerboseLines.count == 5) // 2 (LeCun) + 1 (Vaswani) + 2 (fake_nonsentinel: doi.org + Crossref search)
+        #expect(!run2VerboseLines.isEmpty)
+        #expect(run2VerboseLines.allSatisfy { $0.contains("origin=cache") })
+
+        let run2TextEN = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--lang", "en"]
+        )
+        #expect(run2TextEN.exitCode == 1)
+        #expect(run2TextEN.stdout.contains("fetched 2026-11-16 (cache)"))
+
+        let run1JSON = await defaultReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        let run2JSON = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--json", "--lang", "en"]
+        )
+        #expect(run1JSON.exitCode == 1)
+        #expect(run2JSON.exitCode == 1)
+        let report1 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(run1JSON.stdout.utf8))
+        let report2 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(run2JSON.stdout.utf8))
+        #expect(report2.verdicts.count == report1.verdicts.count)
+        for (v1, v2) in zip(report1.verdicts, report2.verdicts) {
+            #expect(v2.citeKey == v1.citeKey)
+            #expect(v2.firewallClass == v1.firewallClass)
+            #expect(v2.insertable == v1.insertable)
+            #expect(v2.reasons == v1.reasons)
+            #expect(v2.fields == v1.fields)
+            #expect(!v2.sources.isEmpty)
+            #expect(v2.sources.allSatisfy { $0.origin == .cache && $0.fetchedAt == "2026-11-16" })
+        }
+
+        // 3. --registry-replay WITH SCHOLAR_CACHE_DIR AND --no-cache: banner says "no cache" and does NOT read cache
+        let noCacheReplayMiss = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", emptyReplayDir.path, "--no-cache", "--lang", "en"]
+        )
+        #expect(noCacheReplayMiss.exitCode == 2, "--no-cache must bypass SCHOLAR_CACHE_DIR and hit emptyReplayDir (exit 2)")
+        let noCacheReplayHit = await cachedReplayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--no-cache", "--lang", "en"]
+        )
+        #expect(noCacheReplayHit.exitCode == 1)
+        #expect(noCacheReplayHit.stdout.contains("no live network requests, no cache"))
+    }
+
+    @Test("M1 item 7 (Stage 07): --no-cache, --offline, --registry-record cache skip, cache clear subcommand, --help entries, and corrupt SQLite stderr resilience")
+    func m1Stage07CLINoCacheOfflineRecordCacheClearHelpAndCorruptCacheStderr() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage07-cli-flags")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+
+        actor TransportCounter {
+            var count = 0
+            func inc() { count += 1 }
+            func drain() -> Int {
+                let c = count
+                count = 0
+                return c
+            }
+        }
+        let counter = TransportCounter()
+        let mockTransport = ClosureRegistrySession { req in
+            await counter.inc()
+            let r = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(statusCode: r.statusCode, body: r.body, headers: r.headers, origin: .network, fetchedAt: r.fetchedAt)
+        }
+
+        let vaswaniBibURL = tempDir.appendingPathComponent("vaswani.bib")
+        try """
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        """.write(to: vaswaniBibURL, atomically: true, encoding: .utf8)
+
+        let itoBibURL = tempDir.appendingPathComponent("ito.bib")
+        try """
+        @article{pmid_real_ito2015,
+          author  = {Ito, Hiroshi T. and Zhang, Sheng-Jia and Witter, Menno P. and Moser, Edvard I. and Moser, May-Britt},
+          title   = {A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation},
+          journal = {Nature},
+          year    = {2015},
+          pmid    = {26017312}
+        }
+        """.write(to: itoBibURL, atomically: true, encoding: .utf8)
+
+        let bothBibURL = tempDir.appendingPathComponent("both.bib")
+        try (
+            String(contentsOf: vaswaniBibURL, encoding: .utf8)
+            + "\n"
+            + String(contentsOf: itoBibURL, encoding: .utf8)
+        ).write(to: bothBibURL, atomically: true, encoding: .utf8)
+
+        // 1. --help documents --no-cache, cache clear, and SCHOLAR_CACHE_DIR in EN and ZH; --refresh-cache does NOT exist
+        let helpRunner = ScholarCLIRunner(
+            registryTransport: mockTransport,
+            registryClock: .immediate,
+            environment: ["HOME": tempDir.appendingPathComponent("help-home", isDirectory: true).path]
+        )
+        let helpEN = try await helpRunner.execute(arguments: ["--help", "--lang", "en"])
+        let helpZH = try await helpRunner.execute(arguments: ["--help", "--lang", "zh"])
+        for banner in [helpEN, helpZH] {
+            #expect(banner.contains("--no-cache"))
+            #expect(banner.contains("cache clear"))
+            #expect(banner.contains("SCHOLAR_CACHE_DIR"))
+            #expect(!banner.contains("--refresh-cache"))
+        }
+        let rejectedRefresh = await helpRunner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--refresh-cache"]
+        )
+        #expect(rejectedRefresh.exitCode == 2)
+
+        // 2. --no-cache and --offline on a fresh cache dir create NO registry.sqlite
+        let freshCacheDir = tempDir.appendingPathComponent("fresh-cache", isDirectory: true)
+        let freshRunner = ScholarCLIRunner(
+            registryTransport: mockTransport,
+            registryClock: .immediate,
+            environment: [
+                "HOME": tempDir.appendingPathComponent("fresh-home", isDirectory: true).path,
+                "SCHOLAR_CACHE_DIR": freshCacheDir.path
+            ]
+        )
+        let offlineFresh = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(offlineFresh.exitCode == 3)
+        #expect(await counter.drain() == 0)
+        #expect(!FileManager.default.fileExists(atPath: freshCacheDir.appendingPathComponent("registry.sqlite").path))
+
+        let noCacheFresh = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--no-cache", "--verbose", "--lang", "en"]
+        )
+        #expect(noCacheFresh.exitCode == 0)
+        #expect(await counter.drain() == 1)
+        #expect(noCacheFresh.stderr.contains("origin=network"))
+        #expect(!FileManager.default.fileExists(atPath: freshCacheDir.appendingPathComponent("registry.sqlite").path))
+
+        // 3. Warm cache with Vaswani (1 row), then verify --offline returns 0 VERIFIED and --no-cache neither reads nor adds rows
+        let warmRun = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--lang", "en"]
+        )
+        #expect(warmRun.exitCode == 0)
+        #expect(await counter.drain() == 1)
+        let sqliteURL = freshCacheDir.appendingPathComponent("registry.sqlite")
+        #expect(FileManager.default.fileExists(atPath: sqliteURL.path))
+
+        func countCachedRows(_ url: URL) -> Int {
+            var db: OpaquePointer?
+            guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return -1 }
+            defer { sqlite3_close_v2(db) }
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM registry_cache;", -1, &stmt, nil) == SQLITE_OK else { return -1 }
+            defer { sqlite3_finalize(stmt) }
+            return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int(stmt, 0)) : -1
+        }
+        #expect(countCachedRows(sqliteURL) == 1)
+
+        // --offline MUST NOT read cached Vaswani (must still be UNVERIFIED, Verified=0) and MUST NOT write Ito
+        let offlineOnWarm = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", bothBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(offlineOnWarm.exitCode == 3)
+        #expect(offlineOnWarm.stdout.contains("Verified=0"))
+        #expect(!offlineOnWarm.stdout.contains("[VERIFIED]"))
+        #expect(await counter.drain() == 0)
+        #expect(countCachedRows(sqliteURL) == 1)
+
+        // --no-cache MUST NOT read cached Vaswani (sends 2 network requests for Vaswani + Ito) and MUST NOT add Ito to SQLite
+        let noCacheOnWarm = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", bothBibURL.path, "--no-cache", "--verbose", "--lang", "en"]
+        )
+        #expect(noCacheOnWarm.exitCode == 0)
+        #expect(await counter.drain() == 2)
+        #expect(!noCacheOnWarm.stderr.contains("origin=cache"))
+        #expect(countCachedRows(sqliteURL) == 1)
+
+        // 4. --registry-record <dir>: cached Vaswani hits cache (not sent, not recorded), uncached Ito is sent + recorded + cached
+        let recOutDir = tempDir.appendingPathComponent("recorded-partial", isDirectory: true)
+        let recordWithCache = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", bothBibURL.path, "--registry-record", recOutDir.path, "--verbose", "--lang", "en"]
+        )
+        #expect(recordWithCache.exitCode == 0)
+        #expect(await counter.drain() == 1, "Only uncached Ito should be sent over transport during --registry-record")
+        #expect(recordWithCache.stderr.contains("source=arXiv") && recordWithCache.stderr.contains("origin=cache"))
+        #expect(recordWithCache.stderr.contains("source=PubMed") && recordWithCache.stderr.contains("origin=network"))
+        let recManifest = try JSONDecoder().decode(
+            RegistryRecordingManifest.self,
+            from: Data(contentsOf: recOutDir.appendingPathComponent("manifest.json"))
+        )
+        #expect(recManifest.count == 1, "Cache-hit arXiv request must not be recorded into manifest.json")
+        #expect(recManifest.items.first?.service == "pubmed")
+        #expect(countCachedRows(sqliteURL) == 2)
+
+        // 5. `scholaros cache clear`: removes registry.sqlite (+ -wal, -shm), prints removed path, keeps bystander files, exits 0 when missing
+        let bystanderURL = freshCacheDir.appendingPathComponent("keep-notes.txt")
+        try "do not delete".write(to: bystanderURL, atomically: true, encoding: .utf8)
+        try Data("wal".utf8).write(to: URL(fileURLWithPath: sqliteURL.path + "-wal"))
+        try Data("shm".utf8).write(to: URL(fileURLWithPath: sqliteURL.path + "-shm"))
+
+        let clearResEN = await freshRunner.runWithExitStatus(arguments: ["cache", "clear", "--lang", "en"])
+        #expect(clearResEN.exitCode == 0)
+        #expect(clearResEN.stdout.contains(sqliteURL.path))
+        #expect(!FileManager.default.fileExists(atPath: sqliteURL.path))
+        #expect(!FileManager.default.fileExists(atPath: sqliteURL.path + "-wal"))
+        #expect(!FileManager.default.fileExists(atPath: sqliteURL.path + "-shm"))
+        #expect(FileManager.default.fileExists(atPath: bystanderURL.path), "cache clear must never delete other files")
+
+        // Second `cache clear` when file does not exist also exits 0
+        let clearMissingZH = await freshRunner.runWithExitStatus(arguments: ["cache", "clear", "--lang", "zh"])
+        #expect(clearMissingZH.exitCode == 0)
+        #expect(FileManager.default.fileExists(atPath: bystanderURL.path))
+
+        // Invalid `cache` sub-arguments exit 2
+        for badArgs in [["cache"], ["cache", "status"], ["cache", "clear", "extra"]] {
+            let badRes = await freshRunner.runWithExitStatus(arguments: badArgs)
+            #expect(badRes.exitCode == 2)
+        }
+
+        // 6. Corrupt registry.sqlite (garbage bytes): verification succeeds and stderr contains 1 explanation line
+        try Data([0xFF, 0x00, 0xFE, 0xED, 0xBA, 0xAD, 0xF0, 0x0D]).write(to: sqliteURL)
+        let corruptCLIRun = await freshRunner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--lang", "en"]
+        )
+        #expect(corruptCLIRun.exitCode == 0)
+        #expect(corruptCLIRun.stdout.contains("Evaluated=1 Verified=1"))
+        let corruptStderrLines = corruptCLIRun.stderr.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(corruptStderrLines.count == 1, "Expected exactly 1 stderr explanation line on corrupt cache, got: \(corruptCLIRun.stderr)")
+    }
+
+    @Test("M1 item 7 (Stage 07): two concurrent ScholarOS CLI OS processes sharing the same SCHOLAR_CACHE_DIR complete without SQLite lock errors")
+    func m1Stage07TwoProcessesSharingSameCacheDirWithoutErrors() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage07-multiprocess")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let candidates = [
+            repositoryRoot.appendingPathComponent(".build/out/Products/Debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/arm64-apple-macosx/debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/out/Products/Release/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/release/ScholarOS")
+        ].filter { FileManager.default.isExecutableFile(atPath: $0.path) }
+
+        let binaryURL = try #require(
+            candidates.max { lhs, rhs in
+                let d1 = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let d2 = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                return d1 < d2
+            },
+            "Expected compiled ScholarOS executable under .build/"
+        )
+
+        let sharedCacheDir = tempDir.appendingPathComponent("shared-cache", isDirectory: true)
+        let procHome1 = tempDir.appendingPathComponent("home-p1", isDirectory: true)
+        let procHome2 = tempDir.appendingPathComponent("home-p2", isDirectory: true)
+        try FileManager.default.createDirectory(at: procHome1, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: procHome2, withIntermediateDirectories: true)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let bibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib")
+
+        @Sendable func spawnCLI(isolatedHome: URL) throws -> (exitCode: Int32, stdout: String, stderr: String) {
+            let proc = Process()
+            proc.executableURL = binaryURL
+            proc.arguments = [
+                "verify-citations",
+                bibURL.path,
+                "--registry-replay",
+                registryDir.path,
+                "--json",
+                "--lang",
+                "en"
+            ]
+            var env = ProcessInfo.processInfo.environment
+            env["HOME"] = isolatedHome.path
+            env["CFFIXED_USER_HOME"] = isolatedHome.path
+            env["SCHOLAR_CACHE_DIR"] = sharedCacheDir.path
+            proc.environment = env
+
+            let outPipe = Pipe()
+            let errPipe = Pipe()
+            proc.standardOutput = outPipe
+            proc.standardError = errPipe
+            try proc.run()
+            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            return (
+                proc.terminationStatus,
+                String(decoding: outData, as: UTF8.self),
+                String(decoding: errData, as: UTF8.self)
+            )
+        }
+
+        async let p1 = Task.detached { try spawnCLI(isolatedHome: procHome1) }.value
+        async let p2 = Task.detached { try spawnCLI(isolatedHome: procHome2) }.value
+        let (r1, r2) = try await (p1, p2)
+
+        #expect(r1.exitCode == 1, "Process 1 failed: stderr=\(r1.stderr)")
+        #expect(r2.exitCode == 1, "Process 2 failed: stderr=\(r2.stderr)")
+        #expect(r1.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Unexpected Process 1 stderr: \(r1.stderr)")
+        #expect(r2.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Unexpected Process 2 stderr: \(r2.stderr)")
+        #expect(FileManager.default.fileExists(atPath: sharedCacheDir.appendingPathComponent("registry.sqlite").path))
+
+        let rep1 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(r1.stdout.utf8))
+        let rep2 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(r2.stdout.utf8))
+        #expect(rep1.verifiedCount == 5)
+        #expect(rep2.verifiedCount == 5)
+    }
+}
+
+@Suite("ZZZ Home Cache Directory Isolation Guard")
+struct ZZZCacheHomeIsolationGuardTests {
+    @Test("All unit tests isolate HOME / SCHOLAR_CACHE_DIR and never create ~/Library/Caches/ScholarOS in the real account home")
+    func noScholarOSCacheCreatedOutsideIsolatedHomesDuringUnitTests() throws {
+        guard let realHome = RealHomeCacheGuard.realAccountHomePath else { return }
+        if !RealHomeCacheGuard.realAccountCacheExistedAtLoad {
+            let realCachePath = URL(fileURLWithPath: realHome, isDirectory: true)
+                .appendingPathComponent("Library/Caches/ScholarOS", isDirectory: true)
+                .path
+            #expect(
+                !FileManager.default.fileExists(atPath: realCachePath),
+                "Unit tests must never create ~/Library/Caches/ScholarOS in the real user home directory (\(realCachePath))"
+            )
+        }
     }
 }

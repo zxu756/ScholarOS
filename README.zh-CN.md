@@ -14,10 +14,10 @@
 
 - **LaTeX 章节大纲与静态诊断（`scholaros outline`、`scholaros diagnostics`）**：支持直接读取 `.tex` 源文件而无需先创建工程包。在仓库自带的 449 行 IEEEtran 风格样稿 [`Fixtures/sample-ieeetran-manuscript.tex`](Fixtures/sample-ieeetran-manuscript.tex)（内容是为本仓库虚构的，任何人都能重跑这项检查）上，`scholaros outline` 在 `--lang en` 与 `--lang zh` 下均提取出全部 `46` 个 `\section` / `\subsection` 标题（带星号和不带星号的都有），与 `grep -c -E '\\(section|subsection)\*?\{'` 的计数一致（2026-11-14 实测）。
 - **BibTeX 解析与 APA 7th / IEEE 参考文献格式化（`scholaros format-bib`）**：直接解析 `.bib` 文件并输出 APA 7th（`--style apa`）与 IEEE（`--style ieee`）格式参考文献列表，支持常见 LaTeX 重音转义与花括号大小写保护。
-- **引文核查（`scholaros verify-citations`）**：使用五类状态（`VERIFIED`、`DRIFT`、`NOT_FOUND`、`RETRACTED`、`UNVERIFIED`），支持 `--lang en`、`--lang zh` 与 `--json` 输出：
-  - 默认联网查询 Crossref、OpenAlex、`doi.org`、arXiv 与 PubMed；`--verbose` 每发一个 HTTP 请求向标准错误输出一行（数据源、地址、状态码、耗时与来源）。
-  - `--offline` 不发任何网络请求，仅检查标识符格式与不完整的 8 条内置撤稿 DOI 名单（`--lang zh` 下注明 `内置名单，不完整`，`--lang en` 下为 `built-in list, incomplete`）；未联网查询的合法标识符标为 `UNVERIFIED`。
-  - `--registry-replay <目录>` 从 SHA-256 校验通过的本地录制目录离线回放，不发网络请求且不读写缓存，输出带 `REPLAY` 标记。
+- **引文核查（`scholaros verify-citations`、`scholaros cache clear`）**：使用五类状态（`VERIFIED`、`DRIFT`、`NOT_FOUND`、`RETRACTED`、`UNVERIFIED`），支持 `--lang en`、`--lang zh` 与 `--json` 输出：
+  - 默认联网查询 Crossref、OpenAlex、`doi.org`、arXiv 与 PubMed，并将可缓存响应写入本地 SQLite（默认 `~/Library/Caches/ScholarOS/registry.sqlite`，或 `$SCHOLAR_CACHE_DIR/registry.sqlite`）；`--no-cache` 本次运行不读写缓存，`scholaros cache clear` 删除当前生效位置的 `registry.sqlite`（含 `-wal`/`-shm`），`--verbose` 每查一次向标准错误输出一行（数据源、地址、状态码、耗时与来源）。
+  - `--offline` 不发任何网络请求且不读写缓存，仅检查标识符格式与不完整的 8 条内置撤稿 DOI 名单（`--lang zh` 下注明 `内置名单，不完整`，`--lang en` 下为 `built-in list, incomplete`）；未联网查询的合法标识符标为 `UNVERIFIED`。
+  - `--registry-replay <目录>` 从 SHA-256 校验通过的本地录制目录离线回放（不发网络请求；默认不读写缓存，仅在显式设置 `SCHOLAR_CACHE_DIR` 时读写该目录缓存，绝不触碰默认缓存目录），输出带 `REPLAY` 标记。
   - 语法格式损坏的标识符标为 `NOT_FOUND`（`invalid_identifier`）；`10.0000/`、`10.1234/`、`10.9999/` 等前缀在 ISO 26324 语法上合法，不在离线阶段直接判为不存在。
   - 退出码：全部 `VERIFIED` 返回 `0`；存在 `DRIFT`、`NOT_FOUND` 或 `RETRACTED` 返回 `1`；无上述三类但存在 `UNVERIFIED` 返回 `3`；参数、文件不存在、BibTeX 解析失败或回放错误返回 `2`。
 - **评分者间一致性信度与统计计算库（`ScholarPRISMAEngine`、`ScholarPluginSDK`）**：包含多分类名义变量 Cohen's $\kappa$、Brennan-Prediger PABAK、Gwet's $AC_1$、Fleiss' $\kappa$、DerSimonian-Laird 随机效应合成及 Lanczos/Lentz $t$/$F$/$\chi^2$ 分布计算。在 12 项研究、5 分类双人盲筛数据集上，`scholaros prisma-stats` 与 MCP `scholar_prisma_agreement` 均算得 $\kappa = 0.7757$，与闭式手算精确值 $83/107 \approx 0.775701$ 一致（[`reports/m0-acceptance.txt`](reports/m0-acceptance.txt)，2026-11-14）。

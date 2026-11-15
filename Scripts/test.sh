@@ -84,6 +84,31 @@ count_scholaros_preference_files() {
     find "$prefs_dir" -maxdepth 1 -name 'io.github.zxu756.ScholarOS.*' | wc -l | tr -d ' '
 }
 
+# State of ~/Library/Caches/ScholarOS in the caller's real HOME (tests and scripts must isolate HOME / SCHOLAR_CACHE_DIR).
+scholaros_cache_dir_state() {
+    local cache_dir="$HOME/Library/Caches/ScholarOS"
+    if [[ ! -e "$cache_dir" ]]; then
+        echo "absent"
+        return
+    fi
+    local db_file="$cache_dir/registry.sqlite"
+    if [[ -e "$db_file" ]]; then
+        stat -f "present:%m:%z" "$db_file"
+    else
+        echo "present:no-db"
+    fi
+}
+
+assert_real_home_cache_untouched() {
+    local before="$1"
+    local after
+    after="$(scholaros_cache_dir_state)"
+    if [[ "$before" != "$after" ]]; then
+        echo "ERROR: tests or scripts touched real ~/Library/Caches/ScholarOS (before=$before after=$after). Always isolate HOME or SCHOLAR_CACHE_DIR." >&2
+        exit 1
+    fi
+}
+
 working_tree_state() {
     if git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         git -C "$REPO_ROOT" status --short
@@ -128,6 +153,7 @@ case "$MODE" in
         if [[ $# -lt 1 ]]; then
             usage
         fi
+        CACHE_BEFORE="$(scholaros_cache_dir_state)"
         FILTERS=()
         for target in "$@"; do
             mapped="$(map_module_to_filter "$target")"
@@ -136,6 +162,7 @@ case "$MODE" in
         JOINED="$(IFS='|'; echo "${FILTERS[*]}")"
         echo "[test.sh] Running scoped tests: --filter ($JOINED)"
         swift_test --no-parallel --filter "($JOINED)"
+        assert_real_home_cache_untouched "$CACHE_BEFORE"
         ;;
 
     milestone)
@@ -160,6 +187,7 @@ case "$MODE" in
             0)
                 TREE_BEFORE="$(working_tree_state)"
                 PREFS_BEFORE="$(count_scholaros_preference_files)"
+                CACHE_BEFORE="$(scholaros_cache_dir_state)"
                 SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
                 export SCHOLAR_REPORT_DIR
 
@@ -173,6 +201,8 @@ case "$MODE" in
                     echo "ERROR: the run changed the number of io.github.zxu756.ScholarOS.* files in ~/Library/Preferences ($PREFS_BEFORE -> $PREFS_AFTER)." >&2
                     exit 1
                 fi
+                assert_real_home_cache_untouched "$CACHE_BEFORE"
+                echo "[test.sh] Real ~/Library/Caches/ScholarOS untouched ($CACHE_BEFORE)."
                 if [[ "$RECORD" -eq 1 ]]; then
                     echo "[test.sh] --record: reports/ was updated; review and commit the change."
                 else
@@ -202,6 +232,7 @@ case "$MODE" in
                 *) usage ;;
             esac
         done
+        CACHE_BEFORE="$(scholaros_cache_dir_state)"
         SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
         export SCHOLAR_REPORT_DIR
 
@@ -209,6 +240,7 @@ case "$MODE" in
         swift_test --no-parallel
 
         run_m0_acceptance_scripts
+        assert_real_home_cache_untouched "$CACHE_BEFORE"
 
         if [[ "${SCHOLAR_ONLINE:-0}" == "1" ]]; then
             if [[ -f "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py" ]]; then
