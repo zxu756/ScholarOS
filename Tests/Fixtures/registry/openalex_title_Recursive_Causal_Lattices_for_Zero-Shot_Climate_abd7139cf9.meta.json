@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 100883,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_abd7139cf9.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T15:47:24Z",
+  "response_date_header" : "Sun, 15 Nov 2026 15:47:25 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Sun, 15 Nov 2026 15:47:25 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "948",
+    "x-ratelimit-reset" : "29555"
+  },
+  "service" : "openalex",
+  "sha256" : "abcd705a205a0c5fed775acf02a4d964f2c05de00f8dceafd3fbd8e9a0d1f41f",
+  "slug" : "openalex_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_abd7139cf9",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Recursive%20Causal%20Lattices%20for%20Zero-Shot%20Climate%20Forecasting"
+}

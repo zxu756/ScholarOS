@@ -1,6 +1,6 @@
 {
-  "completed_at" : "2026-11-15T14:58:43Z",
-  "count" : 43,
+  "completed_at" : "2026-11-15T15:47:37Z",
+  "count" : 57,
   "items" : [
     {
       "attempts" : 1,
@@ -986,16 +986,340 @@
       "slug" : "doi_handle_10.13328_j.cnki.jos.006981_e3cf0da0b0",
       "status" : 200,
       "url" : "https://doi.org/api/handles/10.13328/j.cnki.jos.006981"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 8065,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:19Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:20 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:20 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "6b65398d043cf627a3229c760e6e4944a24e75ff0d4cf3a8b439d7e0f7d65229",
+      "slug" : "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=The%20Art%20of%20Computer%20Programming%2C%20Volume%201%3A%20Fundamental%20Algorithms%20Knuth%201968&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 61397,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_title_The_Art_of_Computer_Programming_Volume_1_Fundame_5209a5b41f.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:20Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:23 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:23 GMT",
+        "x-ratelimit-cost-usd" : "0.001",
+        "x-ratelimit-credits-used" : "10",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "958",
+        "x-ratelimit-reset" : "29557"
+      },
+      "service" : "openalex",
+      "sha256" : "cde259457b17128d95fb4d430ac8195cd52ae8a76f142eebc7db5ce5381b5628",
+      "slug" : "openalex_title_The_Art_of_Computer_Programming_Volume_1_Fundame_5209a5b41f",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works?per-page=5&search=The%20Art%20of%20Computer%20Programming%20Volume%201%20Fundamental%20Algorithms"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 31379,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_2afc18f2c9.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:23Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:24 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:24 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "577fa6f364fe842d2e78d3732adac7111ee103554394ebcb1cb84caedaf3873b",
+      "slug" : "crossref_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_2afc18f2c9",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Recursive%20Causal%20Lattices%20for%20Zero-Shot%20Climate%20Forecasting%20Whitfield%202023&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 100883,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_abd7139cf9.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:24Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:25 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:25 GMT",
+        "x-ratelimit-cost-usd" : "0.001",
+        "x-ratelimit-credits-used" : "10",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "948",
+        "x-ratelimit-reset" : "29555"
+      },
+      "service" : "openalex",
+      "sha256" : "abcd705a205a0c5fed775acf02a4d964f2c05de00f8dceafd3fbd8e9a0d1f41f",
+      "slug" : "openalex_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_abd7139cf9",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works?per-page=5&search=Recursive%20Causal%20Lattices%20for%20Zero-Shot%20Climate%20Forecasting"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 694,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2401.99999_1af2e6c60c.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:26Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:26 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Sun, 15 Nov 2026 15:47:26 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "34185826762e920b23bf7b133c5fda6a9b1613d0fcb39c1fc614df2a4aa6e73d",
+      "slug" : "arxiv_id_2401.99999_1af2e6c60c",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2401.99999"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 7768,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1109_cvpr.2016.90_3ee58e279d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:26Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:27 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:27 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "6a407070856a19e7068497a08f3454fae270ea3a67c5cbfd4df745465f1ce0a7",
+      "slug" : "crossref_doi_10.1109_cvpr.2016.90_3ee58e279d",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1109/cvpr.2016.90"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 17889,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1109_cvpr.2016.90_ad280be4ce.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:27Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:28 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:28 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "948",
+        "x-ratelimit-reset" : "29552"
+      },
+      "service" : "openalex",
+      "sha256" : "1a511248868f2b87c53aa77c24532c0927375b653533036152c56d9232caaf72",
+      "slug" : "openalex_doi_10.1109_cvpr.2016.90_ad280be4ce",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1109/cvpr.2016.90"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2814,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1512.03385_4d9a055064.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:29Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:29 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Sun, 15 Nov 2026 15:47:29 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "be8253dc25fefe2175564e9de21f2ebb0cd1f9a1aae38b127ae6de2c4ffe0c54",
+      "slug" : "arxiv_id_1512.03385_4d9a055064",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1512.03385"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 1819,
+      "content_type" : "application/json; charset=UTF-8",
+      "raw_file" : "pubmed_pmid_26017312_d4fc6bbe60.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:29Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:30 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json; charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 15:47:30 GMT",
+        "x-ratelimit-limit" : "3",
+        "x-ratelimit-remaining" : "2"
+      },
+      "service" : "pubmed",
+      "sha256" : "32868da8639b57620448f9e2f7e1122ce0c6b53854bbde8bac1295a1428e7ef3",
+      "slug" : "pubmed_pmid_26017312_d4fc6bbe60",
+      "status" : 200,
+      "url" : "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=26017312&retmode=json"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 146,
+      "content_type" : "application/json; charset=UTF-8",
+      "raw_file" : "pubmed_pmid_99999999_a0824e6a33.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:31Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:30 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json; charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 15:47:30 GMT",
+        "x-ratelimit-limit" : "3",
+        "x-ratelimit-remaining" : "1"
+      },
+      "service" : "pubmed",
+      "sha256" : "37b0ed9f7cbf77b4fc8cb44de7b373b225f18eaa7f52f076d19c731ffc48c0a9",
+      "slug" : "pubmed_pmid_99999999_a0824e6a33",
+      "status" : 200,
+      "url" : "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=99999999&retmode=json"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 6373,
+      "content_type" : "application/json; charset=UTF-8",
+      "raw_file" : "pubmed_pmid_9500320_1674b235c6.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:32Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:32 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json; charset=UTF-8",
+        "Date" : "Sun, 15 Nov 2026 15:47:32 GMT",
+        "x-ratelimit-limit" : "3",
+        "x-ratelimit-remaining" : "2"
+      },
+      "service" : "pubmed",
+      "sha256" : "4a3b511f639cf8d737876f3566ac0a9c4c4e272723fff7a88c2b3af485b810cf",
+      "slug" : "pubmed_pmid_9500320_1674b235c6",
+      "status" : 200,
+      "url" : "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=9500320&retmode=json"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 58522,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Deep_learning_LeCun_2015_f76ec1674c.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:33Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:33 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:33 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "acdec4644a81d7ac734aed0a94133e03594f574be053eed7de39069132dc3dd1",
+      "slug" : "crossref_title_Deep_learning_LeCun_2015_f76ec1674c",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Deep%20learning%20LeCun%202015&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 6150,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_title_Unpublished_Workshop_Notes_on_Attention_Kernels_a54be16320.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:34Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:34 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:34 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "1"
+      },
+      "service" : "crossref",
+      "sha256" : "f7d61b4b839e2f78276079eb37de1e27e4dde6bc909bb322a171264948d05cf8",
+      "slug" : "crossref_title_Unpublished_Workshop_Notes_on_Attention_Kernels_a54be16320",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works?query.bibliographic=Unpublished%20Workshop%20Notes%20on%20Attention%20Kernels%20Taylor%202024&rows=5"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 117708,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_title_Unpublished_Workshop_Notes_on_Attention_Kernels_22c82009b4.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-15T15:47:35Z",
+      "response_date_header" : "Sun, 15 Nov 2026 15:47:36 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Sun, 15 Nov 2026 15:47:36 GMT",
+        "x-ratelimit-cost-usd" : "0.001",
+        "x-ratelimit-credits-used" : "10",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "938",
+        "x-ratelimit-reset" : "29544"
+      },
+      "service" : "openalex",
+      "sha256" : "e593d41e876295e9cc6687b3e2ad193f9c50ff5610eee3a3630d248d3cbebedb",
+      "slug" : "openalex_title_Unpublished_Workshop_Notes_on_Attention_Kernels_22c82009b4",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works?per-page=5&search=Unpublished%20Workshop%20Notes%20on%20Attention%20Kernels"
     }
   ],
   "meta_files_sha256" : {
+    "arxiv_id_1512.03385_4d9a055064.meta.json" : "551f60d5ab6207f5ed1d42327585ef81ce3fc6e964b87fb3768585330ab9d38b",
     "arxiv_id_1706.03762_87e6038c6f.meta.json" : "39b72e0602f65547ea021222cc207ae224772999d1d40c82c6d4d5f2b54c485f",
     "arxiv_id_2205.14135_8d94238ba2.meta.json" : "37b08e8442df3b9b109aa9b6f72124d4f588d841d3ab69cd15301584fe0330b3",
+    "arxiv_id_2401.99999_1af2e6c60c.meta.json" : "ed53f13ac09422fc62f8945f332f74890a33426c90baba93b3928d26f546f487",
     "crossref_doi_10.1016_j.fct.2012.08.005_f091402146.meta.json" : "8796c6ca16ec92ad0ca0af0b0bba913d94c4f507d00e0047d70d51810f9a975b",
     "crossref_doi_10.1016_s0140-6736_97_11096-0_e9a9f49e7e.meta.json" : "966bb9d41fd98e690252d8fd062f033b3b68b45247efd7930f2a36cb589ee53d",
     "crossref_doi_10.1038_171737a0_acacff2238.meta.json" : "9d4431b70b282030ec451297b48a4aeab90323ccc39d9959853b9903dce83fbb",
     "crossref_doi_10.1038_fake.2026.99999_1138775f70.meta.json" : "9fd634974b8a2c70ae4ef626e8bd8f42507834aa62bf6e423fe3450810e80212",
     "crossref_doi_10.1038_nature14539_2019f44854.meta.json" : "c65ed28960c019aab492173b2e7ec6fd347b0a1c041553202b26d07ca665f4a3",
+    "crossref_doi_10.1109_cvpr.2016.90_3ee58e279d.meta.json" : "53cda1c6f19e7f2aa17f5027a72e0316c61b4d540c449c92f89bd8eefdbd1700",
     "crossref_doi_10.1162_neco.1997.9.8.1735_7bd3eaa382.meta.json" : "206588fc3df634e1a4ab9bd3ae380194b55281b2e6f144f7d78e2e26c33741ab",
     "crossref_doi_10.1162_neco.1997.99999_67b9d52f07.meta.json" : "5ddba571b1c894161935f2316bbce1fd8572ab8498254414c998569277cfc45c",
     "crossref_doi_10.1234_fake.2026.99999_b67c9dbe38.meta.json" : "c278463d71c0c5e10695bc4e95e7257586aee04bb3598988999e7f5872142d2b",
@@ -1005,11 +1329,15 @@
     "crossref_doi_10.9999_fake.2025.999_f120606925.meta.json" : "f8a881521391ef63c2af9acce0411f7be860fd39ba95c1f22aaceec09581f5a1",
     "crossref_doi_10.9999_hallucinated.2025.0001_dea67e4de6.meta.json" : "9d3b16d034eb044cc7fe57545a6d0f46992d873cea2a1aa853b3cf1643d0feab",
     "crossref_title_Autonomous_Quantum_Hyper-Transformers_for_Zero-S_5591e7e581.meta.json" : "f5824f0a6adf71d5dcba21d2b4fa11cf981e7052553e7b9e712a0d2ad1e1fe61",
+    "crossref_title_Deep_learning_LeCun_2015_f76ec1674c.meta.json" : "c946585b5b32567af0f5e259634de99c95ebe42d4e6b9d9fac04592f76a1adcd",
     "crossref_title_Hallucinated_Zero-Overhead_Infinite_Context_Atte_57b154247b.meta.json" : "68f5138add7cbaa5902b76b95ffa9d532f7f458e566c93fc45f385157100b5ad",
     "crossref_title_ICALP_2015_Frontmatter_Halld_rsson_304d1047e1.meta.json" : "5912bf66ba8c115e1fc70405e30d86930cbdfa697727c89d10e3001ace4d99f4",
     "crossref_title_Long_Short-Term_Memory_Hochreiter_d106bcff37.meta.json" : "498e78610dba859da601ecfe5818672d8c6282c4c43d041b97faeca7b53964fd",
     "crossref_title_Quantum_Gradient_Descent_in_Biological_Neural_Ne_c04ed1c4ce.meta.json" : "fe68f290738a350d423c84d3f21110a9a92113fd69525a126c0fbca5605de7b3",
+    "crossref_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_2afc18f2c9.meta.json" : "7a71b165f17fdc231461460bbdbdfbaf2c48d33d35c56b4694e3a085abcda0ab",
     "crossref_title_Self-Supervised_Topological_Priors_for_Protein_F_7fc84ad787.meta.json" : "8bfc6b29be5326a07778afcbdad10dafa2a8265c327c9471258bcdb2ecfb57a4",
+    "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787.meta.json" : "1208f91e701d56fde1a830ba7a42b7a9fc0f0ca078894e66479553bf255ce3a0",
+    "crossref_title_Unpublished_Workshop_Notes_on_Attention_Kernels_a54be16320.meta.json" : "aa998786da77ecc7b0dc120f611d9d1f92ca29fa1581505012f744cc6f37be13",
     "crossref_title_Zero-Latency_Quantum_Citation_Telepathy_in_Auton_910ea7d306.meta.json" : "1db5261bdb0c6f2454a4153f90ac9d1501a0d85b819b71521fc0f479aa5a7900",
     "doi_handle_10.1038_fake.2026.99999_9c181c6145.meta.json" : "6913fc5c06ea1e21ab5cc84c71003aaf8d2f90f42b2e02269b479d6ea19d33f7",
     "doi_handle_10.1162_neco.1997.99999_5fe6819105.meta.json" : "c4b68f7043518d250ef8f5d789a694c85e30c187286a7924e8c1d6186e29dfa6",
@@ -1024,6 +1352,7 @@
     "openalex_doi_10.1038_171737a0_5344f8b191.meta.json" : "cf23ee947367ef22ca3d18e05b2196b9e2003fb958b7b27c165141d29bd04e0d",
     "openalex_doi_10.1038_fake.2026.99999_fcda3cff0b.meta.json" : "8f503da9f85424a97ce33052b2d66efde5feb531a25a8c9899566fc3d8e94fc2",
     "openalex_doi_10.1038_nature14539_04360041c9.meta.json" : "8c7198e3635cecf77abb3a270a3966c4679da3cfd8f46beb697d0f22786dfb0c",
+    "openalex_doi_10.1109_cvpr.2016.90_ad280be4ce.meta.json" : "858040fa64212bf5093775e0ecf14bd2ee9eac97c4f7ac93c1c7435ca750ac00",
     "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d.meta.json" : "41da752e5ccb464ad89be4ffd71167c788962313bd5fc0abf1b4ff4fb5769560",
     "openalex_doi_10.1162_neco.1997.99999_dc022da667.meta.json" : "98a9819b910c60890031e006617ee1c76bb7899dda189c0193c4083f1405d8c7",
     "openalex_doi_10.1234_fake.2026.99999_fc3ec3aaad.meta.json" : "ab2f66d0118709746ac9571e0ee3a768d579a197713925e8c13f4f7cd7c9c517",
@@ -1031,9 +1360,15 @@
     "openalex_doi_10.4230_lipics.icalp.2015.1_edcc0563b6.meta.json" : "c2233900a599b30c8722135460ffb14c395934d754a5b2ce32f3228a73b61186",
     "openalex_doi_10.9999_fake-llm-cite.9999_0d2b898f6f.meta.json" : "96fbdc25a092ce083c4790e8ac45a0a1e58199b614581b91cd9b9a240a080647",
     "openalex_doi_10.9999_fake.2025.999_cd5a6ab62c.meta.json" : "e54101ae12ca4c1de98cdaf1c2738676e870ed0ade55d358d0a6abaf38b817aa",
-    "openalex_doi_10.9999_hallucinated.2025.0001_5d34a3c86a.meta.json" : "0b960a627d282b8ddbe974be455a8beadd2a88fd0f484988b7b2a3c79786971c"
+    "openalex_doi_10.9999_hallucinated.2025.0001_5d34a3c86a.meta.json" : "0b960a627d282b8ddbe974be455a8beadd2a88fd0f484988b7b2a3c79786971c",
+    "openalex_title_Recursive_Causal_Lattices_for_Zero-Shot_Climate_abd7139cf9.meta.json" : "a93e80cec73e49afae299a87f17fecc2b44cdd5f407fe66975c65c982ff7b353",
+    "openalex_title_The_Art_of_Computer_Programming_Volume_1_Fundame_5209a5b41f.meta.json" : "643fa9e0841a842f72b155b74638e6f627e5132fb68838cc0ebcdfe6f8620694",
+    "openalex_title_Unpublished_Workshop_Notes_on_Attention_Kernels_22c82009b4.meta.json" : "a6896e24940de8bbdad5fdc807648371eebf9810fc7e3ca45537ef6459004f6e",
+    "pubmed_pmid_26017312_d4fc6bbe60.meta.json" : "be6ee8cff33162fe227d279b6abfea57ebef8ce487d868c8f10c1975353b6c7c",
+    "pubmed_pmid_9500320_1674b235c6.meta.json" : "a12731dc633cdb2804f2c1fb878d40e523cf3e386fc8450efdc25f8505e06d60",
+    "pubmed_pmid_99999999_a0824e6a33.meta.json" : "46eb0c22d47f765a0046a2ca080b570b214ac5b63a19180eab705bdebd6b8166"
   },
   "started_at" : "2026-11-15T11:19:08Z",
-  "total_http_requests_sent" : 43,
+  "total_http_requests_sent" : 57,
   "user_agent" : "ScholarOS/1.2.0"
 }

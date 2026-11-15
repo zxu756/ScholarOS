@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 117708,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Unpublished_Workshop_Notes_on_Attention_Kernels_22c82009b4.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-15T15:47:35Z",
+  "response_date_header" : "Sun, 15 Nov 2026 15:47:36 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Sun, 15 Nov 2026 15:47:36 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "938",
+    "x-ratelimit-reset" : "29544"
+  },
+  "service" : "openalex",
+  "sha256" : "e593d41e876295e9cc6687b3e2ad193f9c50ff5610eee3a3630d248d3cbebedb",
+  "slug" : "openalex_title_Unpublished_Workshop_Notes_on_Attention_Kernels_22c82009b4",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Unpublished%20Workshop%20Notes%20on%20Attention%20Kernels"
+}
