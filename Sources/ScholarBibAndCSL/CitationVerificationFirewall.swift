@@ -239,6 +239,66 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     }
 }
 
+public struct ReplayAuditReportEnvelope: Encodable {
+    public let mode: String = "REPLAY"
+    public let replay: Bool = true
+    public let report: CitationFirewallAuditReport
+
+    public init(report: CitationFirewallAuditReport) {
+        self.report = report
+    }
+
+    private enum ReplayKeys: String, CodingKey {
+        case mode
+        case replay
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: ReplayKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(replay, forKey: .replay)
+        try report.encode(to: encoder)
+    }
+}
+
+public enum BibliographyVerificationMode: Sendable {
+    case offline
+    case online(transport: any CitationRegistrySession)
+    case replay(snapshot: RegistryReplaySnapshot)
+    case record(directoryURL: URL, transport: any CitationRegistrySession)
+}
+
+public struct BibliographyVerificationResult: Sendable {
+    public let report: CitationFirewallAuditReport
+    public let isReplay: Bool
+    public let replayUsesCache: Bool
+    public let performedRegistryLookup: Bool
+
+    public init(
+        report: CitationFirewallAuditReport,
+        isReplay: Bool,
+        replayUsesCache: Bool,
+        performedRegistryLookup: Bool
+    ) {
+        self.report = report
+        self.isReplay = isReplay
+        self.replayUsesCache = replayUsesCache
+        self.performedRegistryLookup = performedRegistryLookup
+    }
+
+    public func encodeAuditJSONData(sortedKeys: Bool = true) throws -> Data {
+        let encoder = JSONEncoder()
+        if sortedKeys {
+            encoder.outputFormatting = [.sortedKeys]
+        }
+        if isReplay {
+            return try encoder.encode(ReplayAuditReportEnvelope(report: report))
+        } else {
+            return try encoder.encode(report)
+        }
+    }
+}
+
 private func blockedKeys(from keys: [String]) -> [String] { keys }
 
 // MARK: - Cryptographic & Structural Identifier Checksum Validators (ISO DOI, arXiv, PMID, ORCID, ISSN)
@@ -670,6 +730,7 @@ public struct CitationVerificationFirewall: Sendable {
     public let maxAllowedPublicationYear: Int
     public let minAllowedPublicationYear: Int
     public let rateLimiter: RegistryRateLimiter?
+    public let openAlexBudgetScope: OpenAlexSearchBudgetScope?
     public let cache: RegistryResponseCache?
     public let requestObserver: RegistryRequestObserver?
 
@@ -680,6 +741,7 @@ public struct CitationVerificationFirewall: Sendable {
         minAllowedPublicationYear: Int = 1450,
         maxAllowedPublicationYear: Int = 2030,
         rateLimiter: RegistryRateLimiter? = nil,
+        openAlexBudgetScope: OpenAlexSearchBudgetScope? = nil,
         cache: RegistryResponseCache? = nil,
         requestObserver: RegistryRequestObserver? = nil
     ) {
@@ -689,6 +751,7 @@ public struct CitationVerificationFirewall: Sendable {
         self.minAllowedPublicationYear = minAllowedPublicationYear
         self.maxAllowedPublicationYear = maxAllowedPublicationYear
         self.rateLimiter = rateLimiter
+        self.openAlexBudgetScope = openAlexBudgetScope
         self.cache = cache
         self.requestObserver = requestObserver
     }
@@ -1104,6 +1167,208 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
+    // MARK: - Unified Bibliography Verification Entry Point (`verify-citations`, MCP `scholar_verify_bibliography`, `diagnostics`)
+
+    /// Single shared entry function used by CLI `verify-citations`, MCP `scholar_verify_bibliography`,
+    /// CLI `diagnostics`, and MCP `scholar_lsp_diagnostics` (M1 item 8).
+    public static func verifyBibliography(
+        entries: [BibliographyEntry],
+        mode: BibliographyVerificationMode,
+        noCache: Bool = false,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        clock: any RegistryClock = SystemRegistryClock(),
+        sharedRateLimiter: RegistryRateLimiter? = nil,
+        sharedStandardCache: RegistryResponseCache? = nil,
+        sharedReplayExplicitCache: RegistryResponseCache? = nil,
+        language: ScholarLanguage = .en,
+        cacheWarningHandler: (@Sendable (String) -> Void)? = nil,
+        requestObserver: RegistryRequestObserver? = nil
+    ) async throws -> BibliographyVerificationResult {
+        switch mode {
+        case .offline:
+            let firewall = CitationVerificationFirewall()
+            let rawReport = firewall.auditLibrary(entries)
+            let localized = localizingUntrustedFileTagFindings(in: rawReport, firewall: firewall, language: language)
+            return BibliographyVerificationResult(
+                report: localized,
+                isReplay: false,
+                replayUsesCache: false,
+                performedRegistryLookup: false
+            )
+
+        case .online(let transport):
+            let effectiveClock: any RegistryClock = (transport is RegistryReplaySession)
+                ? ClosureRegistryClock.immediate
+                : clock
+            let limiter = sharedRateLimiter ?? RegistryRateLimiter(clock: effectiveClock)
+            let budgetScope = OpenAlexSearchBudgetScope()
+            let cache: RegistryResponseCache?
+            if noCache || (transport is RegistryReplaySession) {
+                cache = nil
+            } else if let sharedStandardCache {
+                cache = sharedStandardCache
+            } else {
+                cache = RegistryResponseCache(
+                    fileURL: RegistryResponseCache.resolveDatabaseURL(environment: environment),
+                    clock: clock,
+                    language: language,
+                    warningHandler: cacheWarningHandler
+                )
+            }
+            let firewall = CitationVerificationFirewall(
+                rateLimiter: limiter,
+                openAlexBudgetScope: budgetScope,
+                cache: cache,
+                requestObserver: requestObserver
+            )
+            var verdicts: [CitationFirewallEntryVerdict] = []
+            verdicts.reserveCapacity(entries.count)
+            for entry in entries {
+                let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: transport)
+                verdicts.append(verdict)
+            }
+            let rawReport = firewall.summarizeVerdicts(verdicts)
+            let localized = localizingUntrustedFileTagFindings(in: rawReport, firewall: firewall, language: language)
+            return BibliographyVerificationResult(
+                report: localized,
+                isReplay: false,
+                replayUsesCache: false,
+                performedRegistryLookup: true
+            )
+
+        case .replay(let snapshot):
+            let explicitCacheDir = environment["SCHOLAR_CACHE_DIR"]?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let replayCache: RegistryResponseCache?
+            let replayUsesCache: Bool
+            if !noCache, let explicitCacheDir, !explicitCacheDir.isEmpty {
+                if let sharedReplayExplicitCache {
+                    replayCache = sharedReplayExplicitCache
+                } else {
+                    let explicitSQLiteURL = URL(fileURLWithPath: explicitCacheDir, isDirectory: true)
+                        .appendingPathComponent("registry.sqlite", isDirectory: false)
+                    replayCache = RegistryResponseCache(
+                        fileURL: explicitSQLiteURL,
+                        clock: clock,
+                        language: language,
+                        warningHandler: cacheWarningHandler
+                    )
+                }
+                replayUsesCache = true
+            } else {
+                replayCache = nil
+                replayUsesCache = false
+            }
+
+            let replayLimiterClock = ClosureRegistryClock(
+                now: { clock.now() },
+                currentDate: { clock.currentDate() },
+                sleep: { _ in }
+            )
+            let firewall = CitationVerificationFirewall(
+                rateLimiter: RegistryRateLimiter(clock: replayLimiterClock),
+                openAlexBudgetScope: OpenAlexSearchBudgetScope(),
+                cache: replayCache,
+                requestObserver: requestObserver
+            )
+            let replaySession = snapshot.makeSession()
+            var verdicts: [CitationFirewallEntryVerdict] = []
+            verdicts.reserveCapacity(entries.count)
+            for entry in entries {
+                let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: replaySession)
+                try await replaySession.throwIfFailed()
+                verdicts.append(verdict)
+            }
+            let rawReport = firewall.summarizeVerdicts(verdicts)
+            let localized = localizingUntrustedFileTagFindings(in: rawReport, firewall: firewall, language: language)
+            return BibliographyVerificationResult(
+                report: localized,
+                isReplay: true,
+                replayUsesCache: replayUsesCache,
+                performedRegistryLookup: true
+            )
+
+        case .record(let directoryURL, let transport):
+            let limiter = sharedRateLimiter ?? RegistryRateLimiter(clock: clock)
+            let budgetScope = OpenAlexSearchBudgetScope()
+            let cache: RegistryResponseCache?
+            if noCache {
+                cache = nil
+            } else if let sharedStandardCache {
+                cache = sharedStandardCache
+            } else {
+                cache = RegistryResponseCache(
+                    fileURL: RegistryResponseCache.resolveDatabaseURL(environment: environment),
+                    clock: clock,
+                    language: language,
+                    warningHandler: cacheWarningHandler
+                )
+            }
+            let firewall = CitationVerificationFirewall(
+                rateLimiter: limiter,
+                openAlexBudgetScope: budgetScope,
+                cache: cache,
+                requestObserver: requestObserver
+            )
+            let recordingSession = try RegistryRecordingSession(
+                directoryURL: directoryURL,
+                transport: transport
+            )
+            var verdicts: [CitationFirewallEntryVerdict] = []
+            verdicts.reserveCapacity(entries.count)
+            for entry in entries {
+                let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: recordingSession)
+                try await recordingSession.throwIfFailed()
+                verdicts.append(verdict)
+            }
+            _ = try await recordingSession.finalize()
+            let rawReport = firewall.summarizeVerdicts(verdicts)
+            let localized = localizingUntrustedFileTagFindings(in: rawReport, firewall: firewall, language: language)
+            return BibliographyVerificationResult(
+                report: localized,
+                isReplay: false,
+                replayUsesCache: false,
+                performedRegistryLookup: true
+            )
+        }
+    }
+
+    public static func localizingUntrustedFileTagFindings(
+        in report: CitationFirewallAuditReport,
+        firewall: CitationVerificationFirewall,
+        language: ScholarLanguage
+    ) -> CitationFirewallAuditReport {
+        guard language == .zhHans else { return report }
+        var changed = false
+        let updatedVerdicts = report.verdicts.map { verdict -> CitationFirewallEntryVerdict in
+            guard let declared = verdict.auditedEntry.untrustedDeclaredFirewallClass, !declared.isEmpty else {
+                return verdict
+            }
+            changed = true
+            let updatedFindings = verdict.findings.map { finding -> FirewallFinding in
+                guard finding.code == .untrustedEmbeddedFirewallTag else { return finding }
+                return FirewallFinding(
+                    code: finding.code,
+                    severity: finding.severity,
+                    field: finding.field,
+                    detail: "文件里写着 \(declared)，未采信。"
+                )
+            }
+            return CitationFirewallEntryVerdict(
+                citeKey: verdict.citeKey,
+                firewallClass: verdict.firewallClass,
+                insertable: verdict.insertable,
+                reasons: verdict.reasons,
+                sources: verdict.sources,
+                fields: verdict.fields,
+                findings: updatedFindings,
+                auditNote: verdict.auditNote,
+                auditedEntry: verdict.auditedEntry
+            )
+        }
+        return changed ? firewall.summarizeVerdicts(updatedVerdicts) : report
+    }
+
     // MARK: - Citation Insertion Assertion (`ERR_UNVERIFIED_CITATION`)
 
     /// Enforces ScholarOS's citation firewall policy for CLI, MCP, and manuscript exporters.
@@ -1295,6 +1560,7 @@ public struct CitationVerificationFirewall: Sendable {
                 request,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: requestObserver
             )
         }
@@ -1303,6 +1569,7 @@ public struct CitationVerificationFirewall: Sendable {
                 request,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: requestObserver
             )
         }
@@ -1310,6 +1577,7 @@ public struct CitationVerificationFirewall: Sendable {
             request,
             source: source,
             using: session,
+            openAlexBudgetScope: openAlexBudgetScope,
             observer: requestObserver
         )
     }

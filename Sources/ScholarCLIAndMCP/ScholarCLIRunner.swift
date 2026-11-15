@@ -87,28 +87,11 @@ private final class CacheWarningCollector: @unchecked Sendable {
     }
 }
 
-private struct ReplayAuditReportEnvelope: Encodable {
-    let mode: String = "REPLAY"
-    let replay: Bool = true
-    let report: CitationFirewallAuditReport
-
-    private enum ReplayKeys: String, CodingKey {
-        case mode
-        case replay
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: ReplayKeys.self)
-        try container.encode(mode, forKey: .mode)
-        try container.encode(replay, forKey: .replay)
-        try report.encode(to: encoder)
-    }
-}
-
 public struct ScholarCLIRunner: Sendable {
     public let registryTransport: any CitationRegistrySession
     public let registryClock: any RegistryClock
     public let environment: [String: String]?
+    public let mcpInputLines: [String]?
 
     private var effectiveEnvironment: [String: String] {
         environment ?? ProcessInfo.processInfo.environment
@@ -119,11 +102,13 @@ public struct ScholarCLIRunner: Sendable {
             capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
         ),
         registryClock: any RegistryClock = SystemRegistryClock(),
-        environment: [String: String]? = nil
+        environment: [String: String]? = nil,
+        mcpInputLines: [String]? = nil
     ) {
         self.registryTransport = registryTransport
         self.registryClock = registryClock
         self.environment = environment
+        self.mcpInputLines = mcpInputLines
     }
 
     public func execute(arguments: [String]) async throws -> String {
@@ -287,17 +272,27 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--bib", "--registry-replay"],
-                boolFlags: ["--demo", "--json"],
+                boolFlags: ["--demo", "--offline", "--no-cache", "--json"],
                 maxPositionals: 1,
                 lang: lang
             )
             let emitJSON = parsed.bools.contains("--json")
+            let isOffline = parsed.bools.contains("--offline")
+            let noCache = parsed.bools.contains("--no-cache")
             let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let replayDir, replayDir.isEmpty {
                 throw ScholarOSError.invalidCLIArguments(
                     lang.L(
                         "Option '--registry-replay' requires a non-empty directory path.",
                         "选项 '--registry-replay' 需要提供非空目录路径。"
+                    )
+                )
+            }
+            if isOffline && replayDir != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --offline with --registry-replay.",
+                        "不能将 --offline 与 --registry-replay 同时使用。"
                     )
                 )
             }
@@ -309,6 +304,9 @@ public struct ScholarCLIRunner: Sendable {
                     )
                 )
             }
+
+            let lsp: ScholarLSPWorkspaceService
+            let isDemo: Bool
             if let fileArg = parsed.positionals.first {
                 if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
                     throw ScholarOSError.invalidCLIArguments(
@@ -318,37 +316,73 @@ public struct ScholarCLIRunner: Sendable {
                         )
                     )
                 }
-                let lsp = try makeLSPServiceFromDirectManuscript(
+                lsp = try makeLSPServiceFromDirectManuscript(
                     path: fileArg,
                     explicitBibPath: parsed.values["--bib"]
                 )
-                if let replayDir {
-                    let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
-                    _ = await lsp.verifyCitationsOnline(using: replaySession)
-                    try await replaySession.throwIfFailed()
+                isDemo = false
+            } else {
+                if let bibArg = parsed.values["--bib"] {
+                    throw ScholarOSError.invalidCLIArguments(
+                        lang.L(
+                            "Option '--bib' (\(bibArg)) requires a direct <paper.tex> file argument.",
+                            "选项 '--bib'（\(bibArg)）必须搭配直接文件参数 <paper.tex> 使用。"
+                        )
+                    )
                 }
-                return CLIExecutionOutput(
-                    stdout: try formatDiagnostics(lsp.diagnosticsReport(), asJSON: emitJSON, isDemo: false, lang: lang),
-                    exitCode: 0
+                let opened = try openReadDatabase(
+                    parsed: parsed,
+                    usage: lang.L(
+                        "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir>] [--no-cache] [--json] | --project <dir.scholarproj> | --demo",
+                        "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录>] [--no-cache] [--json] | --project <dir.scholarproj> | --demo"
+                    ),
+                    lang: lang
+                )
+                defer { opened.db.close() }
+                lsp = try makeLSPService(from: opened.db)
+                isDemo = opened.isDemo
+            }
+
+            let cacheWarningCollector = CacheWarningCollector()
+            let mode: BibliographyVerificationMode
+            if let replayDir {
+                let snapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayDir))
+                mode = .replay(snapshot: snapshot)
+            } else if isOffline || isDemo {
+                mode = .offline
+            } else {
+                mode = .online(transport: registryTransport)
+            }
+
+            let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                entries: lsp.citedBibliographyEntries,
+                mode: mode,
+                noCache: noCache || isOffline,
+                environment: effectiveEnvironment,
+                clock: registryClock,
+                language: lang,
+                cacheWarningHandler: { message in
+                    cacheWarningCollector.record(message)
+                }
+            )
+            lsp.applyVerificationReport(verificationResult.report)
+
+            var stderrLines = cacheWarningCollector.allLines()
+            if emitJSON && verificationResult.isReplay {
+                stderrLines.append(
+                    Self.replayBannerLine(usesCache: verificationResult.replayUsesCache, lang: lang)
                 )
             }
-            let opened = try openReadDatabase(
-                parsed: parsed,
-                usage: lang.L(
-                    "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--registry-replay <dir>] [--json] | --project <dir.scholarproj> | --demo",
-                    "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--registry-replay <目录>] [--json] | --project <dir.scholarproj> | --demo"
-                ),
-                lang: lang
-            )
-            defer { opened.db.close() }
-            let lsp = try makeLSPService(from: opened.db)
-            if let replayDir {
-                let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
-                _ = await lsp.verifyCitationsOnline(using: replaySession)
-                try await replaySession.throwIfFailed()
-            }
             return CLIExecutionOutput(
-                stdout: try formatDiagnostics(lsp.diagnosticsReport(), asJSON: emitJSON, isDemo: opened.isDemo, lang: lang),
+                stdout: try formatDiagnostics(
+                    lsp.diagnosticsReport(),
+                    asJSON: emitJSON,
+                    isDemo: isDemo,
+                    isReplay: verificationResult.isReplay,
+                    replayUsesCache: verificationResult.replayUsesCache,
+                    lang: lang
+                ),
+                stderr: stderrLines.joined(separator: "\n"),
                 exitCode: 0
             )
 
@@ -462,125 +496,37 @@ public struct ScholarCLIRunner: Sendable {
                 observer = nil
             }
 
-            let env = effectiveEnvironment
-            let baseClock = registryClock
-            let makeStandardCache: () -> RegistryResponseCache? = {
-                guard !noCache else { return nil }
-                return RegistryResponseCache(
-                    fileURL: RegistryResponseCache.resolveDatabaseURL(environment: env),
-                    clock: baseClock,
-                    language: lang,
-                    warningHandler: { message in
-                        cacheWarningCollector.record(message)
-                    }
-                )
-            }
-
-            let firewall: CitationVerificationFirewall
-            let rawAudit: CitationFirewallAuditReport
-            let isReplayMode: Bool
-            let replayUsesCache: Bool
-            let performedRegistryLookup: Bool
-
+            let mode: BibliographyVerificationMode
             if let recordDir {
-                firewall = CitationVerificationFirewall(
-                    rateLimiter: RegistryRateLimiter(clock: registryClock),
-                    cache: makeStandardCache(),
-                    requestObserver: observer
-                )
-                let recordingSession = try RegistryRecordingSession(
+                mode = .record(
                     directoryURL: URL(fileURLWithPath: recordDir),
                     transport: registryTransport
                 )
-                var verdicts: [CitationFirewallEntryVerdict] = []
-                verdicts.reserveCapacity(entries.count)
-                for entry in entries {
-                    let verdict = await firewall.verifyAgainstPublicRegistries(
-                        entry: entry,
-                        session: recordingSession
-                    )
-                    try await recordingSession.throwIfFailed()
-                    verdicts.append(verdict)
-                }
-                _ = try await recordingSession.finalize()
-                rawAudit = firewall.summarizeVerdicts(verdicts)
-                isReplayMode = false
-                replayUsesCache = false
-                performedRegistryLookup = true
             } else if let replayDir {
-                let explicitCacheDir = env["SCHOLAR_CACHE_DIR"]?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                let replayCache: RegistryResponseCache?
-                if !noCache, let explicitCacheDir, !explicitCacheDir.isEmpty {
-                    let explicitSQLiteURL = URL(fileURLWithPath: explicitCacheDir, isDirectory: true)
-                        .appendingPathComponent("registry.sqlite", isDirectory: false)
-                    replayCache = RegistryResponseCache(
-                        fileURL: explicitSQLiteURL,
-                        clock: baseClock,
-                        language: lang,
-                        warningHandler: { message in
-                            cacheWarningCollector.record(message)
-                        }
-                    )
-                    replayUsesCache = true
-                } else {
-                    replayCache = nil
-                    replayUsesCache = false
-                }
-                let replayLimiterClock = ClosureRegistryClock(
-                    now: { baseClock.now() },
-                    currentDate: { baseClock.currentDate() },
-                    sleep: { _ in }
-                )
-                firewall = CitationVerificationFirewall(
-                    rateLimiter: RegistryRateLimiter(clock: replayLimiterClock),
-                    cache: replayCache,
-                    requestObserver: observer
-                )
-                let replaySession = try RegistryReplaySession(
-                    directoryURL: URL(fileURLWithPath: replayDir)
-                )
-                var verdicts: [CitationFirewallEntryVerdict] = []
-                verdicts.reserveCapacity(entries.count)
-                for entry in entries {
-                    let verdict = await firewall.verifyAgainstPublicRegistries(
-                        entry: entry,
-                        session: replaySession
-                    )
-                    try await replaySession.throwIfFailed()
-                    verdicts.append(verdict)
-                }
-                rawAudit = firewall.summarizeVerdicts(verdicts)
-                isReplayMode = true
-                performedRegistryLookup = true
+                let snapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayDir))
+                mode = .replay(snapshot: snapshot)
             } else if isOffline || isDemo {
-                firewall = CitationVerificationFirewall()
-                rawAudit = firewall.auditLibrary(entries)
-                isReplayMode = false
-                replayUsesCache = false
-                performedRegistryLookup = false
+                mode = .offline
             } else {
-                firewall = CitationVerificationFirewall(
-                    rateLimiter: RegistryRateLimiter(clock: registryClock),
-                    cache: makeStandardCache(),
-                    requestObserver: observer
-                )
-                var verdicts: [CitationFirewallEntryVerdict] = []
-                verdicts.reserveCapacity(entries.count)
-                for entry in entries {
-                    let verdict = await firewall.verifyAgainstPublicRegistries(
-                        entry: entry,
-                        session: registryTransport
-                    )
-                    verdicts.append(verdict)
-                }
-                rawAudit = firewall.summarizeVerdicts(verdicts)
-                isReplayMode = false
-                replayUsesCache = false
-                performedRegistryLookup = true
+                mode = .online(transport: registryTransport)
             }
 
-            let audit = Self.localizingUntrustedFileTagFindings(in: rawAudit, firewall: firewall, lang: lang)
+            let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                entries: entries,
+                mode: mode,
+                noCache: noCache || isOffline,
+                environment: effectiveEnvironment,
+                clock: registryClock,
+                language: lang,
+                cacheWarningHandler: { message in
+                    cacheWarningCollector.record(message)
+                },
+                requestObserver: observer
+            )
+            let audit = verificationResult.report
+            let isReplayMode = verificationResult.isReplay
+            let replayUsesCache = verificationResult.replayUsesCache
+            let performedRegistryLookup = verificationResult.performedRegistryLookup
 
             let exitCode: Int32
             if audit.driftCount > 0 || audit.notFoundCount > 0 || audit.retractedCount > 0 {
@@ -607,14 +553,7 @@ public struct ScholarCLIRunner: Sendable {
                         stderr
                     )
                 }
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.sortedKeys]
-                let data: Data
-                if isReplayMode {
-                    data = try encoder.encode(ReplayAuditReportEnvelope(report: audit))
-                } else {
-                    data = try encoder.encode(audit)
-                }
+                let data = try verificationResult.encodeAuditJSONData(sortedKeys: true)
                 return CLIExecutionOutput(
                     stdout: String(decoding: data, as: UTF8.self),
                     stderr: collectedStderr,
@@ -627,21 +566,7 @@ public struct ScholarCLIRunner: Sendable {
                 lines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
             }
             if isReplayMode {
-                if replayUsesCache {
-                    lines.append(
-                        lang.L(
-                            "[REPLAY] Recorded registry replay (no live network requests; reading/writing SCHOLAR_CACHE_DIR cache)",
-                            "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求，读写 SCHOLAR_CACHE_DIR 缓存）"
-                        )
-                    )
-                } else {
-                    lines.append(
-                        lang.L(
-                            "[REPLAY] Recorded registry replay (no live network requests, no cache)",
-                            "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求、不读写缓存）"
-                        )
-                    )
-                }
+                lines.append(Self.replayBannerLine(usesCache: replayUsesCache, lang: lang))
             }
             lines.append(
                 "Evaluated=\(audit.totalEvaluated) Verified=\(audit.verifiedCount) Drift=\(audit.driftCount) NotFound=\(audit.notFoundCount) Retracted=\(audit.retractedCount) Unverified=\(audit.unverifiedCount)"
@@ -1028,22 +953,71 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--registry-replay"],
-                boolFlags: ["--demo"],
-                maxPositionals: 0
+                boolFlags: ["--demo", "--offline", "--no-cache"],
+                maxPositionals: 0,
+                lang: lang
             )
             let projectPath = parsed.values["--project"]
             if let projectPath, !FileManager.default.fileExists(atPath: projectPath) {
                 throw ScholarOSError.fileNotFound(projectPath)
             }
+            let allowDemo = parsed.bools.contains("--demo")
+            let isOffline = parsed.bools.contains("--offline")
+            let noCache = parsed.bools.contains("--no-cache")
             let replayPath = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let replayPath, replayPath.isEmpty {
-                throw ScholarOSError.invalidCLIArguments("Option '--registry-replay' requires a non-empty directory path.")
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Option '--registry-replay' requires a non-empty directory path.",
+                        "选项 '--registry-replay' 需要提供非空目录路径。"
+                    )
+                )
             }
+            if isOffline && replayPath != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --offline with --registry-replay.",
+                        "不能将 --offline 与 --registry-replay 同时使用。"
+                    )
+                )
+            }
+            if allowDemo && replayPath != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --demo with --registry-replay.",
+                        "不能将 --demo 与 --registry-replay 同时使用。"
+                    )
+                )
+            }
+
+            // Validate `--registry-replay` directory at MCP startup (exiting 2 on missing/corrupt manifest or SHA-256 mismatch).
+            let validatedReplaySnapshot: RegistryReplaySnapshot?
+            if let replayPath {
+                validatedReplaySnapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayPath))
+            } else {
+                validatedReplaySnapshot = nil
+            }
+
             let server = ScholarMCPServer(
                 defaultProjectBundlePath: projectPath,
-                allowDemoMode: parsed.bools.contains("--demo"),
-                defaultRegistryReplayPath: replayPath
+                allowDemoMode: allowDemo,
+                defaultRegistryReplayPath: replayPath,
+                defaultRegistryReplaySnapshot: validatedReplaySnapshot,
+                isOffline: isOffline,
+                noCache: noCache,
+                registryTransport: registryTransport,
+                registryClock: registryClock,
+                environment: effectiveEnvironment
             )
+            if let mcpInputLines {
+                var outLines: [String] = []
+                for line in mcpInputLines {
+                    if let resp = await server.handleJSONRPCLineAsync(line) {
+                        outLines.append(resp)
+                    }
+                }
+                return CLIExecutionOutput(stdout: outLines.joined(separator: "\n"), exitCode: 0)
+            }
             await server.serveStdio()
             return CLIExecutionOutput(stdout: "", exitCode: 0)
 
@@ -1362,42 +1336,6 @@ public struct ScholarCLIRunner: Sendable {
         )
     }
 
-    private static func localizingUntrustedFileTagFindings(
-        in report: CitationFirewallAuditReport,
-        firewall: CitationVerificationFirewall,
-        lang: ScholarLanguage
-    ) -> CitationFirewallAuditReport {
-        guard lang == .zhHans else { return report }
-        var changed = false
-        let updatedVerdicts = report.verdicts.map { verdict -> CitationFirewallEntryVerdict in
-            guard let declared = verdict.auditedEntry.untrustedDeclaredFirewallClass, !declared.isEmpty else {
-                return verdict
-            }
-            changed = true
-            let updatedFindings = verdict.findings.map { finding -> FirewallFinding in
-                guard finding.code == .untrustedEmbeddedFirewallTag else { return finding }
-                return FirewallFinding(
-                    code: finding.code,
-                    severity: finding.severity,
-                    field: finding.field,
-                    detail: "文件里写着 \(declared)，未采信。"
-                )
-            }
-            return CitationFirewallEntryVerdict(
-                citeKey: verdict.citeKey,
-                firewallClass: verdict.firewallClass,
-                insertable: verdict.insertable,
-                reasons: verdict.reasons,
-                sources: verdict.sources,
-                fields: verdict.fields,
-                findings: updatedFindings,
-                auditNote: verdict.auditNote,
-                auditedEntry: verdict.auditedEntry
-            )
-        }
-        return changed ? firewall.summarizeVerdicts(updatedVerdicts) : report
-    }
-
     private static func localizedVerdictAuditNote(
         _ verdict: CitationFirewallEntryVerdict,
         lang: ScholarLanguage
@@ -1579,10 +1517,25 @@ public struct ScholarCLIRunner: Sendable {
         return header + body
     }
 
+    private static func replayBannerLine(usesCache: Bool, lang: ScholarLanguage) -> String {
+        if usesCache {
+            return lang.L(
+                "[REPLAY] Recorded registry replay (no live network requests; reading/writing SCHOLAR_CACHE_DIR cache)",
+                "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求，读写 SCHOLAR_CACHE_DIR 缓存）"
+            )
+        }
+        return lang.L(
+            "[REPLAY] Recorded registry replay (no live network requests, no cache)",
+            "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求、不读写缓存）"
+        )
+    }
+
     private func formatDiagnostics(
         _ report: WorkspaceDiagnosticsReport,
         asJSON: Bool,
         isDemo: Bool,
+        isReplay: Bool = false,
+        replayUsesCache: Bool = false,
         lang: ScholarLanguage = .en
     ) throws -> String {
         if asJSON {
@@ -1600,14 +1553,22 @@ public struct ScholarCLIRunner: Sendable {
             let data = try encoder.encode(report.diagnostics)
             return String(decoding: data, as: UTF8.self)
         }
-        let prefix = isDemo ? lang.L("[DEMO] Sample unverified dataset\n", "[DEMO / 演示数据] 示例未核查数据集\n") : ""
-        if report.diagnostics.isEmpty {
-            return prefix + lang.L("0 diagnostics", "0 条诊断")
+        var headerLines: [String] = []
+        if isDemo {
+            headerLines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
         }
-        let body = report.diagnostics.map { diag in
-            "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
-        }.joined(separator: "\n")
-        return prefix + body
+        if isReplay {
+            headerLines.append(Self.replayBannerLine(usesCache: replayUsesCache, lang: lang))
+        }
+        let body: String
+        if report.diagnostics.isEmpty {
+            body = lang.L("0 diagnostics", "0 条诊断")
+        } else {
+            body = report.diagnostics.map { diag in
+                "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
+            }.joined(separator: "\n")
+        }
+        return (headerLines + [body]).joined(separator: "\n")
     }
 
     private func makeLSPService(from db: ScholarProjectDatabase) throws -> ScholarLSPWorkspaceService {
@@ -1636,7 +1597,8 @@ public struct ScholarCLIRunner: Sendable {
 
             Direct File Commands:
               outline <paper.tex> [--json]                           Print numbered section/subsection outline
-              diagnostics <paper.tex> [--bib <refs.bib>] [--json]    Run LaTeX CST, cross-reference & citation lints
+              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir>] [--no-cache] [--json]
+                                                                     Run LaTeX CST, cross-reference & online cited-entry checks
               verify-citations <refs.bib> [options]                  Verify citations online (exit 0 all VERIFIED, 1 DRIFT/NOT_FOUND/RETRACTED, 3 UNVERIFIED, 2 error)
                 --offline                                            Check identifier syntax & built-in retraction hints without network or cache access
                 --no-cache                                           Skip reading and writing the SQLite response cache for this run
@@ -1658,7 +1620,8 @@ public struct ScholarCLIRunner: Sendable {
               audit-editorial --project <dir.scholarproj> | --demo   Run JavaScriptCore editorial plugins
               export-bundle [<dir>] --project <dir> | --demo         Export flattened submission bundle
               export-html [<out.html>] --project <dir> | --demo      Export bilingual HTML audit dossier
-              mcp [--project <dir.scholarproj>] [--demo]             Start JSON-RPC 2.0 MCP server on stdio
+              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <dir>] [--no-cache]
+                                                                     Start JSON-RPC 2.0 MCP server on stdio
               --demo                                                 Launch macOS GUI in explicit DEMO mode
               --export-screenshots <output-dir> [--lang zh|en]       Render 2x Retina screenshots & demo HTML dossier
             """
@@ -1670,7 +1633,8 @@ public struct ScholarCLIRunner: Sendable {
 
             单文件直读命令：
               outline <paper.tex> [--json]                           提取 LaTeX 章节与子章节编号大纲
-              diagnostics <paper.tex> [--bib <refs.bib>] [--json]    执行 LaTeX 语法树、交叉引用与引文静态诊断
+              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录>] [--no-cache] [--json]
+                                                                     执行 LaTeX 语法树、交叉引用与被引用条目核查诊断
               verify-citations <refs.bib> [选项]                     默认联网核查参考文献（退出码：全 VERIFIED 为 0，含 DRIFT/NOT_FOUND/RETRACTED 为 1，仅余 UNVERIFIED 为 3，错误为 2）
                 --offline                                            仅检查标识符语法与内置撤稿名单，不发任何网络请求且不读写缓存
                 --no-cache                                           本次运行不读取也不写入 SQLite 响应缓存
@@ -1692,7 +1656,8 @@ public struct ScholarCLIRunner: Sendable {
               audit-editorial --project <dir.scholarproj> | --demo   运行 JavaScriptCore 审稿插件
               export-bundle [<dir>] --project <dir> | --demo         导出展平的投稿归档目录
               export-html [<out.html>] --project <dir> | --demo      导出中英双语 HTML 审计简报
-              mcp [--project <dir.scholarproj>] [--demo]             在标准输入输出启动 JSON-RPC 2.0 MCP 服务端
+              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <目录>] [--no-cache]
+                                                                     在标准输入输出启动 JSON-RPC 2.0 MCP 服务端
               --demo                                                 以显式演示模式 (DEMO) 启动 macOS 桌面窗口
               --export-screenshots <output-dir> [--lang zh|en]       渲染 2x Retina 演示截图与双语演示 HTML 简报
             """

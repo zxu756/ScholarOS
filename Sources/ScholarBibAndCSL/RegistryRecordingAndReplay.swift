@@ -1097,6 +1097,23 @@ enum RegistryReplayValidator {
     }
 }
 
+public struct RegistryReplaySnapshot: Sendable {
+    public let directoryURL: URL
+    public let manifest: RegistryRecordingManifest
+    fileprivate let verified: RegistryReplayValidator.VerifiedDirectory
+
+    public init(directoryURL: URL) throws {
+        let verifiedDir = try RegistryReplayValidator.loadAndVerifyDirectory(directoryURL: directoryURL)
+        self.directoryURL = directoryURL
+        self.manifest = verifiedDir.manifest
+        self.verified = verifiedDir
+    }
+
+    public func makeSession() -> RegistryReplaySession {
+        RegistryReplaySession(snapshot: self)
+    }
+}
+
 public actor RegistryReplaySession: CitationRegistrySession {
     public nonisolated let directoryURL: URL
     public nonisolated let bypassesCache: Bool = true
@@ -1110,6 +1127,12 @@ public actor RegistryReplaySession: CitationRegistrySession {
         self.directoryURL = directoryURL
         self.manifest = verified.manifest
         self.entriesByURL = verified.entriesByURL
+    }
+
+    public init(snapshot: RegistryReplaySnapshot) {
+        self.directoryURL = snapshot.directoryURL
+        self.manifest = snapshot.manifest
+        self.entriesByURL = snapshot.verified.entriesByURL
     }
 
     public func throwIfFailed() throws {

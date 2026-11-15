@@ -601,38 +601,60 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         )
     }
 
+    /// Bibliography entries actually cited in the workspace's manuscript documents, preserving bibliography order.
+    public var citedBibliographyEntries: [BibliographyEntry] {
+        withLock { st in
+            let ws = ensureWorkspaceAST(&st)
+            let citedKeys = Set(ws.symbolTable.allCitationOccurrences.map(\.citeKey))
+            return st.orderedBibliographyKeys.compactMap { key in
+                guard citedKeys.contains(key) else { return nil }
+                return st.bibliographyByKey[key]
+            }
+        }
+    }
+
+    /// Applies an authoritative in-run `CitationFirewallAuditReport` (e.g. from `CitationVerificationFirewall.verifyBibliography`)
+    /// into the workspace while preserving uncited bibliography entries.
+    public func applyVerificationReport(_ report: CitationFirewallAuditReport) {
+        withLock { st in
+            for verdict in report.verdicts {
+                let entry = verdict.auditedEntry
+                if st.bibliographyByKey[entry.citeKey] == nil {
+                    st.orderedBibliographyKeys.append(entry.citeKey)
+                }
+                st.bibliographyByKey[entry.citeKey] = entry
+                st.inRunVerdictsByKey[entry.citeKey] = verdict
+            }
+            st.cachedDiagnosticsReport = nil
+        }
+    }
+
     /// Runs live/mocked online registry verification (Crossref, OpenAlex, arXiv) across all bibliography entries
     /// and updates the workspace bibliography index atomically.
     public func verifyCitationsOnline(
-        using session: any CitationRegistrySession = LiveURLSessionRegistryClient()
+        using session: any CitationRegistrySession = LiveURLSessionRegistryClient(
+            capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
+        )
     ) async -> CitationFirewallAuditReport {
         let snapshotEntries = bibliographyEntries
+        if let verified = try? await CitationVerificationFirewall.verifyBibliography(
+            entries: snapshotEntries,
+            mode: .online(transport: session),
+            noCache: true
+        ) {
+            applyVerificationReport(verified.report)
+            return verified.report
+        }
+
         var verdicts: [CitationFirewallEntryVerdict] = []
         verdicts.reserveCapacity(snapshotEntries.count)
-
         for entry in snapshotEntries {
             let verdict = await citationFirewall.verifyAgainstPublicRegistries(entry: entry, session: session)
             verdicts.append(verdict)
         }
-
-        withLock { st in
-            var map: [String: BibliographyEntry] = [:]
-            var order: [String] = []
-            var verdictMap: [String: CitationFirewallEntryVerdict] = [:]
-            for verdict in verdicts {
-                let entry = verdict.auditedEntry
-                if map[entry.citeKey] == nil {
-                    order.append(entry.citeKey)
-                }
-                map[entry.citeKey] = entry
-                verdictMap[entry.citeKey] = verdict
-            }
-            st.bibliographyByKey = map
-            st.orderedBibliographyKeys = order
-            st.inRunVerdictsByKey = verdictMap
-            st.cachedDiagnosticsReport = nil
-        }
-        return citationFirewall.summarizeVerdicts(verdicts)
+        let report = citationFirewall.summarizeVerdicts(verdicts)
+        applyVerificationReport(report)
+        return report
     }
 
     // MARK: - Workspace AST, Document Outline, Symbol Table & Metrics

@@ -399,11 +399,11 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             case .drift:
                 diagnostics.append(
                     LSPDiagnostic(
-                        code: "FW_METADATA_DRIFT",
-                        severity: .warning,
-                        message: "Citation '\(occ.citeKey)' has metadata drift (`DRIFT`): \(verdictNote)",
+                        code: "ERR_UNVERIFIED_CITATION",
+                        severity: .error,
+                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is DRIFT (\(verdictNote)).",
                         span: occ.span,
-                        suggestedFix: "Reconcile title/year/author fields against registry metadata."
+                        suggestedFix: "Reconcile title/year/author fields against registry metadata or remove citation '\(occ.citeKey)'."
                     )
                 )
 

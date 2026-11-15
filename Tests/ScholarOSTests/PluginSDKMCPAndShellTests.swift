@@ -389,7 +389,9 @@ struct PluginSDKMCPAndShellTests {
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
         let bundlePath = tempDir.appendingPathComponent("CLIStudy.scholarproj").path
-        let cli = ScholarCLIRunner()
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let cli = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
 
         let versionOut = try await cli.execute(arguments: ["version"])
         #expect(versionOut.contains("ScholarOS 1.2.0"))
@@ -414,7 +416,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(outlineOut.contains("Introduction"))
         #expect(outlineOut.contains("Methodology"))
 
-        let diagOut = try await cli.execute(arguments: ["diagnostics", "--project", bundlePath])
+        let diagOut = try await cli.execute(arguments: ["diagnostics", "--project", bundlePath, "--offline"])
         #expect(!diagOut.isEmpty)
     }
 
@@ -534,7 +536,12 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("ScholarMCPServer handles JSON-RPC 2.0 initialize and tools/list with 8 academic tools")
     func mcpServerInitializeAndToolsListJSONRPC() throws {
-        let server = ScholarMCPServer()
+        let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-init")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let server = ScholarMCPServer(
+            isOffline: true,
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
 
         // 1. initialize handshake
         let initReq = #"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#
@@ -575,7 +582,15 @@ struct PluginSDKMCPAndShellTests {
         )
         db.close()
 
-        let offlineServer = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let isolatedEnv = ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path]
+
+        let offlineServer = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            isOffline: true,
+            environment: isolatedEnv
+        )
         let okReq = #"""
         {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention","style":"ieee"}}}
         """#
@@ -591,7 +606,8 @@ struct PluginSDKMCPAndShellTests {
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
         let server = ScholarMCPServer(
             defaultProjectBundlePath: bundleURL.path,
-            defaultRegistryReplayPath: registryDir.path
+            defaultRegistryReplayPath: registryDir.path,
+            environment: isolatedEnv
         )
 
         // 1. Hallucinated key via full JSON-RPC tools/call envelope -> isError: true + ERR_UNVERIFIED_CITATION
@@ -619,13 +635,17 @@ struct PluginSDKMCPAndShellTests {
     }
 
     @Test("MCP server requires explicit project/demo target and executes provenance search, PRISMA agreement, LSP diagnostics, diff, and citation gaps")
-    func mcpServerExecutesRemainingDomainTools() {
+    func mcpServerExecutesRemainingDomainTools() throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-domain")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedEnv = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+
         // Without default project or allowDemoMode, omitting projectPath fails rather than silently loading demo data
-        let strictServer = ScholarMCPServer()
+        let strictServer = ScholarMCPServer(isOffline: true, environment: isolatedEnv)
         let missingTarget = strictServer.executeToolCall(name: "scholar_prisma_agreement", arguments: [:])
         #expect(missingTarget["isError"] as? Bool == true)
 
-        let server = ScholarMCPServer(allowDemoMode: true)
+        let server = ScholarMCPServer(allowDemoMode: true, isOffline: true, environment: isolatedEnv)
 
         let prov = server.executeToolCall(name: "scholar_search_provenance", arguments: ["claim": "FlashAttention speedup", "demo": true])
         #expect(prov["isError"] as? Bool == false)
@@ -661,7 +681,11 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("S20/S23 regression: CLI requires explicit file or --project/--demo, accepts direct .tex/.bib files, and fails non-zero on unverified citations")
     func s20AndS23CLIDirectFileInputsMissingInputErrorsAndNonZeroVerifyExit() async throws {
-        let cli = ScholarCLIRunner()
+        let tempDir = try makeTempDirectory(prefix: "scholaros-s20-direct")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let cli = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
 
         // 1. Missing input (no file, no --project, no --demo) MUST throw invalidCLIArguments (exit 2), NEVER return demo data
         await #expect(throws: ScholarOSError.self) {
@@ -680,9 +704,6 @@ struct PluginSDKMCPAndShellTests {
         }
 
         // 2. Direct .tex and .bib inputs operate on user files and exit 1 on unverified citations
-        let tempDir = try makeTempDirectory(prefix: "scholaros-s20-direct")
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-
         let texFile = tempDir.appendingPathComponent("paper.tex")
         try """
         \\documentclass{article}
@@ -727,7 +748,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(formatOut.contains("[1]"))
         #expect(formatOut.contains("Deep learning"))
 
-        let diagOut = try await cli.execute(arguments: ["diagnostics", texFile.path, "--bib", bibFile.path])
+        let diagOut = try await cli.execute(arguments: ["diagnostics", texFile.path, "--bib", bibFile.path, "--offline"])
         #expect(diagOut.contains("lecun2015deep"))
     }
 
@@ -750,7 +771,11 @@ struct PluginSDKMCPAndShellTests {
         let dbMetrics = try db.computePRISMAMetrics()
         #expect(abs(dbMetrics.cohensKappa - expectedKappa) < 1e-6)
 
-        let server = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let server = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            isOffline: true,
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
         let mcpResp = server.executeToolCall(
             name: "scholar_prisma_agreement",
             arguments: ["projectPath": bundleURL.path]
@@ -768,7 +793,12 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("S27 regression: MCP server returns -32700 Parse error on invalid JSON and -32601 Method not found on unknown method")
     func s27MCPServerInvalidJSONReturns32700AndUnknownMethodReturns32601() throws {
-        let server = ScholarMCPServer()
+        let tempDir = try makeTempDirectory(prefix: "scholaros-s27-mcp")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let server = ScholarMCPServer(
+            isOffline: true,
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
 
         // 1. Invalid JSON -> JSON-RPC 2.0 Parse error (-32700)
         let parseErrRaw = try #require(server.handleJSONRPCLine("{not valid json"))
@@ -1229,8 +1259,16 @@ struct PluginSDKMCPAndShellTests {
         #expect(zhOffline.stdout.contains("[RETRACTED] retracted_wakefield: 撤稿提示：DOI '10.1016/S0140-6736(97)11096-0' 命中内置撤稿名单（内置名单，不完整）。"))
 
         // The MCP tool returns the same library notes: no "(offline)" label and no Chinese in them either.
+        let mcpTempDir = try makeTempDirectory(prefix: "scholaros-s32-mcp")
+        defer { try? FileManager.default.removeItem(at: mcpTempDir) }
         let rawBib = try String(contentsOfFile: bibPath, encoding: .utf8)
-        let mcpResult = ScholarMCPServer().executeToolCall(name: "scholar_verify_bibliography", arguments: ["bibtex": rawBib])
+        let mcpResult = await ScholarMCPServer(
+            isOffline: true,
+            environment: ["HOME": mcpTempDir.path, "CFFIXED_USER_HOME": mcpTempDir.path]
+        ).executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": rawBib, "offline": true]
+        )
         let mcpContent = try #require(mcpResult["content"] as? [[String: Any]])
         let mcpText = try #require(mcpContent.first?["text"] as? String)
         #expect(mcpText.contains("Not checked against any external registry."))
@@ -1621,7 +1659,10 @@ struct PluginSDKMCPAndShellTests {
         #expect(!serialized.contains("x-firewall-note"))
 
         // 2. verify-citations (offline & replay) is NOT VERIFIED and findings note untrusted declaration
-        let runner = ScholarCLIRunner()
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let isolatedEnv = ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path]
+        let runner = ScholarCLIRunner(environment: isolatedEnv)
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
         let replayJSONRun = try await runner.run(
             arguments: ["verify-citations", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
@@ -1645,7 +1686,7 @@ struct PluginSDKMCPAndShellTests {
 
         // 3. diagnostics emits ERR_UNVERIFIED_CITATION on draft.tex citing fake_tampered
         let diagRun = try await runner.run(
-            arguments: ["diagnostics", texURL.path, "--bib", bibURL.path, "--lang", "en"]
+            arguments: ["diagnostics", texURL.path, "--bib", bibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
         )
         #expect(diagRun.stdout.contains("ERR_UNVERIFIED_CITATION"))
 
@@ -1661,7 +1702,11 @@ struct PluginSDKMCPAndShellTests {
         #expect(citeRes.exitCode != 0)
         #expect(citeRes.stderr.contains("ERR_UNVERIFIED_CITATION"))
 
-        let mcp = ScholarMCPServer(defaultProjectBundlePath: bundleURL.path)
+        let mcp = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            isOffline: true,
+            environment: isolatedEnv
+        )
         let mcpCall = mcp.executeToolCall(
             name: "scholar_cite_key",
             arguments: ["citeKey": "fake_tampered", "style": "apa7"]
@@ -2936,6 +2981,959 @@ struct PluginSDKMCPAndShellTests {
         let rep2 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(r2.stdout.utf8))
         #expect(rep1.verifiedCount == 5)
         #expect(rep2.verifiedCount == 5)
+    }
+
+    // MARK: - 14. M1 Item 8 (Stage 08): Unified Entry Points (`verify-citations`, MCP `scholar_verify_bibliography`, `diagnostics`)
+
+    @Test("M1 acceptance row 20 (Stage 08): MCP scholar_verify_bibliography (--registry-replay) produces entry-for-entry identical report JSON to CLI verify-citations --registry-replay --json across all fixture .bib files")
+    func m1Stage08Row20MCPVerifyBibliographyMatchesCLIVerifyCitationsAcrossAllFixtures() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-row20")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("isolated-home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let isolatedEnv: [String: String] = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let registrySourcesDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources", isDirectory: true)
+        let sourceBibURLs = try FileManager.default.contentsOfDirectory(
+            at: registrySourcesDir,
+            includingPropertiesForKeys: nil
+        )
+        .filter { $0.pathExtension.lowercased() == "bib" }
+        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        #expect(sourceBibURLs.count >= 2)
+        let allBibURLs = [repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")] + sourceBibURLs
+
+        for (idx, bibURL) in allBibURLs.enumerated() {
+            let rawBib = try String(contentsOf: bibURL, encoding: .utf8)
+
+            // 1. CLI `verify-citations <bib> --registry-replay <dir> --json --lang en`
+            let cliRunner = ScholarCLIRunner(environment: isolatedEnv)
+            let cliRes = await cliRunner.runWithExitStatus(
+                arguments: [
+                    "verify-citations",
+                    bibURL.path,
+                    "--registry-replay",
+                    registryDir.path,
+                    "--json",
+                    "--lang",
+                    "en"
+                ]
+            )
+            #expect(cliRes.exitCode == 0 || cliRes.exitCode == 1 || cliRes.exitCode == 3, "Unexpected CLI exit on \(bibURL.lastPathComponent): \(cliRes.stderr)")
+            let cliDict = try #require(
+                JSONSerialization.jsonObject(with: Data(cliRes.stdout.utf8)) as? [String: Any],
+                "CLI stdout was not JSON on \(bibURL.lastPathComponent)"
+            )
+
+            // 2. MCP `scholaros mcp --registry-replay <dir>` calling `scholar_verify_bibliography`
+            let rpcReqObj: [String: Any] = [
+                "jsonrpc": "2.0",
+                "id": 100 + idx,
+                "method": "tools/call",
+                "params": [
+                    "name": "scholar_verify_bibliography",
+                    "arguments": ["bibtex": rawBib]
+                ]
+            ]
+            let rpcLine = String(decoding: try JSONSerialization.data(withJSONObject: rpcReqObj), as: UTF8.self)
+            let mcpRunner = ScholarCLIRunner(
+                environment: isolatedEnv,
+                mcpInputLines: [rpcLine]
+            )
+            let mcpRes = await mcpRunner.runWithExitStatus(
+                arguments: ["mcp", "--registry-replay", registryDir.path]
+            )
+            #expect(mcpRes.exitCode == 0, "MCP replay exited non-zero on \(bibURL.lastPathComponent): \(mcpRes.stderr)")
+
+            let rpcEnv = try #require(
+                JSONSerialization.jsonObject(with: Data(mcpRes.stdout.utf8)) as? [String: Any],
+                "Invalid JSON-RPC response on \(bibURL.lastPathComponent): \(mcpRes.stdout)"
+            )
+            let rpcResult = try #require(rpcEnv["result"] as? [String: Any])
+            #expect(rpcResult["isError"] as? Bool == false)
+            let contentItems = try #require(rpcResult["content"] as? [[String: Any]])
+            let mcpText = try #require(contentItems.first?["text"] as? String)
+            let mcpDict = try #require(
+                JSONSerialization.jsonObject(with: Data(mcpText.utf8)) as? [String: Any],
+                "MCP tool text was not JSON on \(bibURL.lastPathComponent): \(mcpText)"
+            )
+
+            // Both outputs carry REPLAY markers (`mode == "REPLAY"`, `replay == true`)
+            #expect(cliDict["mode"] as? String == "REPLAY")
+            #expect(cliDict["replay"] as? Bool == true)
+            #expect(mcpDict["mode"] as? String == "REPLAY", "MCP --registry-replay output missing mode=REPLAY on \(bibURL.lastPathComponent)")
+            #expect(mcpDict["replay"] as? Bool == true, "MCP --registry-replay output missing replay=true on \(bibURL.lastPathComponent)")
+
+            // Strip timestamp (`generatedAtISO8601`) and verify deep structural equality across complete, unverifiedByReason, and every verdict!
+            var normalizedCLI = cliDict
+            var normalizedMCP = mcpDict
+            normalizedCLI.removeValue(forKey: "generatedAtISO8601")
+            normalizedMCP.removeValue(forKey: "generatedAtISO8601")
+
+            let eq = NSDictionary(dictionary: normalizedCLI).isEqual(to: normalizedMCP)
+            #expect(
+                eq,
+                "MCP scholar_verify_bibliography diverged from CLI verify-citations --json on \(bibURL.lastPathComponent)"
+            )
+        }
+
+        // Default ~/Library/Caches/ScholarOS inside isolatedHome must NOT be created during replay without SCHOLAR_CACHE_DIR
+        let defaultIsolatedCache = isolatedHome.appendingPathComponent("Library/Caches/ScholarOS")
+        #expect(!FileManager.default.fileExists(atPath: defaultIsolatedCache.path))
+    }
+
+    @Test("M1 item 8 (Stage 08): MCP offline: true argument, mcp --offline, and mcp --no-cache obey zero-request / zero-cache rules")
+    func m1Stage08MCPOfflineArgumentServerOfflineFlagAndNoCacheFlag() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-mcp-offline")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        let emptyCacheDir = tempDir.appendingPathComponent("empty-cache", isDirectory: true)
+        let warmCacheDir = tempDir.appendingPathComponent("warm-cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+
+        final class SpyCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var count: Int = 0
+            func bump() {
+                lock.lock()
+                count += 1
+                lock.unlock()
+            }
+            func reset() {
+                lock.lock()
+                count = 0
+                lock.unlock()
+            }
+        }
+        let spy = SpyCounter()
+        let spyTransport = ClosureRegistrySession { req in
+            spy.bump()
+            let r = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(statusCode: r.statusCode, body: r.body, headers: r.headers, origin: .network, fetchedAt: r.fetchedAt)
+        }
+
+        let sampleBib = """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """
+
+        // Pre-warm `warmCacheDir` once using online CLI so `10.1038/nature14539` is cached on disk
+        let warmBibFile = tempDir.appendingPathComponent("warm.bib")
+        try sampleBib.write(to: warmBibFile, atomically: true, encoding: .utf8)
+        let warmRunner = ScholarCLIRunner(
+            registryTransport: spyTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": warmCacheDir.path]
+        )
+        let warmRun = await warmRunner.runWithExitStatus(arguments: ["verify-citations", warmBibFile.path, "--json"])
+        #expect(warmRun.exitCode == 0)
+        #expect(FileManager.default.fileExists(atPath: warmCacheDir.appendingPathComponent("registry.sqlite").path))
+        spy.reset()
+
+        // 1. Online MCP server with per-call `offline: true`: 0 transport requests, does NOT read warm cache or write empty cache, 0 VERIFIED, reason == "offline"
+        for targetCacheDir in [emptyCacheDir, warmCacheDir] {
+            let onlineServer = ScholarMCPServer(
+                registryTransport: spyTransport,
+                registryClock: .immediate,
+                environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": targetCacheDir.path]
+            )
+            let res = await onlineServer.executeToolCallAsync(
+                name: "scholar_verify_bibliography",
+                arguments: ["bibtex": sampleBib, "offline": true]
+            )
+            #expect(res["isError"] as? Bool == false)
+            #expect(spy.count == 0, "offline: true must send 0 transport requests")
+            let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let report = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(text.utf8))
+            #expect(report.verifiedCount == 0)
+            #expect(report.unverifiedCount == 1)
+            #expect(report.unverifiedByReason == ["offline": 1])
+            #expect(report.verdicts.first?.firewallClass == .unverified)
+            #expect(report.verdicts.first?.reasons == ["offline"])
+            #expect(report.verdicts.first?.sources.isEmpty == true)
+        }
+        #expect(!FileManager.default.fileExists(atPath: emptyCacheDir.appendingPathComponent("registry.sqlite").path))
+
+        // 2. `scholaros mcp --offline` (without per-call `offline` arg): 0 transport requests, 0 cache reads/writes, 0 VERIFIED, reason == "offline"
+        let callWithoutOfflineFlag: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": sampleBib]
+            ]
+        ]
+        let callLine = String(decoding: try JSONSerialization.data(withJSONObject: callWithoutOfflineFlag), as: UTF8.self)
+        let mcpOfflineRunner = ScholarCLIRunner(
+            registryTransport: spyTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": emptyCacheDir.path],
+            mcpInputLines: [callLine]
+        )
+        let mcpOfflineOut = await mcpOfflineRunner.runWithExitStatus(arguments: ["mcp", "--offline"])
+        #expect(mcpOfflineOut.exitCode == 0)
+        #expect(spy.count == 0, "mcp --offline must send 0 transport requests")
+        #expect(!FileManager.default.fileExists(atPath: emptyCacheDir.appendingPathComponent("registry.sqlite").path))
+        let offEnv = try #require(JSONSerialization.jsonObject(with: Data(mcpOfflineOut.stdout.utf8)) as? [String: Any])
+        let offRes = try #require(offEnv["result"] as? [String: Any])
+        let offText = try #require(((offRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let offReport = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(offText.utf8))
+        #expect(offReport.verifiedCount == 0)
+        #expect(offReport.unverifiedByReason == ["offline": 1])
+        #expect(offReport.verdicts.first?.reasons == ["offline"])
+
+        // 3. `scholaros mcp --no-cache`: queries online transport, neither reads warm cache nor writes empty cache
+        let mcpNoCacheEmptyRunner = ScholarCLIRunner(
+            registryTransport: spyTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": emptyCacheDir.path],
+            mcpInputLines: [callLine]
+        )
+        let noCacheOut1 = await mcpNoCacheEmptyRunner.runWithExitStatus(arguments: ["mcp", "--no-cache"])
+        #expect(noCacheOut1.exitCode == 0)
+        #expect(spy.count == 2, "mcp --no-cache should query Crossref + OpenAlex online transport")
+        #expect(!FileManager.default.fileExists(atPath: emptyCacheDir.appendingPathComponent("registry.sqlite").path))
+
+        spy.reset()
+        let mcpNoCacheWarmRunner = ScholarCLIRunner(
+            registryTransport: spyTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": warmCacheDir.path],
+            mcpInputLines: [callLine]
+        )
+        let noCacheOut2 = await mcpNoCacheWarmRunner.runWithExitStatus(arguments: ["mcp", "--no-cache"])
+        #expect(noCacheOut2.exitCode == 0)
+        #expect(spy.count == 2, "mcp --no-cache must bypass even a pre-warmed cache")
+    }
+
+    @Test("M1 item 8 (Stage 08): without any flags, both MCP scholar_verify_bibliography and CLI diagnostics use online transport by default")
+    func m1Stage08DefaultOnlineModeForMCPAndDiagnosticsUsesInjectedTransport() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-default-online")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        let mcpCacheDir = tempDir.appendingPathComponent("mcp-cache", isDirectory: true)
+        let diagCacheDir = tempDir.appendingPathComponent("diag-cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+
+        final class URLRecorder: @unchecked Sendable {
+            private let lock = NSLock()
+            private var urls: [String] = []
+            func append(_ url: String) {
+                lock.lock()
+                urls.append(url)
+                lock.unlock()
+            }
+            func drain() -> [String] {
+                lock.lock()
+                defer {
+                    urls.removeAll()
+                    lock.unlock()
+                }
+                return urls
+            }
+        }
+        let recorder = URLRecorder()
+        let onlineTransport = ClosureRegistrySession { req in
+            recorder.append(req.url?.absoluteString ?? "")
+            let r = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(statusCode: r.statusCode, body: r.body, headers: r.headers, origin: .network, fetchedAt: r.fetchedAt)
+        }
+
+        let bibContent = """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """
+
+        // 1. Default `scholaros mcp` (no --offline, no --registry-replay) uses online transport
+        let callObj: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": bibContent]
+            ]
+        ]
+        let callLine = String(decoding: try JSONSerialization.data(withJSONObject: callObj), as: UTF8.self)
+        let mcpRunner = ScholarCLIRunner(
+            registryTransport: onlineTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": mcpCacheDir.path],
+            mcpInputLines: [callLine]
+        )
+        let mcpOut = await mcpRunner.runWithExitStatus(arguments: ["mcp"])
+        #expect(mcpOut.exitCode == 0)
+        let mcpURLs = recorder.drain()
+        #expect(mcpURLs.count == 2, "Default MCP must query Crossref + OpenAlex online transport; got \(String(describing: mcpURLs))")
+        #expect(mcpURLs.contains { $0.contains("api.crossref.org/works/10.1038/nature14539") })
+        #expect(mcpURLs.contains { $0.contains("api.openalex.org/works/https://doi.org/10.1038/nature14539") })
+        let mcpEnv = try #require((try? JSONSerialization.jsonObject(with: Data(mcpOut.stdout.utf8))) as? [String: Any])
+        let mcpRes = try #require(mcpEnv["result"] as? [String: Any])
+        let mcpText = try #require(((mcpRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let mcpReport = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(mcpText.utf8))
+        #expect(mcpReport.verifiedCount == 1)
+        #expect(mcpReport.verdicts.first?.sources.first?.origin == .network)
+
+        // 2. Default `scholaros diagnostics <paper.tex> --bib <refs.bib>` (no --offline, no --registry-replay) uses online transport
+        let texURL = tempDir.appendingPathComponent("paper.tex")
+        let bibURL = tempDir.appendingPathComponent("refs.bib")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}
+        Foundational work \\cite{real_lecun}.
+        \\end{document}
+        """.write(to: texURL, atomically: true, encoding: .utf8)
+        try bibContent.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let diagRunner = ScholarCLIRunner(
+            registryTransport: onlineTransport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path, "SCHOLAR_CACHE_DIR": diagCacheDir.path]
+        )
+        let diagOut = await diagRunner.runWithExitStatus(
+            arguments: ["diagnostics", texURL.path, "--bib", bibURL.path, "--lang", "en"]
+        )
+        #expect(diagOut.exitCode == 0)
+        let diagURLs = recorder.drain()
+        #expect(diagURLs.count == 2, "Default diagnostics must query Crossref + OpenAlex online transport for cited entries; got \(String(describing: diagURLs))")
+        #expect(diagURLs.contains { $0.contains("api.crossref.org/works/10.1038/nature14539") })
+        #expect(diagURLs.contains { $0.contains("api.openalex.org/works/https://doi.org/10.1038/nature14539") })
+        #expect(!diagOut.stdout.contains("ERR_UNVERIFIED_CITATION"), "Verified real_lecun must not emit ERR_UNVERIFIED_CITATION: \(diagOut.stdout)")
+    }
+
+    @Test("M1 item 8 (Stage 08): MCP replay miss returns error with missing URL and zero verdicts while next call in same process succeeds; corrupt replay dir exits 2 at startup")
+    func m1Stage08MCPReplayMissPerCallResilienceCacheRuleAndCorruptStartupExit2() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-mcp-replay")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+
+        // 1. Same MCP server process: Call 1 hits unrecorded DOI -> error with exact URL, no verdicts/UNVERIFIED; Call 2 succeeds!
+        let unrecordedBib = """
+        @article{missing_fixture,
+          author  = {Author, Test},
+          title   = {Paper Not Recorded In Fixture Directory},
+          journal = {Nature},
+          year    = {2025},
+          doi     = {10.1038/unrecorded.2026.77777}
+        }
+        """
+        let validBib = """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """
+
+        let call1Obj: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": unrecordedBib]
+            ]
+        ]
+        let call2Obj: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": validBib]
+            ]
+        ]
+        let line1 = String(decoding: try JSONSerialization.data(withJSONObject: call1Obj), as: UTF8.self)
+        let line2 = String(decoding: try JSONSerialization.data(withJSONObject: call2Obj), as: UTF8.self)
+
+        let mcpRunner = ScholarCLIRunner(
+            environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path],
+            mcpInputLines: [line1, line2]
+        )
+        let mcpOut = await mcpRunner.runWithExitStatus(
+            arguments: ["mcp", "--registry-replay", registryDir.path]
+        )
+        #expect(mcpOut.exitCode == 0)
+        let respLines = mcpOut.stdout.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        #expect(respLines.count == 2, "Expected 2 JSON-RPC responses from same MCP process, got: \(mcpOut.stdout)")
+
+        if respLines.count == 2 {
+            let env1 = try #require(JSONSerialization.jsonObject(with: Data(respLines[0].utf8)) as? [String: Any])
+            let res1 = try #require(env1["result"] as? [String: Any])
+            #expect(res1["isError"] as? Bool == true)
+            let errText = try #require(((res1["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            #expect(errText.contains("https://api.crossref.org/works/10.1038/unrecorded.2026.77777"), "Replay miss error must name missing URL: \(errText)")
+            #expect(!errText.contains("\"verdicts\""), "Replay miss must not emit verdicts: \(errText)")
+            #expect(!errText.contains("UNVERIFIED"), "Replay miss must not degrade to UNVERIFIED: \(errText)")
+
+            let env2 = try #require(JSONSerialization.jsonObject(with: Data(respLines[1].utf8)) as? [String: Any])
+            let res2 = try #require(env2["result"] as? [String: Any])
+            #expect(res2["isError"] as? Bool == false, "Second call in same MCP process must succeed after Call 1 miss")
+            let okText = try #require(((res2["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let okDict = try #require(JSONSerialization.jsonObject(with: Data(okText.utf8)) as? [String: Any])
+            #expect(okDict["mode"] as? String == "REPLAY")
+            #expect(okDict["verifiedCount"] as? Int == 1)
+        }
+
+        // Default HOME cache was NOT created during replay without SCHOLAR_CACHE_DIR
+        #expect(!FileManager.default.fileExists(atPath: isolatedHome.appendingPathComponent("Library/Caches/ScholarOS").path))
+
+        // Explicit SCHOLAR_CACHE_DIR during MCP replay DOES use that cache and never touches default HOME cache
+        let explicitReplayCacheDir = tempDir.appendingPathComponent("explicit-replay-cache", isDirectory: true)
+        let mcpCachedReplayRunner = ScholarCLIRunner(
+            environment: [
+                "HOME": isolatedHome.path,
+                "CFFIXED_USER_HOME": isolatedHome.path,
+                "SCHOLAR_CACHE_DIR": explicitReplayCacheDir.path
+            ],
+            mcpInputLines: [line2]
+        )
+        let cachedReplayOut = await mcpCachedReplayRunner.runWithExitStatus(
+            arguments: ["mcp", "--registry-replay", registryDir.path]
+        )
+        #expect(cachedReplayOut.exitCode == 0)
+        #expect(FileManager.default.fileExists(atPath: explicitReplayCacheDir.appendingPathComponent("registry.sqlite").path))
+        #expect(!FileManager.default.fileExists(atPath: isolatedHome.appendingPathComponent("Library/Caches/ScholarOS").path))
+
+        // 2. Corrupt recording directory (1 byte flipped in a .raw file): `scholaros mcp --registry-replay <corruptDir>` exits 2 AT STARTUP (even before initialize handshake!)
+        let corruptDir = tempDir.appendingPathComponent("corrupt-registry", isDirectory: true)
+        try FileManager.default.copyItem(at: registryDir, to: corruptDir)
+        let rawFiles = try FileManager.default.contentsOfDirectory(at: corruptDir, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "raw" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let targetRaw = try #require(rawFiles.first)
+        var rawBytes = try Data(contentsOf: targetRaw)
+        if rawBytes.isEmpty {
+            rawBytes = Data([0x01])
+        } else {
+            rawBytes[0] ^= 0xFF
+        }
+        try rawBytes.write(to: targetRaw)
+
+        let initOnlyLine = #"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#
+        let corruptRunner = ScholarCLIRunner(
+            environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path],
+            mcpInputLines: [initOnlyLine]
+        )
+        let corruptRes = await corruptRunner.runWithExitStatus(
+            arguments: ["mcp", "--registry-replay", corruptDir.path]
+        )
+        #expect(corruptRes.exitCode == 2, "Corrupt replay dir must exit 2 at mcp startup, got exit=\(corruptRes.exitCode) stdout=\(corruptRes.stdout)")
+        #expect(!corruptRes.stderr.isEmpty)
+
+        // Also verify via spawned OS process (`ScholarOS mcp --registry-replay <corruptDir>`) that startup exits 2 immediately without hanging on stdin
+        let candidates = [
+            repositoryRoot.appendingPathComponent(".build/out/Products/Debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/arm64-apple-macosx/debug/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/out/Products/Release/ScholarOS"),
+            repositoryRoot.appendingPathComponent(".build/release/ScholarOS")
+        ].filter { FileManager.default.isExecutableFile(atPath: $0.path) }
+        if let binaryURL = candidates.max(by: { lhs, rhs in
+            let d1 = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let d2 = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return d1 < d2
+        }) {
+            let proc = Process()
+            proc.executableURL = binaryURL
+            proc.arguments = ["mcp", "--registry-replay", corruptDir.path]
+            var env = ProcessInfo.processInfo.environment
+            env["HOME"] = isolatedHome.path
+            env["CFFIXED_USER_HOME"] = isolatedHome.path
+            proc.environment = env
+            let stdinPipe = Pipe()
+            let outPipe = Pipe()
+            let errPipe = Pipe()
+            proc.standardInput = stdinPipe
+            proc.standardOutput = outPipe
+            proc.standardError = errPipe
+            try proc.run()
+            // Intentionally keep stdin open while waiting for exit to prove startup validation happens before reading stdin!
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            try? stdinPipe.fileHandleForWriting.close()
+            #expect(proc.terminationStatus == 2, "Spawned `ScholarOS mcp --registry-replay <corruptDir>` must exit 2 at startup; got \(proc.terminationStatus)")
+            #expect(!String(decoding: errData, as: UTF8.self).isEmpty)
+        }
+    }
+
+    @Test("M1 item 8 (Stage 08): within one MCP process, OpenAlex budget exhaustion blocks remaining searches in Call 1 but resets in Call 2 when headers show restored budget")
+    func m1Stage08MCPOpenAlexBudgetExhaustionScopedToSingleCallAndResetsAcrossCalls() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-mcp-budget")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+
+        final class OpenAlexCallTracker: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var openAlexRequests: Int = 0
+
+            func nextIndex() -> Int {
+                lock.lock()
+                defer { lock.unlock() }
+                openAlexRequests += 1
+                return openAlexRequests
+            }
+        }
+        let tracker = OpenAlexCallTracker()
+
+        let emptyCrossrefSearchJSON = Data(#"{"status":"ok","message":{"items":[]}}"#.utf8)
+        let emptyOpenAlexSearchJSON = Data(#"{"results":[]}"#.utf8)
+        let matchingOpenAlexCall2JSON = Data(#"""
+        {
+          "results": [
+            {
+              "id": "https://openalex.org/W4200000001",
+              "doi": "https://doi.org/10.1145/9999999.1111111",
+              "display_name": "Deterministic Verification of Scholarly Citations in Practice",
+              "publication_year": 2024,
+              "is_retracted": false,
+              "primary_location": {
+                "source": { "display_name": "Journal of Systems Research" }
+              },
+              "authorships": [
+                { "author": { "display_name": "Clara Lindqvist" } },
+                { "author": { "display_name": "Mateo Alvarez" } }
+              ]
+            }
+          ]
+        }
+        """#.utf8)
+
+        let transport = ClosureRegistrySession { req in
+            let host = req.url?.host?.lowercased() ?? ""
+            if host == "api.crossref.org" {
+                return RegistryHTTPResponse(
+                    statusCode: 200,
+                    body: emptyCrossrefSearchJSON,
+                    headers: [:],
+                    origin: .network,
+                    fetchedAt: "2026-11-16T00:00:00Z"
+                )
+            }
+            if host == "api.openalex.org" {
+                let idx = tracker.nextIndex()
+                if idx == 1 {
+                    // First OpenAlex search in Call 1 drains remaining credits below 10
+                    return RegistryHTTPResponse(
+                        statusCode: 200,
+                        body: emptyOpenAlexSearchJSON,
+                        headers: ["x-ratelimit-remaining": "4"],
+                        origin: .network,
+                        fetchedAt: "2026-11-16T00:00:00Z"
+                    )
+                }
+                // Call 2's OpenAlex search reports healthy remaining credits
+                return RegistryHTTPResponse(
+                    statusCode: 200,
+                    body: matchingOpenAlexCall2JSON,
+                    headers: ["x-ratelimit-remaining": "950"],
+                    origin: .network,
+                    fetchedAt: "2026-11-16T00:00:05Z"
+                )
+            }
+            throw RegistryTransportError(kind: .transportError, detail: "Unexpected host \(host)")
+        }
+
+        let call1Bib = """
+        @article{idless_a,
+          author  = {Alpha, Alice and Beta, Bob},
+          title   = {First Identifierless Entry Exhausting Daily Budget},
+          journal = {Journal of Testing},
+          year    = {2023}
+        }
+        @article{idless_b,
+          author  = {Gamma, Grace and Delta, Dan},
+          title   = {Second Identifierless Entry In Same Call Should Skip OpenAlex},
+          journal = {Journal of Testing},
+          year    = {2023}
+        }
+        """
+        let call2Bib = """
+        @article{idless_c,
+          author  = {Lindqvist, Clara and Alvarez, Mateo},
+          title   = {Deterministic Verification of Scholarly Citations in Practice},
+          journal = {Journal of Systems Research},
+          year    = {2024}
+        }
+        """
+
+        let rpc1: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": call1Bib]
+            ]
+        ]
+        let rpc2: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_verify_bibliography",
+                "arguments": ["bibtex": call2Bib]
+            ]
+        ]
+        let line1 = String(decoding: try JSONSerialization.data(withJSONObject: rpc1), as: UTF8.self)
+        let line2 = String(decoding: try JSONSerialization.data(withJSONObject: rpc2), as: UTF8.self)
+
+        let mcpRunner = ScholarCLIRunner(
+            registryTransport: transport,
+            registryClock: .immediate,
+            environment: ["HOME": isolatedHome.path],
+            mcpInputLines: [line1, line2]
+        )
+        let out = await mcpRunner.runWithExitStatus(arguments: ["mcp", "--no-cache"])
+        #expect(out.exitCode == 0)
+
+        let respLines = out.stdout.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        #expect(respLines.count == 2)
+        if respLines.count == 2 {
+            let env1 = try #require((try? JSONSerialization.jsonObject(with: Data(respLines[0].utf8))) as? [String: Any])
+            let res1 = try #require(env1["result"] as? [String: Any])
+            let text1 = try #require(((res1["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let rep1 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(text1.utf8))
+            let verdictA = try #require(rep1.verdicts.first { $0.citeKey == "idless_a" })
+            let verdictB = try #require(rep1.verdicts.first { $0.citeKey == "idless_b" })
+            #expect(verdictA.reasons == ["no_match_in_search"])
+            #expect(verdictB.reasons.contains("budget_exhausted"), "Second entry in Call 1 must stop OpenAlex search with budget_exhausted; got \(String(describing: verdictB.reasons))")
+
+            let env2 = try #require((try? JSONSerialization.jsonObject(with: Data(respLines[1].utf8))) as? [String: Any])
+            let res2 = try #require(env2["result"] as? [String: Any])
+            let text2 = try #require(((res2["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let rep2 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(text2.utf8))
+            #expect(rep2.verifiedCount == 1, "Call 2 must re-enable OpenAlex search and verify idless_c; got \(String(describing: rep2.verdicts))")
+        }
+
+        // Total OpenAlex requests across both calls: 1 in Call 1 (idless_b skipped!) + 1 in Call 2 = 2
+        #expect(tracker.openAlexRequests == 2, "Expected 2 total OpenAlex requests (1 in Call 1 + 1 in Call 2), got \(tracker.openAlexRequests)")
+    }
+
+    @Test("M1 item 8 (Stage 08): two consecutive calls on the same MCP process share a single RegistryRateLimiter and preserve Crossref spacing")
+    func m1Stage08MCPConsecutiveCallsShareRateLimiterAcrossCalls() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-mcp-limiter")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+
+        final class SharedVirtualClockState: @unchecked Sendable {
+            private let lock = NSLock()
+            private var current: TimeInterval = 10.0
+            private(set) var recordedSleeps: [TimeInterval] = []
+            private(set) var crossrefSendTimestamps: [TimeInterval] = []
+
+            func now() -> TimeInterval {
+                lock.lock()
+                defer { lock.unlock() }
+                return current
+            }
+
+            func advance(_ delta: TimeInterval) {
+                lock.lock()
+                if delta > 0 {
+                    current += delta
+                }
+                lock.unlock()
+            }
+
+            func recordSleep(_ seconds: TimeInterval) {
+                lock.lock()
+                recordedSleeps.append(seconds)
+                if seconds > 0 {
+                    current += seconds
+                }
+                lock.unlock()
+            }
+
+            func recordCrossrefSend() {
+                lock.lock()
+                crossrefSendTimestamps.append(current)
+                lock.unlock()
+            }
+        }
+
+        let clockState = SharedVirtualClockState()
+        let virtualClock = ClosureRegistryClock(
+            now: { clockState.now() },
+            sleep: { seconds in clockState.recordSleep(seconds) }
+        )
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+        let transport = ClosureRegistrySession { req in
+            if req.url?.host?.lowercased() == "api.crossref.org" {
+                clockState.recordCrossrefSend()
+            }
+            let r = try await fixtureReplay.send(req)
+            // Explicit Crossref header: 2 req / 1s -> 0.50s required spacing between Crossref requests
+            return RegistryHTTPResponse(
+                statusCode: r.statusCode,
+                body: r.body,
+                headers: [
+                    "x-rate-limit-limit": "2",
+                    "x-rate-limit-interval": "1s"
+                ],
+                origin: .network,
+                fetchedAt: r.fetchedAt
+            )
+        }
+
+        let bib1 = """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """
+        let bib2 = """
+        @article{real_lstm,
+          author  = {Hochreiter, Sepp and Schmidhuber, J{\\"u}rgen},
+          title   = {Long Short-Term Memory},
+          journal = {Neural Computation},
+          year    = {1997},
+          volume  = {9},
+          pages   = {1735--1780},
+          doi     = {10.1162/neco.1997.9.8.1735}
+        }
+        """
+
+        let server = ScholarMCPServer(
+            noCache: true,
+            registryTransport: transport,
+            registryClock: virtualClock,
+            environment: ["HOME": isolatedHome.path]
+        )
+
+        // Call 1 sends Crossref lookup at t = 10.00
+        let res1 = await server.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": bib1]
+        )
+        #expect(res1["isError"] as? Bool == false)
+
+        // Only 0.10s elapses before Call 2 arrives on the same server (t = 10.10); shared limiter must sleep 0.40s -> t = 10.50
+        clockState.advance(0.10)
+        let res2 = await server.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": bib2]
+        )
+        #expect(res2["isError"] as? Bool == false)
+
+        #expect(clockState.crossrefSendTimestamps.count == 2)
+        if clockState.crossrefSendTimestamps.count == 2 {
+            let delta = clockState.crossrefSendTimestamps[1] - clockState.crossrefSendTimestamps[0]
+            #expect(
+                delta >= 0.50 - 1e-6,
+                "Expected >= 0.50s spacing between Call 1's last Crossref request and Call 2's first Crossref request; got \(delta)s (sleeps=\(String(describing: clockState.recordedSleeps)))"
+            )
+        }
+    }
+
+    @Test("M1 item 8 (Stage 08): diagnostics --registry-replay verifies cited entries only (real_lecun clean, fake_nonsentinel & wrongyear emit ERR_UNVERIFIED_CITATION), --offline sends 0 requests, and --help documents new flags")
+    func m1Stage08DiagnosticsReplayCitedOnlyOfflineZeroRequestsAndHelpFlags() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-diagnostics")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        let offlineCacheDir = tempDir.appendingPathComponent("offline-cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let isolatedEnv: [String: String] = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+
+        // 1a. Manuscript citing `real_lecun` from `Fixtures/citations-m0-recheck.bib` under `--registry-replay`:
+        //     carries REPLAY marker, exits 0, and does NOT emit ERR_UNVERIFIED_CITATION!
+        let realTexURL = tempDir.appendingPathComponent("real-cited.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Introduction}
+        Deep representations \\cite{real_lecun} work well.
+        \\end{document}
+        """.write(to: realTexURL, atomically: true, encoding: .utf8)
+
+        let runner = ScholarCLIRunner(environment: isolatedEnv)
+        let realDiag = await runner.runWithExitStatus(
+            arguments: [
+                "diagnostics",
+                realTexURL.path,
+                "--bib",
+                recheckBibURL.path,
+                "--registry-replay",
+                registryDir.path,
+                "--lang",
+                "en"
+            ]
+        )
+        #expect(realDiag.exitCode == 0, "diagnostics replay failed: \(realDiag.stderr)")
+        #expect(realDiag.stdout.contains("REPLAY"), "diagnostics --registry-replay output must carry REPLAY marker: \(realDiag.stdout)")
+        #expect(!realDiag.stdout.contains("ERR_UNVERIFIED_CITATION"), "Verified real_lecun must not report ERR_UNVERIFIED_CITATION: \(realDiag.stdout)")
+
+        // 1b. Prove `diagnostics` ONLY verifies CITED entries: uncited entry with unrecorded DOI does NOT trigger a replay miss!
+        let mixedBibURL = tempDir.appendingPathComponent("mixed-cited-uncited.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @article{uncited_unrecorded,
+          author  = {Nobody, Uncited},
+          title   = {Never Cited In Manuscript},
+          journal = {Journal},
+          year    = {2025},
+          doi     = {10.1038/uncited.never.recorded.88888}
+        }
+        """.write(to: mixedBibURL, atomically: true, encoding: .utf8)
+        let citedOnlyDiag = await runner.runWithExitStatus(
+            arguments: [
+                "diagnostics",
+                realTexURL.path,
+                "--bib",
+                mixedBibURL.path,
+                "--registry-replay",
+                registryDir.path,
+                "--lang",
+                "en"
+            ]
+        )
+        #expect(citedOnlyDiag.exitCode == 0, "diagnostics must only verify cited entries and skip uncited_unrecorded: stderr=\(citedOnlyDiag.stderr)")
+        #expect(!citedOnlyDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
+
+        // 2. Manuscript citing `fake_nonsentinel` (NOT_FOUND) and `wrongyear5` (DRIFT) -> reports ERR_UNVERIFIED_CITATION, exitCode == 0
+        let fakeTexURL = tempDir.appendingPathComponent("fake-cited.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Introduction}
+        Hallucinated \\cite{fake_nonsentinel} and drifted \\cite{wrongyear5}.
+        \\end{document}
+        """.write(to: fakeTexURL, atomically: true, encoding: .utf8)
+        let fakeDiag = await runner.runWithExitStatus(
+            arguments: [
+                "diagnostics",
+                fakeTexURL.path,
+                "--bib",
+                recheckBibURL.path,
+                "--registry-replay",
+                registryDir.path,
+                "--lang",
+                "en"
+            ]
+        )
+        #expect(fakeDiag.exitCode == 0)
+        #expect(fakeDiag.stdout.contains("REPLAY"))
+        #expect(fakeDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(fakeDiag.stdout.contains("fake_nonsentinel"))
+        #expect(fakeDiag.stdout.contains("wrongyear5"))
+
+        // 3. `diagnostics --offline`: 0 transport requests, cache untouched, reports ERR_UNVERIFIED_CITATION
+        final class OfflineSpy: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var count = 0
+            func bump() { lock.lock(); count += 1; lock.unlock() }
+        }
+        let offlineSpy = OfflineSpy()
+        let failingTransport = ClosureRegistrySession { _ in
+            offlineSpy.bump()
+            throw RegistryTransportError(kind: .transportError, detail: "Should never be called in --offline")
+        }
+        let offlineRunner = ScholarCLIRunner(
+            registryTransport: failingTransport,
+            registryClock: .immediate,
+            environment: [
+                "HOME": isolatedHome.path,
+                "SCHOLAR_CACHE_DIR": offlineCacheDir.path
+            ]
+        )
+        let offlineDiag = await offlineRunner.runWithExitStatus(
+            arguments: ["diagnostics", realTexURL.path, "--bib", recheckBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(offlineDiag.exitCode == 0)
+        #expect(offlineSpy.count == 0)
+        #expect(!FileManager.default.fileExists(atPath: offlineCacheDir.appendingPathComponent("registry.sqlite").path))
+        #expect(offlineDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(offlineDiag.stdout.contains("real_lecun"))
+
+        // 4. `--help` in EN and ZH documents `--offline`, `--registry-replay`, and `--no-cache` for both `diagnostics` and `mcp`, and invalid combinations exit 2
+        let helpEN = try await runner.execute(arguments: ["--help", "--lang", "en"])
+        let helpZH = try await runner.execute(arguments: ["--help", "--lang", "zh"])
+        for helpText in [helpEN, helpZH] {
+            let diagHelpLines = helpText.split(separator: "\n").filter { $0.contains("diagnostics ") }
+            let mcpHelpLines = helpText.split(separator: "\n").filter { $0.contains("mcp ") }
+            #expect(!diagHelpLines.isEmpty)
+            #expect(!mcpHelpLines.isEmpty)
+            let joinedDiagHelp = diagHelpLines.joined(separator: " ")
+            let joinedMCPHelp = mcpHelpLines.joined(separator: " ")
+            #expect(joinedDiagHelp.contains("--offline"), "diagnostics --help missing --offline: \(joinedDiagHelp)")
+            #expect(joinedDiagHelp.contains("--registry-replay"), "diagnostics --help missing --registry-replay: \(joinedDiagHelp)")
+            #expect(joinedDiagHelp.contains("--no-cache"), "diagnostics --help missing --no-cache: \(joinedDiagHelp)")
+            #expect(joinedMCPHelp.contains("--offline"), "mcp --help missing --offline: \(joinedMCPHelp)")
+            #expect(joinedMCPHelp.contains("--registry-replay"), "mcp --help missing --registry-replay: \(joinedMCPHelp)")
+            #expect(joinedMCPHelp.contains("--no-cache"), "mcp --help missing --no-cache: \(joinedMCPHelp)")
+        }
+
+        for invalidArgs in [
+            ["diagnostics", realTexURL.path, "--offline", "--registry-replay", registryDir.path],
+            ["mcp", "--offline", "--registry-replay", registryDir.path],
+            ["mcp", "--demo", "--registry-replay", registryDir.path]
+        ] {
+            let badRes = await runner.runWithExitStatus(arguments: invalidArgs)
+            #expect(badRes.exitCode == 2, "Expected exit 2 for invalid args \(invalidArgs.joined(separator: " ")), got \(badRes.exitCode)")
+        }
     }
 }
 

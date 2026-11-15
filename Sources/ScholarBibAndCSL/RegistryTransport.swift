@@ -226,6 +226,38 @@ public struct RegistryBudgetExhaustedError: Error, LocalizedError, Sendable, Equ
     }
 }
 
+/// Per-call OpenAlex search budget tracker (M1 item 8: in long-lived MCP processes,
+/// OpenAlex `x-ratelimit-remaining < 10` stops searches within the current call only,
+/// while the next call re-evaluates remaining credits from fresh response headers).
+public final class OpenAlexSearchBudgetScope: @unchecked Sendable {
+    private let lock = NSLock()
+    private var exhausted: Bool = false
+    private var lastRemaining: Double?
+
+    public init() {}
+
+    public var isExhausted: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return exhausted
+    }
+
+    public var lastRemainingCredits: Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        return lastRemaining
+    }
+
+    public func recordRemainingCredits(_ remaining: Double, minimumRequired: Double) {
+        lock.lock()
+        lastRemaining = remaining
+        if remaining < minimumRequired {
+            exhausted = true
+        }
+        lock.unlock()
+    }
+}
+
 public struct RegistryRequestTelemetryEvent: Sendable, Equatable {
     public let source: String
     public let url: String
@@ -314,13 +346,15 @@ public actor RegistryRateLimiter {
         _ request: URLRequest,
         source: String,
         using session: any CitationRegistrySession,
+        openAlexBudgetScope: OpenAlexSearchBudgetScope? = nil,
         observer: RegistryRequestObserver? = nil
     ) async throws -> RegistryHTTPResponse {
         let host = request.url?.host?.lowercased() ?? ""
 
-        if Self.isOpenAlexSearchRequest(request, host: host), openAlexSearchBudgetExhausted {
+        if Self.isOpenAlexSearchRequest(request, host: host),
+           isOpenAlexBudgetExhausted(in: openAlexBudgetScope) {
             throw RegistryBudgetExhaustedError(
-                remainingCredits: lastOpenAlexRemainingCredits,
+                remainingCredits: effectiveOpenAlexRemainingCredits(in: openAlexBudgetScope),
                 url: request.url
             )
         }
@@ -334,6 +368,7 @@ public actor RegistryRateLimiter {
                 host: host,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: observer
             )
         case "export.arxiv.org":
@@ -344,6 +379,7 @@ public actor RegistryRateLimiter {
                 host: host,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: observer
             )
         case "eutils.ncbi.nlm.nih.gov":
@@ -354,6 +390,7 @@ public actor RegistryRateLimiter {
                 host: host,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: observer
             )
         default:
@@ -362,6 +399,7 @@ public actor RegistryRateLimiter {
                 host: host,
                 source: source,
                 using: session,
+                openAlexBudgetScope: openAlexBudgetScope,
                 observer: observer
             )
         }
@@ -372,14 +410,16 @@ public actor RegistryRateLimiter {
         host: String,
         source: String,
         using session: any CitationRegistrySession,
+        openAlexBudgetScope: OpenAlexSearchBudgetScope?,
         observer: RegistryRequestObserver?
     ) async throws -> RegistryHTTPResponse {
         var attemptIndex = 0
 
         while true {
-            if Self.isOpenAlexSearchRequest(request, host: host), openAlexSearchBudgetExhausted {
+            if Self.isOpenAlexSearchRequest(request, host: host),
+               isOpenAlexBudgetExhausted(in: openAlexBudgetScope) {
                 throw RegistryBudgetExhaustedError(
-                    remainingCredits: lastOpenAlexRemainingCredits,
+                    remainingCredits: effectiveOpenAlexRemainingCredits(in: openAlexBudgetScope),
                     url: request.url
                 )
             }
@@ -443,7 +483,7 @@ public actor RegistryRateLimiter {
                 updateCrossrefIntervals(from: response, isSearch: isCrossrefSearch)
             }
             if host == "api.openalex.org" {
-                updateOpenAlexBudget(from: response)
+                updateOpenAlexBudget(from: response, in: openAlexBudgetScope)
             }
 
             observer?(
@@ -605,8 +645,27 @@ public actor RegistryRateLimiter {
         }
     }
 
-    private func updateOpenAlexBudget(from response: RegistryHTTPResponse) {
+    private func isOpenAlexBudgetExhausted(in scope: OpenAlexSearchBudgetScope?) -> Bool {
+        if let scope {
+            return scope.isExhausted
+        }
+        return openAlexSearchBudgetExhausted
+    }
+
+    private func effectiveOpenAlexRemainingCredits(in scope: OpenAlexSearchBudgetScope?) -> Double? {
+        if let scope {
+            return scope.lastRemainingCredits
+        }
+        return lastOpenAlexRemainingCredits
+    }
+
+    private func updateOpenAlexBudget(from response: RegistryHTTPResponse, in scope: OpenAlexSearchBudgetScope?) {
         guard let remaining = Self.parseOpenAlexRemainingHeader(from: response) else {
+            return
+        }
+        if let scope {
+            scope.recordRemainingCredits(remaining, minimumRequired: Self.openAlexMinimumSearchCredits)
+            lastOpenAlexRemainingCredits = remaining
             return
         }
         lastOpenAlexRemainingCredits = remaining

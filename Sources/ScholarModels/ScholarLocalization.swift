@@ -487,10 +487,16 @@ extension LSPDiagnostic {
         if code == "ERR_UNVERIFIED_CITATION" {
             let key = Self.extractCiteKey(from: message) ?? "该条目"
             if message.contains("RETRACTED") {
-                return "引文防火墙拦截：\(key) 命中内置离线撤稿名单（内置名单，不完整）。"
+                if message.contains("built-in list") {
+                    return "引文防火墙拦截：\(key) 命中内置离线撤稿名单（内置名单，不完整）。"
+                }
+                return "引文防火墙拦截：\(key) 被外部注册库标记为已撤稿 (RETRACTED)。"
             }
             if message.contains("NOT_FOUND") {
-                return "引文防火墙拦截：\(key) 标识符格式非法或未找到 (NOT_FOUND)。"
+                return "引文防火墙拦截：\(key) 标识符格式非法或在注册库中未找到 (NOT_FOUND)。"
+            }
+            if message.contains("DRIFT") {
+                return "引文防火墙拦截：\(key) 本地元数据与注册库记录不符 (DRIFT)。"
             }
             return "引文防火墙提醒：\(key) 尚未通过外部注册库核查 (ERR_UNVERIFIED_CITATION)。"
         }
