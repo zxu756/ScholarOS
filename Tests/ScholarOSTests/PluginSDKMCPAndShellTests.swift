@@ -2793,6 +2793,71 @@ struct PluginSDKMCPAndShellTests {
         #expect(corruptStderrLines.count == 1, "Expected exactly 1 stderr explanation line on corrupt cache, got: \(corruptCLIRun.stderr)")
     }
 
+    @Test("M1 item 7 (Stage 08 Fix 2): cache unavailable stderr warning emits a single [CACHE] prefix and localizes the sentence under --lang zh while keeping SQLite reason")
+    func m1Stage08Fix2CacheUnavailableStderrSinglePrefixAndChineseLocalization() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage08-fix2-stderr")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySession(directoryURL: registryDir)
+        let mockTransport = ClosureRegistrySession { req in
+            let r = try await fixtureReplay.send(req)
+            return RegistryHTTPResponse(statusCode: r.statusCode, body: r.body, headers: r.headers, origin: .network, fetchedAt: r.fetchedAt)
+        }
+
+        let vaswaniBibURL = tempDir.appendingPathComponent("vaswani.bib")
+        try """
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, Lukasz and Polosukhin, Illia},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        """.write(to: vaswaniBibURL, atomically: true, encoding: .utf8)
+
+        let cacheDir = tempDir.appendingPathComponent("corrupt-cache-dir", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        let sqliteURL = cacheDir.appendingPathComponent("registry.sqlite")
+        try Data([0xFF, 0x00, 0xFE, 0xED, 0xBA, 0xAD, 0xF0, 0x0D]).write(to: sqliteURL)
+
+        let runner = ScholarCLIRunner(
+            registryTransport: mockTransport,
+            registryClock: .immediate,
+            environment: [
+                "HOME": tempDir.appendingPathComponent("isolated-home", isDirectory: true).path,
+                "SCHOLAR_CACHE_DIR": cacheDir.path
+            ]
+        )
+
+        let runEN = await runner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--lang", "en"]
+        )
+        #expect(runEN.exitCode == 0)
+        let enLines = runEN.stderr.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        #expect(enLines.count == 1, "Expected 1 stderr line in EN, got: \(runEN.stderr)")
+        if let enLine = enLines.first {
+            #expect(enLine.hasPrefix("[CACHE] Response cache unavailable ("), "Unexpected EN stderr line: \(enLine)")
+            #expect(!enLine.contains("[CACHE] [CACHE]"), "Duplicate [CACHE] prefix in EN: \(enLine)")
+            #expect(!containsChineseCharacters(enLine), "Unexpected Chinese in EN stderr: \(enLine)")
+        }
+
+        let runZH = await runner.runWithExitStatus(
+            arguments: ["verify-citations", vaswaniBibURL.path, "--lang", "zh"]
+        )
+        #expect(runZH.exitCode == 0)
+        let zhLines = runZH.stderr.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        #expect(zhLines.count == 1, "Expected 1 stderr line in ZH, got: \(runZH.stderr)")
+        if let zhLine = zhLines.first {
+            #expect(zhLine.hasPrefix("[CACHE] 响应缓存不可用（"), "Expected localized ZH cache warning with single [CACHE] prefix, got: \(zhLine)")
+            #expect(!zhLine.contains("[CACHE] [CACHE]"), "Duplicate [CACHE] prefix in ZH: \(zhLine)")
+            #expect(!zhLine.contains("Response cache unavailable"), "English sentence leaked into --lang zh stderr: \(zhLine)")
+            #expect(zhLine.contains("继续核查"), "Expected Chinese continuation notice in ZH stderr: \(zhLine)")
+            // SQLite's diagnostic reason inside parentheses is preserved
+            #expect(zhLine.contains("（") && zhLine.contains("）"), "Expected parenthesized SQLite reason in ZH stderr: \(zhLine)")
+        }
+    }
+
     @Test("M1 item 7 (Stage 07): two concurrent ScholarOS CLI OS processes sharing the same SCHOLAR_CACHE_DIR complete without SQLite lock errors")
     func m1Stage07TwoProcessesSharingSameCacheDirWithoutErrors() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-stage07-multiprocess")

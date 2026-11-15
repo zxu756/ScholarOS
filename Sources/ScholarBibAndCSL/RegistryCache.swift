@@ -14,6 +14,7 @@ public final class RegistryResponseCache: @unchecked Sendable {
 
     public let fileURL: URL
     public let clock: any RegistryClock
+    public let language: ScholarLanguage
     private let warningHandler: (@Sendable (String) -> Void)?
 
     private let lock = NSLock()
@@ -24,10 +25,12 @@ public final class RegistryResponseCache: @unchecked Sendable {
     public init(
         fileURL: URL,
         clock: any RegistryClock = SystemRegistryClock(),
+        language: ScholarLanguage = .en,
         warningHandler: (@Sendable (String) -> Void)? = nil
     ) {
         self.fileURL = fileURL
         self.clock = clock
+        self.language = language
         self.warningHandler = warningHandler
     }
 
@@ -443,6 +446,19 @@ public final class RegistryResponseCache: @unchecked Sendable {
         return "SQLite error \(fallbackCode)"
     }
 
+    public static func formatUnavailableWarning(reason: String, language: ScholarLanguage = .en) -> String {
+        let cleanReason = reason
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        switch language {
+        case .en:
+            return "[CACHE] Response cache unavailable (\(cleanReason)); continuing verification without cache."
+        case .zhHans:
+            return "[CACHE] 响应缓存不可用（\(cleanReason)），已跳过缓存继续核查。"
+        }
+    }
+
     private func disableLocked(reason: String) {
         if let existing = db {
             sqlite3_close_v2(existing)
@@ -451,11 +467,7 @@ public final class RegistryResponseCache: @unchecked Sendable {
         isDisabled = true
         guard !hasEmittedWarning else { return }
         hasEmittedWarning = true
-        let cleanReason = reason
-            .replacingOccurrences(of: "\r", with: " ")
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let message = "[CACHE] Response cache unavailable (\(cleanReason)); continuing verification without cache."
+        let message = Self.formatUnavailableWarning(reason: reason, language: language)
         warningHandler?(message)
     }
 

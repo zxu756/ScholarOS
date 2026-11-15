@@ -66,19 +66,17 @@ private final class VerboseTelemetryCollector: @unchecked Sendable {
 private final class CacheWarningCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var lines: [String] = []
-    private let lang: ScholarLanguage
 
-    init(lang: ScholarLanguage) {
-        self.lang = lang
-    }
+    init() {}
 
     func record(_ message: String) {
         let singleLine = message
             .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
-        let prefix = lang.L("[CACHE]", "[CACHE / 缓存]")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !singleLine.isEmpty else { return }
         lock.lock()
-        lines.append("\(prefix) \(singleLine)")
+        lines.append(singleLine)
         lock.unlock()
     }
 
@@ -453,7 +451,7 @@ public struct ScholarCLIRunner: Sendable {
                 isDemo = opened.isDemo
             }
 
-            let cacheWarningCollector = CacheWarningCollector(lang: lang)
+            let cacheWarningCollector = CacheWarningCollector()
             let verboseCollector: VerboseTelemetryCollector? = verbose ? VerboseTelemetryCollector() : nil
             let observer: RegistryRequestObserver?
             if let collector = verboseCollector {
@@ -471,6 +469,7 @@ public struct ScholarCLIRunner: Sendable {
                 return RegistryResponseCache(
                     fileURL: RegistryResponseCache.resolveDatabaseURL(environment: env),
                     clock: baseClock,
+                    language: lang,
                     warningHandler: { message in
                         cacheWarningCollector.record(message)
                     }
@@ -518,6 +517,7 @@ public struct ScholarCLIRunner: Sendable {
                     replayCache = RegistryResponseCache(
                         fileURL: explicitSQLiteURL,
                         clock: baseClock,
+                        language: lang,
                         warningHandler: { message in
                             cacheWarningCollector.record(message)
                         }
