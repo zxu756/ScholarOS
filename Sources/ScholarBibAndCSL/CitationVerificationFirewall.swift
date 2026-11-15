@@ -1571,6 +1571,8 @@ public struct CitationVerificationFirewall: Sendable {
         let title: String
         let firstAuthorDisplay: String?
         let firstAuthorSurname: String?
+        let firstAuthorFullName: String?
+        let firstAuthorHasExplicitFamilyField: Bool
         let firstAuthorIsCorporate: Bool
         let authorSurnames: [String]
         let publicationYears: [Int]
@@ -1754,14 +1756,17 @@ public struct CitationVerificationFirewall: Sendable {
             && localFirst.familyName.trimmingCharacters(in: .whitespacesAndNewlines).contains(" ")
 
         if remote.firstAuthorIsCorporate || localIsCorporate {
+            let remoteCorpCandidate = remote.firstAuthorIsCorporate
+                ? remoteDisplay
+                : (remote.firstAuthorFullName ?? remoteDisplay)
             let localFull = Self.normalizeCorporateOrAuthorToken(localFirst.description)
-            let remoteFull = Self.normalizeCorporateOrAuthorToken(remoteDisplay)
+            let remoteFull = Self.normalizeCorporateOrAuthorToken(remoteCorpCandidate)
             guard !localFull.isEmpty, localFull == remoteFull else {
                 return (
                     CitationFieldDiscrepancy(
                         field: "firstAuthor",
                         localValue: localFirst.description,
-                        remoteValue: remoteDisplay,
+                        remoteValue: remoteCorpCandidate,
                         source: remote.sourceName,
                         severity: "error",
                         note: "Corporate/institutional first author differs from \(remote.sourceName)."
@@ -1776,20 +1781,39 @@ public struct CitationVerificationFirewall: Sendable {
         let remoteSurnameRaw = remote.firstAuthorSurname ?? remoteDisplay
         let remoteNormSurname = Self.normalizeCorporateOrAuthorToken(remoteSurnameRaw)
 
-        guard !localNormSurname.isEmpty, localNormSurname == remoteNormSurname else {
-            return (
-                CitationFieldDiscrepancy(
-                    field: "firstAuthor",
-                    localValue: localFirst.familyName,
-                    remoteValue: remoteSurnameRaw,
-                    source: remote.sourceName,
-                    severity: "error",
-                    note: "First author surname '\(localFirst.familyName)' differs from \(remote.sourceName) '\(remoteSurnameRaw)'."
-                ),
-                "first_author_mismatch"
-            )
+        if !localNormSurname.isEmpty && localNormSurname == remoteNormSurname {
+            return (nil, nil)
         }
-        return (nil, nil)
+
+        // Compound surname check (S37, e.g. "García Márquez") when remote source (OpenAlex/arXiv)
+        // only exposes an uncomma'd full name string ("Gabriel García Márquez") without separate family field.
+        if !remote.firstAuthorHasExplicitFamilyField,
+           let rawFull = remote.firstAuthorFullName,
+           !rawFull.contains(",") {
+            let localSurnameWords = Self.splitAlphanumericWords(
+                Self.foldLigaturesAndDiacritics(LaTeXTextCodec().decode(localFirst.familyName))
+            )
+            let remoteFullWords = Self.splitAlphanumericWords(
+                Self.foldLigaturesAndDiacritics(LaTeXTextCodec().decode(rawFull))
+            )
+            if localSurnameWords.count >= 2,
+               remoteFullWords.count > localSurnameWords.count,
+               Array(remoteFullWords.suffix(localSurnameWords.count)) == localSurnameWords {
+                return (nil, nil)
+            }
+        }
+
+        return (
+            CitationFieldDiscrepancy(
+                field: "firstAuthor",
+                localValue: localFirst.familyName,
+                remoteValue: remoteSurnameRaw,
+                source: remote.sourceName,
+                severity: "error",
+                note: "First author surname '\(localFirst.familyName)' differs from \(remote.sourceName) '\(remoteSurnameRaw)'."
+            ),
+            "first_author_mismatch"
+        )
     }
 
     /// Author count and `and others` (`et al.`) prefix check.
@@ -2109,6 +2133,8 @@ public struct CitationVerificationFirewall: Sendable {
 
         var firstAuthorDisplay: String?
         var firstAuthorSurname: String?
+        var firstAuthorFullName: String?
+        var firstAuthorHasExplicitFamilyField = false
         var firstAuthorIsCorporate = false
         var authorSurnames: [String] = []
 
@@ -2120,10 +2146,18 @@ public struct CitationVerificationFirewall: Sendable {
             if let fam = nonEmpty(firstObj["family"] as? String) {
                 firstAuthorDisplay = fam
                 firstAuthorSurname = fam
+                if let giv = nonEmpty(firstObj["given"] as? String) {
+                    firstAuthorFullName = "\(giv) \(fam)"
+                } else {
+                    firstAuthorFullName = fam
+                }
+                firstAuthorHasExplicitFamilyField = true
                 firstAuthorIsCorporate = false
             } else if let corpName = nonEmpty(firstObj["name"] as? String) {
                 firstAuthorDisplay = corpName
                 firstAuthorSurname = corpName
+                firstAuthorFullName = corpName
+                firstAuthorHasExplicitFamilyField = false
                 firstAuthorIsCorporate = true
             }
 
@@ -2189,6 +2223,8 @@ public struct CitationVerificationFirewall: Sendable {
                 title: title,
                 firstAuthorDisplay: firstAuthorDisplay,
                 firstAuthorSurname: firstAuthorSurname,
+                firstAuthorFullName: firstAuthorFullName,
+                firstAuthorHasExplicitFamilyField: firstAuthorHasExplicitFamilyField,
                 firstAuthorIsCorporate: firstAuthorIsCorporate,
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
@@ -2223,6 +2259,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         var firstAuthorDisplay: String?
         var firstAuthorSurname: String?
+        var firstAuthorFullName: String?
         var authorSurnames: [String] = []
 
         if let authorships = root["authorships"] as? [[String: Any]], !authorships.isEmpty {
@@ -2236,12 +2273,14 @@ public struct CitationVerificationFirewall: Sendable {
                     if idx == 0 {
                         firstAuthorDisplay = extracted
                         firstAuthorSurname = extracted
+                        firstAuthorFullName = chosen
                     }
                 } else if let fallback = displayName, let extracted = Self.extractSurnameFromAuthorString(fallback) {
                     authorSurnames.append(extracted)
                     if idx == 0 {
                         firstAuthorDisplay = extracted
                         firstAuthorSurname = extracted
+                        firstAuthorFullName = fallback
                     }
                 }
             }
@@ -2276,6 +2315,8 @@ public struct CitationVerificationFirewall: Sendable {
                 title: title,
                 firstAuthorDisplay: firstAuthorDisplay,
                 firstAuthorSurname: firstAuthorSurname,
+                firstAuthorFullName: firstAuthorFullName,
+                firstAuthorHasExplicitFamilyField: false,
                 firstAuthorIsCorporate: false,
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
@@ -2316,9 +2357,13 @@ public struct CitationVerificationFirewall: Sendable {
 
         let authorBlocks = extractAllXMLTagValues("author", in: entrySlice)
         var authorSurnames: [String] = []
+        var firstAuthorRawName: String?
         for block in authorBlocks {
-            if let name = extractXMLTagValue("name", in: block),
+            if let name = nonEmpty(extractXMLTagValue("name", in: block)),
                let sur = Self.extractSurnameFromAuthorString(name) {
+                if firstAuthorRawName == nil {
+                    firstAuthorRawName = name
+                }
                 authorSurnames.append(sur)
             }
         }
@@ -2360,6 +2405,8 @@ public struct CitationVerificationFirewall: Sendable {
                 title: cleanTitle,
                 firstAuthorDisplay: firstSurname,
                 firstAuthorSurname: firstSurname,
+                firstAuthorFullName: firstAuthorRawName,
+                firstAuthorHasExplicitFamilyField: false,
                 firstAuthorIsCorporate: false,
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
