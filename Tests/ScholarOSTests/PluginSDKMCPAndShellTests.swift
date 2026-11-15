@@ -2294,4 +2294,64 @@ struct PluginSDKMCPAndShellTests {
             #expect(!out.lowercased().contains("fabricated"))
         }
     }
+
+    // MARK: - 10. M1 Item 7 (Stage 07): SQLite Response Cache, CLI Flags & Grammar Fixes
+
+    @Test("M1 Stage 07: incomplete unverified summary uses singular '1 entry' when unverifiedCount == 1 and plural 'entries' otherwise")
+    func m1Stage07SingularAndPluralUnverifiedEntryGrammar() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage07-singular")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let oneBibURL = tempDir.appendingPathComponent("one.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          doi     = {10.1038/nature14539}
+        }
+        """.write(to: oneBibURL, atomically: true, encoding: .utf8)
+
+        let twoBibURL = tempDir.appendingPathComponent("two.bib")
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          doi     = {10.1038/nature14539}
+        }
+        @misc{arxiv_real_vaswani,
+          author        = {Vaswani, Ashish},
+          title         = {Attention Is All You Need},
+          year          = {2017},
+          eprint        = {1706.03762},
+          archiveprefix = {arXiv}
+        }
+        """.write(to: twoBibURL, atomically: true, encoding: .utf8)
+
+        let runner = ScholarCLIRunner()
+        let oneOffline = await runner.runWithExitStatus(
+            arguments: ["verify-citations", oneBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(oneOffline.exitCode == 3)
+        #expect(oneOffline.stdout.contains("1 entry could not be verified, reasons: offline=1; results are incomplete."))
+        #expect(!oneOffline.stdout.contains("1 entries could not be verified"))
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let stage05BibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib")
+        let oneReplay = await runner.runWithExitStatus(
+            arguments: ["verify-citations", stage05BibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(oneReplay.exitCode == 1)
+        #expect(oneReplay.stdout.contains("1 entry could not be verified, reasons: no_match_in_search=1; results are incomplete."))
+        #expect(!oneReplay.stdout.contains("1 entries could not be verified"))
+
+        let twoOffline = await runner.runWithExitStatus(
+            arguments: ["verify-citations", twoBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(twoOffline.exitCode == 3)
+        #expect(twoOffline.stdout.contains("2 entries could not be verified, reasons: offline=2; results are incomplete."))
+    }
 }

@@ -1224,8 +1224,9 @@ public struct ScholarCLIRunner: Sendable {
         let reasonSummary = sortedPairs.isEmpty
             ? "offline=\(audit.unverifiedCount)"
             : sortedPairs.joined(separator: ", ")
+        let entryNoun = audit.unverifiedCount == 1 ? "entry" : "entries"
         return lang.L(
-            "\(audit.unverifiedCount) entries could not be verified, reasons: \(reasonSummary); results are incomplete.",
+            "\(audit.unverifiedCount) \(entryNoun) could not be verified, reasons: \(reasonSummary); results are incomplete.",
             "\(audit.unverifiedCount) 条没查成，原因：\(reasonSummary)；结果不完整。"
         )
     }
