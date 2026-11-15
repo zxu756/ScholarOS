@@ -984,4 +984,361 @@ struct BibCSLAndFirewallTests {
         )
         #expect(unmatchedCollection.isEmpty)
     }
+
+    // MARK: - 7. S43 Registry Transport Layer Tests
+
+    @Test("S43 regression: ephemeral session config has nil URLCache, 15s timeout, ScholarOS/1.2.0 User-Agent without @ or mailto, and no politeMailto in Sources")
+    func s43TransportDefaultsUserAgentAndNoPoliteMailtoInSources() async throws {
+        let defaultClient = LiveURLSessionRegistryClient()
+        #expect(defaultClient.timeoutInterval == 15.0)
+        #expect(LiveURLSessionRegistryClient.defaultUserAgent == "ScholarOS/1.2.0")
+
+        let config = try #require(defaultClient.sessionConfiguration)
+        #expect(config.urlCache == nil)
+        #expect(config.httpCookieStorage == nil)
+        #expect(!config.httpShouldSetCookies)
+        #expect(config.requestCachePolicy == .reloadIgnoringLocalCacheData)
+        #expect(config.timeoutIntervalForRequest == 15.0)
+        #expect(config.timeoutIntervalForResource == 15.0)
+
+        let hasPoliteMailtoProperty = Mirror(reflecting: defaultClient).children.contains {
+            $0.label == "politeMailto"
+        }
+        #expect(!hasPoliteMailtoProperty)
+
+        actor CapturedRequestBox {
+            var request: URLRequest?
+            func store(_ req: URLRequest) { request = req }
+        }
+        let box = CapturedRequestBox()
+        let client = LiveURLSessionRegistryClient { req in
+            await box.store(req)
+            let url = try #require(req.url)
+            let http = try #require(
+                HTTPURLResponse(
+                    url: url,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )
+            )
+            return (Data("{}".utf8), http)
+        }
+
+        let targetURL = try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539"))
+        var incoming = URLRequest(url: targetURL)
+        incoming.setValue("CustomCaller/0.1", forHTTPHeaderField: "User-Agent")
+        _ = try await client.send(incoming)
+
+        let sent = try #require(await box.request)
+        #expect(sent.timeoutInterval == 15.0)
+        #expect(sent.cachePolicy == .reloadIgnoringLocalCacheData)
+        let ua = try #require(sent.value(forHTTPHeaderField: "User-Agent"))
+        #expect(ua == "ScholarOS/1.2.0")
+        #expect(!ua.contains("@"))
+        #expect(!ua.lowercased().contains("mailto"))
+        #expect(!ua.lowercased().contains("http://"))
+        #expect(!ua.lowercased().contains("https://"))
+
+        // Verify Sources/ contains no politeMailto or mailto references.
+        try Self.assertSourcesContainNoMailtoReferences()
+    }
+
+    private static func assertSourcesContainNoMailtoReferences() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourcesDir = repoRoot.appendingPathComponent("Sources", isDirectory: true)
+        let enumerator = try #require(FileManager.default.enumerator(at: sourcesDir, includingPropertiesForKeys: nil))
+        var swiftFileCount = 0
+        while let item = enumerator.nextObject() {
+            guard let fileURL = item as? URL, fileURL.pathExtension == "swift" else {
+                continue
+            }
+            swiftFileCount += 1
+            let contents = try String(contentsOf: fileURL, encoding: .utf8)
+            #expect(!contents.contains("politeMailto"), "Found forbidden politeMailto in \(fileURL.lastPathComponent)")
+            #expect(!contents.lowercased().contains("mailto"), "Found forbidden mailto in \(fileURL.lastPathComponent)")
+        }
+        #expect(swiftFileCount > 0)
+    }
+
+    @Test("S43 regression: response headers from item 5 are returned case-insensitively and unlisted headers are excluded")
+    func s43TransportReturnsCapturedHeadersViaClosureAndURLProtocol() async throws {
+        let rawWireHeaders: [String: String] = [
+            "content-type": "application/json; charset=utf-8",
+            "retry-after": "7",
+            "X-Rate-Limit-Limit": "5",
+            "x-rate-limit-interval": "1s",
+            "X-Concurrency-Limit": "1",
+            "X-RateLimit-Remaining": "958",
+            "x-ratelimit-cost-usd": "0.001",
+            "X-Unlisted-Server-Noise": "ignored"
+        ]
+
+        // 1. Test via injected dataLoader closure
+        let loaderClient = LiveURLSessionRegistryClient { req in
+            let url = try #require(req.url)
+            let http = try #require(
+                HTTPURLResponse(
+                    url: url,
+                    statusCode: 429,
+                    httpVersion: "HTTP/2",
+                    headerFields: rawWireHeaders
+                )
+            )
+            return (Data("{\"status\":\"rate_limited\"}".utf8), http)
+        }
+
+        let url = try #require(RegistryURLBuilder.openAlexWorkURL(doi: "10.1038/nature14539"))
+        let res = try await loaderClient.send(URLRequest(url: url))
+        #expect(res.statusCode == 429)
+        #expect(res.headers.count == 7)
+        #expect(res.headers["Content-Type"] == "application/json; charset=utf-8")
+        #expect(res.headers["Retry-After"] == "7")
+        #expect(res.headers["x-rate-limit-limit"] == "5")
+        #expect(res.headers["x-rate-limit-interval"] == "1s")
+        #expect(res.headers["x-concurrency-limit"] == "1")
+        #expect(res.headers["x-ratelimit-remaining"] == "958")
+        #expect(res.headers["x-ratelimit-cost-usd"] == "0.001")
+        #expect(res.headers["X-Unlisted-Server-Noise"] == nil)
+        #expect(res.headerValue(for: "RETRY-AFTER") == "7")
+
+        // 2. Test via offline URLProtocol attached to LiveURLSessionRegistryClient's ephemeral URLSession
+        final class HeaderStubURLProtocol: URLProtocol, @unchecked Sendable {
+            override class func canInit(with request: URLRequest) -> Bool { true }
+            override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+            override func startLoading() {
+                guard let reqURL = request.url,
+                      let http = HTTPURLResponse(
+                          url: reqURL,
+                          statusCode: 200,
+                          httpVersion: "HTTP/1.1",
+                          headerFields: [
+                              "Content-Type": "application/json",
+                              "x-ratelimit-remaining": "990",
+                              "x-ratelimit-cost-usd": "0",
+                              "Server": "stub"
+                          ]
+                      ) else {
+                    client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+                    return
+                }
+                let sentUA = request.value(forHTTPHeaderField: "User-Agent") ?? ""
+                client?.urlProtocol(self, didReceive: http, cacheStoragePolicy: .notAllowed)
+                client?.urlProtocol(self, didLoad: Data(sentUA.utf8))
+                client?.urlProtocolDidFinishLoading(self)
+            }
+            override func stopLoading() {}
+        }
+
+        let protocolClient = LiveURLSessionRegistryClient(protocolClasses: [HeaderStubURLProtocol.self])
+        let protoRes = try await protocolClient.send(URLRequest(url: url))
+        #expect(protoRes.statusCode == 200)
+        #expect(String(data: protoRes.body, encoding: .utf8) == "ScholarOS/1.2.0")
+        #expect(protoRes.headers["Content-Type"] == "application/json")
+        #expect(protoRes.headers["x-ratelimit-remaining"] == "990")
+        #expect(protoRes.headers["x-ratelimit-cost-usd"] == "0")
+        #expect(protoRes.headers["Server"] == nil)
+    }
+
+    @Test("S43 regression: non-HTTP URLResponse throws transport_error instead of defaulting to 200")
+    func s43NonHTTPURLResponseThrowsTransportErrorAndNeverDefaultsTo200() async throws {
+        final class NonHTTPStubURLProtocol: URLProtocol, @unchecked Sendable {
+            override class func canInit(with request: URLRequest) -> Bool { true }
+            override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+            override func startLoading() {
+                let reqURL = request.url ?? URL(string: "https://api.crossref.org/works/10.1038/nature14539")!
+                let plainResponse = URLResponse(
+                    url: reqURL,
+                    mimeType: "application/octet-stream",
+                    expectedContentLength: 2,
+                    textEncodingName: nil
+                )
+                client?.urlProtocol(self, didReceive: plainResponse, cacheStoragePolicy: .notAllowed)
+                client?.urlProtocol(self, didLoad: Data("{}".utf8))
+                client?.urlProtocolDidFinishLoading(self)
+            }
+            override func stopLoading() {}
+        }
+
+        let url = try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539"))
+
+        // 1. Direct dataLoader returning plain URLResponse
+        let closureClient = LiveURLSessionRegistryClient { req in
+            let reqURL = try #require(req.url)
+            let nonHTTP = URLResponse(url: reqURL, mimeType: "text/plain", expectedContentLength: 0, textEncodingName: nil)
+            return (Data(), nonHTTP)
+        }
+
+        do {
+            _ = try await closureClient.send(URLRequest(url: url))
+            Issue.record("Expected RegistryTransportError(.transportError) for non-HTTP URLResponse")
+        } catch let err as RegistryTransportError {
+            #expect(err.kind == .transportError)
+            #expect(err.reasonCode == "transport_error")
+        }
+
+        // 2. Ephemeral URLSession with URLProtocol returning plain URLResponse
+        let protocolClient = LiveURLSessionRegistryClient(protocolClasses: [NonHTTPStubURLProtocol.self])
+        do {
+            _ = try await protocolClient.send(URLRequest(url: url))
+            Issue.record("Expected RegistryTransportError(.transportError) from URLSession non-HTTP response")
+        } catch let err as RegistryTransportError {
+            #expect(err.kind == .transportError)
+            #expect(err.reasonCode == "transport_error")
+        }
+
+        // 3. End-to-end firewall verdict is UNVERIFIED (never VERIFIED)
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: protocolClient)
+        #expect(verdict.firewallClass == .unverified)
+        #expect(!verdict.allowsManuscriptInsertion)
+    }
+
+    @Test("S43 regression: request timeout surfaces RegistryTransportError.timeout in both dataLoader and ephemeral URLSession")
+    func s43RequestTimeoutThrowsTimeoutErrorAndFirewallReturnsUnverified() async throws {
+        final class HangingURLProtocol: URLProtocol, @unchecked Sendable {
+            override class func canInit(with request: URLRequest) -> Bool { true }
+            override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+            override func startLoading() {
+                // Intentionally never finishes so URLSession enforces timeoutInterval.
+            }
+            override func stopLoading() {}
+        }
+
+        let url = try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539"))
+
+        // 1. Injected URLError(.timedOut)
+        let loaderTimeoutClient = LiveURLSessionRegistryClient { _ in
+            throw URLError(.timedOut)
+        }
+        do {
+            _ = try await loaderTimeoutClient.send(URLRequest(url: url))
+            Issue.record("Expected timeout error from URLError(.timedOut)")
+        } catch let err as RegistryTransportError {
+            #expect(err.kind == .timeout)
+            #expect(err.reasonCode == "timeout")
+        }
+
+        // 2. Real URLSession timeout enforcement with HangingURLProtocol (0.15s)
+        let sessionTimeoutClient = LiveURLSessionRegistryClient(
+            timeoutInterval: 0.15,
+            protocolClasses: [HangingURLProtocol.self]
+        )
+        do {
+            _ = try await sessionTimeoutClient.send(URLRequest(url: url))
+            Issue.record("Expected timeout error from hanging URLProtocol")
+        } catch let err as RegistryTransportError {
+            #expect(err.kind == .timeout)
+            #expect(err.reasonCode == "timeout")
+        }
+
+        // 3. Firewall marks entry UNVERIFIED on timeout
+        let firewall = CitationVerificationFirewall()
+        let entry = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let verdict = await firewall.verifyAgainstPublicRegistries(entry: entry, session: loaderTimeoutClient)
+        #expect(verdict.firewallClass == .unverified)
+        #expect(!verdict.allowsManuscriptInsertion)
+    }
+
+    @Test("S43 regression: URLComponents builds valid URLs when DOI contains #, ?, spaces, angle brackets, and percent signs")
+    func s43URLComponentsEncodesSpecialCharacterDOIsAndClosureSessionInjection() async throws {
+        // 1. Direct URLComponents builder checks with #, ?, spaces, <, >, %
+        let doiHashQuerySpace = "10.1000/abc#def?ghi jkl"
+        let crossref1 = try #require(RegistryURLBuilder.crossrefWorkURL(doi: doiHashQuerySpace))
+        let openAlex1 = try #require(RegistryURLBuilder.openAlexWorkURL(doi: doiHashQuerySpace))
+        let handle1 = try #require(RegistryURLBuilder.doiHandleURL(doi: doiHashQuerySpace))
+
+        #expect(crossref1.absoluteString == "https://api.crossref.org/works/10.1000/abc%23def%3Fghi%20jkl")
+        #expect(openAlex1.absoluteString == "https://api.openalex.org/works/https://doi.org/10.1000/abc%23def%3Fghi%20jkl")
+        #expect(handle1.absoluteString == "https://doi.org/api/handles/10.1000/abc%23def%3Fghi%20jkl")
+
+        for built in [crossref1, openAlex1, handle1] {
+            #expect(built.query == nil)
+            #expect(built.fragment == nil)
+        }
+
+        // ? before # plus & and space
+        let doiQueryBeforeHash = "https://doi.org/10.1000/part?x=1&y=2#sec 3"
+        let crossref2 = try #require(RegistryURLBuilder.crossrefWorkURL(doi: doiQueryBeforeHash))
+        #expect(crossref2.absoluteString == "https://api.crossref.org/works/10.1000/part%3Fx=1&y=2%23sec%203")
+        #expect(crossref2.query == nil)
+        #expect(crossref2.fragment == nil)
+
+        // Query endpoints with special characters (#, ?, &, +, spaces)
+        let crSearch = try #require(RegistryURLBuilder.crossrefBibliographicSearchURL(query: "C++ & Q#? 1986", rows: 5))
+        #expect(crSearch.host == "api.crossref.org")
+        #expect(crSearch.path == "/works")
+        #expect(crSearch.fragment == nil)
+        #expect(crSearch.absoluteString.contains("%2B%2B"))
+        #expect(crSearch.absoluteString.contains("%23"))
+        #expect(crSearch.absoluteString.contains("%3F"))
+
+        let oaSearch = try #require(RegistryURLBuilder.openAlexSearchURL(query: "Knuth #1? Vol 1", perPage: 5))
+        #expect(oaSearch.host == "api.openalex.org")
+        #expect(oaSearch.fragment == nil)
+
+        let arxivURL = try #require(RegistryURLBuilder.arXivQueryURL(arXivID: "1706.03762"))
+        #expect(arxivURL.absoluteString == "https://export.arxiv.org/api/query?id_list=1706.03762")
+
+        let pmidURL = try #require(RegistryURLBuilder.pubMedSummaryURL(pmid: "9500320"))
+        #expect(pmidURL.absoluteString == "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=9500320&retmode=json")
+
+        // 2. End-to-end verifyAgainstPublicRegistries using ClosureRegistrySession on a DOI with <, >, #, ?
+        actor URLRecorder {
+            var urls: [URL] = []
+            func append(_ url: URL?) {
+                if let url { urls.append(url) }
+            }
+        }
+        let recorder = URLRecorder()
+        let closureSession = ClosureRegistrySession { request in
+            await recorder.append(request.url)
+            return RegistryHTTPResponse(statusCode: 404, body: Data("not found".utf8))
+        }
+
+        let firewall = CitationVerificationFirewall()
+        let trickyEntry = BibliographyEntry(
+            citeKey: "sici1998",
+            kind: .article,
+            title: "Sample SICI Identifier Entry",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 1998,
+            venue: "Statistics in Medicine",
+            doi: "10.1002/(sici)1097-0258<1661>?v=1#sec"
+        )
+
+        _ = await firewall.verifyAgainstPublicRegistries(
+            entry: trickyEntry,
+            session: closureSession
+        )
+
+        let urls = await recorder.urls
+        #expect(urls.count == 2)
+        for url in urls {
+            #expect(url.query == nil, "Unexpected query in \(url.absoluteString)")
+            #expect(url.fragment == nil, "Unexpected fragment in \(url.absoluteString)")
+            #expect(url.absoluteString.contains("%3C1661%3E"), "Missing encoded angle brackets in \(url.absoluteString)")
+            #expect(url.absoluteString.contains("%3Fv=1%23sec"), "Missing encoded ? and # in \(url.absoluteString)")
+        }
+    }
 }

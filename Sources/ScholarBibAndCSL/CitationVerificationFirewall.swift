@@ -127,66 +127,6 @@ public struct CitationFirewallAuditReport: Sendable, Codable, Hashable {
     }
 }
 
-// MARK: - Protocol-Injected Public Registry HTTP Session
-
-public struct RegistryHTTPResponse: Sendable, Codable, Hashable {
-    public let statusCode: Int
-    public let body: Data
-    public let headers: [String: String]
-
-    public init(statusCode: Int, body: Data, headers: [String: String] = [:]) {
-        self.statusCode = statusCode
-        self.body = body
-        self.headers = headers
-    }
-
-    public static func json(statusCode: Int = 200, _ jsonString: String) -> RegistryHTTPResponse {
-        RegistryHTTPResponse(
-            statusCode: statusCode,
-            body: Data(jsonString.utf8),
-            headers: ["Content-Type": "application/json"]
-        )
-    }
-
-    public static func xml(statusCode: Int = 200, _ xmlString: String) -> RegistryHTTPResponse {
-        RegistryHTTPResponse(
-            statusCode: statusCode,
-            body: Data(xmlString.utf8),
-            headers: ["Content-Type": "application/atom+xml"]
-        )
-    }
-}
-
-public protocol CitationRegistrySession: Sendable {
-    func send(_ request: URLRequest) async throws -> RegistryHTTPResponse
-}
-
-public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
-    public let timeoutInterval: TimeInterval
-    public let politeMailto: String?
-
-    public init(timeoutInterval: TimeInterval = 10.0, politeMailto: String? = nil) {
-        self.timeoutInterval = timeoutInterval
-        self.politeMailto = politeMailto
-    }
-
-    public func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
-        var configured = request
-        configured.timeoutInterval = timeoutInterval
-        let ua: String
-        if let mailto = politeMailto, !mailto.isEmpty {
-            ua = "ScholarOS/1.0 (CitationVerificationFirewall; mailto:\(mailto))"
-        } else {
-            ua = "ScholarOS/1.0 (CitationVerificationFirewall)"
-        }
-        configured.setValue(ua, forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await URLSession.shared.data(for: configured)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 200
-        return RegistryHTTPResponse(statusCode: status, body: data)
-    }
-}
-
 // MARK: - Cryptographic & Structural Identifier Checksum Validators (ISO DOI, arXiv, PMID, ORCID, ISSN)
 
 public enum ScholarlyIdentifierValidator: Sendable {
@@ -1101,8 +1041,7 @@ public struct CitationVerificationFirewall: Sendable {
             var crossrefReturned404 = false
             var openAlexReturned404 = false
 
-            if let encodedDOI = normDOI.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-               let crossrefURL = URL(string: "https://api.crossref.org/works/\(encodedDOI)") {
+            if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normDOI) {
                 do {
                     let response = try await session.send(URLRequest(url: crossrefURL))
                     if response.statusCode == 404 {
@@ -1145,7 +1084,7 @@ public struct CitationVerificationFirewall: Sendable {
                 }
             }
 
-            if let openAlexURL = URL(string: "https://api.openalex.org/works/https://doi.org/\(normDOI)") {
+            if let openAlexURL = RegistryURLBuilder.openAlexWorkURL(doi: normDOI) {
                 do {
                     let response = try await session.send(URLRequest(url: openAlexURL))
                     if response.statusCode == 404 {
@@ -1217,7 +1156,7 @@ public struct CitationVerificationFirewall: Sendable {
         }()
 
         if let arxivID = candidateArXiv,
-           let arxivURL = URL(string: "https://export.arxiv.org/api/query?id_list=\(arxivID)") {
+           let arxivURL = RegistryURLBuilder.arXivQueryURL(arXivID: arxivID) {
             do {
                 let response = try await session.send(URLRequest(url: arxivURL))
                 if response.statusCode == 200 {
