@@ -1341,4 +1341,190 @@ struct BibCSLAndFirewallTests {
             #expect(url.absoluteString.contains("%3Fv=1%23sec"), "Missing encoded ? and # in \(url.absoluteString)")
         }
     }
+
+    // MARK: - 8. M1 Item 9 Registry Recording & Replay Transport Tests
+
+    @Test("M1 item 9: recordingCapturedHeaderNames captures all 11 headers, preserves 404 body byte-for-byte, and validates SHA-256 on replay")
+    func m1Item9RecordingPreservesRawBytesCapturesAllHeadersAndValidatesReplaySHA256() async throws {
+        #expect(LiveURLSessionRegistryClient.recordingCapturedHeaderNames.count == 11)
+        for expectedHeader in [
+            "Content-Type",
+            "Retry-After",
+            "x-rate-limit-limit",
+            "x-rate-limit-interval",
+            "x-concurrency-limit",
+            "x-ratelimit-remaining",
+            "x-ratelimit-cost-usd",
+            "Date",
+            "x-ratelimit-limit",
+            "x-ratelimit-reset",
+            "x-ratelimit-credits-used"
+        ] {
+            #expect(LiveURLSessionRegistryClient.recordingCapturedHeaderNames.contains(expectedHeader))
+        }
+
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-rec-unit-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Exact raw 404 body including trailing bytes and upstream contact string (doi.org 404 pattern);
+        // must be saved verbatim without altering a single byte.
+        let exact404Body: Data = {
+            var buf = Data("{\"responseCode\":100,\"handle\":\"10.1234/fake.2026.99999\",\"message\":\"contact admin@doi.example.org\"}\r\n".utf8)
+            buf.append(contentsOf: [0x00, 0xFF, 0x0A])
+            return buf
+        }()
+
+        let client = LiveURLSessionRegistryClient(
+            capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
+        ) { req in
+            let reqURL = try #require(req.url)
+            let http = try #require(
+                HTTPURLResponse(
+                    url: reqURL,
+                    statusCode: 404,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Content-Type": "application/json;charset=UTF-8",
+                        "Date": "Sun, 15 Nov 2026 11:00:00 GMT",
+                        "x-ratelimit-limit": "1000",
+                        "x-ratelimit-remaining": "958",
+                        "x-ratelimit-reset": "46800",
+                        "x-ratelimit-credits-used": "0",
+                        "x-ratelimit-cost-usd": "0"
+                    ]
+                )
+            )
+            return (exact404Body, http)
+        }
+
+        let recorder = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: client,
+            minimumIntervalSeconds: 0
+        )
+        let handleURL = try #require(RegistryURLBuilder.doiHandleURL(doi: "10.1234/fake.2026.99999"))
+        let recordedResp = try await recorder.send(URLRequest(url: handleURL))
+        #expect(recordedResp.statusCode == 404)
+        #expect(recordedResp.body == exact404Body)
+
+        let manifest = try await recorder.finalize()
+        #expect(manifest.count == 1)
+        #expect(manifest.totalHTTPRequestsSent == 1)
+        #expect(manifest.userAgent == "ScholarOS/1.2.0")
+
+        let item = try #require(manifest.items.first)
+        #expect(item.service == "doi")
+        #expect(item.status == 404)
+        #expect(item.byteLength == exact404Body.count)
+        #expect(item.responseDateHeader == "Sun, 15 Nov 2026 11:00:00 GMT")
+        #expect(item.requestHeaders["User-Agent"] == "ScholarOS/1.2.0")
+        #expect(item.responseHeaders["Date"] == "Sun, 15 Nov 2026 11:00:00 GMT")
+        #expect(item.responseHeaders["x-ratelimit-limit"] == "1000")
+        #expect(item.responseHeaders["x-ratelimit-remaining"] == "958")
+        #expect(item.responseHeaders["x-ratelimit-reset"] == "46800")
+        #expect(item.responseHeaders["x-ratelimit-credits-used"] == "0")
+
+        let diskRaw = try Data(contentsOf: tempDir.appendingPathComponent(item.rawFile))
+        #expect(diskRaw == exact404Body)
+
+        // Replay returns identical bytes and headers, and bypassesCache is true
+        let replay = try RegistryReplaySession(directoryURL: tempDir)
+        #expect(replay.bypassesCache)
+        let replayedResp = try await replay.send(URLRequest(url: handleURL))
+        #expect(replayedResp.statusCode == 404)
+        #expect(replayedResp.body == exact404Body)
+        #expect(replayedResp.headerValue(for: "Date") == "Sun, 15 Nov 2026 11:00:00 GMT")
+        #expect(replayedResp.headerValue(for: "x-ratelimit-remaining") == "958")
+
+        // Unrecorded URL during replay throws RegistryReplayError.unrecordedRequest carrying the missing URL
+        let unrecordedURL = try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/unrecorded.2026"))
+        do {
+            _ = try await replay.send(URLRequest(url: unrecordedURL))
+            Issue.record("Expected RegistryReplayError.unrecordedRequest for unrecorded URL")
+        } catch let err as RegistryReplayError {
+            #expect(err.localizedDescription.contains(unrecordedURL.absoluteString))
+        }
+
+        // Corrupting 1 byte of .raw causes RegistryReplaySession init to fail SHA-256 verification
+        var tamperedRaw = diskRaw
+        tamperedRaw[0] ^= 0x01
+        try tamperedRaw.write(to: tempDir.appendingPathComponent(item.rawFile))
+        #expect(throws: RegistryReplayError.self) {
+            _ = try RegistryReplaySession(directoryURL: tempDir)
+        }
+    }
+
+    @Test("M1 item 9: RegistryRecordingSession rejects disallowed hosts, @/mailto/api_key/local paths in URL or headers, and stops immediately on 429")
+    func m1Item9RecordingRejectsSensitiveRequestDataAndStopsOn429() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-rec-guard-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        actor CallCounter {
+            var count = 0
+            func increment() -> Int {
+                count += 1
+                return count
+            }
+        }
+        let counter = CallCounter()
+        let transport = ClosureRegistrySession { _ in
+            _ = await counter.increment()
+            return RegistryHTTPResponse(statusCode: 429, body: Data("rate limited".utf8), headers: ["Retry-After": "5"])
+        }
+
+        let recorder = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: transport,
+            minimumIntervalSeconds: 0
+        )
+
+        // 1. Disallowed host rejected before transport is called
+        let badHostReq = URLRequest(url: try #require(URL(string: "https://api.semanticscholar.org/graph/v1/paper/123")))
+        await #expect(throws: RegistryRecordingError.self) {
+            _ = try await recorder.send(badHostReq)
+        }
+
+        // 2. Email/@, mailto, api_key, or local path in URL rejected before transport is called
+        let forbiddenURLs = [
+            "https://api.crossref.org/works/10.1038/nature14539?mailto=user@example.com",
+            "https://api.openalex.org/works?search=test&api_key=secret123",
+            "https://api.crossref.org/works/10.1038/nature14539?contact=alice%40example.com",
+            "https://api.crossref.org/works?query.bibliographic=" + NSHomeDirectory()
+        ]
+        for raw in forbiddenURLs {
+            if let badURL = URL(string: raw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? raw) ?? URL(string: raw) {
+                await #expect(throws: RegistryRecordingError.self) {
+                    _ = try await recorder.send(URLRequest(url: badURL))
+                }
+            }
+        }
+
+        // 3. Forbidden header value (@ or api_key) rejected before transport is called
+        var badHeaderReq = URLRequest(url: try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539")))
+        badHeaderReq.setValue("Bearer secret_api_key", forHTTPHeaderField: "X-Custom-Auth")
+        await #expect(throws: RegistryRecordingError.self) {
+            _ = try await recorder.send(badHeaderReq)
+        }
+
+        #expect(await counter.count == 0)
+
+        // 4. Clean allowed request hits transport; HTTP 429 aborts recording immediately without writing .raw
+        let cleanDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-rec-429-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: cleanDir) }
+        let recorder429 = try RegistryRecordingSession(
+            directoryURL: cleanDir,
+            transport: transport,
+            minimumIntervalSeconds: 0
+        )
+        let validReq = URLRequest(url: try #require(RegistryURLBuilder.crossrefWorkURL(doi: "10.1038/nature14539")))
+        await #expect(throws: RegistryRecordingError.self) {
+            _ = try await recorder429.send(validReq)
+        }
+        #expect(await counter.count == 1)
+        let writtenFiles = (try? FileManager.default.contentsOfDirectory(atPath: cleanDir.path)) ?? []
+        #expect(!writtenFiles.contains { $0.hasSuffix(".raw") })
+    }
 }

@@ -21,11 +21,92 @@ public struct CLIExecutionOutput: Sendable, Equatable {
     }
 }
 
+public struct CLIProcessResult: Sendable, Equatable {
+    public let stdout: String
+    public let stderr: String
+    public let exitCode: Int32
+
+    public init(stdout: String, stderr: String = "", exitCode: Int32 = 0) {
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exitCode = exitCode
+    }
+}
+
+private struct ReplayAuditReportEnvelope: Encodable {
+    let mode: String = "REPLAY"
+    let replay: Bool = true
+    let report: CitationFirewallAuditReport
+
+    private enum ReplayKeys: String, CodingKey {
+        case mode
+        case replay
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: ReplayKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(replay, forKey: .replay)
+        try report.encode(to: encoder)
+    }
+}
+
 public struct ScholarCLIRunner: Sendable {
-    public init() {}
+    public let registryTransport: any CitationRegistrySession
+
+    public init(
+        registryTransport: any CitationRegistrySession = LiveURLSessionRegistryClient(
+            capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
+        )
+    ) {
+        self.registryTransport = registryTransport
+    }
 
     public func execute(arguments: [String]) async throws -> String {
         try await run(arguments: arguments).stdout
+    }
+
+    public func runWithExitStatus(arguments: [String]) async -> CLIProcessResult {
+        let cliLang = (try? resolveCLILanguage(arguments: arguments))
+            ?? ProcessInfo.processInfo.environment["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse)
+            ?? .en
+        do {
+            let output = try await run(arguments: arguments)
+            return CLIProcessResult(stdout: output.stdout, stderr: "", exitCode: output.exitCode)
+        } catch let error as ScholarOSError {
+            let desc: String
+            switch error {
+            case .invalidCLIArguments(let detail) where cliLang == .zhHans:
+                desc = "命令行参数错误：\(detail)"
+            case .fileNotFound(let path) where cliLang == .zhHans:
+                desc = "未找到文件或工程路径：\(path)"
+            default:
+                desc = error.localizedDescription
+            }
+            return CLIProcessResult(
+                stdout: "",
+                stderr: "[\(error.errorCodeIdentifier)] \(desc)",
+                exitCode: 2
+            )
+        } catch let error as RegistryReplayError {
+            return CLIProcessResult(
+                stdout: "",
+                stderr: "[ERR_REGISTRY_REPLAY] \(error.localizedDescription)",
+                exitCode: 2
+            )
+        } catch let error as RegistryRecordingError {
+            return CLIProcessResult(
+                stdout: "",
+                stderr: "[ERR_REGISTRY_RECORD] \(error.localizedDescription)",
+                exitCode: 2
+            )
+        } catch {
+            return CLIProcessResult(
+                stdout: "",
+                stderr: "[ERR_RUNTIME] \(error.localizedDescription)",
+                exitCode: 2
+            )
+        }
     }
 
     public func run(arguments: [String]) async throws -> CLIExecutionOutput {
@@ -184,12 +265,56 @@ public struct ScholarCLIRunner: Sendable {
             let parsed = try parseArgs(
                 rest,
                 subcommand: subcommand,
-                valueFlags: ["--project"],
+                valueFlags: ["--project", "--registry-record", "--registry-replay"],
                 boolFlags: ["--demo", "--offline", "--json", "--strict"],
                 maxPositionals: 1,
                 lang: lang
             )
             let emitJSON = parsed.bools.contains("--json")
+            let recordDir = parsed.values["--registry-record"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let recordDir, recordDir.isEmpty {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Option '--registry-record' requires a non-empty directory path.",
+                        "选项 '--registry-record' 需要提供非空目录路径。"
+                    )
+                )
+            }
+            if let replayDir, replayDir.isEmpty {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Option '--registry-replay' requires a non-empty directory path.",
+                        "选项 '--registry-replay' 需要提供非空目录路径。"
+                    )
+                )
+            }
+            if recordDir != nil && replayDir != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot specify both --registry-record and --registry-replay.",
+                        "不能同时指定 --registry-record 与 --registry-replay。"
+                    )
+                )
+            }
+            if parsed.bools.contains("--offline") && (recordDir != nil || replayDir != nil) {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --offline with --registry-record or --registry-replay.",
+                        "不能将 --offline 与 --registry-record 或 --registry-replay 同时使用。"
+                    )
+                )
+            }
+            if parsed.bools.contains("--demo") && (recordDir != nil || replayDir != nil) {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --demo with --registry-record or --registry-replay.",
+                        "不能将 --demo 与 --registry-record 或 --registry-replay 同时使用。"
+                    )
+                )
+            }
+
             let entries: [BibliographyEntry]
             let isDemo: Bool
 
@@ -209,8 +334,8 @@ public struct ScholarCLIRunner: Sendable {
                 let opened = try openReadDatabase(
                     parsed: parsed,
                     usage: lang.L(
-                        "Usage: scholaros verify-citations <refs.bib> [--offline] [--json] | --project <dir.scholarproj> | --demo",
-                        "用法：scholaros verify-citations <refs.bib> [--offline] [--json] | --project <dir.scholarproj> | --demo"
+                        "Usage: scholaros verify-citations <refs.bib> [--offline | --registry-record <dir> | --registry-replay <dir>] [--json] | --project <dir.scholarproj> | --demo",
+                        "用法：scholaros verify-citations <refs.bib> [--offline | --registry-record <目录> | --registry-replay <目录>] [--json] | --project <dir.scholarproj> | --demo"
                     ),
                     lang: lang
                 )
@@ -220,7 +345,52 @@ public struct ScholarCLIRunner: Sendable {
             }
 
             let firewall = CitationVerificationFirewall()
-            let audit = firewall.auditLibrary(entries)
+            let audit: CitationFirewallAuditReport
+            let isReplayMode: Bool
+            let performedRegistryLookup: Bool
+
+            if let recordDir {
+                let recordingSession = try RegistryRecordingSession(
+                    directoryURL: URL(fileURLWithPath: recordDir),
+                    transport: registryTransport
+                )
+                var verdicts: [CitationFirewallEntryVerdict] = []
+                verdicts.reserveCapacity(entries.count)
+                for entry in entries {
+                    let verdict = await firewall.verifyAgainstPublicRegistries(
+                        entry: entry,
+                        session: recordingSession
+                    )
+                    try await recordingSession.throwIfFailed()
+                    verdicts.append(verdict)
+                }
+                _ = try await recordingSession.finalize()
+                audit = firewall.summarizeVerdicts(verdicts)
+                isReplayMode = false
+                performedRegistryLookup = true
+            } else if let replayDir {
+                let replaySession = try RegistryReplaySession(
+                    directoryURL: URL(fileURLWithPath: replayDir)
+                )
+                var verdicts: [CitationFirewallEntryVerdict] = []
+                verdicts.reserveCapacity(entries.count)
+                for entry in entries {
+                    let verdict = await firewall.verifyAgainstPublicRegistries(
+                        entry: entry,
+                        session: replaySession
+                    )
+                    try await replaySession.throwIfFailed()
+                    verdicts.append(verdict)
+                }
+                audit = firewall.summarizeVerdicts(verdicts)
+                isReplayMode = true
+                performedRegistryLookup = true
+            } else {
+                audit = firewall.auditLibrary(entries)
+                isReplayMode = false
+                performedRegistryLookup = false
+            }
+
             let allVerified = audit.totalEvaluated > 0 && audit.verifiedCount == audit.totalEvaluated
             let exitCode: Int32 = allVerified ? 0 : 1
 
@@ -236,7 +406,12 @@ public struct ScholarCLIRunner: Sendable {
                 }
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.sortedKeys]
-                let data = try encoder.encode(audit)
+                let data: Data
+                if isReplayMode {
+                    data = try encoder.encode(ReplayAuditReportEnvelope(report: audit))
+                } else {
+                    data = try encoder.encode(audit)
+                }
                 return CLIExecutionOutput(stdout: String(decoding: data, as: UTF8.self), exitCode: exitCode)
             }
 
@@ -244,12 +419,21 @@ public struct ScholarCLIRunner: Sendable {
             if isDemo {
                 lines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
             }
+            if isReplayMode {
+                lines.append(
+                    lang.L(
+                        "[REPLAY] Recorded registry replay (no live network requests, no cache)",
+                        "[REPLAY / 录制回放] 使用本地录制响应回放（不发网络请求、不读写缓存）"
+                    )
+                )
+            }
             lines.append(
                 "Evaluated=\(audit.totalEvaluated) Verified=\(audit.verifiedCount) Drift=\(audit.driftCount) NotFound=\(audit.notFoundCount) Retracted=\(audit.retractedCount) Unverified=\(audit.unverifiedCount)"
             )
-            // This command never contacts a registry in this version, whether or not --offline is passed.
-            // Say so once, instead of labelling individual entries "(offline)" as if a mode had been chosen.
-            lines.append(Self.noOnlineLookupNotice(lang))
+            if !performedRegistryLookup {
+                // Without --registry-record or --registry-replay, this command performs no online lookups yet.
+                lines.append(Self.noOnlineLookupNotice(lang))
+            }
             for verdict in audit.verdicts {
                 // The class is printed once, here; the note's own leading "[CLASS] " tag is dropped.
                 let note = CitationAuditWording.strippingLeadingClassTag(
@@ -611,6 +795,23 @@ public struct ScholarCLIRunner: Sendable {
         while i < args.count {
             let tok = args[i]
             if tok.hasPrefix("-") {
+                if let eqIdx = tok.firstIndex(of: "=") {
+                    let flagName = String(tok[..<eqIdx])
+                    let flagVal = String(tok[tok.index(after: eqIdx)...])
+                    if valueFlags.contains(flagName) {
+                        guard !flagVal.isEmpty else {
+                            throw ScholarOSError.invalidCLIArguments(
+                                lang.L(
+                                    "Missing value for option '\(flagName)' in '\(subcommand)'.",
+                                    "子命令 '\(subcommand)' 的选项 '\(flagName)' 缺少参数值。"
+                                )
+                            )
+                        }
+                        values[flagName] = flagVal
+                        i += 1
+                        continue
+                    }
+                }
                 if valueFlags.contains(tok) {
                     guard i + 1 < args.count, !args[i + 1].hasPrefix("-") else {
                         throw ScholarOSError.invalidCLIArguments(
@@ -888,8 +1089,11 @@ public struct ScholarCLIRunner: Sendable {
             Direct File Commands:
               outline <paper.tex> [--json]                           Print numbered section/subsection outline
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    Run LaTeX CST, cross-reference & citation lints
-              verify-citations <refs.bib> [--offline] [--json]       Check identifier syntax & built-in retraction hints; no online lookup in this version,
-                                                                     --offline is accepted and changes nothing (exits 1 if any entry is not VERIFIED)
+              verify-citations <refs.bib> [options]                  Verify citations (exits 1 if any entry is not VERIFIED, 2 on error)
+                --offline                                            Check identifier syntax & built-in retraction hints without network lookups
+                --registry-record <dir>                              Query live registries and record raw responses + SHA-256 manifest into <dir>
+                --registry-replay <dir>                              Replay recorded responses from <dir> with no network or cache access (marks REPLAY)
+                --json                                               Emit structured JSON audit report
               format-bib <refs.bib> [--style apa|ieee] [--json]      Format BibTeX entries in APA 7th or IEEE style
 
             Project Bundle & Demo Commands (require --project <dir.scholarproj> or explicit --demo):
@@ -916,8 +1120,11 @@ public struct ScholarCLIRunner: Sendable {
             单文件直读命令：
               outline <paper.tex> [--json]                           提取 LaTeX 章节与子章节编号大纲
               diagnostics <paper.tex> [--bib <refs.bib>] [--json]    执行 LaTeX 语法树、交叉引用与引文静态诊断
-              verify-citations <refs.bib> [--offline] [--json]       检查标识符语法与内置撤稿名单；本版本不联网核查，
-                                                                     --offline 可以写但不改变行为（任一条目非 VERIFIED 时退出码为 1）
+              verify-citations <refs.bib> [选项]                     核查参考文献（任一条目非 VERIFIED 时退出码为 1，参数或回放错误退出码为 2）
+                --offline                                            仅检查标识符语法与内置撤稿名单，不联网核查
+                --registry-record <目录>                             联网查询公开注册库并将原始响应与 SHA-256 清单录制到 <目录>
+                --registry-replay <目录>                             从 <目录> 离线回放录制响应，不发网络请求且不读写缓存（输出带 REPLAY 标记）
+                --json                                               输出结构化 JSON 核查报告
               format-bib <refs.bib> [--style apa|ieee] [--json]      按 APA 7th 或 IEEE 格式输出参考文献列表
 
             工程包与演示命令（必须显式指定 --project <dir.scholarproj> 或 --demo）：

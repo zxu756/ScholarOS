@@ -1072,6 +1072,8 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     }
+                } catch is any FatalRegistrySessionError {
+                    return offlineVerdict
                 } catch {
                     findings.append(
                         FirewallFinding(
@@ -1115,6 +1117,8 @@ public struct CitationVerificationFirewall: Sendable {
                             )
                         )
                     }
+                } catch is any FatalRegistrySessionError {
+                    return offlineVerdict
                 } catch {
                     findings.append(
                         FirewallFinding(
@@ -1217,6 +1221,8 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     )
                 }
+            } catch is any FatalRegistrySessionError {
+                return offlineVerdict
             } catch {
                 findings.append(
                     FirewallFinding(

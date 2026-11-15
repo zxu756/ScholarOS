@@ -54,48 +54,28 @@ public struct ScholarOSMain {
 
         // Mode 2: Headless CLI & JSON-RPC 2.0 MCP Server (unless `--demo` is passed alone to open GUI demo)
         if !userArgs.isEmpty && userArgs != ["--demo"] {
-            let cliLang = explicitCLILanguage ?? .en
             final class CLIResultBox: @unchecked Sendable {
-                var result: Result<CLIExecutionOutput, Error>?
+                var result: CLIProcessResult?
             }
             let box = CLIResultBox()
             let semaphore = DispatchSemaphore(value: 0)
 
             Task.detached {
-                do {
-                    let output = try await ScholarCLIRunner().run(arguments: rawUserArgs)
-                    box.result = .success(output)
-                } catch {
-                    box.result = .failure(error)
-                }
+                box.result = await ScholarCLIRunner().runWithExitStatus(arguments: rawUserArgs)
                 semaphore.signal()
             }
             semaphore.wait()
 
-            switch box.result {
-            case .success(let output):
-                if !output.stdout.isEmpty {
-                    print(output.stdout)
-                }
-                Foundation.exit(output.exitCode)
-            case .failure(let error as ScholarOSError):
-                let desc: String
-                switch error {
-                case .invalidCLIArguments(let detail) where cliLang == .zhHans:
-                    desc = "命令行参数错误：\(detail)"
-                case .fileNotFound(let path) where cliLang == .zhHans:
-                    desc = "未找到文件或工程路径：\(path)"
-                default:
-                    desc = error.localizedDescription
-                }
-                fputs("[\(error.errorCodeIdentifier)] \(desc)\n", stderr)
-                Foundation.exit(2)
-            case .failure(let error):
-                fputs("[ERR_RUNTIME] \(error.localizedDescription)\n", stderr)
-                Foundation.exit(2)
-            case .none:
+            guard let result = box.result else {
                 Foundation.exit(2)
             }
+            if !result.stderr.isEmpty {
+                fputs("\(result.stderr)\n", stderr)
+            }
+            if !result.stdout.isEmpty {
+                print(result.stdout)
+            }
+            Foundation.exit(result.exitCode)
         }
 
         // Mode 3: Interactive Native macOS SwiftUI Workstation (empty state by default; demo ONLY with `--demo`)

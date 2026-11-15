@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ScholarBibAndCSL
 import ScholarModels
 import ScholarProjectStore
 import ScholarPluginSDK
@@ -1180,5 +1181,335 @@ struct PluginSDKMCPAndShellTests {
         #expect(!mcpText.lowercased().contains("(offline)"))
         #expect(!mcpText.lowercased().contains("unverified offline"))
         #expect(!containsChineseCharacters(mcpText))
+    }
+
+    // MARK: - 8. M1 Item 9 CLI `--registry-record` and `--registry-replay` Tests
+
+    @Test("M1 item 9: --help documents --registry-record and --registry-replay in EN/ZH, and invalid flag combinations or missing dirs exit 2")
+    func m1Item9CLIHelpDocumentsRecordAndReplayAndRejectsInvalidFlagCombinationsWithExit2() async throws {
+        let runner = ScholarCLIRunner()
+        let helpEN = try await runner.execute(arguments: ["--help", "--lang", "en"])
+        let helpZH = try await runner.execute(arguments: ["--help", "--lang", "zh"])
+
+        #expect(helpEN.contains("--registry-record"))
+        #expect(helpEN.contains("--registry-replay"))
+        #expect(helpZH.contains("--registry-record"))
+        #expect(helpZH.contains("--registry-replay"))
+
+        let bibPath = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib").path
+        let tempDir = try makeTempDirectory(prefix: "scholaros-cli-flags")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let invalidRuns: [[String]] = [
+            ["verify-citations", bibPath, "--registry-record", tempDir.path, "--registry-replay", tempDir.path],
+            ["verify-citations", bibPath, "--offline", "--registry-replay", tempDir.path],
+            ["verify-citations", bibPath, "--offline", "--registry-record", tempDir.path],
+            ["verify-citations", "--demo", "--registry-replay", tempDir.path],
+            ["verify-citations", "--demo", "--registry-record", tempDir.path],
+            ["verify-citations", bibPath, "--registry-replay"],
+            ["verify-citations", bibPath, "--registry-record"],
+            ["verify-citations", bibPath, "--registry-replay", tempDir.appendingPathComponent("does-not-exist").path]
+        ]
+
+        for args in invalidRuns {
+            let result = await runner.runWithExitStatus(arguments: args)
+            #expect(result.exitCode == 2, "Expected exit code 2 for args \(args), got \(result.exitCode)")
+            #expect(!result.stderr.isEmpty)
+        }
+    }
+
+    @Test("M1 item 9: CLI --registry-replay emits REPLAY in text and JSON top-level, sends 0 transport calls, and exits 2 on miss or tampered manifest")
+    func m1Item9CLIReplayEmitsReplayMarkersExits2OnCorruptManifestOrMissAndNeverCallsTransport() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-cli-rec-replay")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fakeBibURL = tempDir.appendingPathComponent("fake-only.bib")
+        try """
+        @article{fake_nonsentinel,
+          author  = {Whitfield, Eleanor and Patel, Raj},
+          title   = {Quantum Gradient Descent in Biological Neural Networks},
+          journal = {Nature Machine Intelligence},
+          year    = {2025},
+          doi     = {10.1038/fake.2026.99999}
+        }
+        """.write(to: fakeBibURL, atomically: true, encoding: .utf8)
+
+        let recDir = tempDir.appendingPathComponent("recorded-404", isDirectory: true)
+        let stub404Transport = ClosureRegistrySession { _ in
+            RegistryHTTPResponse(
+                statusCode: 404,
+                body: Data("Resource not found.".utf8),
+                headers: [
+                    "Content-Type": "text/plain",
+                    "Date": "Sun, 15 Nov 2026 11:30:00 GMT"
+                ]
+            )
+        }
+
+        let recordRunner = ScholarCLIRunner(registryTransport: stub404Transport)
+        let recResult = await recordRunner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-record", recDir.path, "--lang", "en"]
+        )
+        #expect(recResult.exitCode == 1)
+        #expect(recResult.stdout.contains("NotFound=1"))
+        #expect(!recResult.stdout.contains("this version performs no online registry lookups"))
+        let recordedManifest = try JSONDecoder().decode(
+            RegistryRecordingManifest.self,
+            from: Data(contentsOf: recDir.appendingPathComponent("manifest.json"))
+        )
+        #expect(recordedManifest.count == 2)
+
+        actor SpyCounter {
+            var calls = 0
+            func recordCall() { calls += 1 }
+        }
+        let spyCounter = SpyCounter()
+        let spyTransport = ClosureRegistrySession { req in
+            await spyCounter.recordCall()
+            throw RegistryTransportError(kind: .transportError, detail: "Replay must never invoke live transport", url: req.url)
+        }
+        let replayRunner = ScholarCLIRunner(registryTransport: spyTransport)
+
+        // 1. Text replay carries prominent [REPLAY] marker and makes 0 transport calls
+        let textReplay = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-replay", recDir.path, "--lang", "en"]
+        )
+        #expect(textReplay.exitCode == 1)
+        #expect(textReplay.stdout.hasPrefix("[REPLAY]"))
+        #expect(textReplay.stdout.contains("NotFound=1"))
+        #expect(!containsChineseCharacters(textReplay.stdout))
+        #expect(await spyCounter.calls == 0)
+
+        // 2. JSON replay carries top-level REPLAY markers ("mode": "REPLAY", "replay": true) and makes 0 transport calls
+        let jsonReplay = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-replay", recDir.path, "--json", "--lang", "en"]
+        )
+        #expect(jsonReplay.exitCode == 1)
+        let parsedJSON = try JSONSerialization.jsonObject(with: Data(jsonReplay.stdout.utf8))
+        let topObj = try #require(parsedJSON as? [String: Any])
+        #expect(topObj["mode"] as? String == "REPLAY")
+        #expect(topObj["replay"] as? Bool == true)
+        #expect(topObj["notFoundCount"] as? Int == 1)
+        #expect(await spyCounter.calls == 0)
+
+        // 3. Unrecorded URL during replay exits 2, reports exact missing URL on stderr, and NEVER outputs UNVERIFIED
+        let missBibURL = tempDir.appendingPathComponent("miss.bib")
+        try """
+        @article{unrecorded_paper,
+          author  = {Kowalski, Marek},
+          title   = {Unrecorded Paper},
+          journal = {Nature},
+          year    = {2024},
+          doi     = {10.1038/unrecorded.2026.77777}
+        }
+        """.write(to: missBibURL, atomically: true, encoding: .utf8)
+
+        let missResult = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", missBibURL.path, "--registry-replay", recDir.path, "--lang", "en"]
+        )
+        #expect(missResult.exitCode == 2)
+        #expect(missResult.stderr.contains("https://api.crossref.org/works/10.1038/unrecorded.2026.77777"))
+        #expect(!missResult.stdout.contains("UNVERIFIED"))
+        #expect(await spyCounter.calls == 0)
+
+        // 4. Corrupting manifest.json SHA-256 exits 2
+        let manifestPath = recDir.appendingPathComponent("manifest.json")
+        let origManifest = try String(contentsOf: manifestPath, encoding: .utf8)
+        let tamperedManifest = origManifest.replacingOccurrences(
+            of: "\"sha256\" : \"",
+            with: "\"sha256\" : \"0000"
+        )
+        let altTampered = (tamperedManifest == origManifest)
+            ? origManifest.replacingOccurrences(of: "\"sha256\": \"", with: "\"sha256\": \"0000")
+            : tamperedManifest
+        try altTampered.write(to: manifestPath, atomically: true, encoding: .utf8)
+
+        let corruptResult = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-replay", recDir.path, "--lang", "en"]
+        )
+        #expect(corruptResult.exitCode == 2)
+        #expect(!corruptResult.stderr.isEmpty)
+        #expect(await spyCounter.calls == 0)
+    }
+
+    @Test("M1 item 9: real recorded fixtures in Tests/Fixtures/registry replay identically twice, pass URL/header hygiene, send 0 live requests, and exit 2 on byte corruption or missing recording")
+    func m1Item9RealRecordedRegistryFixturesReplayDeterministicallyEnforceIntegrityAndPassHygiene() async throws {
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let manifestURL = registryDir.appendingPathComponent("manifest.json")
+        #expect(FileManager.default.fileExists(atPath: manifestURL.path), "Missing recorded manifest at \(manifestURL.path)")
+
+        let manifestData = try Data(contentsOf: manifestURL)
+        let manifest = try JSONDecoder().decode(RegistryRecordingManifest.self, from: manifestData)
+        #expect(manifest.count > 0)
+        #expect(manifest.count == manifest.items.count)
+        #expect(manifest.totalHTTPRequestsSent <= 80)
+        #expect(manifest.userAgent == "ScholarOS/1.2.0")
+
+        // 1. Verify request URL and request headers in manifest.json and every .meta.json have no @, mailto, api_key, or local path
+        let forbiddenTokens = ["@", "%40", "mailto", "api_key", "apikey", "/users/", NSHomeDirectory().lowercased()]
+        for item in manifest.items {
+            let metaURL = registryDir.appendingPathComponent("\(item.slug).meta.json")
+            let metaItem = try JSONDecoder().decode(RegistryRecordedItem.self, from: Data(contentsOf: metaURL))
+            #expect(metaItem == item)
+            #expect(item.requestHeaders["User-Agent"] == "ScholarOS/1.2.0")
+
+            let lowerURL = item.url.lowercased()
+            let decodedLowerURL = (item.url.removingPercentEncoding ?? item.url).lowercased()
+            for token in forbiddenTokens where !token.isEmpty && token != "/" {
+                #expect(!lowerURL.contains(token), "Forbidden token '\(token)' in recorded URL \(item.url)")
+                #expect(!decodedLowerURL.contains(token), "Forbidden token '\(token)' in decoded URL \(item.url)")
+            }
+            for (hKey, hVal) in item.requestHeaders {
+                let lowerHKey = hKey.lowercased()
+                let lowerHVal = hVal.lowercased()
+                for token in forbiddenTokens where !token.isEmpty && token != "/" {
+                    #expect(!lowerHKey.contains(token), "Forbidden token '\(token)' in request header name \(hKey)")
+                    #expect(!lowerHVal.contains(token), "Forbidden token '\(token)' in request header value \(hVal)")
+                }
+            }
+
+            let rawBytes = try Data(contentsOf: registryDir.appendingPathComponent(item.rawFile))
+            #expect(rawBytes.count == item.byteLength)
+            #expect(RegistryCanonicalURL.sha256Hex(of: rawBytes) == item.sha256)
+        }
+
+        // 2. Replay twice with an injected spy transport that fails if ever called
+        actor SpyCounter {
+            var count = 0
+            func increment() { count += 1 }
+        }
+        let spyCounter = SpyCounter()
+        let spyTransport = ClosureRegistrySession { req in
+            await spyCounter.increment()
+            throw RegistryTransportError(kind: .transportError, detail: "Replay must not touch network transport", url: req.url)
+        }
+        let replayRunner = ScholarCLIRunner(registryTransport: spyTransport)
+        let bibPath = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib").path
+
+        let textRun1 = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        let textRun2 = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(textRun1.exitCode == 1)
+        #expect(textRun1 == textRun2)
+        #expect(textRun1.stdout.hasPrefix("[REPLAY]"))
+        #expect(!containsChineseCharacters(textRun1.stdout))
+
+        let jsonRun1 = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        let jsonRun2 = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(jsonRun1.exitCode == 1)
+        #expect(jsonRun2.exitCode == 1)
+
+        let top1 = try #require(try JSONSerialization.jsonObject(with: Data(jsonRun1.stdout.utf8)) as? [String: Any])
+        let top2 = try #require(try JSONSerialization.jsonObject(with: Data(jsonRun2.stdout.utf8)) as? [String: Any])
+        #expect(top1["mode"] as? String == "REPLAY")
+        #expect(top1["replay"] as? Bool == true)
+        #expect(top2["mode"] as? String == "REPLAY")
+        #expect(top2["replay"] as? Bool == true)
+
+        let report1 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(jsonRun1.stdout.utf8))
+        let report2 = try JSONDecoder().decode(CitationFirewallAuditReport.self, from: Data(jsonRun2.stdout.utf8))
+        #expect(report1.verdicts.count == 12)
+        #expect(report2.verdicts.count == 12)
+        for (v1, v2) in zip(report1.verdicts, report2.verdicts) {
+            #expect(v1.citeKey == v2.citeKey)
+            #expect(v1.firewallClass == v2.firewallClass)
+            #expect(v1.allowsManuscriptInsertion == v2.allowsManuscriptInsertion)
+            #expect(v1.auditNote == v2.auditNote)
+            #expect(v1.findings == v2.findings)
+        }
+
+        let byKey = Dictionary(uniqueKeysWithValues: report1.verdicts.map { ($0.citeKey, $0) })
+        #expect(byKey["real_lecun"]?.firewallClass == .verified)
+        #expect(byKey["real_lstm"]?.firewallClass == .verified)
+        #expect(byKey["real_watson"]?.firewallClass == .verified)
+        #expect(byKey["fake_nonsentinel"]?.firewallClass == .notFound)
+        #expect(byKey["fake_sentinel"]?.firewallClass == .notFound)
+        #expect(byKey["wrongtitle"]?.firewallClass == .drift)
+        #expect(byKey["wrongyear"]?.firewallClass == .drift)
+        #expect(byKey["wrongyear5"]?.firewallClass == .drift)
+        #expect(byKey["retracted_wakefield"]?.firewallClass == .retracted)
+
+        // Subset of the 3 real recorded entries exits 0 with Verified=3
+        let tempRoot = try makeTempDirectory(prefix: "scholaros-real-fixture-checks")
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let verifiedSubsetBib = tempRoot.appendingPathComponent("real3.bib")
+        let allBibLines = try String(contentsOfFile: bibPath, encoding: .utf8)
+            .split(separator: "\n", omittingEmptySubsequences: true)
+        let firstThreeLines = allBibLines.prefix(3).joined(separator: "\n") + "\n"
+        try firstThreeLines.write(to: verifiedSubsetBib, atomically: true, encoding: .utf8)
+        let subsetRes = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", verifiedSubsetBib.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(subsetRes.exitCode == 0)
+        #expect(subsetRes.stdout.contains("Evaluated=3 Verified=3"))
+
+        // 3. Corrupting 1 byte in a .raw file exits 2
+        let corruptDir = tempRoot.appendingPathComponent("corrupt-raw", isDirectory: true)
+        try FileManager.default.copyItem(at: registryDir, to: corruptDir)
+        let firstItem = try #require(manifest.items.first)
+        let targetRawURL = corruptDir.appendingPathComponent(firstItem.rawFile)
+        var corruptedBytes = try Data(contentsOf: targetRawURL)
+        corruptedBytes[corruptedBytes.count / 2] ^= 0xFF
+        try corruptedBytes.write(to: targetRawURL)
+
+        let corruptRes = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", corruptDir.path, "--lang", "en"]
+        )
+        #expect(corruptRes.exitCode == 2)
+        #expect(!corruptRes.stderr.isEmpty)
+        #expect(corruptRes.stdout.isEmpty)
+
+        // 4a. Deleting one recording (unrecorded miss at runtime) exits 2 and reports its exact URL
+        let missDir = tempRoot.appendingPathComponent("missing-entry-miss", isDirectory: true)
+        try FileManager.default.copyItem(at: registryDir, to: missDir)
+        let removedItem = try #require(manifest.items.first { $0.url.contains("10.1038/171737a0") } ?? manifest.items.first)
+        try FileManager.default.removeItem(at: missDir.appendingPathComponent(removedItem.rawFile))
+        try FileManager.default.removeItem(at: missDir.appendingPathComponent("\(removedItem.slug).meta.json"))
+        let remainingItems = manifest.items.filter { $0.slug != removedItem.slug }
+        var remainingMetaHashes = manifest.metaFilesSHA256
+        remainingMetaHashes?.removeValue(forKey: "\(removedItem.slug).meta.json")
+        let prunedManifest = RegistryRecordingManifest(
+            startedAt: manifest.startedAt,
+            completedAt: manifest.completedAt,
+            userAgent: manifest.userAgent,
+            count: remainingItems.count,
+            totalHTTPRequestsSent: remainingItems.count,
+            items: remainingItems,
+            metaFilesSHA256: remainingMetaHashes
+        )
+        let manifestEncoder = JSONEncoder()
+        manifestEncoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try manifestEncoder.encode(prunedManifest).write(to: missDir.appendingPathComponent("manifest.json"))
+
+        let missRes = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", missDir.path, "--lang", "en"]
+        )
+        #expect(missRes.exitCode == 2)
+        #expect(missRes.stderr.contains(removedItem.url))
+        #expect(missRes.stdout.isEmpty)
+        #expect(!missRes.stdout.contains("UNVERIFIED"))
+
+        // 4b. Deleting the .raw file directly without updating manifest.json also exits 2 and reports the URL
+        let deletedRawDir = tempRoot.appendingPathComponent("deleted-raw-file", isDirectory: true)
+        try FileManager.default.copyItem(at: registryDir, to: deletedRawDir)
+        try FileManager.default.removeItem(at: deletedRawDir.appendingPathComponent(removedItem.rawFile))
+
+        let deletedRawRes = await replayRunner.runWithExitStatus(
+            arguments: ["verify-citations", bibPath, "--registry-replay", deletedRawDir.path, "--lang", "en"]
+        )
+        #expect(deletedRawRes.exitCode == 2)
+        #expect(deletedRawRes.stderr.contains(removedItem.url))
+        #expect(deletedRawRes.stdout.isEmpty)
+
+        // 5. Confirm zero live transport requests were ever issued across all replay checks
+        #expect(await spyCounter.count == 0)
     }
 }

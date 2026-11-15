@@ -115,6 +115,13 @@ public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
         "x-ratelimit-cost-usd"
     ]
 
+    public static let recordingCapturedHeaderNames: [String] = defaultCapturedHeaderNames + [
+        "Date",
+        "x-ratelimit-limit",
+        "x-ratelimit-reset",
+        "x-ratelimit-credits-used"
+    ]
+
     private static let sharedEphemeralSession: URLSession = URLSession(
         configuration: makeEphemeralConfiguration(timeoutInterval: defaultTimeoutInterval)
     )
