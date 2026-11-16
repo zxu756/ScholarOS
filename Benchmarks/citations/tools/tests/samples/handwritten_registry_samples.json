@@ -1,0 +1,163 @@
+{
+  "_handwritten_sample": "Handwritten minimal OpenAlex and Crossref responses for offline unit tests in Benchmarks/citations/tools/tests/.",
+  "clean_crossref_example": {
+    "status": "ok",
+    "message-type": "work",
+    "message": {
+      "DOI": "10.1000/sample.clean.01",
+      "type": "journal-article",
+      "title": [
+        "Adaptive Graph Partitioning Under Dynamic Edge Weights"
+      ],
+      "container-title": [
+        "Journal of Graph Algorithms"
+      ],
+      "author": [
+        {
+          "given": "Elena",
+          "family": "Sánchez",
+          "sequence": "first"
+        },
+        {
+          "given": "Marcus",
+          "family": "Lindholm",
+          "sequence": "additional"
+        }
+      ],
+      "published-online": {
+        "date-parts": [
+          [2018, 11, 20]
+        ]
+      },
+      "published-print": {
+        "date-parts": [
+          [2019, 2, 1]
+        ]
+      },
+      "issued": {
+        "date-parts": [
+          [2018, 11, 20]
+        ]
+      },
+      "volume": "24",
+      "issue": "2",
+      "page": "105-128"
+    }
+  },
+  "skipped_crossref_examples": {
+    "missing_author": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.noauthor",
+        "type": "journal-article",
+        "title": ["Editorial Board Announcement"],
+        "container-title": ["Journal of Testing"],
+        "issued": {"date-parts": [[2020, 1]]}
+      }
+    },
+    "missing_family": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.nofamily",
+        "type": "journal-article",
+        "title": ["Notes on Anonymous Records"],
+        "container-title": ["Journal of Testing"],
+        "author": [{"given": "OnlyGiven", "sequence": "first"}],
+        "issued": {"date-parts": [[2020, 1]]}
+      }
+    },
+    "html_tag_in_title": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.html",
+        "type": "journal-article",
+        "title": ["Growth kinetics of <i>Bacillus subtilis</i> biofilms"],
+        "container-title": ["Microbial Studies"],
+        "author": [{"given": "Clara", "family": "Vogel", "sequence": "first"}],
+        "issued": {"date-parts": [[2021, 5]]}
+      }
+    },
+    "mathml_tag_in_title": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.mathml",
+        "type": "journal-article",
+        "title": ["Bounds on <mml:math><mml:mi>L</mml:mi></mml:math>-functions"],
+        "container-title": ["Analytic Number Theory"],
+        "author": [{"given": "Pavel", "family": "Novak", "sequence": "first"}],
+        "issued": {"date-parts": [[2019, 9]]}
+      }
+    },
+    "not_journal_article": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.chapter",
+        "type": "book-chapter",
+        "title": ["Chapter Three: Convex Relaxations"],
+        "container-title": ["Handbook of Optimization"],
+        "author": [{"given": "Hannah", "family": "Berg", "sequence": "first"}],
+        "issued": {"date-parts": [[2017, 3]]}
+      }
+    },
+    "missing_issued_year": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.1000/skip.noyear",
+        "type": "journal-article",
+        "title": ["Forthcoming Preprint Without Issued Date"],
+        "container-title": ["Journal of Testing"],
+        "author": [{"given": "Omar", "family": "Farouk", "sequence": "first"}],
+        "issued": {"date-parts": [[null]]}
+      }
+    }
+  },
+  "retraction_examples": {
+    "updated_by_retracted": {
+      "status": "ok",
+      "message": {
+        "DOI": "10.7701/ret.alpha.01",
+        "type": "journal-article",
+        "title": ["RETRACTED: Thermal Stability of Layered Perovskite Films"],
+        "container-title": ["Materials Letters Synthetic"],
+        "author": [
+          {"given": "Lukas", "family": "Bauer", "sequence": "first"},
+          {"given": "Mei", "family": "Lin", "sequence": "additional"}
+        ],
+        "issued": {"date-parts": [[2020, 4, 12]]},
+        "volume": "15",
+        "page": "44-52",
+        "updated-by": [
+          {
+            "DOI": "10.7701/notice.alpha.01",
+            "type": "retraction",
+            "label": "Retraction"
+          }
+        ]
+      }
+    },
+    "openalex_retracted_true": {
+      "id": "https://openalex.org/W9900001",
+      "doi": "https://doi.org/10.7702/ret.beta.01",
+      "title": "Catalytic Reduction of Nitrate in Brackish Water",
+      "publication_year": 2019,
+      "is_retracted": true
+    },
+    "openalex_retracted_false": {
+      "id": "https://openalex.org/W9900002",
+      "doi": "https://doi.org/10.7703/unretracted.01",
+      "title": "Unretracted Target Work",
+      "publication_year": 2019,
+      "is_retracted": false
+    }
+  },
+  "doi_handle_examples": {
+    "registered": {
+      "responseCode": 1,
+      "handle": "10.1000/existing"
+    },
+    "unregistered": {
+      "responseCode": 100,
+      "handle": "10.1000/missing"
+    }
+  }
+}

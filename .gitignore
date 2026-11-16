@@ -12,3 +12,5 @@ DerivedData/
 *-shm
 *.sqlite
 *.db
+__pycache__/
+*.py[cod]
