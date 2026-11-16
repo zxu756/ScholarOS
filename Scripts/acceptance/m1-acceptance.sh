@@ -537,6 +537,8 @@ r7 = pt["row7_real_verified_rates"]
 comb = r7["real_three_insertable"]
 rc = r7["real_clean"]
 print(f"combined_insertable={comb['numerator']}/{comb['denominator']} ({comb['rate']*100:.2f}%) real_clean={rc['numerator']}/{rc['denominator']} ({rc['rate']*100:.2f}%) passed={r7['passed']}")
+for item in r7.get("real_three_non_verified_entries", []):
+    print(f"  non_verified: {item['key']} verdict={item['verdict']} reasons={item['reasons']}")
 sys.exit(0 if r7["passed"] else 1)
 PY
 )"

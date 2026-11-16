@@ -80,7 +80,7 @@ TRANSIENT_UNVERIFIED_REASONS = frozenset({
     "unparseable",
 })
 REAL_THREE_GROUPS: Tuple[str, ...] = ("real_clean", "real_human", "real_typo")
-YEAR_ONLINE_VS_PRINT_SUBSTRING = "online-first vs. print-issue"
+YEAR_ONLINE_VS_PRINT_SUBSTRING = "online-first vs. print"
 HTTP_LINE_RE = re.compile(
     r"^\[HTTP\]\s+source=(?P<source>\S+)\s+url=(?P<url>\S+)\s+status=(?P<status>\S+)"
     r"\s+elapsed=(?P<elapsed>\S+)\s+origin=(?P<origin>\S+)"
@@ -297,6 +297,33 @@ def _rate_obj(numerator: int, denominator: int) -> Dict[str, Any]:
     }
 
 
+def _is_verified_with_venue_hint(rec: Dict[str, Any]) -> bool:
+    if rec.get("verdict") != "VERIFIED":
+        return False
+    return any(
+        f.get("field") == "venue" and f.get("severity", "advisory") != "error"
+        for f in (rec.get("fields") or [])
+    )
+
+
+def _collect_real_three_non_verified_entries(
+    records_by_group: Dict[str, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for g in REAL_THREE_GROUPS:
+        for r in records_by_group.get(g, []):
+            if r.get("truth") == "real" and r.get("verdict") != "VERIFIED":
+                out.append(
+                    {
+                        "key": r["key"],
+                        "group": r["group"],
+                        "verdict": r["verdict"],
+                        "reasons": list(r["reasons"]),
+                    }
+                )
+    return out
+
+
 def _compute_metrics_bundle(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     cm = _empty_confusion_matrix()
     verdict_counts = {v: 0 for v in VERDICT_COLUMNS}
@@ -304,6 +331,7 @@ def _compute_metrics_bundle(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]
 
     allow_total = 0
     allow_insertable_true = 0
+    verified_with_venue_hint_count = 0
     insertable_true_total = 0
     insertable_false_total = 0
 
@@ -341,6 +369,8 @@ def _compute_metrics_bundle(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]
             allow_total += 1
             if insertable:
                 allow_insertable_true += 1
+            if _is_verified_with_venue_hint(rec):
+                verified_with_venue_hint_count += 1
         elif verdict in ("DRIFT", "NOT_FOUND", "RETRACTED"):
             block_total += 1
             if truth != "real":
@@ -361,6 +391,7 @@ def _compute_metrics_bundle(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]
     return {
         "total_entries": total,
         "verdict_counts": verdict_counts,
+        "verified_with_venue_hint_count": verified_with_venue_hint_count,
         "confusion_matrix": cm,
         "allow_precision": _rate_obj(allow_insertable_true, allow_total),
         "allow_recall": _rate_obj(allow_insertable_true, insertable_true_total),
@@ -708,22 +739,12 @@ def _evaluate_gates(
     row6_rate_obj = _rate_obj(len(row6_false_nf_ret), len(real3_recs))
     row6_pass = (row6_rate_obj["rate"] is not None) and (row6_rate_obj["rate"] <= 0.02)
 
-    # Row 7: real three groups VERIFIED rate (insertable==True entries in real3, and raw 220 count)
-    real3_insertable = [r for r in real3_recs if r["insertable"]]
-    real3_verified_ins = sum(1 for r in real3_insertable if r["verdict"] == "VERIFIED")
+    # Row 7: real three groups VERIFIED rate (truth=='real' entries across real_clean, real_human, real_typo; plus raw 220 count)
+    real3_truth_real = [r for r in real3_recs if r["truth"] == "real"]
+    real3_verified_ins = sum(1 for r in real3_truth_real if r["verdict"] == "VERIFIED")
     real3_verified_all = sum(1 for r in real3_recs if r["verdict"] == "VERIFIED")
-    real3_non_verified = [
-        {
-            "key": r["key"],
-            "group": r["group"],
-            "verdict": r["verdict"],
-            "reasons": r["reasons"],
-            "insertable": r["insertable"],
-        }
-        for r in real3_recs
-        if r["verdict"] != "VERIFIED"
-    ]
-    row7_combined_rate = _rate_obj(real3_verified_ins, len(real3_insertable))
+    real3_non_verified = _collect_real_three_non_verified_entries(records_by_group)
+    row7_combined_rate = _rate_obj(real3_verified_ins, len(real3_truth_real))
     row7_combined_all220_rate = _rate_obj(real3_verified_all, len(real3_recs))
 
     rc_verified = sum(1 for r in rc_recs if r["verdict"] == "VERIFIED")
@@ -1055,6 +1076,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "replay_misses": [],
             "overall_metrics": None,
             "selected_metrics": None,
+            "real_three_non_verified_entries": [],
             "per_group": {},
         }
         with open(report_path, "w", encoding="utf-8", newline="\n") as out_f:
@@ -1350,6 +1372,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "expected_group_count": GROUP_COUNTS[g],
                 "selected_count": len(sel_keys),
                 "evaluated_count": 0,
+                "verified_with_venue_hint_count": None,
                 "metrics": None,
                 "unexpected_entries": [],
             }
@@ -1417,6 +1440,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "selected_count": len(sel_keys),
             "evaluated_count": len(g_records),
             "verdict_counts": g_metrics["verdict_counts"],
+            "verified_with_venue_hint_count": g_metrics["verified_with_venue_hint_count"],
             "confusion_matrix": g_metrics["confusion_matrix"],
             "in_expected": g_metrics["in_expected"],
             "unverified": g_metrics["unverified"],
@@ -1495,6 +1519,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     elif selected_metrics is not None:
         recorded_only["unverified"] = selected_metrics["unverified"]
 
+    real_three_non_verified_entries = _collect_real_three_non_verified_entries(
+        records_by_group
+    )
+
     report_obj: Dict[str, Any] = {
         "date": date_str,
         "generated_at": iso_now,
@@ -1522,6 +1550,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "identifier_breakdown": identifier_breakdown,
         "hard_requirements": hard_requirements,
         "provisional_thresholds": provisional_thresholds,
+        "real_three_non_verified_entries": real_three_non_verified_entries,
         "recorded_only": recorded_only,
         "per_group": per_group_report,
     }
@@ -1541,29 +1570,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     if manifest_sha256:
         print(f"recordings/manifest.json sha256={manifest_sha256} (items={manifest_count})")
-    print("-" * 92)
+    print("-" * 100)
     print(
-        "%-18s %6s %5s %5s %5s %5s %5s %10s  %s"
-        % ("group", "eval", "VER", "DRF", "NF", "RET", "UNV", "in_expect", "status")
+        "%-18s %6s %5s %6s %5s %5s %5s %5s %10s  %s"
+        % ("group", "eval", "VER", "v_hint", "DRF", "NF", "RET", "UNV", "in_expect", "status")
     )
-    print("-" * 92)
+    print("-" * 100)
     for g in target_groups:
         gp = per_group_report[g]
         if gp["status"] != "OK":
             print(
-                "%-18s %6s %5s %5s %5s %5s %5s %10s  %s"
-                % (g, f"0/{gp['selected_count']}", "-", "-", "-", "-", "-", "-", gp["status"])
+                "%-18s %6s %5s %6s %5s %5s %5s %5s %10s  %s"
+                % (g, f"0/{gp['selected_count']}", "-", "-", "-", "-", "-", "-", "-", gp["status"])
             )
             continue
         vc = gp["verdict_counts"]
         ie = gp["in_expected"]
         ie_pct = f"{ie['rate'] * 100:.1f}%" if ie["rate"] is not None else "n/a"
         print(
-            "%-18s %6d %5d %5d %5d %5d %5d %10s  %s"
+            "%-18s %6d %5d %6d %5d %5d %5d %5d %10s  %s"
             % (
                 g,
                 gp["evaluated_count"],
                 vc["VERIFIED"],
+                gp["verified_with_venue_hint_count"],
                 vc["DRIFT"],
                 vc["NOT_FOUND"],
                 vc["RETRACTED"],
@@ -1572,7 +1602,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 gp["status"],
             )
         )
-    print("-" * 92)
+    print("-" * 100)
 
     if replay_misses:
         print(f"\nReplay misses ({len(replay_misses)} group(s)):")
@@ -1591,6 +1621,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         bp = active_metrics["block_precision"]
         br = active_metrics["block_recall"]
         unv = active_metrics["unverified"]
+        vh_cnt = active_metrics["verified_with_venue_hint_count"]
         ap_s = f"{ap['rate'] * 100:.2f}%" if ap["rate"] is not None else "n/a (0 VERIFIED)"
         ar_s = f"{ar['rate'] * 100:.2f}%" if ar["rate"] is not None else "n/a"
         bp_s = f"{bp['rate'] * 100:.2f}%" if bp["rate"] is not None else "n/a"
@@ -1598,7 +1629,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         unv_s = f"{unv['rate'] * 100:.2f}%" if unv["rate"] is not None else "n/a"
         metrics_heading = "Overall Metrics (480/480)" if complete else "Selected Slice Metrics (partial, complete=false)"
         print(f"\n{metrics_heading}:")
-        print(f"  Allow (VERIFIED): precision={ap['numerator']}/{ap['denominator']} ({ap_s}), recall={ar['numerator']}/{ar['denominator']} ({ar_s})")
+        print(f"  Allow (VERIFIED): precision={ap['numerator']}/{ap['denominator']} ({ap_s}), recall={ar['numerator']}/{ar['denominator']} ({ar_s}), verified_with_venue_hint={vh_cnt}")
         print(f"  Block (DRIFT/NOT_FOUND/RETRACTED vs truth!=real): precision={bp['numerator']}/{bp['denominator']} ({bp_s}), recall={br['numerator']}/{br['denominator']} ({br_s})")
         print(f"  Unverified: {unv['count']}/{active_metrics['total_entries']} ({unv_s}) by_reason={unv['by_reason']}")
         print(f"  Hard gate (non-insertable VERIFIED == 0): count={hard_requirements['non_insertable_verified_count']} passed={hard_requirements['passed']}")
@@ -1607,6 +1638,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(
                 f"  Identifierless entries: total={no_id['total_entries']} verdicts={no_id['verdict_counts']} "
                 f"in_expected={no_id['in_expected']['numerator']}/{no_id['in_expected']['denominator']}"
+            )
+
+    # Row 7 helper: list non-VERIFIED entries among truth == 'real' in (real_clean, real_human, real_typo)
+    evaluated_real_three_truth_real = sum(
+        1
+        for g in REAL_THREE_GROUPS
+        for r in records_by_group.get(g, [])
+        if r.get("truth") == "real"
+    )
+    if any(g in records_by_group for g in REAL_THREE_GROUPS):
+        if real_three_non_verified_entries:
+            print(
+                f"\nReal three groups (truth=real) non-VERIFIED entries ({len(real_three_non_verified_entries)}/{evaluated_real_three_truth_real}):"
+            )
+            for item in real_three_non_verified_entries:
+                print(
+                    f"  - [{item['group']}] {item['key']}: verdict={item['verdict']} reasons={item['reasons']}"
+                )
+        else:
+            print(
+                f"\nReal three groups (truth=real) non-VERIFIED entries: 0/{evaluated_real_three_truth_real}"
             )
 
     # Print all entries outside gold.jsonl `expected`
