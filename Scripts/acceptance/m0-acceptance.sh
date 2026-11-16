@@ -49,12 +49,15 @@ REPORT_FILE="$REPORT_DIR/m0-acceptance.txt"
 
 export SCHOLAR_SANDBOX_HOME="$WORK/home"
 mkdir -p "$SCHOLAR_SANDBOX_HOME"
+# shellcheck source=Scripts/acceptance/lib-cli-guard.sh
+source "$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
 if [[ -z "${SCHOLAR_CLI_BIN:-}" ]]; then
     export SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS"
     swift build >/dev/null
+elif [[ ! -x "$SCHOLAR_CLI_BIN" ]]; then
+    echo "FAIL: SCHOLAR_CLI_BIN is not an executable file: $SCHOLAR_CLI_BIN" >&2
+    exit 2
 fi
-# shellcheck source=Scripts/acceptance/lib-cli-guard.sh
-source "$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
 
 # Fictional IEEEtran-style sample manuscript that lives in this repository (see its header comment).
 FIXTURE_REL="Fixtures/sample-ieeetran-manuscript.tex"
@@ -222,10 +225,17 @@ run_named_unit_test() {
     # ------------------------------------------------------------------
     echo "== [Row 4] sandbox-exec deny network* scholaros verify-citations $BIB_FIXTURE_REL, no --offline (--lang en & --lang zh) =="
     set +e
-    SANDBOX_EN_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang en 2>&1)"
-    SANDBOX_EN_EXIT=$?
-    SANDBOX_ZH_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
-    SANDBOX_ZH_EXIT=$?
+    if [[ "${SCHOLAR_OUTER_NO_NETWORK:-0}" == "1" ]]; then
+        SANDBOX_EN_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang en 2>&1)"
+        SANDBOX_EN_EXIT=$?
+        SANDBOX_ZH_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
+        SANDBOX_ZH_EXIT=$?
+    else
+        SANDBOX_EN_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang en 2>&1)"
+        SANDBOX_EN_EXIT=$?
+        SANDBOX_ZH_OUT="$(HOME="$SCHOLAR_SANDBOX_HOME" CFFIXED_USER_HOME="$SCHOLAR_SANDBOX_HOME" sandbox-exec -p '(version 1)(allow default)(deny network*)' "$SCHOLAR_CLI_BIN" verify-citations "$WORK/refs.bib" --lang zh 2>&1)"
+        SANDBOX_ZH_EXIT=$?
+    fi
     REPLAY_EN_OUT="$(scholaros verify-citations "$WORK/refs.bib" --registry-replay "$REPO_ROOT/Tests/Fixtures/registry" --lang en 2>&1)"
     REPLAY_EN_EXIT=$?
     REPLAY_ZH_OUT="$(scholaros verify-citations "$WORK/refs.bib" --registry-replay "$REPO_ROOT/Tests/Fixtures/registry" --lang zh 2>&1)"

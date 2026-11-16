@@ -59,6 +59,10 @@ mkdir -p "$SCHOLAR_SANDBOX_HOME"
 # README replay looks the executable up on PATH exactly as the README tells the reader to.
 unset SCHOLAR_CLI_BIN
 GUARD_LIB="$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
+# Validate SCHOLAR_OUTER_NO_NETWORK=1 (exits 2 if not actually inside a network-denying sandbox)
+# and detect outer sandbox so child swift / test.sh invocations pass --disable-sandbox.
+# shellcheck source=Scripts/acceptance/lib-cli-guard.sh
+source "$GUARD_LIB"
 
 README_FILES=("README.md" "README.zh-CN.md")
 
@@ -106,6 +110,19 @@ command_lines_only() {
         exit 1
     fi
     echo "command_lines_identical=true"
+    if ! grep -q -E 'ScholarOS[[:space:]]+verify-citations[[:space:]].*--offline' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS verify-citations ... --offline' example"
+        exit 1
+    fi
+    if ! grep -q -E 'ScholarOS[[:space:]]+verify-citations[[:space:]].*--registry-replay[[:space:]]+Tests/Fixtures/registry' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS verify-citations ... --registry-replay Tests/Fixtures/registry' example"
+        exit 1
+    fi
+    if grep -E 'ScholarOS[[:space:]]+verify-citations[[:space:]]' "$WORK/README.md.commands.txt" | grep -v -E -- '(--offline|--registry-replay)'; then
+        echo "FAIL: every 'ScholarOS verify-citations' command in README must pass --offline or --registry-replay so replay never touches the network"
+        exit 1
+    fi
+    echo "verify_citations_offline_and_replay_examples_present=true"
     echo ""
 
     for README_FILE in "${README_FILES[@]}"; do
@@ -119,13 +136,18 @@ command_lines_only() {
             cat "$WORK/$README_FILE.blocks.sh"
         } > "$WORK/replay.sh"
         set +e
-        bash "$WORK/replay.sh" 2>&1
+        bash "$WORK/replay.sh" > "$WORK/$README_FILE.replay.out" 2>&1
         REPLAY_EXIT=$?
         set -e
+        cat "$WORK/$README_FILE.replay.out"
         echo ""
         echo "replay_exit[$README_FILE]=$REPLAY_EXIT"
         if [[ "$REPLAY_EXIT" -ne 0 ]]; then
             echo "FAIL: replaying the code blocks of $README_FILE exited with $REPLAY_EXIT"
+            exit 1
+        fi
+        if ! grep -q '^\[REPLAY' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not emit [REPLAY] banner from verify-citations --registry-replay"
             exit 1
         fi
         echo ""

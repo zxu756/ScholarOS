@@ -4,7 +4,7 @@
 
 面向 macOS 的 Swift 包与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供 LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、公开学术注册库引文核查、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
 
-> **当前状态说明（M1 进行中）：** `scholaros verify-citations`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、`scholaros cite` 与 MCP `scholar_cite_key` 共用同一引文核查函数，默认联网查询公开学术注册库（Crossref、OpenAlex、`doi.org`、arXiv、PubMed），带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），`--no-cache` 跳过缓存读写，忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，写回条目的结论按 30 天（`NOT_FOUND` 为 1 天）过期。M1 仅余 480 条基准集（`Benchmarks/citations/`）评测与验收脚本尚在进行中。macOS 桌面窗口启动默认为空，当前**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**。
+> **当前状态说明（M1 进行中）：** `scholaros verify-citations`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、`scholaros cite` 与 MCP `scholar_cite_key` 共用同一引文核查函数，默认联网查询公开学术注册库（Crossref、OpenAlex、`doi.org`、arXiv、PubMed），带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），`--registry-record <目录>`（可配 `--registry-record-limit <N>`）录制真实响应，`--no-cache` 跳过缓存读写，忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，写回条目的结论按 30 天（`NOT_FOUND` 为 1 天）过期。M1 尚待完成 480 条基准集（`Benchmarks/citations/`）的全量响应录制与联网指标生成。macOS 桌面窗口启动默认为空，当前**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**。
 
 ---
 
@@ -17,6 +17,7 @@
 - **引文核查（`scholaros verify-citations`、`scholaros cache clear`）**：使用五类状态（`VERIFIED`、`DRIFT`、`NOT_FOUND`、`RETRACTED`、`UNVERIFIED`），支持 `--lang en`、`--lang zh` 与 `--json` 输出：
   - 默认联网查询 Crossref、OpenAlex、`doi.org`、arXiv 与 PubMed，并将可缓存响应写入本地 SQLite（默认 `~/Library/Caches/ScholarOS/registry.sqlite`，或 `$SCHOLAR_CACHE_DIR/registry.sqlite`）；`--no-cache` 本次运行不读写缓存，`scholaros cache clear` 删除当前生效位置的 `registry.sqlite`（含 `-wal`/`-shm`），`--verbose` 每查一次向标准错误输出一行（数据源、地址、状态码、耗时与来源）。
   - `--offline` 不发任何网络请求且不读写缓存，仅检查标识符格式与不完整的 8 条内置撤稿 DOI 名单（`--lang zh` 下注明 `内置名单，不完整`，`--lang en` 下为 `built-in list, incomplete`）；未联网查询的合法标识符标为 `UNVERIFIED`。
+  - `--registry-record <目录>` 联网查询公开注册库（默认读写缓存，加 `--no-cache` 跳过缓存），将原始响应字节、元数据与 SHA-256 `manifest.json` 写入 `<目录>`，已录过的地址直接复用；`--registry-record-limit <N>`（正整数，默认 `80`，只能与 `--registry-record` 一起使用）限制本次运行最多新发出的请求数。
   - `--registry-replay <目录>` 从 SHA-256 校验通过的本地录制目录离线回放（不发网络请求；默认不读写缓存，仅在显式设置 `SCHOLAR_CACHE_DIR` 时读写该目录缓存，绝不触碰默认缓存目录），输出带 `REPLAY` 标记。
   - 语法格式损坏的标识符标为 `NOT_FOUND`（`invalid_identifier`）；`10.0000/`、`10.1234/`、`10.9999/` 等前缀在 ISO 26324 语法上合法，不在离线阶段直接判为不存在。
   - 退出码：全部 `VERIFIED` 返回 `0`；存在 `DRIFT`、`NOT_FOUND` 或 `RETRACTED` 返回 `1`；无上述三类但存在 `UNVERIFIED` 返回 `3`；参数、文件不存在、BibTeX 解析失败或回放错误返回 `2`。
@@ -103,7 +104,7 @@ Scripts/test.sh scope ScholarBibAndCSL
 ## 当前边界与后续计划
 
 - **桌面端界面（不带子命令运行 `ScholarOS`）**：默认打开空白窗口（`0` 份手稿、`0` 条文献），当前尚不能直接打开用户本地 `.tex`、`.bib` 或 `.pdf` 文件，**仅在传入 `--demo` 或点击“载入演示数据”时查看内置未核查示例数据**（顶部带有 `DEMO / 演示数据` 横幅）。
-- **M1 剩余项（联网引文核验）**：在 480 条标注基准集（`Benchmarks/citations/`）上评测准确率与误拒率，并接入 M1 验收脚本。
+- **M1 剩余项（联网引文核验）**：完成 480 条标注基准集（`Benchmarks/citations/`）全部 12 组的响应录制，并运行联网评测（`Scripts/acceptance/m1-citation-bench.py --live`）生成第一屏指标数字。
 - **M2 计划（解析器、PDF 切分与 CiteStudio 对齐）**：完善 LaTeX `\verb`、`verbatim`、`lstlisting`、`\url{%}` 与 `\bibitem` 解析；支持 BibTeX 单条语法错误后的恢复解析；修复 APA 标题大小写与 IEEE 专著格式；改进双栏 PDF 章节标题与跨栏表格切分；暴露与 CiteStudio 对齐的 MCP 工具名称。
 - **冻结模块（尚未完成端到端验收，M3 之后再议）**：引文图谱分析（力导向布局、PageRank、Louvain 聚类、Kleinberg 突现检测、主路径分析）、PRISMA 筛查界面、偏倚风险与 Meta 分析界面、Myers 修订追踪界面、投稿归档打包器、Zotero SQLite 桥接、Typst 支持、`JavaScriptCore` 审稿插件、持久化撤销/重做以及仅用于测试的合成 PDF 生成器。
 
