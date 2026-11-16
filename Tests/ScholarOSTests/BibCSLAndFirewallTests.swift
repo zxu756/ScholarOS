@@ -5282,4 +5282,179 @@ struct BibCSLAndFirewallTests {
             #expect(v.reasons.contains("title_mismatch"))
         }
     }
+
+    @Test("M1 stage 12 (S57): Crossref and OpenAlex HTML entities (&amp;, &lt;, &gt;, &quot;, &#39;, decimal, hex) are decoded for both comparison and display, including real_human_012 recording")
+    func m1Stage12S57HTMLEntityDecodingInCrossrefAndOpenAlexComparisonAndDisplay() async throws {
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+
+        // 1. Replay real_human_012 ("Industrial &amp; Engineering Chemistry Research" in recorded Crossref JSON)
+        let rh012Entries = try loadBenchmarkEntries(group: "real_human", keys: ["real_human_012"])
+        #expect(rh012Entries.count == 1)
+
+        let rh012EN = try await CitationVerificationFirewall.verifyBibliography(
+            entries: rh012Entries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let vEN = try #require(rh012EN.report.verdicts.first)
+        #expect(vEN.firewallClass == .verified)
+        let venueEN = try #require(vEN.fields.first { $0.field == "venue" })
+        #expect(venueEN.localValue == "Ind. Eng. Chem.")
+        #expect(venueEN.remoteValue == "Industrial & Engineering Chemistry Research")
+        #expect(!venueEN.remoteValue.contains("&amp;"))
+        #expect(!vEN.auditNote.contains("&amp;"))
+        #expect(vEN.auditNote.contains("Industrial & Engineering Chemistry Research"))
+        #expect(vEN.findings.contains {
+            $0.field == "venue"
+                && $0.detail.contains("Industrial & Engineering Chemistry Research")
+                && !$0.detail.contains("&amp;")
+        })
+
+        let rh012ZH = try await CitationVerificationFirewall.verifyBibliography(
+            entries: rh012Entries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .zhHans
+        )
+        let vZH = try #require(rh012ZH.report.verdicts.first)
+        let venueZH = try #require(vZH.fields.first { $0.field == "venue" })
+        #expect(venueZH.remoteValue == "Industrial & Engineering Chemistry Research")
+        #expect(!(venueZH.note ?? "").contains("&amp;"))
+
+        // Also verify comparison uses decoded venue: if local journal is "Industrial & Engineering Chemistry Research",
+        // it matches real_human_012's recorded Crossref container-title with NO venue hint.
+        let fullJournalEntry = BibliographyEntry(
+            citeKey: "rh012_decoded_match",
+            kind: .article,
+            title: "110th anniversary: continuum modeling of granular mixing in a rotating drum",
+            authors: [
+                BibAuthor(givenName: "Qijun", familyName: "Zheng"),
+                BibAuthor(givenName: "Liang", familyName: "Bai"),
+                BibAuthor(givenName: "Liuyimei", familyName: "Yang"),
+                BibAuthor(givenName: "Aibing", familyName: "Yu")
+            ],
+            year: 2019,
+            venue: "Industrial & Engineering Chemistry Research",
+            doi: "10.1021/acs.iecr.9b03642"
+        )
+        let fullJournalResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: [fullJournalEntry],
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let vFull = try #require(fullJournalResult.report.verdicts.first)
+        #expect(vFull.firewallClass == .verified)
+        #expect(!vFull.fields.contains { $0.field == "venue" })
+
+        // 2. Verify Crossref & OpenAlex string fields (title, subtitle, venue, author) decode named, decimal, and hex entities
+        // in DRIFT display and comparison (including '<' from &lt; not swallowing subsequent words as an HTML tag)
+        let crossrefEntityPayload = """
+        {"status":"ok","message":{
+          "DOI":"10.1000/s57.crossref",
+          "title":["Bounds for 0 &lt; x &amp; x &gt; -1 in &quot;Fast&quot; &#39;Models&#39;"],
+          "subtitle":["Revisiting &#x00E9;tale &#8217;s Approach"],
+          "container-title":["Journal of A &amp; B &#39;Systems&#39;"],
+          "author":[{"given":"Ren&#x00E9;","family":"O&#39;Connor","sequence":"first"}],
+          "issued":{"date-parts":[[2021]]}
+        }}
+        """
+        let oaNotRetracted = #"{"id":"https://openalex.org/W1","doi":"https://doi.org/10.1000/s57.crossref","title":"Bounds","publication_year":2021,"is_retracted":false,"authorships":[{"raw_author_name":"Rene O'Connor"}]}"#
+
+        let openAlexEntityPayload = """
+        {"id":"https://openalex.org/W2",
+         "doi":"https://doi.org/10.1000/s57.openalex",
+         "title":"A &amp; B &lt; C &gt; D &quot;Quoted&quot; &#39;Single&#39; &#65; &#x0042;",
+         "publication_year":2022,
+         "is_retracted":false,
+         "primary_location":{"source":{"display_name":"Materials &amp; Design &#39;Letters&#39;"}},
+         "authorships":[{"raw_author_name":"Jean-Luc D&#39;Arcy"}]}
+        """
+
+        struct StaticEntityMockSession: CitationRegistrySession {
+            let responses: [String: (Int, String)]
+            func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
+                guard let url = request.url?.absoluteString, let hit = responses[url] else {
+                    return RegistryHTTPResponse(statusCode: 404, body: Data("Not found".utf8), headers: [:], origin: .network)
+                }
+                return RegistryHTTPResponse(
+                    statusCode: hit.0,
+                    body: Data(hit.1.utf8),
+                    headers: ["content-type": "application/json"],
+                    origin: .network
+                )
+            }
+        }
+
+        let session = StaticEntityMockSession(responses: [
+            "https://api.crossref.org/works/10.1000/s57.crossref": (200, crossrefEntityPayload),
+            "https://api.openalex.org/works/https://doi.org/10.1000/s57.crossref": (200, oaNotRetracted),
+            "https://api.crossref.org/works/10.1000/s57.openalex": (404, "Not found"),
+            "https://api.openalex.org/works/https://doi.org/10.1000/s57.openalex": (200, openAlexEntityPayload)
+        ])
+        let firewall = CitationVerificationFirewall()
+
+        // Crossref DRIFT check: wrong year triggers DRIFT while title+subtitle (including 0 < x) and O'Connor author match!
+        // And mismatched local entry displays decoded title, author, and venue without raw HTML entities.
+        let crYearOnlyDrift = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "s57_cr_cmp",
+                kind: .article,
+                title: "Bounds for 0 < x & x > -1 in \"Fast\" 'Models': Revisiting étale ’s Approach",
+                authors: [BibAuthor(givenName: "René", familyName: "O'Connor")],
+                year: 2018,
+                venue: "Journal of A & B 'Systems'",
+                doi: "10.1000/s57.crossref"
+            ),
+            session: session
+        )
+        #expect(crYearOnlyDrift.firewallClass == .drift)
+        #expect(crYearOnlyDrift.reasons == ["year_mismatch"], "Title (with < and subtitle), author (O'Connor), and venue (& and ') must match after entity decoding; got reasons=\(crYearOnlyDrift.reasons)")
+
+        let crDisplayDrift = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "s57_cr_disp",
+                kind: .article,
+                title: "Completely Different Title",
+                authors: [BibAuthor(givenName: "Jane", familyName: "Smith")],
+                year: 2018,
+                venue: "Wrong Venue",
+                doi: "10.1000/s57.crossref"
+            ),
+            session: session
+        )
+        #expect(crDisplayDrift.firewallClass == .drift)
+        let crTitleRemote = try #require(crDisplayDrift.fields.first { $0.field == "title" })
+        #expect(crTitleRemote.remoteValue == "Bounds for 0 < x & x > -1 in \"Fast\" 'Models'")
+        let crAuthorRemote = try #require(crDisplayDrift.fields.first { $0.field == "firstAuthor" })
+        #expect(crAuthorRemote.remoteValue == "O'Connor")
+        let crVenueRemote = try #require(crDisplayDrift.fields.first { $0.field == "venue" })
+        #expect(crVenueRemote.remoteValue == "Journal of A & B 'Systems'")
+
+        // OpenAlex DRIFT check: decoded display & comparison
+        let oaDisplayDrift = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "s57_oa_disp",
+                kind: .article,
+                title: "Different Title",
+                authors: [BibAuthor(givenName: "Jane", familyName: "Smith")],
+                year: 2018,
+                venue: "Wrong Venue",
+                doi: "10.1000/s57.openalex"
+            ),
+            session: session
+        )
+        #expect(oaDisplayDrift.firewallClass == .drift)
+        let oaTitleRemote = try #require(oaDisplayDrift.fields.first { $0.field == "title" })
+        #expect(oaTitleRemote.remoteValue == "A & B < C > D \"Quoted\" 'Single' A B")
+        let oaAuthorRemote = try #require(oaDisplayDrift.fields.first { $0.field == "firstAuthor" })
+        #expect(oaAuthorRemote.remoteValue == "D'Arcy")
+        let oaVenueRemote = try #require(oaDisplayDrift.fields.first { $0.field == "venue" })
+        #expect(oaVenueRemote.remoteValue == "Materials & Design 'Letters'")
+    }
 }

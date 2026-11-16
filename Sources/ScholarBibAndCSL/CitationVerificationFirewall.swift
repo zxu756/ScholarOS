@@ -4838,11 +4838,12 @@ public struct CitationVerificationFirewall: Sendable {
 
     private func parseCrossrefWorkObject(_ message: [String: Any]) -> RegistryPayloadParseOutcome {
         let title: String = {
-            if let titles = message["title"] as? [String], let first = titles.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-                return first.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let titles = message["title"] as? [String],
+               let first = titles.compactMap({ nonEmptyDecoded($0) }).first {
+                return first
             }
-            if let single = message["title"] as? String {
-                return single.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let single = nonEmptyDecoded(message["title"] as? String) {
+                return single
             }
             return ""
         }()
@@ -4852,12 +4853,11 @@ public struct CitationVerificationFirewall: Sendable {
 
         let subtitle: String? = {
             if let subs = message["subtitle"] as? [String],
-               let first = subs.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-                return first.trimmingCharacters(in: .whitespacesAndNewlines)
+               let first = subs.compactMap({ nonEmptyDecoded($0) }).first {
+                return first
             }
-            if let single = message["subtitle"] as? String {
-                let trimmed = single.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmed.isEmpty ? nil : trimmed
+            if let single = nonEmptyDecoded(message["subtitle"] as? String) {
+                return single
             }
             return nil
         }()
@@ -4877,10 +4877,10 @@ public struct CitationVerificationFirewall: Sendable {
                 (($0["sequence"] as? String)?.lowercased() == "first")
             } ?? 0
             let firstObj = authors[firstIdx]
-            if let fam = nonEmpty(firstObj["family"] as? String) {
+            if let fam = nonEmptyDecoded(firstObj["family"] as? String) {
                 firstAuthorDisplay = fam
                 firstAuthorSurname = fam
-                if let giv = nonEmpty(firstObj["given"] as? String) {
+                if let giv = nonEmptyDecoded(firstObj["given"] as? String) {
                     firstAuthorFullName = "\(giv) \(fam)"
                     firstAuthorFamilyOnlyWithoutGiven = false
                 } else {
@@ -4889,7 +4889,7 @@ public struct CitationVerificationFirewall: Sendable {
                 }
                 firstAuthorHasExplicitFamilyField = true
                 firstAuthorIsCorporate = false
-            } else if let corpName = nonEmpty(firstObj["name"] as? String) {
+            } else if let corpName = nonEmptyDecoded(firstObj["name"] as? String) {
                 firstAuthorDisplay = corpName
                 firstAuthorSurname = corpName
                 firstAuthorFullName = corpName
@@ -4905,9 +4905,9 @@ public struct CitationVerificationFirewall: Sendable {
             }
             for idx in orderedIndices {
                 let item = authors[idx]
-                if let fam = nonEmpty(item["family"] as? String) {
+                if let fam = nonEmptyDecoded(item["family"] as? String) {
                     authorSurnames.append(fam)
-                } else if let name = nonEmpty(item["name"] as? String) {
+                } else if let name = nonEmptyDecoded(item["name"] as? String) {
                     authorSurnames.append(name)
                 }
             }
@@ -4928,22 +4928,22 @@ public struct CitationVerificationFirewall: Sendable {
         var venues: [String] = []
         if let arr = message["container-title"] as? [String] {
             for item in arr {
-                if let v = nonEmpty(item), !venues.contains(v) {
+                if let v = nonEmptyDecoded(item), !venues.contains(v) {
                     venues.append(v)
                 }
             }
-        } else if let single = nonEmpty(message["container-title"] as? String), !venues.contains(single) {
+        } else if let single = nonEmptyDecoded(message["container-title"] as? String), !venues.contains(single) {
             venues.append(single)
         }
 
         var shortVenues: [String] = []
         if let arr = message["short-container-title"] as? [String] {
             for item in arr {
-                if let v = nonEmpty(item), !shortVenues.contains(v) {
+                if let v = nonEmptyDecoded(item), !shortVenues.contains(v) {
                     shortVenues.append(v)
                 }
             }
-        } else if let single = nonEmpty(message["short-container-title"] as? String), !shortVenues.contains(single) {
+        } else if let single = nonEmptyDecoded(message["short-container-title"] as? String), !shortVenues.contains(single) {
             shortVenues.append(single)
         }
 
@@ -5053,7 +5053,7 @@ public struct CitationVerificationFirewall: Sendable {
         guard root["id"] != nil || root["title"] != nil || root["display_name"] != nil else {
             return .unparseable
         }
-        let title = nonEmpty(root["title"] as? String) ?? nonEmpty(root["display_name"] as? String) ?? ""
+        let title = nonEmptyDecoded(root["title"] as? String) ?? nonEmptyDecoded(root["display_name"] as? String) ?? ""
         guard !title.isEmpty else {
             return .registeredNoMetadata
         }
@@ -5079,8 +5079,8 @@ public struct CitationVerificationFirewall: Sendable {
         if let authorships = root["authorships"] as? [[String: Any]], !authorships.isEmpty {
             for (idx, item) in authorships.enumerated() {
                 // M1 item 2 (S50): prefer `raw_author_name`, falling back to `author.display_name`.
-                let rawName = nonEmpty(item["raw_author_name"] as? String)
-                let displayName = nonEmpty((item["author"] as? [String: Any])?["display_name"] as? String)
+                let rawName = nonEmptyDecoded(item["raw_author_name"] as? String)
+                let displayName = nonEmptyDecoded((item["author"] as? [String: Any])?["display_name"] as? String)
                 let chosen = rawName ?? displayName
                 if let chosen, let extracted = Self.extractSurnameFromAuthorString(chosen) {
                     authorSurnames.append(extracted)
@@ -5104,22 +5104,22 @@ public struct CitationVerificationFirewall: Sendable {
         var shortVenues: [String] = []
         if let primaryLoc = root["primary_location"] as? [String: Any],
            let sourceObj = primaryLoc["source"] as? [String: Any] {
-            if let disp = nonEmpty(sourceObj["display_name"] as? String) {
+            if let disp = nonEmptyDecoded(sourceObj["display_name"] as? String) {
                 venues.append(disp)
             }
-            if let abbr = nonEmpty(sourceObj["abbreviated_title"] as? String), !shortVenues.contains(abbr) {
+            if let abbr = nonEmptyDecoded(sourceObj["abbreviated_title"] as? String), !shortVenues.contains(abbr) {
                 shortVenues.append(abbr)
             }
             if let alts = sourceObj["alternate_titles"] as? [String] {
                 for alt in alts {
-                    if let cleanAlt = nonEmpty(alt), !venues.contains(cleanAlt) {
+                    if let cleanAlt = nonEmptyDecoded(alt), !venues.contains(cleanAlt) {
                         venues.append(cleanAlt)
                     }
                 }
             }
         }
         if let hostVenue = root["host_venue"] as? [String: Any],
-           let disp = nonEmpty(hostVenue["display_name"] as? String),
+           let disp = nonEmptyDecoded(hostVenue["display_name"] as? String),
            !venues.contains(disp) {
             venues.append(disp)
         }
@@ -5491,35 +5491,141 @@ public struct CitationVerificationFirewall: Sendable {
         return nil
     }
 
+    private func nonEmptyDecoded(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let decoded = Self.decodeHTMLEntities(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+        return decoded.isEmpty ? nil : decoded
+    }
+
     private static func decodeXMLEntities(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&apos;", with: "'")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&#x27;", with: "'")
-            .replacingOccurrences(of: "&ndash;", with: "–")
-            .replacingOccurrences(of: "&mdash;", with: "—")
+        decodeHTMLEntities(text)
+    }
+
+    static func decodeHTMLEntities(_ text: String) -> String {
+        guard text.contains("&") else { return text }
+        var out = ""
+        out.reserveCapacity(text.count)
+        var cursor = text.startIndex
+        while cursor < text.endIndex {
+            let ch = text[cursor]
+            if ch != "&" {
+                out.append(ch)
+                cursor = text.index(after: cursor)
+                continue
+            }
+
+            let entityStart = text.index(after: cursor)
+            var scan = entityStart
+            var steps = 0
+            var foundSemicolon: String.Index?
+            while scan < text.endIndex && steps < 14 {
+                let sCh = text[scan]
+                if sCh == ";" {
+                    foundSemicolon = scan
+                    break
+                }
+                if sCh == "&" || sCh.isWhitespace {
+                    break
+                }
+                scan = text.index(after: scan)
+                steps += 1
+            }
+
+            if let semiIdx = foundSemicolon, semiIdx > entityStart {
+                let token = String(text[entityStart..<semiIdx])
+                if let decoded = resolveHTMLEntityToken(token) {
+                    out.append(decoded)
+                    cursor = text.index(after: semiIdx)
+                    continue
+                }
+            }
+
+            out.append("&")
+            cursor = entityStart
+        }
+        return out
+    }
+
+    private static func resolveHTMLEntityToken(_ token: String) -> String? {
+        if token.hasPrefix("#x") || token.hasPrefix("#X") {
+            let hex = token.dropFirst(2)
+            guard !hex.isEmpty, hex.count <= 6, hex.allSatisfy(\.isHexDigit),
+                  let cp = UInt32(hex, radix: 16), cp > 0,
+                  let scalar = UnicodeScalar(cp) else {
+                return nil
+            }
+            if cp == 0x0D || cp == 0x0A {
+                return " "
+            }
+            return String(scalar)
+        }
+        if token.hasPrefix("#") {
+            let dec = token.dropFirst(1)
+            guard !dec.isEmpty, dec.count <= 7, dec.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  let cp = UInt32(dec, radix: 10), cp > 0,
+                  let scalar = UnicodeScalar(cp) else {
+                return nil
+            }
+            if cp == 0x0D || cp == 0x0A {
+                return " "
+            }
+            return String(scalar)
+        }
+        switch token.lowercased() {
+        case "amp": return "&"
+        case "lt": return "<"
+        case "gt": return ">"
+        case "quot": return "\""
+        case "apos": return "'"
+        case "nbsp": return "\u{00A0}"
+        case "ndash": return "–"
+        case "mdash": return "—"
+        case "ldquo": return "“"
+        case "rdquo": return "”"
+        case "lsquo": return "‘"
+        case "rsquo": return "’"
+        case "hellip": return "…"
+        case "times": return "×"
+        case "minus": return "−"
+        case "deg": return "°"
+        case "pm", "plusmn": return "±"
+        default: return nil
+        }
     }
 
     private static func stripHTMLTagsAndEntities(_ text: String) -> String {
+        let chars = Array(text)
         var stripped = ""
-        stripped.reserveCapacity(text.count)
-        var insideTag = false
-        for ch in text {
-            if ch == "<" {
-                insideTag = true
-                stripped.append(" ")
-            } else if ch == ">" && insideTag {
-                insideTag = false
-                stripped.append(" ")
-            } else if !insideTag {
-                stripped.append(ch)
+        stripped.reserveCapacity(chars.count)
+        var i = 0
+        while i < chars.count {
+            if chars[i] == "<", i + 1 < chars.count {
+                let isOpeningTag = chars[i + 1].isASCII && chars[i + 1].isLetter
+                let isClosingTag = chars[i + 1] == "/" && (i + 2 < chars.count) && chars[i + 2].isASCII && chars[i + 2].isLetter
+                if isOpeningTag || isClosingTag {
+                    var j = i + 1
+                    var closingIdx: Int?
+                    while j < chars.count {
+                        if chars[j] == ">" {
+                            closingIdx = j
+                            break
+                        }
+                        if chars[j] == "<" {
+                            break
+                        }
+                        j += 1
+                    }
+                    if let closingIdx {
+                        stripped.append(" ")
+                        i = closingIdx + 1
+                        continue
+                    }
+                }
             }
+            stripped.append(chars[i])
+            i += 1
         }
-        return decodeXMLEntities(stripped)
+        return decodeHTMLEntities(stripped)
     }
 
     private static func stripOuterRetractionMarkers(_ text: String) -> String {
