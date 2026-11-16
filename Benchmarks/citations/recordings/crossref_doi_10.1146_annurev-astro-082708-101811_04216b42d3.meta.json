@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 81387,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1146_annurev-astro-082708-101811_04216b42d3.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T07:37:40Z",
+  "response_date_header" : "Mon, 16 Nov 2026 07:37:40 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 07:37:40 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "2c065cc2fc42193b9b18c82deda68cc213f0853dd4e03756221a40ee74b13fec",
+  "slug" : "crossref_doi_10.1146_annurev-astro-082708-101811_04216b42d3",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1146/annurev-astro-082708-101811"
+}

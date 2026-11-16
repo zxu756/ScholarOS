@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 3445,
+  "content_type" : "application/atom+xml; charset=utf-8",
+  "raw_file" : "arxiv_id_1304.7762_aac127f4db.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T07:37:42Z",
+  "response_date_header" : "Mon, 16 Nov 2026 07:37:42 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/atom+xml; charset=utf-8",
+    "Date" : "Mon, 16 Nov 2026 07:37:42 GMT"
+  },
+  "service" : "arxiv",
+  "sha256" : "01e056a9678c7650c8065d46dde5b20a1d660d2d78f0e1bf61f1c0c01a633563",
+  "slug" : "arxiv_id_1304.7762_aac127f4db",
+  "status" : 200,
+  "url" : "https://export.arxiv.org/api/query?id_list=1304.7762"
+}

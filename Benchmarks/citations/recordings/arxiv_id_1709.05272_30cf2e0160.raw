@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/ETBxTUCd4qWrGoumo9r18dVDQHA</id>
+  <title>arXiv Query: search_query=&amp;id_list=1709.05272&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:24Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1709.05272" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1709.05272v1</id>
+    <title>Economic Complexity: "Buttarla in caciara" vs a constructive approach</title>
+    <updated>2017-09-15T15:36:48Z</updated>
+    <link href="https://arxiv.org/abs/1709.05272v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1709.05272v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>This note is a contribution to the debate about the optimal algorithm for Economic Complexity that recently appeared on ArXiv [1, 2] . The authors of [2] eventually agree that the ECI+ algorithm [1] consists just in a renaming of the Fitness algorithm we introduced in 2012, as we explicitly showed in [3]. However, they omit any comment on the fact that their extensive numerical tests claimed to demonstrate that the same algorithm works well if they name it ECI+, but not if its name is Fitness. They should realize that this eliminates any credibility to their numerical methods and therefore also to their new analysis, in which they consider many algorithms [2]. Since by their own admission the best algorithm is the Fitness one, their new claim became that the search for the best algorithm is pointless and all algorithms are alike. This is exactly the opposite of what they claimed a few days ago and it does not deserve much comments. After these clarifications we also present a constructive analysis of the status of Economic Complexity, its algorithms, its successes and its perspectives. For us the discussion closes here, we will not reply to further comments.</summary>
+    <category term="econ.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2017-09-15T15:36:48Z</published>
+    <arxiv:primary_category term="econ.GN"/>
+    <author>
+      <name>Luciano Pietronero</name>
+    </author>
+    <author>
+      <name>Matthieu Cristelli</name>
+    </author>
+    <author>
+      <name>Andrea Gabrielli</name>
+    </author>
+    <author>
+      <name>Dario Mazzilli</name>
+    </author>
+    <author>
+      <name>Emanuele Pugliese</name>
+    </author>
+    <author>
+      <name>Andrea Tacchella</name>
+    </author>
+    <author>
+      <name>Andrea Zaccaria</name>
+    </author>
+  </entry>
+</feed>

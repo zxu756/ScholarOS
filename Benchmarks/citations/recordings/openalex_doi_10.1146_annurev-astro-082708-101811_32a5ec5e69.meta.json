@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 48685,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1146_annurev-astro-082708-101811_32a5ec5e69.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T07:37:40Z",
+  "response_date_header" : "Mon, 16 Nov 2026 07:37:41 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 07:37:41 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "590",
+    "x-ratelimit-reset" : "58939"
+  },
+  "service" : "openalex",
+  "sha256" : "e8d9bc6e5f3ef62f2a7516a1c88521bb35a86a0263d0306a5f7f25265cdc99ac",
+  "slug" : "openalex_doi_10.1146_annurev-astro-082708-101811_32a5ec5e69",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1146/annurev-astro-082708-101811"
+}

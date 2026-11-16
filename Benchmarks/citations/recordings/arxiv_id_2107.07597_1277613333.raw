@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/3VuWqOSHq2W6GbV9hRU6Q0Ky3fM</id>
+  <title>arXiv Query: search_query=&amp;id_list=2107.07597&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:36:33Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2107.07597" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2107.07597v2</id>
+    <title>Coarse-grained Stochastic Model of Myosin-Driven Vesicles into Dendritic Spines</title>
+    <updated>2022-04-08T17:12:57Z</updated>
+    <link href="https://arxiv.org/abs/2107.07597v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2107.07597v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We study the dynamics of membrane vesicle motor transport into dendritic spines, which are bulbous intracellular compartments in neurons that play a key role in transmitting signals between neurons. We consider the stochastic analog of the vesicle transport model in [Park and Fai, The Dynamics of Vesicles Driven Into Closed Constrictions by Molecular Motors. Bull. Math. Biol. 82, 141 (2020)]. The stochastic version, which may be considered as an agent-based model, relies mostly on the action of individual myosin motors to produce vesicle motion. To aid in our analysis, we coarse-grain this agent-based model using a master equation combined with a partial differential equation describing the probability of local motor positions. We confirm through convergence studies that the coarse-graining captures the essential features of bistability in velocity (observed in experiments) and waiting-time distributions to switch between steady-state velocities. Interestingly, these results allow us to reformulate the translocation problem in terms of the mean first passage time for a run-and-tumble particle moving on a finite domain with absorbing boundaries at the two ends. We conclude by presenting numerical and analytical calculations of vesicle translocation.</summary>
+    <category term="q-bio.SC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2021-07-15T20:18:17Z</published>
+    <arxiv:comment>33 pages, 10 figures</arxiv:comment>
+    <arxiv:primary_category term="q-bio.SC"/>
+    <arxiv:journal_ref>SIAM J. Appl. Mat., 82(3), 793-820, 2022</arxiv:journal_ref>
+    <author>
+      <name>Youngmin Park</name>
+    </author>
+    <author>
+      <name>Prashant Singh</name>
+    </author>
+    <author>
+      <name>Thomas G. Fai</name>
+    </author>
+    <arxiv:doi>10.1137/21M1434180</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1137/21M1434180" title="doi"/>
+  </entry>
+</feed>

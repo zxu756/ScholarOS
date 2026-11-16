@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/K7kbhzBldc10XuCPXJWZS81p4cc</id>
+  <title>arXiv Query: search_query=&amp;id_list=1008.3745&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:36:26Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1008.3745" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1008.3745v2</id>
+    <title>Classification of Gapped Symmetric Phases in 1D Spin Systems</title>
+    <updated>2010-09-05T16:49:40Z</updated>
+    <link href="https://arxiv.org/abs/1008.3745v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1008.3745v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Quantum many-body systems divide into a variety of phases with very different physical properties. The question of what kind of phases exist and how to identify them seems hard especially for strongly interacting systems. Here we make an attempt to answer this question for gapped interacting quantum spin systems whose ground states are short-range correlated. Based on the local unitary equivalence relation between short-range correlated states in the same phase, we classify possible quantum phases for 1D matrix product states, which represent well the class of 1D gapped ground states. We find that in the absence of any symmetry all states are equivalent to trivial product states, which means that there is no topological order in 1D. However, if certain symmetry is required, many phases exist with different symmetry protected topological orders. The symmetric local unitary equivalence relation also allows us to obtain some simple results for quantum phases in higher dimensions when some symmetries are present.</summary>
+    <category term="cond-mat.str-el" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="quant-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2010-08-23T04:08:40Z</published>
+    <arxiv:comment>21 pages, 7 figures. Version 2, classification for parity and translation symmetry updated</arxiv:comment>
+    <arxiv:primary_category term="cond-mat.str-el"/>
+    <arxiv:journal_ref>Phys. Rev. B 83, 035107 (2011)</arxiv:journal_ref>
+    <author>
+      <name>Xie Chen</name>
+    </author>
+    <author>
+      <name>Zheng-Cheng Gu</name>
+    </author>
+    <author>
+      <name>Xiao-Gang Wen</name>
+    </author>
+    <arxiv:doi>10.1103/PhysRevB.83.035107</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevB.83.035107" title="doi"/>
+  </entry>
+</feed>

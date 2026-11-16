@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api//Vg1J3HRvKhnShSJfxaNOsPCTYk</id>
+  <title>arXiv Query: search_query=&amp;id_list=1903.07712&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:38:47Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1903.07712" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1903.07712v3</id>
+    <title>Benchmarking Web API Quality -- Revisited</title>
+    <updated>2020-07-03T15:24:21Z</updated>
+    <link href="https://arxiv.org/abs/1903.07712v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1903.07712v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Modern applications increasingly interact with web APIs -- reusable components, deployed and operated outside the application, and accessed over the network. Their existence, arguably, spurs application innovations, making it easy to integrate data or functionalities. While previous work has analyzed the ecosystem of web APIs and their design, little is known about web API quality at runtime. This gap is critical, as qualities including availability, latency, or provider security preferences can severely impact applications and user experience. In this paper, we revisit a 3-month, geo-distributed benchmark of popular web APIs, originally performed in 2015. We repeat this benchmark in 2018 and compare results from these two benchmarks regarding availability and latency. We furthermore introduce new results from assessing provider security preferences, collected both in 2015 and 2018, and results from our attempts to reach out to API providers with the results from our 2015 experiments. Our extensive experiments show that web API qualities vary 1.) based on the geo-distribution of clients, 2.) during our individual experiments, and 3.) between the two experiments. Our findings provide evidence to foster the discussion around web API quality, and can act as a basis for the creation of tools and approaches to mitigate quality issues.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.DC" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2019-03-18T20:50:25Z</published>
+    <arxiv:comment>Accepted for publication in the Rivers Journal of Web Engineering. The paper is text-wise identical to the camera-ready version but uses a different template</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>David Bermbach</name>
+    </author>
+    <author>
+      <name>Erik Wittern</name>
+    </author>
+  </entry>
+</feed>

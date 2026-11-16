@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/mhSWtWahB8SfOApBgBneCjI5utw</id>
+  <title>arXiv Query: search_query=&amp;id_list=2007.12719&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:38Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2007.12719" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2007.12719v2</id>
+    <title>Taking the Counterfactual Online: Efficient and Unbiased Online Evaluation for Ranking</title>
+    <updated>2020-07-28T17:59:33Z</updated>
+    <link href="https://arxiv.org/abs/2007.12719v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2007.12719v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Counterfactual evaluation can estimate Click-Through-Rate (CTR) differences between ranking systems based on historical interaction data, while mitigating the effect of position bias and item-selection bias. We introduce the novel Logging-Policy Optimization Algorithm (LogOpt), which optimizes the policy for logging data so that the counterfactual estimate has minimal variance. As minimizing variance leads to faster convergence, LogOpt increases the data-efficiency of counterfactual estimation. LogOpt turns the counterfactual approach - which is indifferent to the logging policy - into an online approach, where the algorithm decides what rankings to display. We prove that, as an online evaluation method, LogOpt is unbiased w.r.t. position and item-selection bias, unlike existing interleaving methods. Furthermore, we perform large-scale experiments by simulating comparisons between thousands of rankers. Our results show that while interleaving methods make systematic errors, LogOpt is as efficient as interleaving without being biased.</summary>
+    <category term="cs.IR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2020-07-24T18:05:58Z</published>
+    <arxiv:comment>ICTIR 2020</arxiv:comment>
+    <arxiv:primary_category term="cs.IR"/>
+    <author>
+      <name>Harrie Oosterhuis</name>
+    </author>
+    <author>
+      <name>Maarten de Rijke</name>
+    </author>
+    <arxiv:doi>10.1145/3409256.3409820</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1145/3409256.3409820" title="doi"/>
+  </entry>
+</feed>

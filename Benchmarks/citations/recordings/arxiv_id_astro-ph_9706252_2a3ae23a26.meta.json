@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 3495,
+  "content_type" : "application/atom+xml; charset=utf-8",
+  "raw_file" : "arxiv_id_astro-ph_9706252_2a3ae23a26.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T07:36:49Z",
+  "response_date_header" : "Mon, 16 Nov 2026 07:36:49 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/atom+xml; charset=utf-8",
+    "Date" : "Mon, 16 Nov 2026 07:36:49 GMT"
+  },
+  "service" : "arxiv",
+  "sha256" : "c4527b0f83806ce91d0418853c6415b38f7fd9f133bb40e3b37293951732c892",
+  "slug" : "arxiv_id_astro-ph_9706252_2a3ae23a26",
+  "status" : 200,
+  "url" : "https://export.arxiv.org/api/query?id_list=astro-ph%2F9706252"
+}

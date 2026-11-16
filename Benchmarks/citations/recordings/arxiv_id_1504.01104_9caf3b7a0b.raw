@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/gjwRIQ3c4/1T9H5mdrBl6pdHDVw</id>
+  <title>arXiv Query: search_query=&amp;id_list=1504.01104&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:45Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1504.01104" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1504.01104v1</id>
+    <title>Obscuration in AGNs: near-infrared luminosity relations and dust colors</title>
+    <updated>2015-04-05T09:42:33Z</updated>
+    <link href="https://arxiv.org/abs/1504.01104v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1504.01104v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We combine two approaches to isolate the AGN luminosity at near-infrared wavelengths and relate the near-IR pure AGN luminosity to other tracers of the AGN. Using integral-field spectroscopic data of an archival sample of 51 local AGNs, we estimate the fraction of non-stellar light by comparing the nuclear equivalent width of the stellar 2.3 micron CO absorption feature with the intrinsic value for each galaxy. We compare this fraction to that derived from a spectral decomposition of the integrated light in the central arc second and find them to be consistent with each other. Using our estimates of the near-IR AGN light, we find a strong correlation with presumably isotropic AGN tracers. We show that a significant offset exists between type 1 and type 2 sources in the sense that type 1 sources are 7 (10) times brighter in the near-IR at log L_MIR = 42.5 (log L_X = 42.5). These offsets only becomes clear when treating infrared type 1 sources as type 1 AGNs.
+  All AGNs have very red near-to-mid-IR dust colors. This, as well as the range of observed near-IR temperatures, can be explained with a simple model with only two free parameters: the obscuration to the hot dust and the ratio between the warm and hot dust areas. We find obscurations of A_V (hot) = 5 - 15 mag for infrared type 1 sources and A_V (hot) = 15 - 35 mag for type 2 sources. The ratio of hot dust to warm dust areas of about 1000 is nicely consistent with the ratio of radii of the respective regions as found by infrared interferometry.</summary>
+    <category term="astro-ph.GA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2015-04-05T09:42:33Z</published>
+    <arxiv:comment>17 pages, 10 Figures, 3 Tables, accepted by A&amp;A</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.GA"/>
+    <arxiv:journal_ref>A&amp;A 578, A47 (2015)</arxiv:journal_ref>
+    <author>
+      <name>L. Burtscher</name>
+    </author>
+    <author>
+      <name>G. Orban de Xivry</name>
+    </author>
+    <author>
+      <name>R. I. Davies</name>
+    </author>
+    <author>
+      <name>A. Janssen</name>
+    </author>
+    <author>
+      <name>D. Lutz</name>
+    </author>
+    <author>
+      <name>D. Rosario</name>
+    </author>
+    <author>
+      <name>A. Contursi</name>
+    </author>
+    <author>
+      <name>R. Genzel</name>
+    </author>
+    <author>
+      <name>J. Gracia-Carpio</name>
+    </author>
+    <author>
+      <name>M. -Y. Lin</name>
+    </author>
+    <author>
+      <name>A. Schnorr-Mueller</name>
+    </author>
+    <author>
+      <name>A. Sternberg</name>
+    </author>
+    <author>
+      <name>E. Sturm</name>
+    </author>
+    <author>
+      <name>L. Tacconi</name>
+    </author>
+    <arxiv:doi>10.1051/0004-6361/201525817</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1051/0004-6361/201525817" title="doi"/>
+  </entry>
+</feed>

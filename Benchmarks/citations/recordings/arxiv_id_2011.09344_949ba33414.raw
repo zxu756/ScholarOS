@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/pWrGqomBmtuAR7N5hYym0Z5SSJg</id>
+  <title>arXiv Query: search_query=&amp;id_list=2011.09344&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:38:31Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2011.09344" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2011.09344v1</id>
+    <title>Probing the anomalous positron fraction origin with fully leptonic decaying gravitino dark matter candidates</title>
+    <updated>2020-11-18T15:31:14Z</updated>
+    <link href="https://arxiv.org/abs/2011.09344v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2011.09344v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The flux of electron and positron cosmic rays measured by the space-based experiments PAMELA, AMS-02, CALET, DAMPE and Fermi-LAT shows an unexpected behaviour at high energies, in comparison with expectations from standard astrophysical sources. In particular, AMS-02 observations provide compelling evidence for a new source of positrons and electrons whose origin is still unknown. Plausible scenarios include either the contribution of dark matter or unresolved astrophysical sources, such as nearby pulsars. It has been shown that explanations based mostly on dark matter, tend to overproduce gamma-rays, entering in conflict with measurements of the extra-galactic gamma-ray background (EGB). Although this situation seems to be quite generic, it ultimately depends on the properties of the dark matter candidate. In this work we revisit a model in which the gravitino is a dark matter candidate decaying to SM particles through R-parity violating couplings. We show that decay channels allowed by trilinear couplings produce more electrons and positrons and fewer photons in comparison to channels allowed by bilinear couplings. Indeed, when considering AMS-02 data alone we find that the trilinear model is compatible with EGB constraints. However, this result may change when DAMPE or CALET measurements of the sum of electrons and positrons fluxes are considered instead of AMS-02 data. Therefore, in order to evaluate this model further, discrepancies between the data collected by these experiments need to be clarified</summary>
+    <category term="hep-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2020-11-18T15:31:14Z</published>
+    <arxiv:primary_category term="hep-ph"/>
+    <author>
+      <name>Johannes Buchner</name>
+    </author>
+    <author>
+      <name>Edson Carquin</name>
+    </author>
+    <author>
+      <name>Marco A. Díaz</name>
+    </author>
+    <author>
+      <name>Germán A. Gómez-Vargas</name>
+    </author>
+    <author>
+      <name>Boris Panes</name>
+    </author>
+    <author>
+      <name>Nicolás Viaux</name>
+    </author>
+  </entry>
+</feed>

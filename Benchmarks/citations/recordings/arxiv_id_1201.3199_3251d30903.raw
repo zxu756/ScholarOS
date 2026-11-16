@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/kO0Ke/ImENA8NiGPfpoAbmb3Fxg</id>
+  <title>arXiv Query: search_query=&amp;id_list=1201.3199&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:17Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1201.3199" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1201.3199v1</id>
+    <title>Explosive events - swirling transition region jets</title>
+    <updated>2012-01-16T10:21:42Z</updated>
+    <link href="https://arxiv.org/abs/1201.3199v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1201.3199v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>In this paper, we extend our earlier work to provide additional evidence for an alternative scenario to explain the nature of so-called `explosive events'. The bi-directed, fast Doppler motion of explosive events observed spectroscopically in the transition region emission is classically interpreted as a pair of bidirectional jets moving upward and downward from a reconnection site. We discuss the problems of such a model. In our previous work, we focused basically on the discrepancy of fast Doppler motion without detectable motion in the image plane. We now suggest an alternative scenario for the explosive events, based on our observations of spectral line tilts and bifurcated structure in some events. Both features are indicative of rotational motion in narrow structures. We explain the bifurcation as the result of rotation of hollow cylindrical structures and demonstrate that such a sheath model can also be applied to explain the nature of the puzzling `explosive events'. We find that the spectral tilt, the lack of apparent motion, the bifurcation, and a rapidly growing number of direct observations support an alternative scenario of linear, spicular-sized jets with a strong spinning motion.</summary>
+    <category term="astro-ph.SR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2012-01-16T10:21:42Z</published>
+    <arxiv:comment>9 pages, 3 figures, accepted for publication in Solar Physics</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.SR"/>
+    <author>
+      <name>W. Curdt</name>
+    </author>
+    <author>
+      <name>H. Tian</name>
+    </author>
+    <author>
+      <name>S. Kamio</name>
+    </author>
+    <arxiv:doi>10.1007/s11207-012-9940-9</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1007/s11207-012-9940-9" title="doi"/>
+  </entry>
+</feed>

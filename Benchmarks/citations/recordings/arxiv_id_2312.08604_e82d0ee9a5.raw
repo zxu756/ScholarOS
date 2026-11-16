@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/0o+mq+aVCeIhN3tA6+f9Ky0/baY</id>
+  <title>arXiv Query: search_query=&amp;id_list=2312.08604&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:36:41Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2312.08604" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2312.08604v2</id>
+    <title>Verification of Neural Reachable Tubes via Scenario Optimization and Conformal Prediction</title>
+    <updated>2024-04-10T03:29:32Z</updated>
+    <link href="https://arxiv.org/abs/2312.08604v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2312.08604v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Learning-based approaches for controlling safety-critical systems are rapidly growing in popularity; thus, it is important to assure their performance and safety. Hamilton-Jacobi (HJ) reachability analysis is a popular formal verification tool for providing such guarantees, since it can handle general nonlinear system dynamics, bounded adversarial system disturbances, and state and input constraints. However, its computational and memory complexity scales exponentially with the state dimension, making it intractable for large-scale systems. To overcome this challenge, neural approaches, such as DeepReach, have been used to synthesize reachable tubes and safety controllers for high-dimensional systems. However, verifying these neural reachable tubes remains challenging. In this work, we propose two verification methods, based on robust scenario optimization and conformal prediction, to provide probabilistic safety guarantees for neural reachable tubes. Our methods allow a direct trade-off between resilience to outlier errors in the neural tube, which are inevitable in a learning-based approach, and the strength of the probabilistic safety guarantee. Furthermore, we show that split conformal prediction, a widely used method in the machine learning community for uncertainty quantification, reduces to a scenario-based approach, making the two methods equivalent not only for verification of neural reachable tubes but also more generally. To our knowledge, our proof is the first in the literature to show a strong relationship between conformal prediction and scenario optimization. Finally, we propose an outlier-adjusted verification approach that uses the error distribution in neural reachable tubes to recover greater safe volumes. We demonstrate the efficacy of the proposed approaches for the high-dimensional problems of multi-vehicle collision avoidance and rocket landing with no-go zones.</summary>
+    <category term="cs.RO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="eess.SY" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2023-12-14T02:03:36Z</published>
+    <arxiv:comment>Accepted to 6th Annual Learning for Dynamics &amp; Control Conference. arXiv admin note: text overlap with arXiv:2209.12336</arxiv:comment>
+    <arxiv:primary_category term="cs.RO"/>
+    <author>
+      <name>Albert Lin</name>
+    </author>
+    <author>
+      <name>Somil Bansal</name>
+    </author>
+  </entry>
+</feed>

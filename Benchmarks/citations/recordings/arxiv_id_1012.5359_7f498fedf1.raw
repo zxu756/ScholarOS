@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/1eGDIrRSVNeWgWNdJzXClfCu3wo</id>
+  <title>arXiv Query: search_query=&amp;id_list=1012.5359&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:34Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1012.5359" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1012.5359v2</id>
+    <title>The innermost dusty structure in active galactic nuclei as probed by the Keck interferometer</title>
+    <updated>2011-01-17T10:10:38Z</updated>
+    <link href="https://arxiv.org/abs/1012.5359v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1012.5359v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We are now exploring the inner region of Type 1 active galactic nuclei (AGNs) with the Keck interferometer in the near-infrared. Adding to the four targets previously studied, we report measurements of the K-band (2.2 um) visibilities for four more targets, namely AKN120, IC4329A, Mrk6, and the radio-loud QSO 3C273 at z=0.158. The observed visibilities are quite high for all the targets, which we interpret as an indication of the partial resolution of the dust sublimation region. The effective ring radii derived from the observed visibilities scale approximately with L^1/2, where L is the AGN luminosity. Comparing the radii with those from independent optical-infrared reverberation measurements, these data support our previous claim that the interferometric ring radius is either roughly equal to or slightly larger than the reverberation radius. We interpret the ratio of these two radii for a given L as an approximate probe of the radial distribution of the inner accreting material. We show tentative evidence that this inner radial structure might be closely related to the radio-loudness of the central engine. Finally, we re-observed the brightest Seyfert 1 galaxy NGC4151. Its marginally higher visibility at a shorter projected baseline, compared to our previous measurements obtained one year before, further supports the partial resolution of the inner structure. We did not detect any significant change in the implied emission size when the K-band flux was brightened by a factor of 1.5 over a time interval of one year.</summary>
+    <category term="astro-ph.CO" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2010-12-24T08:03:55Z</published>
+    <arxiv:comment>accepted for publication in A&amp;A, after language editing</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.CO"/>
+    <author>
+      <name>Makoto Kishimoto</name>
+      <arxiv:affiliation>MPIfR</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Sebastian F. Hoenig</name>
+      <arxiv:affiliation>UCSB</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Robert Antonucci</name>
+      <arxiv:affiliation>UCSB</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Richard Barvainis</name>
+      <arxiv:affiliation>NSF</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Takayuki Kotani</name>
+      <arxiv:affiliation>ISAS</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Konrad R. W. Tristram</name>
+      <arxiv:affiliation>MPIfR</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Gerd Weigelt</name>
+      <arxiv:affiliation>MPIfR</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Ken Levin</name>
+      <arxiv:affiliation>SSO</arxiv:affiliation>
+    </author>
+    <arxiv:doi>10.1051/0004-6361/201016054</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1051/0004-6361/201016054" title="doi"/>
+  </entry>
+</feed>

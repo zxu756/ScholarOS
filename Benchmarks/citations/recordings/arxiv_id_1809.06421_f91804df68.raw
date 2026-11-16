@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/peiQPsZZtIskah+q6VUnJOy58QU</id>
+  <title>arXiv Query: search_query=&amp;id_list=1809.06421&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:57Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1809.06421" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1809.06421v2</id>
+    <title>A Flexible Design for Funding Public Goods</title>
+    <updated>2020-08-16T19:33:39Z</updated>
+    <link href="https://arxiv.org/abs/1809.06421v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1809.06421v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We propose a design for philanthropic or publicly-funded seeding to allow (near) optimal provision of a decentralized, self-organizing ecosystem of public goods. The concept extends ideas from Quadratic Voting to a funding mechanism for endogenous community formation. Individuals make public goods contributions to projects of value to them. The amount received by the project is (proportional to) the square of the sum of the square roots of contributions received. Under the "standard model" this yields first best public goods provision. Variations can limit the cost, help protect against collusion and aid coordination. We discuss applications to campaign finance, open source software ecosystems, news media finance and urban public projects. More broadly, we offer a resolution to the classic liberal-communitarian debate in political philosophy by providing neutral and non-authoritarian rules that nonetheless support collective organization.</summary>
+    <category term="econ.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2018-09-17T20:07:13Z</published>
+    <arxiv:primary_category term="econ.GN"/>
+    <arxiv:journal_ref>2019 Management Science 65(11): 5171-5187</arxiv:journal_ref>
+    <author>
+      <name>Vitalik Buterin</name>
+    </author>
+    <author>
+      <name>Zoe Hitzig</name>
+    </author>
+    <author>
+      <name>E. Glen Weyl</name>
+    </author>
+    <arxiv:doi>10.1287/mnsc.2019.3337</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1287/mnsc.2019.3337" title="doi"/>
+  </entry>
+</feed>

@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/2/29d989ayFWrC9VV1tDyi6vG/8</id>
+  <title>arXiv Query: search_query=&amp;id_list=1806.07243&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:38:11Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1806.07243" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1806.07243v6</id>
+    <title>Learning Conditioned Graph Structures for Interpretable Visual Question Answering</title>
+    <updated>2018-11-01T14:10:47Z</updated>
+    <link href="https://arxiv.org/abs/1806.07243v6" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1806.07243v6" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Visual Question answering is a challenging problem requiring a combination of concepts from Computer Vision and Natural Language Processing. Most existing approaches use a two streams strategy, computing image and question features that are consequently merged using a variety of techniques. Nonetheless, very few rely on higher level image representations, which can capture semantic and spatial relationships. In this paper, we propose a novel graph-based approach for Visual Question Answering. Our method combines a graph learner module, which learns a question specific graph representation of the input image, with the recent concept of graph convolutions, aiming to learn image representations that capture question specific interactions. We test our approach on the VQA v2 dataset using a simple baseline architecture enhanced by the proposed graph learner module. We obtain promising results with 66.18% accuracy and demonstrate the interpretability of the proposed method. Code can be found at github.com/aimbrain/vqa-project.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2018-06-19T13:59:05Z</published>
+    <arxiv:comment>NIPS 2018 (13 pages, 7 figures)</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Will Norcliffe-Brown</name>
+    </author>
+    <author>
+      <name>Efstathios Vafeias</name>
+    </author>
+    <author>
+      <name>Sarah Parisot</name>
+    </author>
+  </entry>
+</feed>

@@ -1,6 +1,6 @@
 {
-  "completed_at" : "2026-11-16T04:27:10Z",
-  "count" : 693,
+  "completed_at" : "2026-11-16T07:38:50Z",
+  "count" : 748,
   "items" : [
     {
       "attempts" : 1,
@@ -16388,13 +16388,1252 @@
       "slug" : "openalex_title_Non-destructive_analysis_of_iron-gall_ink_on_his_535a0cbc84",
       "status" : 200,
       "url" : "https://api.openalex.org/works?per-page=5&search=Non-destructive%20analysis%20of%20iron-gall%20ink%20on%20historical%20manuscripts"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3691,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1807.04972_c22541c080.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:20Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:20 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:20 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "89201f3e0bd74f6d8728e709524f8271e80aa8e13eaa224b7fde40fe4dfc16d2",
+      "slug" : "arxiv_id_1807.04972_c22541c080",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1807.04972"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 13700,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1051_0004-6361_201322068_fcab43c622.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:20Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:21 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:21 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "9262c2896fbb0ed669c67f1699c7aed634e436bcbe3c3d1006390a5e4f81f625",
+      "slug" : "crossref_doi_10.1051_0004-6361_201322068_fcab43c622",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1051/0004-6361/201322068"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 61747,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1051_0004-6361_201322068_b1ba860351.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:21Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:22 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:22 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "59018"
+      },
+      "service" : "openalex",
+      "sha256" : "20ad921d9f7797316df6c2132c9a3cd297b993ce0502c69e8f4b55c1c0e77e21",
+      "slug" : "openalex_doi_10.1051_0004-6361_201322068_b1ba860351",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1051/0004-6361/201322068"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 5380,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1307.6212_2d41d66664.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:23Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:23 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:23 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "3e354f898cfca14d7520abe0b2cfe57ae27f32bfb0fa7e2f1c7add8d2fbcb971",
+      "slug" : "arxiv_id_1307.6212_2d41d66664",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1307.6212"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 8597,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1103_physrevb.83.035107_40a8ce3b8d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:24Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:24 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:24 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "51a819e133a516ae784df8658a7c380d902c975df56b558cf8ef0715be68cbf8",
+      "slug" : "crossref_doi_10.1103_physrevb.83.035107_40a8ce3b8d",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1103/physrevb.83.035107"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 20977,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1103_physrevb.83.035107_24003ba434.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:24Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:24 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:24 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "59016"
+      },
+      "service" : "openalex",
+      "sha256" : "34bfad8601cd1baed3315f0a8d202985b4e2df6fc4ea6a6a2f108214da20cdf3",
+      "slug" : "openalex_doi_10.1103_physrevb.83.035107_24003ba434",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1103/physrevb.83.035107"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2887,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1008.3745_447030b873.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:26Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:27 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:27 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "63c8d79a965bbe0e66b20fec552ed9e87a245a928906840950cc8b2875b683d2",
+      "slug" : "arxiv_id_1008.3745_447030b873",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1008.3745"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 8671,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2401.00096_ed6d139841.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:30Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:30 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:30 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "893fd1e7fdd10ddeb95d296e28482f31e417643efa350604cd0d8fbecdf4695b",
+      "slug" : "arxiv_id_2401.00096_ed6d139841",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2401.00096"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 10874,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1137_21m1434180_a563fe0140.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:30Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:30 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:30 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "f29173f3c39b2dff00b8ea2f16731b086dad114178fd8f318a2a3f195f418080",
+      "slug" : "crossref_doi_10.1137_21m1434180_a563fe0140",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1137/21m1434180"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 24086,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1137_21m1434180_e42be1e673.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:31Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:31 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:31 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "59009"
+      },
+      "service" : "openalex",
+      "sha256" : "fe07cd4ccad3e1a9a93a8fe3bcf57e940219f9ef3f499622393f73fe6923fd26",
+      "slug" : "openalex_doi_10.1137_21m1434180_e42be1e673",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1137/21m1434180"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2999,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2107.07597_1277613333.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:33Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:33 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:33 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "716901f197a771d989a012aff851a9de40fc7ce646f15aaec921d227fd5112e3",
+      "slug" : "arxiv_id_2107.07597_1277613333",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2107.07597"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3687,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2312.08604_e82d0ee9a5.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:41Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:41 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:41 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "1949dd78f5fdc6d06e7165a3b441eb7b783223f1775f222995b08c16ab19741c",
+      "slug" : "arxiv_id_2312.08604_e82d0ee9a5",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2312.08604"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 6428,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1086_304823_0b7e88d533.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:47Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:48 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:48 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "4dc33ed0294363c21a0c0ef8b538ac994c8c2951f75ef89b35070bfebaa98d44",
+      "slug" : "crossref_doi_10.1086_304823_0b7e88d533",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1086/304823"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 25682,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1086_304823_7f74a230bc.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:48Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:48 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:48 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58992"
+      },
+      "service" : "openalex",
+      "sha256" : "4c14721b3206697c5f487c4a24c8d8c9809c2b51f933c34cd387ea7b71641c83",
+      "slug" : "openalex_doi_10.1086_304823_7f74a230bc",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1086/304823"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3495,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_astro-ph_9706252_2a3ae23a26.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:49Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:49 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:49 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "c4527b0f83806ce91d0418853c6415b38f7fd9f133bb40e3b37293951732c892",
+      "slug" : "arxiv_id_astro-ph_9706252_2a3ae23a26",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=astro-ph%2F9706252"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 25023,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.3847_1538-3881_ac5ea4_6ce9d92471.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:50Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:50 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:50 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "72757c783861996e79a8529eb3d1a063e2c5bc7f82f658e96a73905119d5ba67",
+      "slug" : "crossref_doi_10.3847_1538-3881_ac5ea4_6ce9d92471",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.3847/1538-3881/ac5ea4"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 32763,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.3847_1538-3881_ac5ea4_fa29a14ec6.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:50Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:51 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:36:51 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58989"
+      },
+      "service" : "openalex",
+      "sha256" : "d51a7207f8c6337a6ae99426ba6edfe93fd053510e730833db17b5325be0f11a",
+      "slug" : "openalex_doi_10.3847_1538-3881_ac5ea4_fa29a14ec6",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.3847/1538-3881/ac5ea4"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3573,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2203.03678_51c705d00d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:52Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:53 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:53 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "c30cece4e9351ae54fd1f1674c1c6cf9dfcf94dacaddddfc687f20fde5755d4d",
+      "slug" : "arxiv_id_2203.03678_51c705d00d",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2203.03678"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2002,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1004.2086_686ab40223.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:36:56Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:36:56 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:36:56 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "244caf1e68bf0dc016f3b78f1f6f202b115a332ad7fe3b23dc41aea83a297dcd",
+      "slug" : "arxiv_id_1004.2086_686ab40223",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1004.2086"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 27872,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1038_nature17197_d9b988c60d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:12Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:12 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:12 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "3569fa369d0a00c87d5005c2a137094f0a3a81737767f42da3ca2a583ede9511",
+      "slug" : "crossref_doi_10.1038_nature17197_d9b988c60d",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1038/nature17197"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 25724,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1038_nature17197_148c087a94.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:12Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:13 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:13 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58967"
+      },
+      "service" : "openalex",
+      "sha256" : "c2c00214bc884f8d920305c9d9123644076a9224c98e755af260540910f7360b",
+      "slug" : "openalex_doi_10.1038_nature17197_148c087a94",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1038/nature17197"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3339,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1604.01400_ffeb881a08.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:13Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:14 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:14 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "ebf52bea892aadfaae6cef49f806a7c70a2134390e7a14f784074ad8044ea252",
+      "slug" : "arxiv_id_1604.01400_ffeb881a08",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1604.01400"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 10637,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1007_s11207-012-9940-9_f93ed58de2.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:14Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:14 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:14 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "f1c6a6d0cf8c958b868698c5a2466d80a6ade4dcadb17974fafeede21a7366db",
+      "slug" : "crossref_doi_10.1007_s11207-012-9940-9_f93ed58de2",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1007/s11207-012-9940-9"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 20963,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1007_s11207-012-9940-9_1edbb51925.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:15Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:15 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:15 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58965"
+      },
+      "service" : "openalex",
+      "sha256" : "109c361af51dee1338427f94572ccb568aa1226023c591a524c9dab1f78fac9e",
+      "slug" : "openalex_doi_10.1007_s11207-012-9940-9_1edbb51925",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1007/s11207-012-9940-9"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2870,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1201.3199_3251d30903.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:17Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:17 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:17 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "80cd6ed6abca72afb03b00a10bbcd27e39b8e019e85cab8d389e91a1476a554d",
+      "slug" : "arxiv_id_1201.3199_3251d30903",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1201.3199"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 25806,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1051_0004-6361_201936255_a3505d45ee.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:17Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:17 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:17 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "181cacd119408e1fa490b76f7e8bb8da1263b399a5d94c74cbb7a4576c4fee12",
+      "slug" : "crossref_doi_10.1051_0004-6361_201936255_a3505d45ee",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1051/0004-6361/201936255"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 87572,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1051_0004-6361_201936255_62d94dbc9a.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:18Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:18 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:18 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58962"
+      },
+      "service" : "openalex",
+      "sha256" : "7df904e718cd7fa26dcf24d023a2e0819f3fc947b3db8f7dce59f83b5197d048",
+      "slug" : "openalex_doi_10.1051_0004-6361_201936255_62d94dbc9a",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1051/0004-6361/201936255"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 5165,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1912.01361_0ef2bbe20d.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:20Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:20 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:20 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "518e810791b072e81792f53c88b9784d35f6e316f3e8a52845eb4dad23aef3f9",
+      "slug" : "arxiv_id_1912.01361_0ef2bbe20d",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1912.01361"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2891,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1709.05272_30cf2e0160.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:23Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:24 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:24 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "ace9c7f565e1d18a94cf566015540e9de7de99289fad916c2be975deca2786e3",
+      "slug" : "arxiv_id_1709.05272_30cf2e0160",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1709.05272"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 9523,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1086_375320_ec338656b1.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:25Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:25 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:25 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "2721aecc8352e79279ebbbc5ab3b8e98a59f6e8275722010fdca4c22a28ecb4d",
+      "slug" : "crossref_doi_10.1086_375320_ec338656b1",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1086/375320"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 24164,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1086_375320_157a49d659.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:26Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:26 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:26 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58954"
+      },
+      "service" : "openalex",
+      "sha256" : "3a834da8a111c981f4de93a587528867d471b9ff2f020f1513d9847ad4ba2c4f",
+      "slug" : "openalex_doi_10.1086_375320_157a49d659",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1086/375320"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3012,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_astro-ph_0306023_03470f9a61.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:27Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:27 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:27 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "48edeb88befb67e047daacd7076818cfb6beb1f280083dd88e2e83be845b3a29",
+      "slug" : "arxiv_id_astro-ph_0306023_03470f9a61",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=astro-ph%2F0306023"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 19476,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.3847_0004-637x_823_2_82_cb55991c56.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:27Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:28 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:28 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "10df8bab5f98f0156b1b8e5e630da5f39fc2f6634c33dac4c55fd0e38e68e65d",
+      "slug" : "crossref_doi_10.3847_0004-637x_823_2_82_cb55991c56",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.3847/0004-637x/823/2/82"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 21920,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.3847_0004-637x_823_2_82_1cd0ad232b.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:28Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:28 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:28 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58952"
+      },
+      "service" : "openalex",
+      "sha256" : "af7d3a096827a6e9d50c0bfaae51a8dab74e1ad8970d98b867ba31179efe7dd7",
+      "slug" : "openalex_doi_10.3847_0004-637x_823_2_82_1cd0ad232b",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.3847/0004-637x/823/2/82"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2656,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1604.04078_f0fbf87040.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:30Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:31 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:31 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "75b79e17a84ce102c54c93d8d8803174552aa7ddca254c969788f871d8f259c4",
+      "slug" : "arxiv_id_1604.04078_f0fbf87040",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1604.04078"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 9327,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1051_0004-6361_201016054_3b70aa25dd.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:31Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:31 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:31 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "1626dab703cf227a7311d273e8bf77dac8c1fb0fb48c3d26ece0fdb19fc7bcc0",
+      "slug" : "crossref_doi_10.1051_0004-6361_201016054_3b70aa25dd",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1051/0004-6361/201016054"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 24408,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1051_0004-6361_201016054_d1b9b6c445.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:32Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:32 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:32 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58948"
+      },
+      "service" : "openalex",
+      "sha256" : "49ce30a7875e66b723bdfa826b0bbf513cdaa1b58856de8c32abca5f02a7d506",
+      "slug" : "openalex_doi_10.1051_0004-6361_201016054_d1b9b6c445",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1051/0004-6361/201016054"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3982,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1012.5359_7f498fedf1.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:34Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:34 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:34 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "9f859f2969153b023573366ee0548df207c35253d46fe00797b4a252bb101b60",
+      "slug" : "arxiv_id_1012.5359_7f498fedf1",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1012.5359"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 10800,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1145_3409256.3409820_fe890fb068.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:35Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:35 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:35 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "e532ff6dee134caf74d65f95ebaa226e7b51525d2f471cb5a1696c7cac903f85",
+      "slug" : "crossref_doi_10.1145_3409256.3409820_fe890fb068",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1145/3409256.3409820"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 19373,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1145_3409256.3409820_c0bc7491cc.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:36Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:36 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:36 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58944"
+      },
+      "service" : "openalex",
+      "sha256" : "bd3554e25c9a08f46573607073ac26dda6e83ba2487dc449bdc09821e0c89e56",
+      "slug" : "openalex_doi_10.1145_3409256.3409820_c0bc7491cc",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1145/3409256.3409820"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2711,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2007.12719_3795826b19.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:37Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:38 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:38 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "3ddd743d9d2cc549a7b8b65b9b2b55438385942e839372927638ebb6a5248a19",
+      "slug" : "arxiv_id_2007.12719_3795826b19",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2007.12719"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 81387,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1146_annurev-astro-082708-101811_04216b42d3.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:40Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:40 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:40 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "2c065cc2fc42193b9b18c82deda68cc213f0853dd4e03756221a40ee74b13fec",
+      "slug" : "crossref_doi_10.1146_annurev-astro-082708-101811_04216b42d3",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1146/annurev-astro-082708-101811"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 48685,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1146_annurev-astro-082708-101811_32a5ec5e69.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:40Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:41 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:41 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58939"
+      },
+      "service" : "openalex",
+      "sha256" : "e8d9bc6e5f3ef62f2a7516a1c88521bb35a86a0263d0306a5f7f25265cdc99ac",
+      "slug" : "openalex_doi_10.1146_annurev-astro-082708-101811_32a5ec5e69",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1146/annurev-astro-082708-101811"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3445,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1304.7762_aac127f4db.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:42Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:42 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:42 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "01e056a9678c7650c8065d46dde5b20a1d660d2d78f0e1bf61f1c0c01a633563",
+      "slug" : "arxiv_id_1304.7762_aac127f4db",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1304.7762"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 16983,
+      "content_type" : "application/json",
+      "raw_file" : "crossref_doi_10.1051_0004-6361_201525817_2f14a58010.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:42Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:43 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:43 GMT",
+        "x-concurrency-limit" : "1",
+        "x-rate-limit-interval" : "1s",
+        "x-rate-limit-limit" : "5"
+      },
+      "service" : "crossref",
+      "sha256" : "f033913ea088a5932f8081493bc54cc798f5d8f6d734ade073df2535f044c585",
+      "slug" : "crossref_doi_10.1051_0004-6361_201525817_2f14a58010",
+      "status" : 200,
+      "url" : "https://api.crossref.org/works/10.1051/0004-6361/201525817"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 39545,
+      "content_type" : "application/json",
+      "raw_file" : "openalex_doi_10.1051_0004-6361_201525817_7ecf18cc18.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:43Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:43 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/json",
+        "Date" : "Mon, 16 Nov 2026 07:37:43 GMT",
+        "x-ratelimit-cost-usd" : "0",
+        "x-ratelimit-credits-used" : "0",
+        "x-ratelimit-limit" : "1000",
+        "x-ratelimit-remaining" : "590",
+        "x-ratelimit-reset" : "58937"
+      },
+      "service" : "openalex",
+      "sha256" : "b884ce08499a6d5fd5eb6027b02c9f509b15ba47c1c753dcd93de7a3c69b6ca7",
+      "slug" : "openalex_doi_10.1051_0004-6361_201525817_7ecf18cc18",
+      "status" : 200,
+      "url" : "https://api.openalex.org/works/https://doi.org/10.1051/0004-6361/201525817"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3922,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1504.01104_9caf3b7a0b.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:45Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:46 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:46 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "9b22df747cce389acfa648224ece6e4ba6b640e864e5e815f66ad3096f9bf5cd",
+      "slug" : "arxiv_id_1504.01104_9caf3b7a0b",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1504.01104"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3098,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2204.08731_82739817e3.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:54Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:54 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:54 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "5ebf92f785f24988de7d422bd233e68959f6e0df1c6f64cd5e9fded665f9250a",
+      "slug" : "arxiv_id_2204.08731_82739817e3",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2204.08731"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2594,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1809.06421_f91804df68.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:37:57Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:37:58 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:37:58 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "4991afcde7aa12789182f505283e0fb6fa6f3f599da588424f764908cc27f68f",
+      "slug" : "arxiv_id_1809.06421_f91804df68",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1809.06421"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2575,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1806.07243_d78604adc3.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:11Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:11 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:11 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "fd14412d80747ed9eccef3d165ca996e5baae041bfcb48c82d89dfedd8f6478e",
+      "slug" : "arxiv_id_1806.07243_d78604adc3",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1806.07243"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3159,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2107.04386_17f867750c.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:15Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:15 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:15 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "bdb25169b650d8a5fe79c0f125a119ac38556c2b488bc0826507ddd9e7c40a0f",
+      "slug" : "arxiv_id_2107.04386_17f867750c",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2107.04386"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3361,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1902.04871_50520a2d1b.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:28Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:28 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:28 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "b8969c9b383de1e048702c3bb6ab350b2f9b4f22b7a68cead14d85fc58557b27",
+      "slug" : "arxiv_id_1902.04871_50520a2d1b",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1902.04871"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3213,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2011.09344_949ba33414.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:31Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:32 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:32 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "367448590c98ab3188f2e8c09265c7ff65bdacae392f748d8e8e21e8c5690313",
+      "slug" : "arxiv_id_2011.09344_949ba33414",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2011.09344"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 3066,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_2107.11238_ab67fb7c26.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:43Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:43 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:43 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "2209a4201e53f1f5112c4cee074227bafaaf8734f4aa2d2fe4fcf46b41f647cd",
+      "slug" : "arxiv_id_2107.11238_ab67fb7c26",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=2107.11238"
+    },
+    {
+      "attempts" : 1,
+      "byte_length" : 2972,
+      "content_type" : "application/atom+xml; charset=utf-8",
+      "raw_file" : "arxiv_id_1903.07712_a41f9699d1.raw",
+      "request_headers" : {
+        "User-Agent" : "ScholarOS/1.2.0"
+      },
+      "requested_at" : "2026-11-16T07:38:46Z",
+      "response_date_header" : "Mon, 16 Nov 2026 07:38:47 GMT",
+      "response_headers" : {
+        "Content-Type" : "application/atom+xml; charset=utf-8",
+        "Date" : "Mon, 16 Nov 2026 07:38:47 GMT"
+      },
+      "service" : "arxiv",
+      "sha256" : "bfe963680dbbb72e6c24da7c19cf03e6088b91350b2344e7a76d6bb02fe924b7",
+      "slug" : "arxiv_id_1903.07712_a41f9699d1",
+      "status" : 200,
+      "url" : "https://export.arxiv.org/api/query?id_list=1903.07712"
     }
   ],
   "meta_files_sha256" : {
+    "arxiv_id_1004.2086_686ab40223.meta.json" : "d14ba867aa68c4f1e867cc9470757a78372ff499fb8eedd3f068249056f55e0a",
+    "arxiv_id_1008.3745_447030b873.meta.json" : "fc419b3216585d890d1b933282278c325abe72806766b5ae07818ad97ce48a00",
+    "arxiv_id_1012.5359_7f498fedf1.meta.json" : "94846299d349f5ea494cb3eaa9bf3eee15f245f8a534e52fc68d9df3ebddb35c",
+    "arxiv_id_1201.3199_3251d30903.meta.json" : "c200aba6b4f8c6ba367e4c19ba45bb59e1b08226900cf11cccc4afb50522419c",
+    "arxiv_id_1304.7762_aac127f4db.meta.json" : "291ba55e02467078f9ffb848e13fb308388d44ede754f0602a1f265b0b2648d2",
+    "arxiv_id_1307.6212_2d41d66664.meta.json" : "49cee3be57cfd47ab0d6c8e06205cfe4a0ff4fb324e788ff97f9381f1b45f376",
+    "arxiv_id_1504.01104_9caf3b7a0b.meta.json" : "59de6abd0fb8d05495e30c807cde6a7a8d3d035e8478103633ce221b5d38c831",
     "arxiv_id_1512.03385_4d9a055064.meta.json" : "f7cfab9ee7c7e0057de1f8d3dcab5aebfa9136ad626b031654464367657209ce",
+    "arxiv_id_1604.01400_ffeb881a08.meta.json" : "855b7dc27fde7844ee3b289ce0d8f20cb99fc21c6da8710448bbd9e8a61ed22d",
+    "arxiv_id_1604.04078_f0fbf87040.meta.json" : "39ae459407879cc2559ff98a7aa5b34823f64ca706a8e3c9a9fde0f85d849a63",
     "arxiv_id_1706.03762_87e6038c6f.meta.json" : "24736c35db141b68bdb8814dfa1d4de51e2c6beb09dcf92ef0247339f8b1c90c",
+    "arxiv_id_1709.05272_30cf2e0160.meta.json" : "ea66ee506a7ee06d458446ef4422a2bf53b75bc0bc5b7985c83a1da0b26c31fe",
+    "arxiv_id_1806.07243_d78604adc3.meta.json" : "d97036a3bba726bfc8984fa1b876271420e0149c5fdf5bbbac3574c76e396c35",
+    "arxiv_id_1807.04972_c22541c080.meta.json" : "14f0f75c520141e0103c5ddd5715c9cabe187fa908fab8932ae965a3922a3e74",
+    "arxiv_id_1809.06421_f91804df68.meta.json" : "d457dc6b5dd37f66303fa260237cd73ed079a059fec6da7c41ea3314e006b9e1",
+    "arxiv_id_1902.04871_50520a2d1b.meta.json" : "99e201f67d14077d684760d6e5d972816197cf95102b708543c8821ebf8b2dff",
+    "arxiv_id_1903.07712_a41f9699d1.meta.json" : "b96d6786858f99019a9fb3e5d0bc14283fe7b11b20764951a831c42432df9e14",
+    "arxiv_id_1912.01361_0ef2bbe20d.meta.json" : "696244b9e43f4cb185e6b15d1f591e9474c21273895ff8f52fd635af806928c5",
+    "arxiv_id_2007.12719_3795826b19.meta.json" : "7b0774459d99ef34f52e0a4d278fdd934a2cf60d46dad8aaf9dd09e41e1ac0a4",
+    "arxiv_id_2011.09344_949ba33414.meta.json" : "e912e311f6424f2ca06c95cadeb8aac73a0e2c24acd6cf00b4794b297034667b",
+    "arxiv_id_2107.04386_17f867750c.meta.json" : "ac5b0babc4db84349f2a7a811cddece4441958322cc0b0b6d51435fc8eb6f73c",
+    "arxiv_id_2107.07597_1277613333.meta.json" : "4294967cc38b98775a353ea5b8e28bece2f88270b744a555af9ddb71866a83b6",
+    "arxiv_id_2107.11238_ab67fb7c26.meta.json" : "26c448f7ec96f748b46fef233108ab00eba6f8843dedc456bb0521a376275651",
+    "arxiv_id_2203.03678_51c705d00d.meta.json" : "eee2626e9865337c3d5a387d9a2bd47867c8caf061690d9061f7ab8efdcf0ab6",
+    "arxiv_id_2204.08731_82739817e3.meta.json" : "de4f58f34489310d9598bd2eb6cbe9731dab893d02b428a64ad387ceedf1dbee",
     "arxiv_id_2205.14135_8d94238ba2.meta.json" : "ac320edc57bcc532b69f6a7ba6007acc7361ca3e5448c4bbeb96002017d0e916",
+    "arxiv_id_2312.08604_e82d0ee9a5.meta.json" : "f144b2257faff290e9b82aa43735cbe2708fdb7f465d798aa81fc8fbdcdfe74e",
+    "arxiv_id_2401.00096_ed6d139841.meta.json" : "483bb2d80fc77eeeb9185a4745d0c6c38d65ca2a1caadf28a52f668350725c83",
     "arxiv_id_2401.99999_1af2e6c60c.meta.json" : "bdae32168ecd506250c2bc5573b42f0ba3824140e6430841d0347972d0dffb72",
+    "arxiv_id_astro-ph_0306023_03470f9a61.meta.json" : "d392d1b9ccc1f343ff9bb7479aa864c4d36ce5d9e17af8dfaee411c6c7b639bc",
+    "arxiv_id_astro-ph_9706252_2a3ae23a26.meta.json" : "011df91b7b14fe17cc9ee9d74609402029198ca664a8141f220db4cc450b39d1",
     "crossref_doi_10.1002_net.1975.5.1.45_2601a7beca.meta.json" : "67eb2f518ea3453a8ea1a5de091afb2e833d66427f78da55841a865b678088de",
     "crossref_doi_10.1002_sapm195938177_5050262597.meta.json" : "9fd9f9164b4ce5f4c3669e54c104130d60d143af10ff82dad1bfe0fbc8a3d60b",
     "crossref_doi_10.1002_sia.740150219_2e3acae4df.meta.json" : "fa699271a26516e243a552642b19721177340c98656de54aabe343a3f2988f46",
@@ -16419,6 +17658,7 @@
     "crossref_doi_10.1007_s10722-024-02117-w_d45ec0ddb2.meta.json" : "d7d90e0d7ac0cb888ad2789414825526eef49dd45fa2f49f9882590749b689b4",
     "crossref_doi_10.1007_s10924-023-02861-7_d4288686ac.meta.json" : "2bcb93bb0abb213a266bad6a5398002ad802fc0bbf30249ea656d64e323820fc",
     "crossref_doi_10.1007_s11005-004-3760-2_64137d0bd9.meta.json" : "be5415eb5994669cde707749c74c61effca64808a2741d1509e6d7d8906be990",
+    "crossref_doi_10.1007_s11207-012-9940-9_f93ed58de2.meta.json" : "eed7a8b532015b12af698f580ef050b785903ddb39b97b2a8baf8da284927829",
     "crossref_doi_10.1007_s11265-017-1293-z_90017ef19c.meta.json" : "94e0b81da92d9d7e043b65a60d919a86b1284706f45be0c3dee6cca2b491935b",
     "crossref_doi_10.1016_0009-2614_95_00942-w_a3d14caa05.meta.json" : "4bd315192c3302d031066ae176050adabe92c083c37ad635b1c5fe9dca75c615",
     "crossref_doi_10.1016_0022-0531_92_90054-l_65fa512272.meta.json" : "e2cbabb9bbbcf79e2429370a425526269b2efce456940497bb5e746ca2c27975",
@@ -16489,13 +17729,18 @@
     "crossref_doi_10.1038_171737a0_acacff2238.meta.json" : "74846770797846cf83cd17d265fca03b4f77dfaf278eb747cf84e9bd7a7cef07",
     "crossref_doi_10.1038_fake.2026.99999_1138775f70.meta.json" : "5b94b4f68a4e152e4e2eeaaf460ebfef1a4ee185eeeaae7338b2780836205aef",
     "crossref_doi_10.1038_nature14539_2019f44854.meta.json" : "1d44fcaa691ceaac4d7d53b6d91a8b54bae90265fcd736b3113db10dd24f02b6",
+    "crossref_doi_10.1038_nature17197_d9b988c60d.meta.json" : "19e20ff7017aeeb18c815ca6bae17efa8c4a10ed979bf16628795dd2ee45295f",
     "crossref_doi_10.1038_nbt0517-481a_cebc5a3128.meta.json" : "f9695e1271e598a3f08402de688a643580f011879d99b15d59564568a320fec1",
     "crossref_doi_10.1038_nbt0808-881_7eccc0bbbc.meta.json" : "a056ae92509b458d1163f8baf89f4b4bbd7c73e090bf342f2386af1db5d6db83",
     "crossref_doi_10.1038_s41467-023-38842-6_2a52d2241e.meta.json" : "3323df2e40014c3d443bec0936105b684adea17d26c80945a5a2c8793b16e66c",
     "crossref_doi_10.1038_s41557-023-01212-2_cb8c495947.meta.json" : "22731d629279ab0b5e0ad1b1d6a28d01d6dabf4f555e1bf2a008b7ae393847a7",
     "crossref_doi_10.1038_s41598-025-94125-8_bf21c78d4d.meta.json" : "5261ee29192d319ed9dfdb5d470fc3eecd2ac2677642692165fe1d4fd809da2c",
     "crossref_doi_10.1038_srep10350_9b843096f0.meta.json" : "6987d647b0d82c3c56a13d099a2afb25fdcda4a2d114d3aaf251e397c487cfa3",
+    "crossref_doi_10.1051_0004-6361_201016054_3b70aa25dd.meta.json" : "4608636bfc08dc642ab8bde5b11d1a3a9380282069a6b10d4c4775516517c564",
+    "crossref_doi_10.1051_0004-6361_201322068_fcab43c622.meta.json" : "11435f56141acf78fd19456e52656004eb55d4fd0eef543f27d9b8dfc8c03d83",
     "crossref_doi_10.1051_0004-6361_201424548_c2fd188ece.meta.json" : "c33cca5e72de2449e7486129f1bcd29b8ced1c213ab70875d4596f3efd9c22d7",
+    "crossref_doi_10.1051_0004-6361_201525817_2f14a58010.meta.json" : "c2f253cb4e084788c898a0dc182f38181ef0b98ce8e270ee01a5b33231ac53eb",
+    "crossref_doi_10.1051_0004-6361_201936255_a3505d45ee.meta.json" : "6e85fe7d41f68ddcd063978779ca703f8abb35a8a4c067b4c6769454542bdf3b",
     "crossref_doi_10.1051_0004-6361_202346167_94ce5ceacd.meta.json" : "0387b9506c4f4bf11cbab6a0826b25061f8b3e1daea7f0808f9a80aa8b273951",
     "crossref_doi_10.1051_m1missing.ngfx8u2bbz_d0b00f1905.meta.json" : "856455e28c355dd356dd5130b3d9d3bcf74b84e4c065e8f517f8f6d97b4f8424",
     "crossref_doi_10.1051_matecconf_201930005012_fe26a12fd4.meta.json" : "c2a97d75f61d364cabc7d66a7e88e1a8b53393694bf39d28fcd46db6e73a069c",
@@ -16517,6 +17762,8 @@
     "crossref_doi_10.1080_17430437.2025.2510953_54923e470c.meta.json" : "66bcdb695fa1c8cda4b9b3e4ef51eea045f329866518616702499b14cafa5143",
     "crossref_doi_10.1080_m1missing.eujn6wtp6n_3183ebe1da.meta.json" : "ea0a13fdfc7f5c2208696f0d91941561e21ebebefccf1339d153f1ef43256832",
     "crossref_doi_10.1080_m1missing.w2vnqwbzuu_d4cdca4036.meta.json" : "5934793396547ab184d26c43c352a06a136e0379dc0d0943ed7b54120c9267f9",
+    "crossref_doi_10.1086_304823_0b7e88d533.meta.json" : "c5bddf7ac5d145209c9a5708a3dd667bdcfd615b1c537e8596545d7157018c08",
+    "crossref_doi_10.1086_375320_ec338656b1.meta.json" : "0e7fc69743a1da37c500bf11398c7534db0cf0fe14fa45f3d1fc5f4fba866d15",
     "crossref_doi_10.1088_1674-1056_abd468_7a4f3adeaf.meta.json" : "edf355841b3577411d52a37bc77dd72e403e970c2f57b6c7ccb63e2c8845a824",
     "crossref_doi_10.1088_1751-8121_aa86c6_90045287d1.meta.json" : "d36fbcff8a47e2f770479369f6afc3a0788365aaafcfb5efa63883ef6d5d8115",
     "crossref_doi_10.1093_bib_bbab454_90fe2dded5.meta.json" : "b4b3a3ef4881dda30be2a4f7b98836e51e64614d0d11d6b9597004b006715029",
@@ -16532,6 +17779,7 @@
     "crossref_doi_10.1097_00001888-199311000-00010_1eaf56db96.meta.json" : "694e98738b0d6afbace0ba524649646d0bd63beba2a4825ecf36e9c21d2d69e3",
     "crossref_doi_10.1097_m1missing.d8r7yzzhwg_d407fe33f1.meta.json" : "2ddf55727065aa495c6b682ba2ded1ddac297cb2e27e3233745f635cda8ba959",
     "crossref_doi_10.1103_physreva.67.032302_e0fada4aee.meta.json" : "7b4674e3fe8b46b6eca93b66e08450978cfe1807b9676098c7051157b9a90138",
+    "crossref_doi_10.1103_physrevb.83.035107_40a8ce3b8d.meta.json" : "f79cad29f47792edbb9bca3844de5264ada37b2b4f9c23a83ece2967f6af7f6c",
     "crossref_doi_10.1103_physrevb.93.201103_61b80ff05d.meta.json" : "757f90abfe311a4bde6f46393ca318b2ce28ee323f952a1b86382fd87734d60b",
     "crossref_doi_10.1103_physreve.70.032901_a170a141d8.meta.json" : "0003db4b164b45ee6bf85664293ec635a03de14756a19382b6cb17c6bf9cde32",
     "crossref_doi_10.1103_physreve.72.021906_985ceafffe.meta.json" : "d769323b06058c3a41dfa76b0d5a1a346da8024e0cd915ac2b3d9bc6f3a0e488",
@@ -16559,6 +17807,7 @@
     "crossref_doi_10.1121_1.5134578_34572ff3b4.meta.json" : "b480d4dcb500afcf505dcad979833787adf69e11e93c75c4f661323b16b7353a",
     "crossref_doi_10.1134_1.1842301_5167641404.meta.json" : "dbb07c7ed4dacc4650f6a5bc0259d2191d7784eda9f7d10638736e91fce0f3a7",
     "crossref_doi_10.1137_16m1063885_9636d363c2.meta.json" : "68d930578acec8122fd98917827a82134b665f075f287410eb591d8fa890c998",
+    "crossref_doi_10.1137_21m1434180_a563fe0140.meta.json" : "7331b4f2d424c4341267bb6e2f60c85e4c7798b30769d2804d8838734f2bf987",
     "crossref_doi_10.1137_s0363012995281626_a6f1209718.meta.json" : "1557adf1c30acec72c5abb5b8d1093d1fffe6470d362e4b873ab6dc2693edbf6",
     "crossref_doi_10.1140_epjb_e2009-00386-9_fada241a51.meta.json" : "025d49e5417101577df7e01f4e76b4336fbf17088558bbabf0aeff194af2b544",
     "crossref_doi_10.1140_epjp_s13360-023-04022-0_b196b0a403.meta.json" : "b236c2d4720fed437731098867e4eb5f5e9af8b00b40ae678d15ee39401e4430",
@@ -16566,11 +17815,13 @@
     "crossref_doi_10.1143_jpsj.77.123002_034ec44a57.meta.json" : "8fec326d7b1f0ce85478ecac1499af90480b637599098011bb4496e2b8d886e6",
     "crossref_doi_10.1145_1596519.1596520_fc9ae42078.meta.json" : "7d844081f6aaa310ed7d3f2fe9045e8f24aace72378b199b93d684c47fc59153",
     "crossref_doi_10.1145_274790.273181_9ce7c20b78.meta.json" : "5586dd60235aeccaea09e3acfb65161b50787a4fa68e0ed062ca959f3fb75145",
+    "crossref_doi_10.1145_3409256.3409820_fe890fb068.meta.json" : "847c96209680b8da92888d5f5e72c68968843ad5a526188484e6a8da1973f59f",
     "crossref_doi_10.1145_3447928.3456652_e6040cdff4.meta.json" : "6d4dc0b83874278e483111913ff27dbb640d538c7c0bbb7430241a4e527cc4d7",
     "crossref_doi_10.1145_362929.362947_3fb84b6447.meta.json" : "58001ebdaecf8435aade29448def1bbebd5b5fe31402806f04503dbad1faa78e",
     "crossref_doi_10.1145_367766.368168_a44b9f5905.meta.json" : "0a0ad7c9b4006b8b1fcafc3027c8f7d5e43626bcb80d1dffe4aca59e0d2cd50e",
     "crossref_doi_10.1145_6138.6149_9b2db2b15c.meta.json" : "90e04bba7e7292ecd89449534472984ff15dfc46b6c625fa2954bd3e40545e71",
     "crossref_doi_10.1145_m1missing.8n6s6svafb_17f868ae70.meta.json" : "6114da4231287e2a10238116b1f8ce6a08b86692df8785bb9c9d0699cab3dffa",
+    "crossref_doi_10.1146_annurev-astro-082708-101811_04216b42d3.meta.json" : "823ff253cc01894e209c1cce7d9967ac6358c1c0a7ecaf34cc6a65183a9e81a6",
     "crossref_doi_10.1149_232.01180ecst_5277560b07.meta.json" : "3199eb2e6c8c69ea60b4f2ae9e0204ea73630df729814a5d0dfa45ca328a575b",
     "crossref_doi_10.11606_issn.1983-6023.sank.2008.88723_21317ffd5a.meta.json" : "caddd493eef87e8e17b584c0fca0e2439eaa8535cc51932111c859dc501d94e8",
     "crossref_doi_10.1162_neco.1997.9.8.1735_7bd3eaa382.meta.json" : "daa5547e7e3d9772cc05c5d93ff1e38981243fe463cc36cbc02af5a206e6e53e",
@@ -16631,6 +17882,8 @@
     "crossref_doi_10.3390_s8127866_980f048fc0.meta.json" : "3fa3a76d8c1911b44ae8739f5f7e6a5793540f10b2d9bcefc91f8287044e8d73",
     "crossref_doi_10.3390_su14138213_0b0aba7099.meta.json" : "0cd5246b2b3a412d8f59c9331f6d123ab755402a5aed222513c1ddef0974f9d5",
     "crossref_doi_10.3390_w13213024_a4f93da754.meta.json" : "7aafc2c08daef9fdcf5ca3ee1a233b21737d6f716a09964425d5035b061942f9",
+    "crossref_doi_10.3847_0004-637x_823_2_82_cb55991c56.meta.json" : "c1c4e7fa0f2fef13d96ebc239a5367f28ef9f01d502203bafdb3da29a669af98",
+    "crossref_doi_10.3847_1538-3881_ac5ea4_6ce9d92471.meta.json" : "d2d9ec44680f4f62e5e9eb4dff880ed0da4810f1a2088e262341ee3e999cc83d",
     "crossref_doi_10.3847_1538-4357_aad3bc_cf78258c04.meta.json" : "be199a435d78bc78a7572004a19df4ab043d7b3f399e28fd5a6de32c98b71cca",
     "crossref_doi_10.3892_ijo.24.1.107_c88629c144.meta.json" : "8b19f8c1566deb2547c007882e661be291aad54ab3623f9ba1ed7afafccf6caa",
     "crossref_doi_10.3892_m1missing.auh68gszf6_f104d47dbf.meta.json" : "ff20c236b0a8dc7471101ebb8afeb0b34bd0805b1a255c1054bfd6b6a0feb9ae",
@@ -16809,6 +18062,7 @@
     "openalex_doi_10.1007_s10722-024-02117-w_9d1089cf82.meta.json" : "a5fd4a271adc3ef37d132a63600f81f15a613e3645451b49ff8a22c929f5583e",
     "openalex_doi_10.1007_s10924-023-02861-7_8797d23c10.meta.json" : "e9e1c69a49959779423735374ccf155a6a8c12b144d89b5042a2ee83c72c56a5",
     "openalex_doi_10.1007_s11005-004-3760-2_5443c7722b.meta.json" : "640606d55a2c4837611787a238c429ed9c1a917ee81a2f89412ac95f12f88816",
+    "openalex_doi_10.1007_s11207-012-9940-9_1edbb51925.meta.json" : "e2bb40feed1c474fa7a8657595b020d41696ac76159eb35cd6d9f39df68017d2",
     "openalex_doi_10.1007_s11265-017-1293-z_c705db83b0.meta.json" : "ed06e63d3b6fb827080ea91b8937c0a6d960385868d59ec6330a105ba82b9b31",
     "openalex_doi_10.1016_0009-2614_95_00942-w_880e64c2be.meta.json" : "14d9406a7d8f8fd8476109e03258cf3d7cd089ef0e29d66ab3757fd8b445d969",
     "openalex_doi_10.1016_0022-0531_92_90054-l_1077f2dd99.meta.json" : "68f0c246bfd6c6890636729ecd3a18b643486eab8a1a1b398d90f6ce02524bb1",
@@ -16879,13 +18133,18 @@
     "openalex_doi_10.1038_171737a0_5344f8b191.meta.json" : "b0d4302674d25938650763bd968d4cd5eadb76ad94a29e0195caceb5b5e2cd64",
     "openalex_doi_10.1038_fake.2026.99999_fcda3cff0b.meta.json" : "e265dbe3619ff17d01fa86501c9cf07ce9f34aee2e0e5494a9cf2b541f246e3a",
     "openalex_doi_10.1038_nature14539_04360041c9.meta.json" : "a2ac27f4fb692e3039522f3ec7a3741e3106f9f800bd893f19962e5c4d804308",
+    "openalex_doi_10.1038_nature17197_148c087a94.meta.json" : "879b12eb789ae4957135115f5b4f1548dc932936976f611c44c562982b917d58",
     "openalex_doi_10.1038_nbt0517-481a_b2c83d2cbe.meta.json" : "f4a8e2de3f86e35a9c7c141a615fa9c635fcd5460423a7ec16a8c543e199c9fa",
     "openalex_doi_10.1038_nbt0808-881_02176ad96e.meta.json" : "23e2ef3bc00c42444cd10a57d164cd0aea7c8374791d427d99652bf63c697a3e",
     "openalex_doi_10.1038_s41467-023-38842-6_e1be061949.meta.json" : "d2b853d53c7af50d5c39ddfef246bafeed11adcc40a3282f1a808b12c354aa3b",
     "openalex_doi_10.1038_s41557-023-01212-2_620e905d02.meta.json" : "860be71d6b8e017858db8b1481812eef3761cbfeedeccaa9e3373537fec0d8f3",
     "openalex_doi_10.1038_s41598-025-94125-8_72cb3e6a0a.meta.json" : "0673d6ef61a0456cff1614406c28cb4819951a728116a6ee62b57398772277cc",
     "openalex_doi_10.1038_srep10350_cbf57464a1.meta.json" : "e2b83d4680a1127a0e77f9ee066c22143e8cc75f482476e28d7da7af17bb1d35",
+    "openalex_doi_10.1051_0004-6361_201016054_d1b9b6c445.meta.json" : "3753beb57a6383063e649bce205bd8db3e9dc0051f9d9d3f684c9021d1ee42e2",
+    "openalex_doi_10.1051_0004-6361_201322068_b1ba860351.meta.json" : "60c84fe011856711760eba9e5a6398e9e9fcc06a2b5ac3563e7b3c03bf015427",
     "openalex_doi_10.1051_0004-6361_201424548_08d9f1b9d7.meta.json" : "33eccda5a2ceedcf111a48a7bdde7bde8c10eb11d80155fd55c887a4903e67ce",
+    "openalex_doi_10.1051_0004-6361_201525817_7ecf18cc18.meta.json" : "e489e79614dbe8ca0ccbe37d84f691ddee5aa9e7cf2f9c55dc9bbc6b3d8948e9",
+    "openalex_doi_10.1051_0004-6361_201936255_62d94dbc9a.meta.json" : "91fc5fb5799e36fca69eaeb8ff678a01574f28c28ddade98a3f84ab0075de311",
     "openalex_doi_10.1051_0004-6361_202346167_224a08625b.meta.json" : "e96279e1a82b164418d436b22c9472f4cb8f95e04ab839cbfe5ec37df752f900",
     "openalex_doi_10.1051_m1missing.ngfx8u2bbz_c999841074.meta.json" : "36ea2dd439a520cba4073987febeba113d9a53e4a036f7b439f128b3b3eb6b24",
     "openalex_doi_10.1051_matecconf_201930005012_33677fa467.meta.json" : "c7d10a8581959d56d62599d364085b5a1a152bdc1756d7f1228fe0de9d9e2e12",
@@ -16907,6 +18166,8 @@
     "openalex_doi_10.1080_17430437.2025.2510953_21778479f0.meta.json" : "5591bd3e2c9d682142c87f4bd234646b30dc7eec7bd18c8624f890c4f96a8e14",
     "openalex_doi_10.1080_m1missing.eujn6wtp6n_f6fc58de87.meta.json" : "00f4ff6325cdba00dc611dd7a4915c65c8fa05ef4c6942fe2c89505204e74a9a",
     "openalex_doi_10.1080_m1missing.w2vnqwbzuu_9d27ff60d2.meta.json" : "9eb985e44e22b586b5471e43db953fcfaec7a595cd59750e2e638ab0f79c4e4c",
+    "openalex_doi_10.1086_304823_7f74a230bc.meta.json" : "c70a14925457940d181bc2aef42a575ed6c4c3b60f91eb297b52ce904cbe20ad",
+    "openalex_doi_10.1086_375320_157a49d659.meta.json" : "ae9c8675d507bd0ec020a55a7c2ab7c11062eb1d746e83638ff54347f5f719c7",
     "openalex_doi_10.1088_1674-1056_abd468_f49a8c493b.meta.json" : "5a8d34b5d91d5c29ec4f9c3463ebeed2a3f88214ba055c136a975ae17b634915",
     "openalex_doi_10.1088_1751-8121_aa86c6_9c487d98f3.meta.json" : "65c9796e35dca91f0827f0a8ee31ff2d9752ec936db4be227f49012a558dec27",
     "openalex_doi_10.1093_bib_bbab454_87db78e9a4.meta.json" : "02d487aa563f7c6fbd1b7c8e57a1790cb0ed66dc785c0559e795a5f38dfb3969",
@@ -16922,6 +18183,7 @@
     "openalex_doi_10.1097_00001888-199311000-00010_31c29f2067.meta.json" : "9390d03b5ec0229342c12d9810ac925cd3f95a5a7fbb1dd1b22bba5ddd9d3614",
     "openalex_doi_10.1097_m1missing.d8r7yzzhwg_58dbce45d1.meta.json" : "cd713f9bf52dd527f3707ca019a56b1e5b2dc4d4301104f301beab66c1e2b9c7",
     "openalex_doi_10.1103_physreva.67.032302_0b6bfdf1d4.meta.json" : "a3e12fae7d375034c0ccb0768322a8e8404debb983ef1cdbad4819c3e734a679",
+    "openalex_doi_10.1103_physrevb.83.035107_24003ba434.meta.json" : "03a3c7ea5c5d382c4257ddbb66978f80d26123bbe262bc36ec00ea5204775219",
     "openalex_doi_10.1103_physrevb.93.201103_b42b8e4659.meta.json" : "9f8089ee0df4cc3aa55e568de87b6e2305845367e1096a4a9cfedbc5b3ba5637",
     "openalex_doi_10.1103_physreve.70.032901_ee54aaae73.meta.json" : "9ca695381d8a97c1a546dfdb60b4499a6c61194a354b4df0acca514f46256af6",
     "openalex_doi_10.1103_physreve.72.021906_b642289bd8.meta.json" : "01800682e2c3e95f1cc8b924a33ba68e4dd86ef304d47074b785bf4a450f1c1c",
@@ -16949,6 +18211,7 @@
     "openalex_doi_10.1121_1.5134578_f95eaaf2c3.meta.json" : "c7a2e3b8c64a054488dfc0d223f4324a9b35109dcf6ef2d94c8741e5e1ff6ada",
     "openalex_doi_10.1134_1.1842301_95af2e421a.meta.json" : "d016ed7fcaa12e4a69d5dfaaef8b702977356a85a794c6a6d1b1ac9a82fb6911",
     "openalex_doi_10.1137_16m1063885_d29b5a506b.meta.json" : "b4e0228e1b04e7b1598aa8cc2575e72fb3cee9db4d374d9390698e6398478afe",
+    "openalex_doi_10.1137_21m1434180_e42be1e673.meta.json" : "02e857ab86204c2671358720fe013cb616ad9099be355ffa4c44560783e36599",
     "openalex_doi_10.1137_s0363012995281626_dcc015802a.meta.json" : "457cd06026e1bdc9d30516081b1e76bc26a949827fb66171bc21ff04f1b8c7d6",
     "openalex_doi_10.1140_epjb_e2009-00386-9_ad7738910c.meta.json" : "fac58d18752b2a5a43737360bf0befd9da1f077da1b6aa5dc5411c3ae061b527",
     "openalex_doi_10.1140_epjp_s13360-023-04022-0_e90f7aa4a1.meta.json" : "75d0ee289d6c3c119fdb0014cf36494f3b4a26a69cdfa6b7144d5fafe45cbf42",
@@ -16956,11 +18219,13 @@
     "openalex_doi_10.1143_jpsj.77.123002_40e364bbe0.meta.json" : "cd7b50e16467a29914cdaa5abd5cef937edff8b68c1a78b303941688a381722f",
     "openalex_doi_10.1145_1596519.1596520_89be25f126.meta.json" : "fdc90be832daaf438624ec3930b6f96352a065d394c299211f8a9abeb11be067",
     "openalex_doi_10.1145_274790.273181_c449cba04e.meta.json" : "3ce6b2c67083ba1649cad8c14367e7e0b39d72b389272a75cf09f7060cdc4e07",
+    "openalex_doi_10.1145_3409256.3409820_c0bc7491cc.meta.json" : "53bfde8b9515fa3e50c0ed61a8f78140cc0e38b996f573f1c215a3d5aa4a7cb9",
     "openalex_doi_10.1145_3447928.3456652_68fec81e1a.meta.json" : "328cf69cb3ccf206f055b70330276a8cd2d9663685e3143f037f3c1189644ccf",
     "openalex_doi_10.1145_362929.362947_11cf271a6c.meta.json" : "337765cc9f86bafc998b7f4d62be9a827c2a4eea25d9b3d401f29876a73063e9",
     "openalex_doi_10.1145_367766.368168_57ac31a4fb.meta.json" : "d0af55a34cf41e8d1f78e6f1f3acb449392ac73de8073f4008e39635cb85a398",
     "openalex_doi_10.1145_6138.6149_c3cf96849f.meta.json" : "86ce38aac5a8f395cd5ccb7ac9a7fee48aa4d232be1761cb8a288d7605e894c5",
     "openalex_doi_10.1145_m1missing.8n6s6svafb_fb3b5922de.meta.json" : "790be76858a8368b0cfc9fb670e085ccc31b9b39b98d59e998ba82a302bd9049",
+    "openalex_doi_10.1146_annurev-astro-082708-101811_32a5ec5e69.meta.json" : "4d58dc1c63f1d01143e588b5fd2aed19e6966fa22f1c30baf48566b1183fb3ec",
     "openalex_doi_10.1149_232.01180ecst_fe523ef9a6.meta.json" : "1eb0ffd6d0cd3ae97260404cf7d945573b3bb88cfa13076e9e35abf61672a9b3",
     "openalex_doi_10.11606_issn.1983-6023.sank.2008.88723_57ee80da5f.meta.json" : "03f395b0d7cb7bddbb1fe3501de8ec0720650e048e103fe3428397542c460859",
     "openalex_doi_10.1162_neco.1997.9.8.1735_988238be1d.meta.json" : "13f2fa8e8a86f0347a19f6c2738b1ccda7d1031cc9a2d71535554e4fae5a551e",
@@ -17021,6 +18286,8 @@
     "openalex_doi_10.3390_s8127866_d17530be2c.meta.json" : "bf057da939f283528c92ac50d055fea57ad626fda851310f3a99ed05d093b413",
     "openalex_doi_10.3390_su14138213_e3bbb3e68b.meta.json" : "7640daa15808482e33c4f1ebfd48cf9d3daf7cb79266d88a6a16374389153be4",
     "openalex_doi_10.3390_w13213024_d8e124b2c3.meta.json" : "75d05797cda18e016642571ef2ccc6e8e71537f3ac186eacac728068a1e5e372",
+    "openalex_doi_10.3847_0004-637x_823_2_82_1cd0ad232b.meta.json" : "d8da0c0ea123a68657ae88bbd69f79ce83927eef390838391e1f98153b8bbbc2",
+    "openalex_doi_10.3847_1538-3881_ac5ea4_fa29a14ec6.meta.json" : "5657ddc7e6454790e46cb9286c877c474a794ef0849432010f8145058c2bc2b8",
     "openalex_doi_10.3847_1538-4357_aad3bc_5c056d8e22.meta.json" : "ed33556752f08e9344ff57b49fe952ae47134c42ce2a8056b8a5246f0ff12566",
     "openalex_doi_10.3892_ijo.24.1.107_07f85cc545.meta.json" : "bf103ffdfa89b941f84bb24054242a73317d62113f1c16eeae06761cb79fc306",
     "openalex_doi_10.3892_m1missing.auh68gszf6_11810fa3a9.meta.json" : "1fcd7f985a1293c2f8a3df02a3ce241160d79fc1d58a9fc4e04efa0c1bc30697",
@@ -17086,6 +18353,6 @@
     "pubmed_pmid_99999999_a0824e6a33.meta.json" : "95534edf6cfc21ec3f9014bbb651e95df795681a77c5298d44eeec779ea9a58f"
   },
   "started_at" : "2026-11-16T02:39:27Z",
-  "total_http_requests_sent" : 693,
+  "total_http_requests_sent" : 748,
   "user_agent" : "ScholarOS/1.2.0"
 }

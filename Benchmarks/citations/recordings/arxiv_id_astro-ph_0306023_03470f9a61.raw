@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/GD5J+v6t8qXcOap3uFbRIJ0ZaFY</id>
+  <title>arXiv Query: search_query=&amp;id_list=astro-ph/0306023&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:27Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=astro-ph/0306023" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/astro-ph/0306023v1</id>
+    <title>A New Empirical Model for the Structural Analysis of Early-type Galaxies and a Critical Review of the Nuker Model</title>
+    <updated>2003-06-02T00:26:52Z</updated>
+    <link href="https://arxiv.org/abs/astro-ph/0306023v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/astro-ph/0306023v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  The Nuker law was designed to match the inner few (~3-10) arcseconds of predominantly nearby (&lt; 30 Mpc) early-type galaxy light-profiles; it was never intended to describe an entire profile. The Sersic model, on the other hand, was developed to fit the entire profile; however, due to the presence of partially depleted galaxy cores, the Sersic model cannot always describe the very inner region. We have therefore developed a new empirical model consisting of an inner power-law, a transition region, and an outer Sersic model to connect the inner and outer structure of elliptical galaxies. Moreover, the stability of the Nuker model parameters are investigated. Surprisingly, none are found to be stable quantities; all are shown to vary systematically with a profile's fitted radial extent, and often by more than 100%. Considering elliptical galaxies spanning a range of 7.5 magnitudes, the central stellar density of the underlying host galaxy is observed to increase with galaxy luminosity until the onset of core formation, detected only in the brightest elliptical galaxies. We suggest that the so-called ``power-law'' galaxies may actually be described by the Sersic model over their entire radial range.</summary>
+    <category term="astro-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2003-06-02T00:26:52Z</published>
+    <arxiv:primary_category term="astro-ph"/>
+    <arxiv:journal_ref>Astron.J., v.125, p.2951 (2002)</arxiv:journal_ref>
+    <author>
+      <name>Alister W. Graham</name>
+    </author>
+    <author>
+      <name>Peter Erwin</name>
+    </author>
+    <author>
+      <name>Ignacio Trujillo</name>
+    </author>
+    <author>
+      <name>Andres Asensio Ramos</name>
+    </author>
+    <arxiv:doi>10.1086/375320</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1086/375320" title="doi"/>
+  </entry>
+</feed>

@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/ytbt3fAxlJaftK/ysVDTYiUePCk</id>
+  <title>arXiv Query: search_query=&amp;id_list=1902.04871&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:38:28Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1902.04871" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1902.04871v1</id>
+    <title>The Role of a Tiny Brightening in a Huge Geo-effective Solar Eruption Leading to the St Patrick's Day Storm</title>
+    <updated>2019-02-13T11:59:48Z</updated>
+    <link href="https://arxiv.org/abs/1902.04871v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1902.04871v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The largest magnetic storm in solar cycle 24 was caused by a fast coronal mass ejection (CME) that was related to a small C9.1 flare that occurred on 15 March 2015 in solar active region (AR) NOAA 12297. The purpose of this study is to understand the onset mechanism of the geo-effective huge solar eruption. We focused on the C2.4 flare that occurred prior to the C9.1 flare of the filament eruption. The magnetic field structure in the AR was complicated: there were several filaments including the one that erupted and caused the CME. We hence carefully investigated the photospheric magnetic field, brightenings observed in the solar atmosphere, and the three-dimensional coronal magnetic field extrapolated from nonlinear force-free field modeling, using data from Hinode and Solar Dynamics Observatory. We found three intriguing points : (1) There was a compact but noticeably highly twisted magnetic field structure that is represented by a small filament in the C2.4 flaring region, where a tiny precursor brightening was observed before the C2.4 flare. (2) The C2.4 flaring region is located in the vicinity of a foot point of the closed field that prohibits the filament from erupting. (3) The filament shows a sudden eruption after the C2.4 flare and accompanying small filament eruption. From our analysis, we suggest that a small magnetic disturbance that was represented by the tiny precursor brightening at the time of the C2.4 flare is related to the trigger of the huge filament eruption.</summary>
+    <category term="astro-ph.SR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2019-02-13T11:59:48Z</published>
+    <arxiv:comment>18 pages, 7 figures, accepted by the Astrophysical Journal. There is an animation file that is corresponding to Figure 3 exist but it is not available here. Please see the ApJ publication</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.SR"/>
+    <author>
+      <name>Yumi Bamba</name>
+    </author>
+    <author>
+      <name>Satoshi Inoue</name>
+    </author>
+    <author>
+      <name>Keiji Hayashi</name>
+    </author>
+    <arxiv:doi>10.3847/1538-4357/ab06ff</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.3847/1538-4357/ab06ff" title="doi"/>
+  </entry>
+</feed>

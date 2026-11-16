@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/Hc64TwEn2GNV3N3jVHJgPmozW8g</id>
+  <title>arXiv Query: search_query=&amp;id_list=1604.04078&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:31Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1604.04078" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1604.04078v1</id>
+    <title>The instability and non-existence of multi-stranded loops, when driven by transverse waves</title>
+    <updated>2016-04-14T08:54:50Z</updated>
+    <link href="https://arxiv.org/abs/1604.04078v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1604.04078v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>In recent years, omni-present transverse waves have been observed in all layers of the solar atmosphere. Coronal loops are often modeled as a collection of individual strands, in order to explain their thermal behaviour and appearance. We perform 3D ideal MHD simulations to study the effect of a continuous small amplitude transverse footpoint driving on the internal structure of a coronal loop composed of strands. The output is also converted to synthetic images, corresponding to the AIA 171 A and 193 A passbands, using FoMo. We show that the multi-stranded loop ceases to exist in the traditional sense of the word, because the plasma is efficiently mixed perpendicularly to the magnetic field, with the Kelvin-Helmholtz instability acting as the main mechanism. The final product of our simulation is mixed loop with density structures on a large range of scales, resembling a power-law. Thus, multi-stranded loops are unstable to driving by transverse waves, and this raises a strong doubt on the usability and applicability of coronal loop models consisting of independent strands.</summary>
+    <category term="astro-ph.SR" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2016-04-14T08:54:50Z</published>
+    <arxiv:primary_category term="astro-ph.SR"/>
+    <author>
+      <name>N. Magyar</name>
+    </author>
+    <author>
+      <name>T. Van Doorsselaere</name>
+    </author>
+    <arxiv:doi>10.3847/0004-637X/823/2/82</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.3847/0004-637X/823/2/82" title="doi"/>
+  </entry>
+</feed>

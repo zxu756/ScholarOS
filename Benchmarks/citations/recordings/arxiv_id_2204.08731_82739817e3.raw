@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/dvPsub6kEhjopqVMZtD5q0y8mh8</id>
+  <title>arXiv Query: search_query=&amp;id_list=2204.08731&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:54Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2204.08731" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2204.08731v1</id>
+    <title>Protostellar and Protoplanetary Disk Masses in the Serpens Region</title>
+    <updated>2022-04-19T08:18:39Z</updated>
+    <link href="https://arxiv.org/abs/2204.08731v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2204.08731v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present the results from an Atacama Large Millimeter/Submillimeter Array (ALMA) 1.3 mm continuum and $^{12}$CO ($J=2-1$) line survey spread over 10 square degrees in the Serpens star-forming region of 320 young stellar objects, 302 of which are likely members of Serpens (16 Class I, 35 Flat spectrum, 235 Class II, and 16 Class III). From the continuum data, we derive disk dust masses and show that they systematically decline from Class I to Flat spectrum to Class II sources. Grouped by stellar evolutionary state, the disk mass distributions are similar to other young ($&lt;3$ Myr) regions, indicating that the large scale environment of a star-forming region does not strongly affect its overall disk dust mass properties. These comparisons between populations reinforce previous conclusions that disks in the Ophiuchus star-forming region have anomalously low masses at all evolutionary stages. Additionally, we find a single deeply embedded protostar that has not been documented elsewhere in the literature and, from the CO line data, 15 protostellar outflows which we catalog here.</summary>
+    <category term="astro-ph.SR" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="astro-ph.GA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-04-19T08:18:39Z</published>
+    <arxiv:comment>14 pages, 9 figures, 3 tables, accepted to ApJ</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.SR"/>
+    <author>
+      <name>Alexa R. Anderson</name>
+    </author>
+    <author>
+      <name>Jonathan P. Williams</name>
+    </author>
+    <author>
+      <name>Nienke van der Marel</name>
+    </author>
+    <author>
+      <name>Charles J. Law</name>
+    </author>
+    <author>
+      <name>Luca Ricci</name>
+    </author>
+    <author>
+      <name>John J. Tobin</name>
+    </author>
+    <author>
+      <name>Simin Tong</name>
+    </author>
+    <arxiv:doi>10.3847/1538-4357/ac8ff0</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.3847/1538-4357/ac8ff0" title="doi"/>
+  </entry>
+</feed>

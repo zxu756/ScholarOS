@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/AtCQpkgEy4aTcCa2Qw+q/JUkjzM</id>
+  <title>arXiv Query: search_query=&amp;id_list=1604.01400&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:13Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1604.01400" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1604.01400v1</id>
+    <title>A 17-billion-solar-mass black hole in a group galaxy with a diffuse core</title>
+    <updated>2016-04-05T20:00:02Z</updated>
+    <link href="https://arxiv.org/abs/1604.01400v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1604.01400v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Quasars are associated with and powered by the accretion of material onto massive black holes; the detection of highly luminous quasars with redshifts greater than z = 6 suggests that black holes of up to ten billion solar masses already existed 13 billion years ago. Two possible present-day dormant descendants of this population of active black holes have been found in the galaxies NGC 3842 and NGC 4889 at the centres of the Leo and Coma galaxy clusters, which together form the central region of the Great Wall - the largest local structure of galaxies. The most luminous quasars, however, are not confined to such high-density regions of the early Universe; yet dormant black holes of this high mass have not yet been found outside of modern-day rich clusters. Here we report observations of the stellar velocity distribution in the galaxy NGC 1600 - a relatively isolated elliptical galaxy near the centre of a galaxy group at a distance of 64 Mpc from Earth. We use orbit superposition models to determine that the black hole at the centre of NGC 1600 has a mass of 17 billion solar masses. The spatial distribution of stars near the centre of NGC 1600 is rather diffuse. We find that the region of depleted stellar density in the cores of massive elliptical galaxies extends over the same radius as the gravitational sphere of influence of the central black holes, and interpret this as the dynamical imprint of the black holes.</summary>
+    <category term="astro-ph.GA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2016-04-05T20:00:02Z</published>
+    <arxiv:comment>11 pages, 4 figures + 6 extended data figures; published in Nature on April 6th, 2016</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.GA"/>
+    <author>
+      <name>Jens Thomas</name>
+    </author>
+    <author>
+      <name>Chung-Pei Ma</name>
+    </author>
+    <author>
+      <name>Nicholas J. McConnell</name>
+    </author>
+    <author>
+      <name>Jenny E. Greene</name>
+    </author>
+    <author>
+      <name>John P. Blakeslee</name>
+    </author>
+    <author>
+      <name>Ryan Janish</name>
+    </author>
+    <arxiv:doi>10.1038/nature17197</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1038/nature17197" title="doi"/>
+  </entry>
+</feed>

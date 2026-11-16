@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/kQ3DMpcA/PJezjYqT39WcS6UaZ4</id>
+  <title>arXiv Query: search_query=&amp;id_list=2203.03678&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:36:53Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=2203.03678" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2203.03678v2</id>
+    <title>An Infrared view of the obscured AGN environment in NGC 4945</title>
+    <updated>2022-04-26T18:49:15Z</updated>
+    <link href="https://arxiv.org/abs/2203.03678v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2203.03678v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>NGC 4945 harbors one of the nearest active galactic nuclei (AGN), which allows reaching high spatial resolution with the current observational facilities. The Seyfert 2 nucleus is deeply obscured by an edge-on disk with $A_V\sim14$, requiring infrared observations to study circumnuclear structures and the interstellar medium. In this work, we present an imaging and longslit spectroscopic study of the nuclear region with a spatial resolution of 6.5 pc, based on Flamingos-2 (F2) and T-ReCS data taken at the Gemini South observatory. We report sub-arcsecond photometric measurements of the nucleus in $J$, $H$ and $K_{\rm s}$ filters, and at larger apertures. We do not detect nuclear variability. The nuclear spectra confirm that even in $K$-band the AGN emission-line features are completely obscured by dust. We detect a circumnuclear disk in $K$-band as well as in the mid-infrared (MIR) $N$- and $Q_{\rm a}$-bands, with a radial scale length of $\sim$120 pc. The disk shows knots mostly in a ring-like arrangement that has been previously detected with HST Pa $α$ observations, indicating that these are deeply embedded, massive young star clusters. We present here the spectrum of one of the brightest and unresolved object (R$&lt;5$pc), which we identify as a super star cluster candidate with M$_{K_{\rm s}} -16.6\pm0.4$. For the circumnuclear region, a detailed rotation curve allows to measure a nuclear mass of $M=(4.4 \pm 3)\times 10^{6} M_\odot$ within a radius of $\sim6.5$ pc. We also report the detection of hot dust ($\sim 1000$ K) out to a nuclear distance of 80 pc measured along the semi-major axis.</summary>
+    <category term="astro-ph.GA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-03-07T19:37:08Z</published>
+    <arxiv:comment>14 pages</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.GA"/>
+    <arxiv:journal_ref>2022 AJ 163 230</arxiv:journal_ref>
+    <author>
+      <name>Gaia Gaspar</name>
+    </author>
+    <author>
+      <name>Rubén J. Díaz</name>
+    </author>
+    <author>
+      <name>Damián Mast</name>
+    </author>
+    <author>
+      <name>María Paz Agüero</name>
+    </author>
+    <author>
+      <name>Mischa Schirmer</name>
+    </author>
+    <author>
+      <name>Guillermo Günthardt</name>
+    </author>
+    <author>
+      <name>Eduardo O. Schmidt</name>
+    </author>
+    <arxiv:doi>10.3847/1538-3881/ac5ea4</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.3847/1538-3881/ac5ea4" title="doi"/>
+  </entry>
+</feed>

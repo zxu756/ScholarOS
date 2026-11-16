@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/AI1cWpRWYvAsJBLTWpuSZXkxSoo</id>
+  <title>arXiv Query: search_query=&amp;id_list=1912.01361&amp;start=0&amp;max_results=10</title>
+  <updated>2026-11-16T07:37:20Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=1912.01361" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/1912.01361v1</id>
+    <title>An image of the dust sublimation region in the nucleus of NGC 1068</title>
+    <updated>2019-12-03T13:42:25Z</updated>
+    <link href="https://arxiv.org/abs/1912.01361v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/1912.01361v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We present near-infrared interferometric data on the Seyfert 2 galaxy NGC 1068, obtained with the GRAVITY instrument on the European Southern Observatory Very Large Telescope Interferometer. The extensive baseline coverage from 5 to 60 Mλallowed us to reconstruct a continuum image of the nucleus with an unrivaled 0.2 pc resolution in the K-band. We find a thin ring-like structure of emission with a radius r = 0.24+/-0.03 pc, inclination i = 70+/-5 deg, position angle PA = -50+/-4 deg, and h/r &lt; 0.14, which we associate with the dust sublimation region. The observed morphology is inconsistent with the expected signatures of a geometrically and optically thick torus. Instead, the infrared emission shows a striking resemblance to the 22 GHz maser disc, which suggests they share a common region of origin. The near-infrared spectral energy distribution indicates a bolometric luminosity of (0.4-4.7) x 10^45 erg/s, behind a large A_K ~ 5.5 (A_V ~ 90) screen of extinction that also appears to contribute significantly to obscuring the broad line region.</summary>
+    <category term="astro-ph.GA" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2019-12-03T13:42:25Z</published>
+    <arxiv:comment>Accepted for publication in Astronomy and Astrophysics. 13 pages with 7 figures</arxiv:comment>
+    <arxiv:primary_category term="astro-ph.GA"/>
+    <arxiv:journal_ref>A&amp;A 634, A1 (2020)</arxiv:journal_ref>
+    <author>
+      <name> GRAVITY Collaboration</name>
+    </author>
+    <author>
+      <name>O. Pfuhl</name>
+    </author>
+    <author>
+      <name>R. Davies</name>
+    </author>
+    <author>
+      <name>J. Dexter</name>
+    </author>
+    <author>
+      <name>H. Netzer</name>
+    </author>
+    <author>
+      <name>S. Hoenig</name>
+    </author>
+    <author>
+      <name>D. Lutz</name>
+    </author>
+    <author>
+      <name>M. Schartmann</name>
+    </author>
+    <author>
+      <name>E. Sturm</name>
+    </author>
+    <author>
+      <name>A. Amorim</name>
+    </author>
+    <author>
+      <name>W. Brandner</name>
+    </author>
+    <author>
+      <name>Y. Clenet</name>
+    </author>
+    <author>
+      <name>P. T. de Zeeuw</name>
+    </author>
+    <author>
+      <name>A. Eckart</name>
+    </author>
+    <author>
+      <name>F. Eisenhauer</name>
+    </author>
+    <author>
+      <name>N. M. Foerster Schreiber</name>
+    </author>
+    <author>
+      <name>F. Gao</name>
+    </author>
+    <author>
+      <name>P. J. V. Garcia</name>
+    </author>
+    <author>
+      <name>R. Genzel</name>
+    </author>
+    <author>
+      <name>S. Gillessen</name>
+    </author>
+    <author>
+      <name>D. Gratadour</name>
+    </author>
+    <author>
+      <name>M. Kishimoto</name>
+    </author>
+    <author>
+      <name>S. Lacour</name>
+    </author>
+    <author>
+      <name>F. Millour</name>
+    </author>
+    <author>
+      <name>T. Ott</name>
+    </author>
+    <author>
+      <name>T. Paumard</name>
+    </author>
+    <author>
+      <name>K. Perraut</name>
+    </author>
+    <author>
+      <name>G. Perrin</name>
+    </author>
+    <author>
+      <name>B. M. Peterson</name>
+    </author>
+    <author>
+      <name>P. O. Petrucci</name>
+    </author>
+    <author>
+      <name>M. A. Prieto</name>
+    </author>
+    <author>
+      <name>D. Rouan</name>
+    </author>
+    <author>
+      <name>J. Shangguan</name>
+    </author>
+    <author>
+      <name>T. Shimizu</name>
+    </author>
+    <author>
+      <name>A. Sternberg</name>
+    </author>
+    <author>
+      <name>O. Straub</name>
+    </author>
+    <author>
+      <name>C. Straubmeier</name>
+    </author>
+    <author>
+      <name>L. J. Tacconi</name>
+    </author>
+    <author>
+      <name>K. R. W. Tristram</name>
+    </author>
+    <author>
+      <name>P. Vermot</name>
+    </author>
+    <author>
+      <name>I. Waisberg</name>
+    </author>
+    <author>
+      <name>F. Widmann</name>
+    </author>
+    <author>
+      <name>J. Woillez</name>
+    </author>
+    <arxiv:doi>10.1051/0004-6361/201936255</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1051/0004-6361/201936255" title="doi"/>
+  </entry>
+</feed>
