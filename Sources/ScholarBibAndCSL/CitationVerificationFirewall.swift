@@ -2884,7 +2884,12 @@ public struct CitationVerificationFirewall: Sendable {
                     continue
                 }
             }
-            guard compareTitle(localTitle: entry.title, remoteTitle: candidate.title, sourceName: sourceName).discrepancy == nil else {
+            guard compareTitle(
+                localTitle: entry.title,
+                remoteSubtitle: candidate.subtitle,
+                remoteTitle: candidate.title,
+                sourceName: sourceName
+            ).discrepancy == nil else {
                 continue
             }
             guard compareFirstAuthor(localAuthors: entry.authors, remote: candidate).discrepancy == nil else {
@@ -3862,7 +3867,12 @@ public struct CitationVerificationFirewall: Sendable {
             guard let candDOI = candidate.doi, !candDOI.isEmpty, !seenDOIs.contains(candDOI) else {
                 continue
             }
-            guard compareTitle(localTitle: entry.title, remoteTitle: candidate.title, sourceName: "Crossref").discrepancy == nil else {
+            guard compareTitle(
+                localTitle: entry.title,
+                remoteSubtitle: candidate.subtitle,
+                remoteTitle: candidate.title,
+                sourceName: "Crossref"
+            ).discrepancy == nil else {
                 continue
             }
             guard compareFirstAuthor(localAuthors: entry.authors, remote: candidate).discrepancy == nil else {
@@ -4047,6 +4057,7 @@ public struct CitationVerificationFirewall: Sendable {
         let sourceName: String
         let doi: String?
         let title: String
+        let subtitle: String?
         let firstAuthorDisplay: String?
         let firstAuthorSurname: String?
         let firstAuthorFullName: String?
@@ -4063,6 +4074,7 @@ public struct CitationVerificationFirewall: Sendable {
             sourceName: String,
             doi: String?,
             title: String,
+            subtitle: String? = nil,
             firstAuthorDisplay: String?,
             firstAuthorSurname: String?,
             firstAuthorFullName: String?,
@@ -4078,6 +4090,7 @@ public struct CitationVerificationFirewall: Sendable {
             self.sourceName = sourceName
             self.doi = doi
             self.title = title
+            self.subtitle = subtitle
             self.firstAuthorDisplay = firstAuthorDisplay
             self.firstAuthorSurname = firstAuthorSurname
             self.firstAuthorFullName = firstAuthorFullName
@@ -4204,8 +4217,11 @@ public struct CitationVerificationFirewall: Sendable {
     }
 
     /// Word-by-word title comparison (no Jaro-Winkler). Missing local title or any word difference yields `DRIFT`.
+    /// When `remoteSubtitle` is present (S56, Crossref), accepts `remoteTitle`, `"remoteTitle: remoteSubtitle"`,
+    /// `"remoteTitle. remoteSubtitle"`, or `"remoteTitle remoteSubtitle"`.
     func compareTitle(
         localTitle: String,
+        remoteSubtitle: String? = nil,
         remoteTitle: String,
         sourceName: String
     ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
@@ -4225,7 +4241,6 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         let localWords = Self.normalizeTitleTokensForComparison(trimmedLocal)
-        let remoteWords = Self.normalizeTitleTokensForComparison(remoteTitle)
 
         if localWords.isEmpty {
             return (
@@ -4241,7 +4256,18 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        guard localWords == remoteWords else {
+        var acceptedForms: [String] = [remoteTitle]
+        if let rawSub = remoteSubtitle?.trimmingCharacters(in: .whitespacesAndNewlines), !rawSub.isEmpty {
+            acceptedForms.append("\(remoteTitle): \(rawSub)")
+            acceptedForms.append("\(remoteTitle). \(rawSub)")
+            acceptedForms.append("\(remoteTitle) \(rawSub)")
+        }
+
+        let matched = acceptedForms.contains { candidate in
+            localWords == Self.normalizeTitleTokensForComparison(candidate)
+        }
+
+        guard matched else {
             return (
                 CitationFieldDiscrepancy(
                     field: "title",
@@ -4676,7 +4702,12 @@ public struct CitationVerificationFirewall: Sendable {
         var driftReasons: [String] = []
 
         let coreChecks: [(CitationFieldDiscrepancy?, String?)] = [
-            compareTitle(localTitle: entry.title, remoteTitle: remote.title, sourceName: remote.sourceName),
+            compareTitle(
+                localTitle: entry.title,
+                remoteSubtitle: remote.subtitle,
+                remoteTitle: remote.title,
+                sourceName: remote.sourceName
+            ),
             compareFirstAuthor(localAuthors: entry.authors, remote: remote),
             compareAuthorCount(localAuthors: entry.authors, remote: remote),
             comparePublicationYear(localYear: entry.year, remoteYears: remote.publicationYears, sourceName: remote.sourceName)
@@ -4819,6 +4850,18 @@ public struct CitationVerificationFirewall: Sendable {
             return .registeredNoMetadata
         }
 
+        let subtitle: String? = {
+            if let subs = message["subtitle"] as? [String],
+               let first = subs.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                return first.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if let single = message["subtitle"] as? String {
+                let trimmed = single.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+            return nil
+        }()
+
         let normalizedDOI = ReferenceIdentifierNormalizer.normalizeDOI(message["DOI"] as? String)
 
         var firstAuthorDisplay: String?
@@ -4927,6 +4970,7 @@ public struct CitationVerificationFirewall: Sendable {
                 sourceName: "Crossref",
                 doi: normalizedDOI,
                 title: title,
+                subtitle: subtitle,
                 firstAuthorDisplay: firstAuthorDisplay,
                 firstAuthorSurname: firstAuthorSurname,
                 firstAuthorFullName: firstAuthorFullName,

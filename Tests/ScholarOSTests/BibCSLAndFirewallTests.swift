@@ -5166,4 +5166,120 @@ struct BibCSLAndFirewallTests {
         #expect(auditVenueHint.remoteValue == "Nature")
         #expect(auditVenueHint.severity == "advisory")
     }
+
+    @Test("M1 stage 12 (S56): Crossref subtitle matches main, 'main: sub', 'main. sub', and 'main sub', replays real_human_042/070 as VERIFIED, and keeps mut_title (20) and Row 9 near-titles as DRIFT")
+    func m1Stage12S56CrossrefSubtitleMatchingAndMutTitleRow9Preserved() async throws {
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+
+        // 1. Replay real_human_042 and real_human_070 -> both VERIFIED
+        let subtitleHumanEntries = try loadBenchmarkEntries(group: "real_human", keys: ["real_human_042", "real_human_070"])
+        #expect(subtitleHumanEntries.count == 2)
+        let subtitleHumanResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: subtitleHumanEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        for v in subtitleHumanResult.report.verdicts {
+            #expect(v.firewallClass == .verified, "\(v.citeKey) expected VERIFIED, got \(v.firewallClass) (\(v.reasons))")
+            #expect(v.insertable == true)
+            #expect(v.reasons == ["verified_match"])
+        }
+
+        // Also check all 4 local title forms ("Main", "Main: Sub", "Main. Sub", "Main Sub") against real_human_042's recorded Crossref DOI
+        let formVariants: [(String, String)] = [
+            ("s56_main_only", "Generalized Halton sequences in 2008"),
+            ("s56_colon", "Generalized Halton sequences in 2008: A comparative study"),
+            ("s56_dot", "Generalized Halton sequences in 2008. A comparative study"),
+            ("s56_space", "Generalized Halton sequences in 2008 A comparative study")
+        ]
+        let variantEntries = formVariants.map { key, localTitle in
+            BibliographyEntry(
+                citeKey: key,
+                kind: .article,
+                title: localTitle,
+                authors: [
+                    BibAuthor(givenName: "Henri", familyName: "Faure"),
+                    BibAuthor(givenName: "Christiane", familyName: "Lemieux")
+                ],
+                year: 2009,
+                venue: "ACM Transactions on Modeling and Computer Simulation",
+                doi: "10.1145/1596519.1596520"
+            )
+        }
+        let variantResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: variantEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        for v in variantResult.report.verdicts {
+            #expect(v.firewallClass == .verified, "Form \(v.citeKey) expected VERIFIED, got \(v.firewallClass)")
+        }
+
+        // Wrong subtitle on same DOI must still be DRIFT
+        let wrongSubEntry = BibliographyEntry(
+            citeKey: "s56_wrong_sub",
+            kind: .article,
+            title: "Generalized Halton sequences in 2008: An unrelated subtitle",
+            authors: [
+                BibAuthor(givenName: "Henri", familyName: "Faure"),
+                BibAuthor(givenName: "Christiane", familyName: "Lemieux")
+            ],
+            year: 2009,
+            venue: "ACM Transactions on Modeling and Computer Simulation",
+            doi: "10.1145/1596519.1596520"
+        )
+        let wrongSubResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: [wrongSubEntry],
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let vWrongSub = try #require(wrongSubResult.report.verdicts.first)
+        #expect(vWrongSub.firewallClass == .drift)
+        #expect(vWrongSub.reasons.contains("title_mismatch"))
+
+        // 2. mut_title (all 20 entries) remains 20/20 DRIFT
+        let mutTitleBibURL = Self.benchmarkCitationsURL
+            .appendingPathComponent("entries", isDirectory: true)
+            .appendingPathComponent("mut_title.bib")
+        let mutTitleEntries = try BibTeXCodec().parse(String(contentsOf: mutTitleBibURL, encoding: .utf8))
+        #expect(mutTitleEntries.count == 20)
+        let mutTitleResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: mutTitleEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        #expect(mutTitleResult.report.driftCount == 20)
+        for v in mutTitleResult.report.verdicts {
+            #expect(v.firewallClass == .drift, "\(v.citeKey) expected DRIFT, got \(v.firewallClass)")
+            #expect(v.insertable == false)
+        }
+
+        // 3. audit_manual near-title cases (Row 9: audit_013..audit_016) remain DRIFT
+        let row9NearTitleEntries = try loadBenchmarkEntries(
+            group: "audit_manual",
+            keys: ["audit_013", "audit_014", "audit_015", "audit_016"]
+        )
+        #expect(row9NearTitleEntries.count == 4)
+        let row9Result = try await CitationVerificationFirewall.verifyBibliography(
+            entries: row9NearTitleEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        for v in row9Result.report.verdicts {
+            #expect(v.firewallClass == .drift, "\(v.citeKey) expected DRIFT, got \(v.firewallClass)")
+            #expect(v.insertable == false)
+            #expect(v.reasons.contains("title_mismatch"))
+        }
+    }
 }
