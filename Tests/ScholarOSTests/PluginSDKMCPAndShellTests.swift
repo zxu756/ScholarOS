@@ -4319,6 +4319,188 @@ struct PluginSDKMCPAndShellTests {
             #expect(joined.contains("--no-cache"), "cite --help (\(lang)) missing --no-cache: \(joined)")
         }
     }
+
+    @Test("M1 stage 11 (item 0): CLI --registry-record-limit <N> enforces per-run new-request cap, preserves first 3 recorded items on 4th-request limit error (exit 2), resumes past 80 existing items, rejects invalid values/combinations with exit 2, and documents flag in EN/ZH --help")
+    func m1Stage11CLIRegistryRecordLimitPerRunBudgetReplayabilityAndValidation() async throws {
+        let tempRoot = try makeTempDirectory(prefix: "scholaros-cli-rec-limit")
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let sandboxHome = tempRoot.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: sandboxHome, withIntermediateDirectories: true)
+        let isolatedEnv = ["HOME": sandboxHome.path, "CFFIXED_USER_HOME": sandboxHome.path]
+
+        let fixtureRegistryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let fixtureReplay = try RegistryReplaySnapshot(directoryURL: fixtureRegistryDir)
+
+        actor CallTracker {
+            var count = 0
+            func record() -> Int {
+                count += 1
+                return count
+            }
+            func reset() {
+                count = 0
+            }
+        }
+        let tracker = CallTracker()
+
+        // Transport serves real recorded responses from Tests/Fixtures/registry when present,
+        // and syntactically valid 404 responses for synthetic 10.1234/cap.* DOIs used to test the 80 cap.
+        let injectedTransport = ClosureRegistrySession { req in
+            _ = await tracker.record()
+            let session = fixtureReplay.makeSession()
+            if let recorded = try? await session.send(req) {
+                return RegistryHTTPResponse(
+                    statusCode: recorded.statusCode,
+                    body: recorded.body,
+                    headers: recorded.headers,
+                    origin: .network
+                )
+            }
+            let urlStr = req.url?.absoluteString ?? ""
+            if urlStr.contains("doi.org/api/handles/") {
+                return RegistryHTTPResponse(
+                    statusCode: 404,
+                    body: Data("{\"responseCode\":100}".utf8),
+                    headers: ["Content-Type": "application/json", "Date": "Mon, 16 Nov 2026 03:00:00 GMT"]
+                )
+            }
+            return RegistryHTTPResponse(
+                statusCode: 404,
+                body: Data("Not found".utf8),
+                headers: ["Content-Type": "text/plain", "Date": "Mon, 16 Nov 2026 03:00:00 GMT"]
+            )
+        }
+
+        let runner = ScholarCLIRunner(
+            registryTransport: injectedTransport,
+            registryClock: ClosureRegistryClock.immediate,
+            environment: isolatedEnv
+        )
+
+        // 1. Both EN and ZH --help document --registry-record-limit
+        for lang in ["en", "zh"] {
+            let helpRes = await runner.runWithExitStatus(arguments: ["--help", "--lang", lang])
+            #expect(helpRes.exitCode == 0)
+            #expect(helpRes.stdout.contains("--registry-record-limit"), "--help (\(lang)) must document --registry-record-limit")
+        }
+
+        let twoRealBib = tempRoot.appendingPathComponent("two_real.bib")
+        let oneRealBib = tempRoot.appendingPathComponent("one_real.bib")
+        let recheckLines = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        ).split(separator: "\n", omittingEmptySubsequences: true)
+        try (recheckLines.prefix(1).joined(separator: "\n") + "\n").write(to: oneRealBib, atomically: true, encoding: .utf8)
+        try (recheckLines.prefix(2).joined(separator: "\n") + "\n").write(to: twoRealBib, atomically: true, encoding: .utf8)
+
+        let dummyRecDir = tempRoot.appendingPathComponent("dummy-rec", isDirectory: true)
+
+        // 2. Invalid values and invalid flag combinations all return exit code 2
+        let invalidInvocations: [[String]] = [
+            ["verify-citations", oneRealBib.path, "--registry-record-limit", "10"],
+            ["verify-citations", oneRealBib.path, "--offline", "--registry-record-limit", "10"],
+            ["verify-citations", oneRealBib.path, "--registry-replay", fixtureRegistryDir.path, "--registry-record-limit", "10"],
+            ["verify-citations", "--demo", "--registry-record-limit", "10"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit", "0"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit=0"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit", "-1"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit=-5"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit", "abc"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit", "3.5"],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit="],
+            ["verify-citations", oneRealBib.path, "--registry-record", dummyRecDir.path, "--registry-record-limit"]
+        ]
+        for badArgs in invalidInvocations {
+            let res = await runner.runWithExitStatus(arguments: badArgs)
+            #expect(res.exitCode == 2, "Expected exit 2 for invalid args \(badArgs), got \(res.exitCode): stderr=\(res.stderr)")
+            #expect(res.stdout.isEmpty)
+        }
+        #expect(await tracker.count == 0, "Invalid CLI flags must fail before sending any requests")
+
+        // 3. --registry-record-limit 3: two_real.bib needs 4 requests (2 for real_lecun + 2 for real_lstm);
+        //    4th new request fails with exit 2 reporting limit (3) and exact URL, while first 3 are saved & replayable!
+        let limit3Dir = tempRoot.appendingPathComponent("rec-limit-3", isDirectory: true)
+        let limit3Run = await runner.runWithExitStatus(
+            arguments: [
+                "verify-citations", twoRealBib.path,
+                "--registry-record", limit3Dir.path,
+                "--registry-record-limit", "3",
+                "--no-cache",
+                "--lang", "en"
+            ]
+        )
+        #expect(limit3Run.exitCode == 2)
+        #expect(limit3Run.stderr.contains("(3)"))
+        #expect(limit3Run.stderr.contains("https://api.openalex.org/works/https://doi.org/10.1162/neco.1997.9.8.1735"))
+        #expect(await tracker.count == 3)
+
+        // First 3 recorded responses on disk are valid and replay one_real.bib (real_lecun, 2 requests) cleanly
+        let snapshot3 = try RegistryReplaySnapshot(directoryURL: limit3Dir)
+        #expect(snapshot3.manifest.count == 3)
+        let replayAfterLimit3 = await runner.runWithExitStatus(
+            arguments: ["verify-citations", oneRealBib.path, "--registry-replay", limit3Dir.path, "--lang", "en"]
+        )
+        #expect(replayAfterLimit3.exitCode == 0)
+        #expect(replayAfterLimit3.stdout.contains("Evaluated=1 Verified=1"))
+        #expect(await tracker.count == 3, "Replay must send 0 new transport requests")
+
+        // 4. Pre-populate a directory with 80 recorded items, then run CLI --registry-record without --registry-record-limit:
+        //    default remains 80 NEW requests, so recording two_real.bib (2+2=4 new requests) succeeds!
+        let dir80 = tempRoot.appendingPathComponent("rec-existing-80", isDirectory: true)
+        let prefillSession = try RegistryRecordingSession(
+            directoryURL: dir80,
+            transport: injectedTransport,
+            maxRequests: 80,
+            minimumIntervalSeconds: 0
+        )
+        for idx in 1...80 {
+            let u = try #require(RegistryURLBuilder.doiHandleURL(doi: String(format: "10.1234/cap.%03d", idx)))
+            _ = try await prefillSession.send(URLRequest(url: u))
+        }
+        _ = try await prefillSession.finalize()
+        await tracker.reset()
+
+        let resumePast80Run = await runner.runWithExitStatus(
+            arguments: [
+                "verify-citations", twoRealBib.path,
+                "--registry-record", dir80.path,
+                "--no-cache",
+                "--lang", "en"
+            ]
+        )
+        #expect(resumePast80Run.exitCode == 0, "Expected exit 0 when adding 4 new requests onto 80 existing, stderr=\(resumePast80Run.stderr)")
+        #expect(await tracker.count == 4)
+        let snapshot84 = try RegistryReplaySnapshot(directoryURL: dir80)
+        #expect(snapshot84.manifest.count == 84)
+        #expect(snapshot84.manifest.totalHTTPRequestsSent == 84)
+
+        // 5. Default limit is still 80 when --registry-record-limit is omitted:
+        //    a .bib needing >80 new requests fails at 80 with exit 2.
+        var manyBibLines: [String] = []
+        for idx in 1...30 {
+            manyBibLines.append(
+                "@article{cap_\(idx), author={Doe, Jane}, title={Synthetic Item \(idx)}, journal={J}, year={2024}, doi={10.1234/over80.\(idx)}}"
+            )
+        }
+        let over80Bib = tempRoot.appendingPathComponent("over80.bib")
+        try manyBibLines.joined(separator: "\n").write(to: over80Bib, atomically: true, encoding: .utf8)
+
+        await tracker.reset()
+        let defaultCapDir = tempRoot.appendingPathComponent("rec-default-cap", isDirectory: true)
+        let defaultCapRun = await runner.runWithExitStatus(
+            arguments: [
+                "verify-citations", over80Bib.path,
+                "--registry-record", defaultCapDir.path,
+                "--no-cache",
+                "--lang", "en"
+            ]
+        )
+        #expect(defaultCapRun.exitCode == 2)
+        #expect(defaultCapRun.stderr.contains("(80)"))
+        #expect(await tracker.count == 80)
+        let snapshotDefaultCap = try RegistryReplaySnapshot(directoryURL: defaultCapDir)
+        #expect(snapshotDefaultCap.manifest.count == 80)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

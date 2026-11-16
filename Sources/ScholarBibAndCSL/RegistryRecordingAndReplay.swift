@@ -528,12 +528,14 @@ public actor RegistryRecordingSession: CitationRegistrySession {
     public nonisolated let userAgent: String
 
     private let transport: any CitationRegistrySession
+    private let clock: any RegistryClock
     private let startedAt: String
     private var orderedItems: [RegistryRecordedItem]
     private var itemsByURL: [String: RegistryRecordedItem]
     private var urlBySlug: [String: String]
     private var metaFilesSHA256: [String: String]
     private var httpRequestsSent: Int
+    private var sessionRequestsSent: Int
     private var lastRequestFinishedUptime: TimeInterval?
     private var lastCrossrefSearchFinishedUptime: TimeInterval?
     private var lastArXivRequestFinishedUptime: TimeInterval?
@@ -551,7 +553,8 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         ),
         maxRequests: Int = 80,
         minimumIntervalSeconds: TimeInterval = 0.35,
-        userAgent: String = LiveURLSessionRegistryClient.defaultUserAgent
+        userAgent: String = LiveURLSessionRegistryClient.defaultUserAgent,
+        clock: any RegistryClock = SystemRegistryClock()
     ) throws {
         guard maxRequests > 0 else {
             throw RegistryRecordingError.ioFailure("maxRequests must be positive.")
@@ -575,7 +578,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             }
         }
 
-        let nowISO = Self.iso8601UTCString()
+        let nowISO = Self.iso8601UTCString(from: clock.currentDate())
         var loadedItems: [RegistryRecordedItem] = []
         var loadedByURL: [String: RegistryRecordedItem] = [:]
         var loadedBySlug: [String: String] = [:]
@@ -598,6 +601,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
 
         self.directoryURL = directoryURL
         self.transport = transport
+        self.clock = clock
         self.maxRequests = maxRequests
         self.minimumIntervalSeconds = max(0, minimumIntervalSeconds)
         self.userAgent = userAgent
@@ -607,6 +611,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         self.urlBySlug = loadedBySlug
         self.metaFilesSHA256 = loadedMetaHashes
         self.httpRequestsSent = initialRequestCount
+        self.sessionRequestsSent = 0
     }
 
     public func throwIfFailed() throws {
@@ -618,6 +623,10 @@ public actor RegistryRecordingSession: CitationRegistrySession {
     public func send(_ request: URLRequest) async throws -> RegistryHTTPResponse {
         await acquireSerialSlot()
         defer { releaseSerialSlot() }
+
+        if let fatalError {
+            throw fatalError
+        }
 
         let method = (request.httpMethod ?? "GET").uppercased()
         guard method == "GET" else {
@@ -689,7 +698,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             )
         }
 
-        if httpRequestsSent >= maxRequests {
+        if sessionRequestsSent >= maxRequests {
             let err = RegistryRecordingError.requestBudgetExceeded(limit: maxRequests, url: canonicalURL)
             fatalError = err
             throw err
@@ -709,35 +718,48 @@ public actor RegistryRecordingSession: CitationRegistrySession {
         let isCrossrefSearch = (service == "crossref" && canonicalURL.contains("query.bibliographic"))
         let isArXiv = (service == "arxiv")
         if minimumIntervalSeconds > 0 {
+            let currentNow = clock.now()
             var sleepSeconds: TimeInterval = 0
             if let lastUptime = lastRequestFinishedUptime {
-                let elapsed = ProcessInfo.processInfo.systemUptime - lastUptime
+                let elapsed = currentNow - lastUptime
                 sleepSeconds = max(sleepSeconds, minimumIntervalSeconds - elapsed)
             }
             if isCrossrefSearch, let lastSearchUptime = lastCrossrefSearchFinishedUptime {
-                let elapsedSearch = ProcessInfo.processInfo.systemUptime - lastSearchUptime
+                let elapsedSearch = currentNow - lastSearchUptime
                 sleepSeconds = max(sleepSeconds, max(minimumIntervalSeconds, 1.05) - elapsedSearch)
             }
             if isArXiv, let lastArXivUptime = lastArXivRequestFinishedUptime {
-                let elapsedArXiv = ProcessInfo.processInfo.systemUptime - lastArXivUptime
+                let elapsedArXiv = currentNow - lastArXivUptime
                 sleepSeconds = max(sleepSeconds, max(minimumIntervalSeconds, 3.05) - elapsedArXiv)
             }
             if sleepSeconds > 0 {
-                let nanos = UInt64((sleepSeconds * 1_000_000_000).rounded(.up))
-                try await Task.sleep(nanoseconds: nanos)
+                do {
+                    try await clock.sleep(sleepSeconds)
+                } catch {
+                    let err = RegistryRecordingError.transportFailed(
+                        url: canonicalURL,
+                        detail: "Recording interrupted while waiting for rate limit spacing."
+                    )
+                    fatalError = err
+                    throw err
+                }
             }
         }
 
-        let requestedAt = Self.iso8601UTCString()
-        httpRequestsSent += 1
+        let requestedAt = Self.iso8601UTCString(from: clock.currentDate())
 
         let response: RegistryHTTPResponse
         do {
             response = try await transport.send(outgoingRequest)
         } catch is CancellationError {
+            let err = RegistryRecordingError.transportFailed(
+                url: canonicalURL,
+                detail: "Recording cancelled while requesting \(canonicalURL)."
+            )
+            fatalError = err
             throw CancellationError()
         } catch {
-            let nowUp = ProcessInfo.processInfo.systemUptime
+            let nowUp = clock.now()
             lastRequestFinishedUptime = nowUp
             if isCrossrefSearch {
                 lastCrossrefSearchFinishedUptime = nowUp
@@ -752,7 +774,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             fatalError = err
             throw err
         }
-        let finishedUp = ProcessInfo.processInfo.systemUptime
+        let finishedUp = clock.now()
         lastRequestFinishedUptime = finishedUp
         if isCrossrefSearch {
             lastCrossrefSearchFinishedUptime = finishedUp
@@ -815,6 +837,8 @@ public actor RegistryRecordingSession: CitationRegistrySession {
             )
             let metaHash = RegistryCanonicalURL.sha256Hex(of: metaData)
 
+            sessionRequestsSent += 1
+            httpRequestsSent += 1
             orderedItems.append(item)
             itemsByURL[canonicalURL] = item
             urlBySlug[slug] = canonicalURL
@@ -850,7 +874,7 @@ public actor RegistryRecordingSession: CitationRegistrySession {
     private func writeManifestToDisk() throws -> RegistryRecordingManifest {
         let manifest = RegistryRecordingManifest(
             startedAt: startedAt,
-            completedAt: Self.iso8601UTCString(),
+            completedAt: Self.iso8601UTCString(from: clock.currentDate()),
             userAgent: userAgent,
             count: orderedItems.count,
             totalHTTPRequestsSent: httpRequestsSent,

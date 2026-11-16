@@ -4771,4 +4771,151 @@ struct BibCSLAndFirewallTests {
             #expect(reasonZH.contains("doi_not_registered"))
         }
     }
+
+    // MARK: - 14. M1 Stage 11 (Item 0): Per-Run Recording Request Budget & Crash-Safe Replayability
+
+    @Test("M1 stage 11 (item 0): RegistryRecordingSession counts only new requests in the current run, reuses 80 existing items without counting, enforces default 80 and custom maxRequests, and leaves a valid replayable directory after budget error, transport failure, or cancellation")
+    func m1Stage11RecordingBudgetCountsPerRunResumesPast80AndPreservesReplayabilityOnFailure() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-rec-stage11-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        actor TransportProbe {
+            var calls = 0
+            var failOnCall: Int?
+            var cancelOnCall: Int?
+
+            func setFailure(failOn: Int? = nil, cancelOn: Int? = nil) {
+                self.calls = 0
+                self.failOnCall = failOn
+                self.cancelOnCall = cancelOn
+            }
+
+            func nextCall() -> (index: Int, shouldFail: Bool, shouldCancel: Bool) {
+                calls += 1
+                return (calls, calls == failOnCall, calls == cancelOnCall)
+            }
+        }
+
+        let probe = TransportProbe()
+        let transport = ClosureRegistrySession { req in
+            let step = await probe.nextCall()
+            if step.shouldCancel {
+                throw CancellationError()
+            }
+            if step.shouldFail {
+                throw RegistryTransportError(kind: .transportError, detail: "Simulated disconnect", url: req.url)
+            }
+            let body = Data("{\"responseCode\":100,\"handle\":\"unregistered\"}".utf8)
+            return RegistryHTTPResponse(
+                statusCode: 404,
+                body: body,
+                headers: [
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "Date": "Mon, 16 Nov 2026 03:00:00 GMT"
+                ]
+            )
+        }
+
+        // 1. Default maxRequests is 80: first 80 new requests succeed; 81st throws requestBudgetExceeded(limit: 80)
+        let session1 = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: transport,
+            minimumIntervalSeconds: 0
+        )
+        #expect(session1.maxRequests == 80)
+        for idx in 1...80 {
+            let url = try #require(RegistryURLBuilder.doiHandleURL(doi: String(format: "10.1234/prefill.%03d", idx)))
+            let resp = try await session1.send(URLRequest(url: url))
+            #expect(resp.statusCode == 404)
+        }
+        let url81 = try #require(RegistryURLBuilder.doiHandleURL(doi: "10.1234/prefill.081"))
+        do {
+            _ = try await session1.send(URLRequest(url: url81))
+            Issue.record("Expected 81st new request in default session to throw requestBudgetExceeded")
+        } catch let err as RegistryRecordingError {
+            #expect(err == .requestBudgetExceeded(limit: 80, url: url81.absoluteString))
+        }
+        #expect(await probe.calls == 80)
+
+        // Even after budget exceeded without finalize(), the 80 recorded items on disk must replay cleanly
+        let replayAfter80 = try RegistryReplaySession(directoryURL: tempDir)
+        #expect(replayAfter80.manifest.count == 80)
+        #expect(replayAfter80.manifest.totalHTTPRequestsSent == 80)
+
+        // 2. With 80 items already in tempDir, a NEW session reuses existing URLs (0 counted) AND can send new requests
+        await probe.setFailure()
+        let session2 = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: transport,
+            maxRequests: 3,
+            minimumIntervalSeconds: 0
+        )
+        // Reusing 5 existing URLs must not call transport or consume the 3-request budget
+        for idx in 1...5 {
+            let existingURL = try #require(RegistryURLBuilder.doiHandleURL(doi: String(format: "10.1234/prefill.%03d", idx)))
+            let reused = try await session2.send(URLRequest(url: existingURL))
+            #expect(reused.statusCode == 404)
+        }
+        #expect(await probe.calls == 0)
+
+        // Sending 3 new URLs (#81, #82, #83) succeeds; 4th new URL (#84) fails with limit 3
+        for idx in 81...83 {
+            let newURL = try #require(RegistryURLBuilder.doiHandleURL(doi: String(format: "10.1234/prefill.%03d", idx)))
+            let recorded = try await session2.send(URLRequest(url: newURL))
+            #expect(recorded.statusCode == 404)
+        }
+        let url84 = try #require(RegistryURLBuilder.doiHandleURL(doi: "10.1234/prefill.084"))
+        do {
+            _ = try await session2.send(URLRequest(url: url84))
+            Issue.record("Expected 4th new request in maxRequests=3 session to fail")
+        } catch let err as RegistryRecordingError {
+            #expect(err == .requestBudgetExceeded(limit: 3, url: url84.absoluteString))
+        }
+        #expect(await probe.calls == 3)
+
+        let replayAfter83 = try RegistryReplaySession(directoryURL: tempDir)
+        #expect(replayAfter83.manifest.count == 83)
+        #expect(replayAfter83.manifest.totalHTTPRequestsSent == 83)
+
+        // 3. Transport disconnect mid-run leaves already-recorded items (83 + 2 = 85) intact and replayable
+        await probe.setFailure(failOn: 3)
+        let session3 = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: transport,
+            maxRequests: 10,
+            minimumIntervalSeconds: 0
+        )
+        for idx in 84...85 {
+            let u = try #require(RegistryURLBuilder.doiHandleURL(doi: String(format: "10.1234/prefill.%03d", idx)))
+            _ = try await session3.send(URLRequest(url: u))
+        }
+        let url86 = try #require(RegistryURLBuilder.doiHandleURL(doi: "10.1234/prefill.086"))
+        await #expect(throws: RegistryRecordingError.self) {
+            _ = try await session3.send(URLRequest(url: url86))
+        }
+        let replayAfterDisconnect = try RegistryReplaySession(directoryURL: tempDir)
+        #expect(replayAfterDisconnect.manifest.count == 85)
+        #expect(replayAfterDisconnect.manifest.totalHTTPRequestsSent == 85)
+
+        // 4. Task cancellation / interruption mid-run also leaves directory replayable and marks session failed
+        await probe.setFailure(cancelOn: 2)
+        let session4 = try RegistryRecordingSession(
+            directoryURL: tempDir,
+            transport: transport,
+            maxRequests: 10,
+            minimumIntervalSeconds: 0
+        )
+        _ = try await session4.send(URLRequest(url: url86))
+        let url87 = try #require(RegistryURLBuilder.doiHandleURL(doi: "10.1234/prefill.087"))
+        await #expect(throws: (any Error).self) {
+            _ = try await session4.send(URLRequest(url: url87))
+        }
+        await #expect(throws: RegistryRecordingError.self) {
+            try await session4.throwIfFailed()
+        }
+        let replayAfterCancel = try RegistryReplaySession(directoryURL: tempDir)
+        #expect(replayAfterCancel.manifest.count == 86)
+        #expect(replayAfterCancel.manifest.totalHTTPRequestsSent == 86)
+    }
 }

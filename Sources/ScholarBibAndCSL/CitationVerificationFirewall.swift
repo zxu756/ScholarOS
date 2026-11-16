@@ -266,7 +266,7 @@ public enum BibliographyVerificationMode: Sendable {
     case offline
     case online(transport: any CitationRegistrySession)
     case replay(snapshot: RegistryReplaySnapshot)
-    case record(directoryURL: URL, transport: any CitationRegistrySession)
+    case record(directoryURL: URL, transport: any CitationRegistrySession, maxRequests: Int = 80)
 }
 
 public struct BibliographyVerificationResult: Sendable {
@@ -1334,7 +1334,7 @@ public struct CitationVerificationFirewall: Sendable {
                 performedRegistryLookup: true
             )
 
-        case .record(let directoryURL, let transport):
+        case .record(let directoryURL, let transport, let maxRequests):
             let limiter = sharedRateLimiter ?? RegistryRateLimiter(clock: clock)
             let budgetScope = OpenAlexSearchBudgetScope()
             let cache: RegistryResponseCache?
@@ -1359,7 +1359,9 @@ public struct CitationVerificationFirewall: Sendable {
             )
             let recordingSession = try RegistryRecordingSession(
                 directoryURL: directoryURL,
-                transport: transport
+                transport: transport,
+                maxRequests: maxRequests,
+                clock: clock
             )
             var verdicts: [CitationFirewallEntryVerdict] = []
             verdicts.reserveCapacity(entries.count)

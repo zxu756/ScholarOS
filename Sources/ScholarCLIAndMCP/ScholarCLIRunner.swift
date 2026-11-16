@@ -397,7 +397,7 @@ public struct ScholarCLIRunner: Sendable {
             let parsed = try parseArgs(
                 rest,
                 subcommand: subcommand,
-                valueFlags: ["--project", "--registry-record", "--registry-replay"],
+                valueFlags: ["--project", "--registry-record", "--registry-record-limit", "--registry-replay"],
                 boolFlags: ["--demo", "--offline", "--no-cache", "--json", "--strict", "--verbose"],
                 maxPositionals: 1,
                 lang: lang
@@ -407,6 +407,7 @@ public struct ScholarCLIRunner: Sendable {
             let noCache = parsed.bools.contains("--no-cache")
             let verbose = parsed.bools.contains("--verbose")
             let recordDir = parsed.values["--registry-record"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rawRecordLimit = parsed.values["--registry-record-limit"]
             let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
 
             if let recordDir, recordDir.isEmpty {
@@ -449,6 +450,32 @@ public struct ScholarCLIRunner: Sendable {
                     )
                 )
             }
+            let recordLimit: Int
+            if let rawRecordLimit {
+                guard recordDir != nil else {
+                    throw ScholarOSError.invalidCLIArguments(
+                        lang.L(
+                            "Option '--registry-record-limit' can only be used with '--registry-record <dir>'.",
+                            "选项 '--registry-record-limit' 只能与 '--registry-record <目录>' 一起使用。"
+                        )
+                    )
+                }
+                guard !rawRecordLimit.isEmpty,
+                      rawRecordLimit.allSatisfy({ $0 >= "0" && $0 <= "9" }),
+                      let parsedLimit = Int(rawRecordLimit),
+                      parsedLimit > 0
+                else {
+                    throw ScholarOSError.invalidCLIArguments(
+                        lang.L(
+                            "Option '--registry-record-limit' requires a positive integer (got '\(rawRecordLimit)').",
+                            "选项 '--registry-record-limit' 需要正整数（收到 '\(rawRecordLimit)'）。"
+                        )
+                    )
+                }
+                recordLimit = parsedLimit
+            } else {
+                recordLimit = 80
+            }
 
             let entries: [BibliographyEntry]
             let isDemo: Bool
@@ -482,8 +509,8 @@ public struct ScholarCLIRunner: Sendable {
                 let opened = try openReadDatabase(
                     parsed: parsed,
                     usage: lang.L(
-                        "Usage: scholaros verify-citations <refs.bib> [--offline | --registry-record <dir> | --registry-replay <dir>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo",
-                        "用法：scholaros verify-citations <refs.bib> [--offline | --registry-record <目录> | --registry-replay <目录>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo"
+                        "Usage: scholaros verify-citations <refs.bib> [--offline | --registry-record <dir> [--registry-record-limit <N>] | --registry-replay <dir>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo",
+                        "用法：scholaros verify-citations <refs.bib> [--offline | --registry-record <目录> [--registry-record-limit <N>] | --registry-replay <目录>] [--no-cache] [--verbose] [--json] | --project <dir.scholarproj> | --demo"
                     ),
                     lang: lang
                 )
@@ -507,7 +534,8 @@ public struct ScholarCLIRunner: Sendable {
             if let recordDir {
                 mode = .record(
                     directoryURL: URL(fileURLWithPath: recordDir),
-                    transport: registryTransport
+                    transport: registryTransport,
+                    maxRequests: recordLimit
                 )
             } else if let replayDir {
                 let snapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayDir))
@@ -1165,7 +1193,7 @@ public struct ScholarCLIRunner: Sendable {
                     }
                 }
                 if valueFlags.contains(tok) {
-                    guard i + 1 < args.count, !args[i + 1].hasPrefix("-") else {
+                    guard i + 1 < args.count else {
                         throw ScholarOSError.invalidCLIArguments(
                             lang.L(
                                 "Missing value for option '\(tok)' in '\(subcommand)'.",
@@ -1173,7 +1201,16 @@ public struct ScholarCLIRunner: Sendable {
                             )
                         )
                     }
-                    values[tok] = args[i + 1]
+                    let nextTok = args[i + 1]
+                    if nextTok.hasPrefix("--") || nextTok == "-h" || valueFlags.contains(nextTok) || boolFlags.contains(nextTok) {
+                        throw ScholarOSError.invalidCLIArguments(
+                            lang.L(
+                                "Missing value for option '\(tok)' in '\(subcommand)'.",
+                                "子命令 '\(subcommand)' 的选项 '\(tok)' 缺少参数值。"
+                            )
+                        )
+                    }
+                    values[tok] = nextTok
                     i += 2
                 } else if boolFlags.contains(tok) {
                     bools.insert(tok)
@@ -1667,6 +1704,7 @@ public struct ScholarCLIRunner: Sendable {
                 --offline                                            Check identifier syntax & built-in retraction hints without network or cache access
                 --no-cache                                           Skip reading and writing the SQLite response cache for this run
                 --registry-record <dir>                              Query live registries (using cache unless --no-cache) and record network responses + SHA-256 manifest into <dir>
+                --registry-record-limit <N>                          Max new HTTP requests to send in this --registry-record run (positive integer, default: 80)
                 --registry-replay <dir>                              Replay recorded responses from <dir> (no network; uses cache only when SCHOLAR_CACHE_DIR is set)
                 --verbose                                            Log one telemetry line per lookup to stderr (source, URL, status, elapsed, origin)
                 --json                                               Emit structured JSON audit report
@@ -1704,6 +1742,7 @@ public struct ScholarCLIRunner: Sendable {
                 --offline                                            仅检查标识符语法与内置撤稿名单，不发任何网络请求且不读写缓存
                 --no-cache                                           本次运行不读取也不写入 SQLite 响应缓存
                 --registry-record <目录>                             联网查询公开注册库（默认读写缓存）并将发出的响应与 SHA-256 清单录制到 <目录>
+                --registry-record-limit <N>                          本次 --registry-record 运行最多新发出的请求数（正整数，默认 80）
                 --registry-replay <目录>                             从 <目录> 离线回放录制响应（不发网络请求；仅显式设置 SCHOLAR_CACHE_DIR 时读写该缓存）
                 --verbose                                            每查一次往标准错误输出一行（数据源、地址、状态码、耗时、来源）
                 --json                                               输出结构化 JSON 核查报告
