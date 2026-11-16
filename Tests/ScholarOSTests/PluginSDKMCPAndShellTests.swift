@@ -4797,6 +4797,291 @@ struct PluginSDKMCPAndShellTests {
         #expect(!run1.stdout.contains("\"id\""), "diagnostics --json must not contain random id fields")
         #expect(Data(run1.stdout.utf8) == Data(run2.stdout.utf8), "Two runs of diagnostics --offline --json must be byte-for-byte identical")
     }
+
+    // MARK: - 18. M2 Stage 02: Unified Manuscript Loader (Items 1–5)
+
+    @Test("M2 Stage 02 item 1: unified loader resolves all 7 include syntaxes via lexer tokens (ignoring comments & verbatim), tries exact path before .tex, and drives both diagnostics and outline")
+    func m2Stage02Item1SevenIncludeSyntaxesExactBeforeTexCommentsAndVerbatimIgnoredInDiagnosticsAndOutline() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage02-item1")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        let mainTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-multi/main.tex")
+        let diagRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(diagRes.exitCode != 2, "stderr=\(diagRes.stderr)")
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(diagRes.stdout.utf8)) as? [String: Any])
+
+        let files = try #require(obj["files"] as? [[String: Any]])
+        let filePaths = files.compactMap { $0["path"] as? String }
+        #expect(filePaths == [
+            "main.tex",
+            "chapters/ch_one.tex",
+            "chapters/ch_two.tex",
+            "sections/braced_input.tex",
+            "sections/unbraced_input.tex",
+            "sections/if_exists.tex",
+            "sections/sub_doc.tex",
+            "modules/mod_a/entry.tex",
+            "modules/mod_a/nested/leaf.tex",
+            "snippets/exact_name.inc"
+        ])
+        #expect(!filePaths.contains("sections/commented_out.tex"))
+
+        let labels = try #require(obj["labels"] as? [[String: Any]])
+        let labelKeys = Set(labels.compactMap { $0["key"] as? String })
+        #expect(labelKeys == [
+            "ch:m_one", "ch:m_two", "sec:braced", "sec:unbraced",
+            "sec:ifexists", "sec:subfile", "sec:imported", "sec:subimported", "sec:exact"
+        ])
+        #expect(!labelKeys.contains("sec:commented_out"))
+
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        let inc002 = diags.filter { ($0["code"] as? String) == "INC002" }
+        #expect(inc002.isEmpty, "Unexpected INC002: \(inc002)")
+
+        // `outline` must also use the unified loader and include sections from unbraced \input, \InputIfFileExists, \subfile, \import, \subimport, and exact-extension files
+        let outlineRes = await runner.runWithExitStatus(
+            arguments: ["outline", mainTex.path, "--json", "--lang", "en"]
+        )
+        #expect(outlineRes.exitCode == 0, "stderr=\(outlineRes.stderr)")
+        let outlineArr = try #require(try JSONSerialization.jsonObject(with: Data(outlineRes.stdout.utf8)) as? [[String: Any]])
+        let outlineTitles = outlineArr.compactMap { $0["title"] as? String }
+        #expect(outlineTitles.contains("Unbraced Input"))
+        #expect(outlineTitles.contains("IfExists Input"))
+        #expect(outlineTitles.contains("Subfile Section"))
+        #expect(outlineTitles.contains("Imported Entry"))
+        #expect(outlineTitles.contains("Subimported Leaf"))
+        #expect(outlineTitles.contains("Exact Extension Snippet"))
+        #expect(!outlineTitles.contains("Commented Out"))
+    }
+
+    @Test("M2 Stage 02 item 2 (S69): invalid UTF-8 root and child files fall back to Windows-1252, emit WARNING ENC001 per file, and never skip or exit 2")
+    func m2Stage02Item2Windows1252EncodingFallbackAndENC001Warning() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage02-item2")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        let mainTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-encoding/main.tex")
+        let diagRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(diagRes.exitCode != 2, "Windows-1252 manuscript must not exit 2; stderr=\(diagRes.stderr)")
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(diagRes.stdout.utf8)) as? [String: Any])
+
+        let files = try #require(obj["files"] as? [[String: Any]])
+        try #require(files.count == 2)
+        #expect(files[0]["path"] as? String == "main.tex")
+        #expect(files[0]["encoding"] as? String == "windows-1252")
+        #expect(files[1]["path"] as? String == "sub.tex")
+        #expect(files[1]["encoding"] as? String == "windows-1252")
+        #expect(files[1]["includedFrom"] as? String == "main.tex:5")
+
+        let labels = try #require(obj["labels"] as? [[String: Any]])
+        #expect(Set(labels.compactMap { $0["key"] as? String }) == ["sec:poincare", "sec:gauss"])
+        let citations = try #require(obj["citations"] as? [[String: Any]])
+        #expect(Set(citations.compactMap { $0["key"] as? String }) == ["knuth1968", "lecun2015"])
+
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        let enc001 = diags.filter { ($0["code"] as? String) == "ENC001" }
+        #expect(enc001.count == 2, "Expected 2 ENC001 warnings (main.tex and sub.tex), got \(enc001)")
+        for d in enc001 {
+            #expect(d["severity"] as? String == "WARNING")
+            #expect(d["category"] as? String == "structure")
+        }
+        #expect(Set(enc001.compactMap { $0["file"] as? String }) == ["main.tex", "sub.tex"])
+        #expect(diags.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+
+        // Also check `outline` decodes accents/smart quotes cleanly without failing
+        let outlineRes = await runner.runWithExitStatus(
+            arguments: ["outline", mainTex.path, "--json", "--lang", "en"]
+        )
+        #expect(outlineRes.exitCode == 0)
+        let outlineArr = try #require(try JSONSerialization.jsonObject(with: Data(outlineRes.stdout.utf8)) as? [[String: Any]])
+        let titles = outlineArr.compactMap { $0["title"] as? String }
+        #expect(titles.contains { $0.contains("Poincaré") })
+        #expect(titles.contains { $0.contains("Gauß") && $0.contains("Müller") })
+    }
+
+    @Test("M2 Stage 02 item 3 (S59): existing .bib no longer triggers false INC002, and genuinely missing included file reports ERROR INC002 with exact including file and line")
+    func m2Stage02Item3NoFalseINC002OnExistingBibAndExactFileLineOnMissingInclude() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage02-item3")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        // 1. Existing .bib in Tests/Fixtures/manuscripts/include-multi/main.tex must have 0 INC002 and match Tectonic expected sets
+        let includeMultiTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/include-multi/main.tex")
+        let includeMultiExpURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/expected/include-multi.json")
+        let expObj = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: includeMultiExpURL)) as? [String: Any])
+
+        let okRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", includeMultiTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(okRes.exitCode != 2)
+        let okObj = try #require(try JSONSerialization.jsonObject(with: Data(okRes.stdout.utf8)) as? [String: Any])
+        let okDiags = try #require(okObj["diagnostics"] as? [[String: Any]])
+        #expect(okDiags.filter { ($0["code"] as? String) == "INC002" }.isEmpty, "Existing refs.bib must not emit INC002: \(okDiags)")
+
+        let actualCites = Set((okObj["citations"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+        let expectedCites = Set(expObj["cite_keys"] as? [String] ?? [])
+        #expect(actualCites == expectedCites)
+        let actualLabels = Set((okObj["labels"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+        let expectedLabels = Set(expObj["labels"] as? [String] ?? [])
+        #expect(actualLabels == expectedLabels)
+
+        // 2. Genuinely missing included file inside child `sections/intro.tex` line 3 emits ERROR INC002 at sections/intro.tex:3
+        let missingInputTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-missing/missing-input/main.tex")
+        let missRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", missingInputTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(missRes.exitCode != 2)
+        let missObj = try #require(try JSONSerialization.jsonObject(with: Data(missRes.stdout.utf8)) as? [String: Any])
+        let missDiags = try #require(missObj["diagnostics"] as? [[String: Any]])
+        let inc002List = missDiags.filter { ($0["code"] as? String) == "INC002" }
+        try #require(inc002List.count == 1)
+        #expect(inc002List[0]["severity"] as? String == "ERROR")
+        #expect(inc002List[0]["category"] as? String == "structure")
+        #expect(inc002List[0]["file"] as? String == "sections/intro.tex")
+        #expect(inc002List[0]["line"] as? Int == 3)
+    }
+
+    @Test("M2 Stage 02 item 4 (S61, S71): child-file \\bibliography{a,b} & \\addbibresource, optional .bib suffix, main .bbl fallback with INFO BIB_FROM_BBL, INC002 when both absent, --bib exclusive override, and no INC002 on thebibliography")
+    func m2Stage02Item4BibliographyDiscoveryBblFallbackAndExplicitBibOverride() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage02-item4")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        // 4a. Child-file \bibliography{refs_main, refs_extra.bib} and \addbibresource{refs_biblatex} (ignoring commented ghost_bib)
+        let loaderMultiTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-multi/main.tex")
+        let multiRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", loaderMultiTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let multiObj = try #require(try JSONSerialization.jsonObject(with: Data(multiRes.stdout.utf8)) as? [String: Any])
+        let multiCites = try #require(multiObj["citations"] as? [[String: Any]])
+        #expect(multiCites.map { $0["key"] as? String } == ["k_biblatex", "k_extra", "k_leaf", "k_one", "k_sub", "k_two"])
+        #expect(multiCites.allSatisfy { ($0["defined"] as? Bool) == true })
+        let multiDiags = try #require(multiObj["diagnostics"] as? [[String: Any]])
+        #expect(multiDiags.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+        #expect(multiDiags.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+
+        // 4b. Missing .bib (`custom`) with matching `<main>.bbl` (`acl_latex.bbl`) reads .bbl, emits INFO BIB_FROM_BBL, and emits 0 INC002
+        let bblFallbackTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-missing/bbl-fallback/acl_latex.tex")
+        let bblRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", bblFallbackTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let bblObj = try #require(try JSONSerialization.jsonObject(with: Data(bblRes.stdout.utf8)) as? [String: Any])
+        let bblDiags = try #require(bblObj["diagnostics"] as? [[String: Any]])
+        #expect(bblDiags.filter { ($0["code"] as? String) == "INC002" }.isEmpty, "Should not emit INC002 when <main>.bbl exists: \(bblDiags)")
+        let bibFromBbl = bblDiags.filter { ($0["code"] as? String) == "BIB_FROM_BBL" }
+        try #require(bibFromBbl.count == 1)
+        #expect(bibFromBbl[0]["severity"] as? String == "INFO")
+        #expect(bibFromBbl[0]["category"] as? String == "structure")
+        #expect(bibFromBbl[0]["file"] as? String == "acl_latex.tex")
+        #expect(bibFromBbl[0]["line"] as? Int == 6)
+        let bblSources = try #require(bblObj["bibliographySources"] as? [[String: Any]])
+        try #require(bblSources.count == 1)
+        #expect(bblSources[0]["kind"] as? String == "bbl")
+        #expect(bblSources[0]["path"] as? String == "acl_latex.bbl")
+
+        // 4c. Missing .bib without `<main>.bbl` emits ERROR INC002 at exact line
+        let missingBibTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/loader-missing/missing-bib/main.tex")
+        let missBibRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", missingBibTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let missBibObj = try #require(try JSONSerialization.jsonObject(with: Data(missBibRes.stdout.utf8)) as? [String: Any])
+        let missBibDiags = try #require(missBibObj["diagnostics"] as? [[String: Any]])
+        let missBibInc002 = missBibDiags.filter { ($0["code"] as? String) == "INC002" }
+        try #require(missBibInc002.count == 1)
+        #expect(missBibInc002[0]["file"] as? String == "main.tex")
+        #expect(missBibInc002[0]["line"] as? Int == 5)
+
+        // 4d. Explicit `--bib` overrides manuscript `\bibliography{nothere}` without emitting INC002
+        let overrideBib = tempDir.appendingPathComponent("override.bib")
+        try """
+        @article{smith2024, author={Smith, Jane}, title={Override Entry}, journal={J}, year={2024}}
+        """.write(to: overrideBib, atomically: true, encoding: .utf8)
+        let overrideRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", missingBibTex.path, "--bib", overrideBib.path, "--offline", "--json", "--lang", "en"]
+        )
+        let overrideObj = try #require(try JSONSerialization.jsonObject(with: Data(overrideRes.stdout.utf8)) as? [String: Any])
+        let overrideDiags = try #require(overrideObj["diagnostics"] as? [[String: Any]])
+        #expect(overrideDiags.filter { ($0["code"] as? String) == "INC002" }.isEmpty, "Explicit --bib must suppress missing implicit .bib INC002: \(overrideDiags)")
+        #expect(overrideDiags.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+        let overrideSources = try #require(overrideObj["bibliographySources"] as? [[String: Any]])
+        try #require(overrideSources.count == 1)
+        #expect(overrideSources[0]["kind"] as? String == "bib")
+        #expect(overrideSources[0]["entries"] as? Int == 1)
+
+        // 4e. Manuscript with `thebibliography` and no `.bib` (`2506.06594v1`) emits 0 INC002
+        let thebibTex = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2506.06594v1/src/From_Adaptive_Control_Evolving_Control.tex")
+        let thebibRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", thebibTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let thebibObj = try #require(try JSONSerialization.jsonObject(with: Data(thebibRes.stdout.utf8)) as? [String: Any])
+        let thebibDiags = try #require(thebibObj["diagnostics"] as? [[String: Any]])
+        #expect(thebibDiags.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+    }
+
+    @Test("M2 Stage 02 item 5 (S60, S61): JSON files and bibliographySources list exact read files and sources across 2405.13682v5 (\\input{main.bbl}), 2501.00066v2 (commented \\bibliography), and 2410.04196v2 (unused template .bib)")
+    func m2Stage02Item5JSONFilesAndBibliographySourcesExactness() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage02-item5")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        // 1. 2405.13682v5: `\input{main.bbl}` on line 97 must appear in `files` as `main.bbl` (not skipped as `main.bbl.tex`), 0 INC002
+        let p2405 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2405.13682v5/src/main.tex")
+        let res2405 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", p2405.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj2405 = try #require(try JSONSerialization.jsonObject(with: Data(res2405.stdout.utf8)) as? [String: Any])
+        let files2405 = try #require(obj2405["files"] as? [[String: Any]])
+        let paths2405 = files2405.compactMap { $0["path"] as? String }
+        #expect(paths2405.contains("main.bbl"), "Expected main.bbl in files of 2405.13682v5, got \(paths2405)")
+        #expect(paths2405.contains("src/supp-ridgelet-quick.tex"))
+        #expect(paths2405.count == 18) // 17 .tex + 1 main.bbl
+        let bblFileRec = try #require(files2405.first { ($0["path"] as? String) == "main.bbl" })
+        #expect(bblFileRec["includedFrom"] as? String == "main.tex:97")
+        let diags2405 = try #require(obj2405["diagnostics"] as? [[String: Any]])
+        #expect(diags2405.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+
+        // 2. 2501.00066v2: commented `% \bibliography{iclr2024_conference}` must not duplicate bibliographySources, 0 INC002
+        let p2501 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2501.00066v2/src/main.tex")
+        let res2501 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", p2501.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj2501 = try #require(try JSONSerialization.jsonObject(with: Data(res2501.stdout.utf8)) as? [String: Any])
+        let bib2501 = try #require(obj2501["bibliographySources"] as? [[String: Any]])
+        #expect(bib2501.count == 1, "Commented \\bibliography must not read .bib twice: \(bib2501)")
+        if let firstBib2501 = bib2501.first {
+            #expect(firstBib2501["path"] as? String == "iclr2024_conference.bib")
+        }
+        let diags2501 = try #require(obj2501["diagnostics"] as? [[String: Any]])
+        #expect(diags2501.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+
+        // 3. 2410.04196v2: 12 reachable .tex files (commented `sections/tables/runtime` excluded), only `fhbi.bib` in bibliographySources (`example_paper.bib` excluded), 0 INC002
+        let p2410 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2410.04196v2/src/main.tex")
+        let res2410 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", p2410.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj2410 = try #require(try JSONSerialization.jsonObject(with: Data(res2410.stdout.utf8)) as? [String: Any])
+        let files2410 = try #require(obj2410["files"] as? [[String: Any]])
+        #expect(files2410.count == 12)
+        let bib2410 = try #require(obj2410["bibliographySources"] as? [[String: Any]])
+        #expect(bib2410.map { $0["path"] as? String } == ["fhbi.bib"])
+        let diags2410 = try #require(obj2410["diagnostics"] as? [[String: Any]])
+        #expect(diags2410.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

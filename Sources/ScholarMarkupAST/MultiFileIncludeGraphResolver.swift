@@ -42,6 +42,66 @@ public struct InMemoryManuscriptSourceProvider: ManuscriptSourceProvider, Sendab
     }
 }
 
+// MARK: - Encoding-Aware Text File Reader (UTF-8 with Windows-1252 Fallback)
+
+/// Result of reading a manuscript or bibliography file with strict UTF-8 validation and Windows-1252 fallback.
+public struct DecodedTextFile: Sendable, Hashable {
+    public let text: String
+    public let encodingName: String
+    public let usedFallbackEncoding: Bool
+
+    public init(text: String, encodingName: String, usedFallbackEncoding: Bool) {
+        self.text = text
+        self.encodingName = encodingName
+        self.usedFallbackEncoding = usedFallbackEncoding
+    }
+}
+
+/// Strict UTF-8 decoder falling back deterministically to Windows-1252 (WHATWG / CP1252) when bytes are not valid UTF-8.
+public enum ScholarTextFileReader {
+    private static let cp1252C1Table: [UInt32] = [
+        0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, // 0x80..0x87
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F, // 0x88..0x8F
+        0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, // 0x90..0x97
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178  // 0x98..0x9F
+    ]
+
+    public static func decodeData(_ data: Data) -> DecodedTextFile {
+        if let utf8Text = String(data: data, encoding: .utf8) {
+            return DecodedTextFile(text: utf8Text, encodingName: "utf-8", usedFallbackEncoding: false)
+        }
+        var scalars = String.UnicodeScalarView()
+        scalars.reserveCapacity(data.count)
+        for byte in data {
+            if byte >= 0x80 && byte <= 0x9F {
+                let cp = cp1252C1Table[Int(byte - 0x80)]
+                scalars.append(UnicodeScalar(cp)!)
+            } else {
+                scalars.append(UnicodeScalar(UInt32(byte))!)
+            }
+        }
+        return DecodedTextFile(
+            text: String(scalars),
+            encodingName: "windows-1252",
+            usedFallbackEncoding: true
+        )
+    }
+
+    public static func readRegularFile(atPath path: String) throws -> DecodedTextFile {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), !isDir.boolValue else {
+            throw ScholarOSError.fileNotFound(path)
+        }
+        let data: Data
+        do {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            throw ScholarOSError.fileNotFound(path)
+        }
+        return decodeData(data)
+    }
+}
+
 /// Hybrid provider consulting open unsaved editor buffers first and falling back to `projectRootDirectory` on disk.
 public struct DiskAndOverlayManuscriptSourceProvider: ManuscriptSourceProvider, Sendable {
     public let projectRootDirectory: String
@@ -62,7 +122,8 @@ public struct DiskAndOverlayManuscriptSourceProvider: ManuscriptSourceProvider, 
             return true
         }
         let fullPath = resolveFilesystemPath(norm)
-        return FileManager.default.fileExists(atPath: fullPath)
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir) && !isDir.boolValue
     }
 
     public func readSource(at relativeOrAbsolutePath: String) throws -> String {
@@ -71,10 +132,11 @@ public struct DiskAndOverlayManuscriptSourceProvider: ManuscriptSourceProvider, 
             return dirty
         }
         let fullPath = resolveFilesystemPath(norm)
-        guard FileManager.default.fileExists(atPath: fullPath) else {
+        do {
+            return try ScholarTextFileReader.readRegularFile(atPath: fullPath).text
+        } catch {
             throw ScholarOSError.fileNotFound(relativeOrAbsolutePath)
         }
-        return try String(contentsOfFile: fullPath, encoding: .utf8)
     }
 
     private func resolveFilesystemPath(_ normalizedPath: String) -> String {
@@ -94,8 +156,10 @@ public struct DiskAndOverlayManuscriptSourceProvider: ManuscriptSourceProvider, 
 public enum IncludeDirectiveKind: String, Sendable, Codable, Hashable, CaseIterable {
     case latexInput = "\\input"
     case latexInclude = "\\include"
+    case latexInputIfFileExists = "\\InputIfFileExists"
     case latexSubfile = "\\subfile"
     case latexImport = "\\import"
+    case latexSubimport = "\\subimport"
     case latexBibliography = "\\bibliography"
     case latexAddBibResource = "\\addbibresource"
     case typstInclude = "#include"
@@ -114,14 +178,18 @@ public enum IncludeDirectiveKind: String, Sendable, Codable, Hashable, CaseItera
 
     public static func classify(command: String) -> IncludeDirectiveKind {
         switch command {
-        case "\\input", "\\inputIfFileExists":
+        case "\\input":
             return .latexInput
+        case "\\InputIfFileExists", "\\inputIfFileExists":
+            return .latexInputIfFileExists
         case "\\include", "\\includeonly":
             return .latexInclude
         case "\\subfile":
             return .latexSubfile
-        case "\\import", "\\subimport":
+        case "\\import", "\\import*":
             return .latexImport
+        case "\\subimport", "\\subimport*":
+            return .latexSubimport
         case "\\bibliography", "\\nobibliography":
             return .latexBibliography
         case "\\addbibresource", "\\addglobalbib":
@@ -338,65 +406,582 @@ enum IncludePathNormalizer {
         return normalizePath(directory + "/" + relativePath)
     }
 
-    /// Normalizes extensions (`.tex`, `.typ`, `.bib`, `.md`) and checks candidate relative locations
-    /// (root directory first for LaTeX `\input`/`\include`, current file's directory first for Typst `#include`/`\subimport`).
+    /// Resolves LaTeX, Typst, and Markdown include/bibliography targets:
+    /// - LaTeX file includes (`\input{f}`, `\input f`, `\include{f}`, `\InputIfFileExists{f}`, `\subfile{f}`):
+    ///   resolved relative to `rootDir` (falling back to `activeImportDir` when inside an `\import`/`\subimport` subtree),
+    ///   checking the exact path `f` first and then `f + ".tex"`.
+    /// - `\import{dir}{f}`: `dir` is relative to `rootDir` (unless absolute), `f` inside `dir`, updating child `activeImportDir`.
+    /// - `\subimport{dir}{f}`: `dir` is relative to `activeImportDir` (or `currentDir`), `f` inside `dir`, updating child `activeImportDir`.
+    /// - LaTeX bibliography resources (`\bibliography`, `\addbibresource`): `.bib` suffix optional, relative to `rootDir` (then `activeImportDir`).
     static func resolveIncludeTarget(
+        rawDir: String? = nil,
         rawTarget: String,
         kind: IncludeDirectiveKind,
         includingFile: String,
         rootFile: String,
+        activeImportDir: String,
         format: ManuscriptFormat,
         provider: any ManuscriptSourceProvider
-    ) -> (resolvedPath: String, exists: Bool) {
-        let cleaned = rawTarget
-            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'")))
+    ) -> (resolvedPath: String, exists: Bool, nextImportDir: String) {
+        let trimChars = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'"))
+        let cleaned = rawTarget.trimmingCharacters(in: trimChars)
+        let cleanedDir = rawDir?.trimmingCharacters(in: trimChars)
         guard !cleaned.isEmpty else {
-            return ("", false)
+            return ("", false, activeImportDir)
         }
 
         let hasExplicitExt = !(cleaned as NSString).pathExtension.isEmpty
-        var extensionCandidates: [String] = [cleaned]
-        if !hasExplicitExt {
-            if kind.isBibliographyResource {
-                extensionCandidates = [cleaned + ".bib", cleaned + ".yml", cleaned]
-            } else {
-                switch format {
-                case .latex:
-                    extensionCandidates = [cleaned + ".tex", cleaned + ".sty", cleaned]
-                case .typst:
-                    extensionCandidates = [cleaned + ".typ", cleaned]
-                case .markdown:
-                    extensionCandidates = [cleaned + ".md", cleaned + ".qmd", cleaned]
+        let extensionCandidates: [String]
+        let defaultMissingTarget: String
+
+        if kind.isBibliographyResource {
+            switch format {
+            case .latex:
+                if cleaned.lowercased().hasSuffix(".bib") {
+                    extensionCandidates = [cleaned]
+                    defaultMissingTarget = cleaned
+                } else {
+                    extensionCandidates = [cleaned + ".bib", cleaned]
+                    defaultMissingTarget = cleaned + ".bib"
                 }
+            case .typst, .markdown:
+                if hasExplicitExt {
+                    extensionCandidates = [cleaned]
+                    defaultMissingTarget = cleaned
+                } else {
+                    extensionCandidates = [cleaned + ".bib", cleaned + ".yml", cleaned]
+                    defaultMissingTarget = cleaned + ".bib"
+                }
+            }
+        } else {
+            switch format {
+            case .latex:
+                if cleaned.lowercased().hasSuffix(".tex") {
+                    extensionCandidates = [cleaned]
+                } else {
+                    // Exact name first, then `+ ".tex"`.
+                    extensionCandidates = [cleaned, cleaned + ".tex"]
+                }
+                defaultMissingTarget = hasExplicitExt ? cleaned : (cleaned + ".tex")
+            case .typst:
+                extensionCandidates = hasExplicitExt ? [cleaned] : [cleaned, cleaned + ".typ"]
+                defaultMissingTarget = hasExplicitExt ? cleaned : (cleaned + ".typ")
+            case .markdown:
+                extensionCandidates = hasExplicitExt ? [cleaned] : [cleaned, cleaned + ".md", cleaned + ".qmd"]
+                defaultMissingTarget = hasExplicitExt ? cleaned : (cleaned + ".md")
             }
         }
 
         let rootDir = parentDirectory(of: rootFile)
         let currentDir = parentDirectory(of: includingFile)
 
-        // LaTeX resolves `\input` / `\include` / `\bibliography` relative to the root `.tex` working directory first,
-        // then falls back to the including file's directory; Typst resolves relative to `includingFile` first.
-        let baseDirectories: [String]
-        if format == .typst || kind == .latexImport {
-            baseDirectories = (currentDir == rootDir) ? [currentDir] : [currentDir, rootDir]
-        } else {
-            baseDirectories = (rootDir == currentDir) ? [rootDir] : [rootDir, currentDir]
+        switch kind {
+        case .latexImport:
+            let importBase: String
+            if let d = cleanedDir, !d.isEmpty {
+                importBase = join(directory: rootDir, relativePath: d)
+            } else {
+                // Fallback when `rawDir` was already joined into `rawTarget` (e.g. AST-only callers)
+                let joined = join(directory: rootDir, relativePath: cleaned)
+                for extCandidate in extensionCandidates {
+                    let cand = join(directory: rootDir, relativePath: extCandidate)
+                    if provider.fileExists(at: cand) {
+                        return (cand, true, parentDirectory(of: cand))
+                    }
+                }
+                let fb = join(directory: rootDir, relativePath: defaultMissingTarget)
+                return (fb, false, parentDirectory(of: joined))
+            }
+            for extCandidate in extensionCandidates {
+                let candidatePath = join(directory: importBase, relativePath: extCandidate)
+                if provider.fileExists(at: candidatePath) {
+                    return (candidatePath, true, importBase)
+                }
+            }
+            let fallback = join(directory: importBase, relativePath: defaultMissingTarget)
+            return (fallback, false, importBase)
+
+        case .latexSubimport:
+            var candidateBases: [String] = []
+            if let d = cleanedDir, !d.isEmpty {
+                let b1 = join(directory: activeImportDir, relativePath: d)
+                candidateBases.append(b1)
+                if currentDir != activeImportDir {
+                    let b2 = join(directory: currentDir, relativePath: d)
+                    if b2 != b1 {
+                        candidateBases.append(b2)
+                    }
+                }
+                for subBase in candidateBases {
+                    for extCandidate in extensionCandidates {
+                        let candidatePath = join(directory: subBase, relativePath: extCandidate)
+                        if provider.fileExists(at: candidatePath) {
+                            return (candidatePath, true, subBase)
+                        }
+                    }
+                }
+                let fallbackBase = candidateBases.first ?? activeImportDir
+                return (join(directory: fallbackBase, relativePath: defaultMissingTarget), false, fallbackBase)
+            } else {
+                let bases = (activeImportDir == currentDir) ? [activeImportDir] : [activeImportDir, currentDir]
+                for b in bases {
+                    for extCandidate in extensionCandidates {
+                        let cand = join(directory: b, relativePath: extCandidate)
+                        if provider.fileExists(at: cand) {
+                            return (cand, true, parentDirectory(of: cand))
+                        }
+                    }
+                }
+                let fb = join(directory: activeImportDir, relativePath: defaultMissingTarget)
+                return (fb, false, parentDirectory(of: fb))
+            }
+
+        default:
+            let baseDirectories: [String]
+            if format == .typst {
+                baseDirectories = (currentDir == rootDir) ? [currentDir] : [currentDir, rootDir]
+            } else {
+                // LaTeX resolves relative to `rootDir` (and checks `activeImportDir` if inside an `\import` / `\subimport` module).
+                if activeImportDir != rootDir {
+                    baseDirectories = [rootDir, activeImportDir]
+                } else {
+                    baseDirectories = [rootDir]
+                }
+            }
+
+            for baseDir in baseDirectories {
+                for extCandidate in extensionCandidates {
+                    let candidatePath = join(directory: baseDir, relativePath: extCandidate)
+                    if provider.fileExists(at: candidatePath) {
+                        return (candidatePath, true, activeImportDir)
+                    }
+                }
+            }
+
+            let primaryDir = baseDirectories.first ?? rootDir
+            return (join(directory: primaryDir, relativePath: defaultMissingTarget), false, activeImportDir)
+        }
+    }
+}
+
+// MARK: - Lexer-Driven LaTeX Include & Bibliography Directive Extractor
+
+private struct ExtractedIncludeDirective: Sendable, Hashable {
+    let command: String
+    let rawDir: String?
+    let rawTarget: String
+    let span: TextSpan
+
+    var combinedRawTargetPath: String {
+        guard let dir = rawDir, !dir.isEmpty else { return rawTarget }
+        if dir.hasSuffix("/") {
+            return dir + rawTarget
+        }
+        return dir + "/" + rawTarget
+    }
+}
+
+private enum LexerIncludeDirectiveScanner {
+    private static let verbatimEnvironments: Set<String> = [
+        "verbatim", "verbatim*", "Verbatim", "BVerbatim",
+        "lstlisting", "minted", "comment"
+    ]
+
+    static func extractDirectives(from tokens: [MarkupToken], filePath: String) -> [ExtractedIncludeDirective] {
+        var directives: [ExtractedIncludeDirective] = []
+        let count = tokens.count
+        var idx = 0
+
+        @inline(__always)
+        func isNewlineWhitespace(_ tok: MarkupToken) -> Bool {
+            tok.kind == .whitespace && (tok.lexeme.contains("\n") || tok.lexeme.contains("\r"))
         }
 
-        var primaryFallback: String? = nil
-        for baseDir in baseDirectories {
-            for extCandidate in extensionCandidates {
-                let candidatePath = join(directory: baseDir, relativePath: extCandidate)
-                if primaryFallback == nil {
-                    primaryFallback = candidatePath
-                }
-                if provider.fileExists(at: candidatePath) {
-                    return (candidatePath, true)
+        func skipHorizontalWhitespaceAndComments(_ cursor: inout Int) {
+            while cursor < count && tokens[cursor].kind != .eof {
+                let t = tokens[cursor]
+                if t.kind == .comment {
+                    cursor += 1
+                } else if t.kind == .whitespace && !isNewlineWhitespace(t) {
+                    cursor += 1
+                } else {
+                    break
                 }
             }
         }
 
-        return (primaryFallback ?? normalizePath(extensionCandidates[0]), false)
+        func skipToBraceAllowingSingleNewline(_ cursor: inout Int) {
+            skipHorizontalWhitespaceAndComments(&cursor)
+            if cursor < count && isNewlineWhitespace(tokens[cursor]) {
+                var probe = cursor + 1
+                skipHorizontalWhitespaceAndComments(&probe)
+                if probe < count && (tokens[probe].kind == .leftBrace || tokens[probe].kind == .leftBracket) {
+                    cursor = probe
+                }
+            }
+        }
+
+        func peekSameLineEnvironmentName(at cmdIndex: Int) -> (name: String, nextIndex: Int)? {
+            var c = cmdIndex + 1
+            skipHorizontalWhitespaceAndComments(&c)
+            guard c < count && tokens[c].kind == .leftBrace else { return nil }
+            c += 1
+            var name = ""
+            while c < count && tokens[c].kind != .rightBrace && tokens[c].kind != .eof {
+                if isNewlineWhitespace(tokens[c]) {
+                    return nil
+                }
+                if tokens[c].kind != .comment {
+                    name.append(tokens[c].lexeme)
+                }
+                c += 1
+            }
+            guard c < count && tokens[c].kind == .rightBrace else { return nil }
+            let trimmed = name.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return nil }
+            return (trimmed, c + 1)
+        }
+
+        func consumeBracketGroup(_ cursor: inout Int) {
+            guard cursor < count && tokens[cursor].kind == .leftBracket else { return }
+            cursor += 1
+            var bracketDepth = 1
+            var braceDepth = 0
+            var consecutiveNewlines = 0
+            while cursor < count && bracketDepth > 0 && tokens[cursor].kind != .eof {
+                let t = tokens[cursor]
+                if isNewlineWhitespace(t) {
+                    consecutiveNewlines += 1
+                    if consecutiveNewlines >= 2 { break }
+                    cursor += 1
+                    continue
+                }
+                if t.kind != .whitespace && t.kind != .comment {
+                    consecutiveNewlines = 0
+                }
+                if t.kind == .leftBrace {
+                    braceDepth += 1
+                } else if t.kind == .rightBrace && braceDepth > 0 {
+                    braceDepth -= 1
+                } else if braceDepth == 0 && t.kind == .leftBracket {
+                    bracketDepth += 1
+                } else if braceDepth == 0 && t.kind == .rightBracket {
+                    bracketDepth -= 1
+                }
+                cursor += 1
+            }
+        }
+
+        func consumeBraceGroup(_ cursor: inout Int) -> (content: String, endPos: TextPosition)? {
+            guard cursor < count && tokens[cursor].kind == .leftBrace else { return nil }
+            var endPos = tokens[cursor].span.end
+            cursor += 1
+            var depth = 1
+            var pieces: [String] = []
+            var consecutiveNewlines = 0
+            while cursor < count && depth > 0 && tokens[cursor].kind != .eof {
+                let t = tokens[cursor]
+                if t.kind == .leftBrace {
+                    depth += 1
+                    pieces.append(t.lexeme)
+                    endPos = t.span.end
+                    consecutiveNewlines = 0
+                    cursor += 1
+                    continue
+                }
+                if t.kind == .rightBrace {
+                    depth -= 1
+                    endPos = t.span.end
+                    consecutiveNewlines = 0
+                    cursor += 1
+                    if depth > 0 {
+                        pieces.append(t.lexeme)
+                    }
+                    continue
+                }
+                if isNewlineWhitespace(t) {
+                    consecutiveNewlines += 1
+                    if consecutiveNewlines >= 2 {
+                        break
+                    }
+                } else if t.kind != .whitespace && t.kind != .comment {
+                    consecutiveNewlines = 0
+                }
+                if t.kind != .comment {
+                    pieces.append(t.lexeme)
+                }
+                endPos = t.span.end
+                cursor += 1
+            }
+            return (pieces.joined(), endPos)
+        }
+
+        func skipDelimitedInlineVerbatim(_ cursor: inout Int) {
+            guard cursor < count && tokens[cursor].kind != .eof && !isNewlineWhitespace(tokens[cursor]) else {
+                return
+            }
+            let firstTok = tokens[cursor]
+            guard let delim = firstTok.lexeme.unicodeScalars.first else {
+                cursor += 1
+                return
+            }
+            if firstTok.lexeme.unicodeScalars.dropFirst().contains(delim) {
+                cursor += 1
+                return
+            }
+            cursor += 1
+            while cursor < count && tokens[cursor].kind != .eof && !isNewlineWhitespace(tokens[cursor]) {
+                if tokens[cursor].lexeme.unicodeScalars.contains(delim) {
+                    cursor += 1
+                    break
+                }
+                cursor += 1
+            }
+        }
+
+        while idx < count {
+            let tok = tokens[idx]
+            if tok.kind == .eof { break }
+            if tok.kind == .comment {
+                idx += 1
+                continue
+            }
+
+            if tok.kind == .command {
+                let cmd = tok.lexeme
+
+                // 1. Skip verbatim-like environments (`verbatim`, `lstlisting`, `minted`, `comment`, etc.)
+                if cmd == "\\begin",
+                   let opened = peekSameLineEnvironmentName(at: idx),
+                   verbatimEnvironments.contains(opened.name)
+                {
+                    idx = opened.nextIndex
+                    while idx < count && tokens[idx].kind != .eof {
+                        if tokens[idx].kind == .command && tokens[idx].lexeme == "\\end",
+                           let closed = peekSameLineEnvironmentName(at: idx),
+                           closed.name == opened.name
+                        {
+                            idx = closed.nextIndex
+                            break
+                        }
+                        idx += 1
+                    }
+                    continue
+                }
+
+                // 2. Skip inline verbatim commands (`\verb`, `\verb*`, `\lstinline`, `\mintinline`)
+                if cmd == "\\verb" || cmd == "\\verb*" {
+                    idx += 1
+                    if cmd == "\\verb" && idx < count && tokens[idx].lexeme == "*" && tokens[idx].span.start == tok.span.end {
+                        idx += 1
+                    }
+                    skipDelimitedInlineVerbatim(&idx)
+                    continue
+                }
+                if cmd == "\\lstinline" || cmd == "\\mintinline" {
+                    idx += 1
+                    skipHorizontalWhitespaceAndComments(&idx)
+                    if idx < count && tokens[idx].kind == .leftBracket {
+                        consumeBracketGroup(&idx)
+                        skipHorizontalWhitespaceAndComments(&idx)
+                    }
+                    if cmd == "\\mintinline" && idx < count && tokens[idx].kind == .leftBrace {
+                        _ = consumeBraceGroup(&idx)
+                        skipHorizontalWhitespaceAndComments(&idx)
+                    }
+                    if idx < count && tokens[idx].kind == .leftBrace {
+                        _ = consumeBraceGroup(&idx)
+                    } else {
+                        skipDelimitedInlineVerbatim(&idx)
+                    }
+                    continue
+                }
+
+                // 3. Skip macro definition replacement bodies so unexpanded `#1` helpers aren't treated as literal paths
+                if LaTeXCommandRole.classify(cmd) == .macroDefinition {
+                    idx += 1
+                    skipHorizontalWhitespaceAndComments(&idx)
+                    if cmd == "\\def" || cmd == "\\gdef" || cmd == "\\edef" || cmd == "\\xdef" {
+                        if idx < count && tokens[idx].kind == .command {
+                            idx += 1
+                        }
+                        while idx < count && tokens[idx].kind != .leftBrace && tokens[idx].kind != .eof && !isNewlineWhitespace(tokens[idx]) {
+                            idx += 1
+                        }
+                        if idx < count && tokens[idx].kind == .leftBrace {
+                            _ = consumeBraceGroup(&idx)
+                        }
+                    } else {
+                        if idx < count && tokens[idx].kind == .leftBrace {
+                            _ = consumeBraceGroup(&idx)
+                        } else if idx < count && tokens[idx].kind == .command {
+                            idx += 1
+                        }
+                        skipToBraceAllowingSingleNewline(&idx)
+                        if cmd.hasSuffix("DocumentCommand") && idx < count && tokens[idx].kind == .leftBrace {
+                            _ = consumeBraceGroup(&idx)
+                            skipToBraceAllowingSingleNewline(&idx)
+                        } else {
+                            while idx < count && tokens[idx].kind == .leftBracket {
+                                consumeBracketGroup(&idx)
+                                skipToBraceAllowingSingleNewline(&idx)
+                            }
+                        }
+                        if idx < count && tokens[idx].kind == .leftBrace {
+                            _ = consumeBraceGroup(&idx)
+                        }
+                    }
+                    continue
+                }
+
+                // 4. `\includeonly{...}` restricts compilation without inserting a file
+                if cmd == "\\includeonly" {
+                    idx += 1
+                    skipToBraceAllowingSingleNewline(&idx)
+                    if idx < count && tokens[idx].kind == .leftBrace {
+                        _ = consumeBraceGroup(&idx)
+                    }
+                    continue
+                }
+
+                // 5. Two-argument `\import{dir}{f}` and `\subimport{dir}{f}`
+                if cmd == "\\import" || cmd == "\\import*" || cmd == "\\subimport" || cmd == "\\subimport*" {
+                    let startPos = tok.span.start
+                    idx += 1
+                    skipToBraceAllowingSingleNewline(&idx)
+                    if idx < count && tokens[idx].kind == .leftBracket {
+                        consumeBracketGroup(&idx)
+                        skipToBraceAllowingSingleNewline(&idx)
+                    }
+                    guard let dirGrp = consumeBraceGroup(&idx) else {
+                        continue
+                    }
+                    skipToBraceAllowingSingleNewline(&idx)
+                    guard let fileGrp = consumeBraceGroup(&idx) else {
+                        continue
+                    }
+                    let dirStr = dirGrp.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let fileStr = fileGrp.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !fileStr.isEmpty {
+                        directives.append(
+                            ExtractedIncludeDirective(
+                                command: cmd,
+                                rawDir: dirStr,
+                                rawTarget: fileStr,
+                                span: TextSpan(filePath: filePath, start: startPos, end: fileGrp.endPos)
+                            )
+                        )
+                    }
+                    continue
+                }
+
+                // 6. Single-argument file includes (`\input{f}`, `\input f`, `\include{f}`, `\InputIfFileExists{f}`, `\subfile{f}`)
+                if cmd == "\\input" || cmd == "\\include"
+                    || cmd == "\\InputIfFileExists" || cmd == "\\inputIfFileExists"
+                    || cmd == "\\subfile"
+                {
+                    let startPos = tok.span.start
+                    idx += 1
+                    skipHorizontalWhitespaceAndComments(&idx)
+                    if idx < count && tokens[idx].kind == .leftBracket {
+                        consumeBracketGroup(&idx)
+                        skipHorizontalWhitespaceAndComments(&idx)
+                    }
+                    if idx < count && isNewlineWhitespace(tokens[idx]) {
+                        var probe = idx + 1
+                        skipHorizontalWhitespaceAndComments(&probe)
+                        if probe < count && tokens[probe].kind == .leftBrace {
+                            idx = probe
+                        }
+                    }
+                    if idx < count && tokens[idx].kind == .leftBrace {
+                        if let grp = consumeBraceGroup(&idx) {
+                            let target = grp.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !target.isEmpty {
+                                directives.append(
+                                    ExtractedIncludeDirective(
+                                        command: cmd,
+                                        rawDir: nil,
+                                        rawTarget: target,
+                                        span: TextSpan(filePath: filePath, start: startPos, end: grp.endPos)
+                                    )
+                                )
+                            }
+                        }
+                    } else if cmd == "\\input" {
+                        var pathChars = ""
+                        var endPos = tok.span.end
+                        while idx < count {
+                            let t = tokens[idx]
+                            if t.kind == .whitespace || t.kind == .comment
+                                || t.kind == .leftBrace || t.kind == .rightBrace
+                                || t.kind == .command || t.kind == .mathInline
+                                || t.kind == .mathDisplay || t.kind == .eof
+                            {
+                                break
+                            }
+                            pathChars.append(t.lexeme)
+                            endPos = t.span.end
+                            idx += 1
+                        }
+                        let cleaned = pathChars.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !cleaned.isEmpty {
+                            directives.append(
+                                ExtractedIncludeDirective(
+                                    command: cmd,
+                                    rawDir: nil,
+                                    rawTarget: cleaned,
+                                    span: TextSpan(filePath: filePath, start: startPos, end: endPos)
+                                )
+                            )
+                        }
+                    }
+                    continue
+                }
+
+                // 7. Bibliography resource directives (`\bibliography{a,b}`, `\addbibresource[...]{x.bib}`)
+                if cmd == "\\bibliography" || cmd == "\\nobibliography"
+                    || cmd == "\\addbibresource" || cmd == "\\addglobalbib"
+                {
+                    let startPos = tok.span.start
+                    idx += 1
+                    skipToBraceAllowingSingleNewline(&idx)
+                    if idx < count && tokens[idx].kind == .leftBracket {
+                        consumeBracketGroup(&idx)
+                        skipToBraceAllowingSingleNewline(&idx)
+                    }
+                    guard let grp = consumeBraceGroup(&idx) else {
+                        continue
+                    }
+                    let span = TextSpan(filePath: filePath, start: startPos, end: grp.endPos)
+                    let rawTarget = grp.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let targets: [String]
+                    if cmd == "\\bibliography" || cmd == "\\nobibliography" {
+                        targets = rawTarget
+                            .split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            .filter { !$0.isEmpty }
+                    } else {
+                        targets = rawTarget.isEmpty ? [] : [rawTarget]
+                    }
+                    for item in targets {
+                        directives.append(
+                            ExtractedIncludeDirective(
+                                command: cmd,
+                                rawDir: nil,
+                                rawTarget: item,
+                                span: span
+                            )
+                        )
+                    }
+                    continue
+                }
+            }
+
+            idx += 1
+        }
+
+        return directives
     }
 }
 
@@ -419,15 +1004,26 @@ public struct MultiFileIncludeGraphResolver: Sendable {
         self.macroEngine = macroEngine ?? MacroExpansionEngine(lexer: lexer)
     }
 
+    public static func normalizeRelativePath(_ rawPath: String) -> String {
+        IncludePathNormalizer.normalizePath(rawPath)
+    }
+
     // MARK: Public Workspace Resolution APIs
 
     /// Resolves an entire multi-file project from an in-memory `[filePath: source]` dictionary.
     public func resolveWorkspace(
         rootFilePath: String,
-        files: [String: String]
+        files: [String: String],
+        ignoreBibliographyDirectives: Bool = false,
+        satisfiedMissingBibliographyPaths: Set<String> = []
     ) -> MergedManuscriptWorkspaceAST {
         let provider = InMemoryManuscriptSourceProvider(files: files)
-        return resolveWorkspace(rootFilePath: rootFilePath, provider: provider)
+        return resolveWorkspace(
+            rootFilePath: rootFilePath,
+            provider: provider,
+            ignoreBibliographyDirectives: ignoreBibliographyDirectives,
+            satisfiedMissingBibliographyPaths: satisfiedMissingBibliographyPaths
+        )
     }
 
     /// Resolves a multi-file project from disk with optional unsaved dirty editor buffer overlays.
@@ -447,10 +1043,13 @@ public struct MultiFileIncludeGraphResolver: Sendable {
     /// -> cycle-safe AST splicing -> cross-file symbol table -> numbered outline with section word counts.
     public func resolveWorkspace(
         rootFilePath: String,
-        provider: any ManuscriptSourceProvider
+        provider: any ManuscriptSourceProvider,
+        ignoreBibliographyDirectives: Bool = false,
+        satisfiedMissingBibliographyPaths: Set<String> = []
     ) -> MergedManuscriptWorkspaceAST {
         let normalizedRoot = IncludePathNormalizer.normalizePath(rootFilePath)
         let rootFormat = ManuscriptFormat.detect(fromPath: normalizedRoot)
+        let initialRootDir = IncludePathNormalizer.parentDirectory(of: normalizedRoot)
 
         var perFileParseResults: [String: MarkupParseResult] = [:]
         var perFileRawSources: [String: String] = [:]
@@ -463,8 +1062,8 @@ public struct MultiFileIncludeGraphResolver: Sendable {
         var missingSeen = Set<String>()
         var visitedManuscripts = Set<String>()
 
-        // Step 1: Parse reachable manuscript files in DFS reading order, collecting include & bib edges.
-        func discoverFile(_ filePath: String) {
+        // Step 1: Parse reachable manuscript files in DFS reading order, collecting include & bib edges from lexer tokens.
+        func discoverFile(_ filePath: String, activeImportDir: String) {
             guard !visitedManuscripts.contains(filePath) else { return }
             visitedManuscripts.insert(filePath)
 
@@ -482,38 +1081,63 @@ public struct MultiFileIncludeGraphResolver: Sendable {
             let parseResult = parser.parse(source: source, filePath: filePath, format: fileFormat)
             perFileParseResults[filePath] = parseResult
 
-            let includeNodes = parseResult.root.allFileIncludes
+            let directives: [ExtractedIncludeDirective]
+            if fileFormat == .latex {
+                directives = LexerIncludeDirectiveScanner.extractDirectives(
+                    from: parseResult.tokens,
+                    filePath: filePath
+                )
+            } else {
+                directives = parseResult.root.allFileIncludes.compactMap { node in
+                    guard case .fileInclude(let cmd, let rawTarget) = node.kind, cmd != "\\includeonly" else {
+                        return nil
+                    }
+                    return ExtractedIncludeDirective(
+                        command: cmd,
+                        rawDir: nil,
+                        rawTarget: rawTarget,
+                        span: node.span
+                    )
+                }
+            }
+
             var fileOutgoing: [IncludeGraphEdge] = []
 
-            for incNode in includeNodes {
-                guard case .fileInclude(let cmd, let rawTarget) = incNode.kind else { continue }
-                // `\includeonly{...}` restricts compilation rather than inserting text directly.
-                if cmd == "\\includeonly" { continue }
+            for directive in directives {
+                let directiveKind = IncludeDirectiveKind.classify(command: directive.command)
+                if ignoreBibliographyDirectives && directiveKind.isBibliographyResource {
+                    continue
+                }
 
-                let directiveKind = IncludeDirectiveKind.classify(command: cmd)
                 let resolved = IncludePathNormalizer.resolveIncludeTarget(
-                    rawTarget: rawTarget,
+                    rawDir: directive.rawDir,
+                    rawTarget: directive.rawTarget,
                     kind: directiveKind,
                     includingFile: filePath,
                     rootFile: normalizedRoot,
+                    activeImportDir: activeImportDir,
                     format: fileFormat,
                     provider: provider
                 )
                 guard !resolved.resolvedPath.isEmpty else { continue }
 
+                let satisfiedByBBL = directiveKind.isBibliographyResource
+                    && satisfiedMissingBibliographyPaths.contains(resolved.resolvedPath)
+                let effectiveExists = resolved.exists || satisfiedByBBL
+
                 let edge = IncludeGraphEdge(
                     sourceFile: filePath,
-                    rawTargetPath: rawTarget,
+                    rawTargetPath: directive.combinedRawTargetPath,
                     resolvedTargetFile: resolved.resolvedPath,
                     kind: directiveKind,
                     isBibliographyResource: directiveKind.isBibliographyResource,
-                    targetExists: resolved.exists,
-                    directiveSpan: incNode.span
+                    targetExists: effectiveExists,
+                    directiveSpan: directive.span
                 )
                 allEdges.append(edge)
                 fileOutgoing.append(edge)
 
-                if !resolved.exists {
+                if !effectiveExists {
                     if !missingSeen.contains(resolved.resolvedPath) {
                         missingSeen.insert(resolved.resolvedPath)
                         missingFiles.append(resolved.resolvedPath)
@@ -522,19 +1146,19 @@ public struct MultiFileIncludeGraphResolver: Sendable {
                 }
 
                 if directiveKind.isBibliographyResource {
-                    if !bibSeen.contains(resolved.resolvedPath) {
+                    if resolved.exists && !bibSeen.contains(resolved.resolvedPath) {
                         bibSeen.insert(resolved.resolvedPath)
                         bibliographyFiles.append(resolved.resolvedPath)
                     }
                 } else {
-                    discoverFile(resolved.resolvedPath)
+                    discoverFile(resolved.resolvedPath, activeImportDir: resolved.nextImportDir)
                 }
             }
 
             adjacency[filePath] = fileOutgoing
         }
 
-        discoverFile(normalizedRoot)
+        discoverFile(normalizedRoot, activeImportDir: initialRootDir)
 
         // Step 2: Run Tarjan's Strongly Connected Components + exact elementary cycle extraction.
         let cycles = detectCyclesViaTarjan(
@@ -796,8 +1420,8 @@ public struct MultiFileIncludeGraphResolver: Sendable {
                     output.append(child)
                     continue
                 }
-                // Match the exact resolved edge by directive span & command
-                if let matchedEdge = fileEdges.first(where: { $0.directiveSpan == child.span && !$0.isBibliographyResource }),
+                // Match the exact resolved edge by directive start position
+                if let matchedEdge = fileEdges.first(where: { $0.directiveSpan.start == child.span.start && !$0.isBibliographyResource }),
                    matchedEdge.targetExists,
                    !activeStack.contains(matchedEdge.resolvedTargetFile),
                    let includedResult = perFileParseResults[matchedEdge.resolvedTargetFile] {
@@ -988,7 +1612,7 @@ public struct MultiFileIncludeGraphResolver: Sendable {
                 case .fileInclude(let cmd, _):
                     let directiveKind = IncludeDirectiveKind.classify(command: cmd)
                     if !directiveKind.isBibliographyResource,
-                       let matchedEdge = fileEdges.first(where: { $0.directiveSpan == node.span && !$0.isBibliographyResource }),
+                       let matchedEdge = fileEdges.first(where: { $0.directiveSpan.start == node.span.start && !$0.isBibliographyResource }),
                        matchedEdge.targetExists {
                         walkFile(matchedEdge.resolvedTargetFile)
                     }

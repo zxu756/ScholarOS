@@ -1726,7 +1726,9 @@ private struct ParseStreamWorker {
         }
 
         // `\import{sections/}{intro.tex}` or `\subimport{sections/}{intro.tex}` takes TWO brace groups!
-        if cmdTok.lexeme == "\\import" || cmdTok.lexeme == "\\subimport" {
+        if cmdTok.lexeme == "\\import" || cmdTok.lexeme == "\\import*"
+            || cmdTok.lexeme == "\\subimport" || cmdTok.lexeme == "\\subimport*"
+        {
             guard peek().kind == .leftBrace else {
                 return [
                     emitIssue(
@@ -1770,7 +1772,9 @@ private struct ParseStreamWorker {
             var endPos = cmdTok.span.end
             while !isAtEnd {
                 let t = peek()
-                if t.kind == .whitespace || t.kind == .comment || t.kind == .leftBrace || t.kind == .rightBrace {
+                if t.kind == .whitespace || t.kind == .comment || t.kind == .leftBrace || t.kind == .rightBrace
+                    || t.kind == .command || t.kind == .mathInline || t.kind == .mathDisplay
+                {
                     break
                 }
                 pathChars.append(t.lexeme)
@@ -2320,6 +2324,12 @@ private struct ParseStreamWorker {
                     let lbl = parseLaTeXLabelDeclaration()
                     semanticNodes.append(lbl)
                     endPos = lbl.span.end
+                    continue
+                }
+                if role == .fileInclude || role == .bibliographyResource {
+                    let incs = parseLaTeXFileInclude()
+                    semanticNodes.append(contentsOf: incs)
+                    if let last = incs.last { endPos = last.span.end }
                     continue
                 }
                 if role == .controlSymbol {

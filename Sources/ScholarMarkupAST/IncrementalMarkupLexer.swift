@@ -210,7 +210,8 @@ public enum LaTeXCommandRole: String, Sendable, Codable, Hashable, CaseIterable 
 
     private static let fileIncludeCommands: Set<String> = [
         "\\input", "\\include", "\\includeonly", "\\subfile",
-        "\\import", "\\subimport", "\\inputIfFileExists"
+        "\\import", "\\import*", "\\subimport", "\\subimport*",
+        "\\InputIfFileExists", "\\inputIfFileExists"
     ]
 
     private static let bibliographyCommands: Set<String> = [
@@ -1497,7 +1498,8 @@ public struct IncrementalMarkupLexer: Sendable {
         "\\newcommand", "\\renewcommand", "\\providecommand", "\\DeclareRobustCommand",
         "\\DeclareMathOperator", "\\caption",
         "\\cite", "\\citep", "\\citet", "\\citealt", "\\citealp", "\\citeauthor",
-        "\\parencite", "\\textcite", "\\autocite", "\\vspace", "\\hspace"
+        "\\parencite", "\\textcite", "\\autocite", "\\vspace", "\\hspace",
+        "\\import", "\\subimport"
     ]
 
     // MARK: - 2. Typst Handwritten State-Machine Lexer

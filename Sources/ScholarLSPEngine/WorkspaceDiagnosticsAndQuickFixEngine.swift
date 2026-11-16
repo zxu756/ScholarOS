@@ -148,7 +148,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         bibliography: [BibliographyEntry] = [],
         sourcesByFile: [String: String] = [:],
         bibliographyFiles: [String: String] = [:],
-        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
+        extraDiagnostics: [LSPDiagnostic] = []
     ) -> WorkspaceDiagnosticsReport {
         var diagnostics: [LSPDiagnostic] = []
         var actions: [LSPCodeAction] = []
@@ -159,8 +160,9 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             resolvedSources[path] = pr.tokens.map(\.lexeme).joined()
         }
 
-        // 1. Upstream Syntax/CST Recovery + Include Graph + Symbol Table Diagnostics
+        // 1. Upstream Syntax/CST Recovery + Include Graph + Symbol Table + Loader Diagnostics
         diagnostics.append(contentsOf: workspace.diagnostics)
+        diagnostics.append(contentsOf: extraDiagnostics)
         actions.append(contentsOf: buildSymbolDiagnosticQuickFixes(workspace: workspace, sourcesByFile: resolvedSources))
 
         // 2. Citation Verification Firewall Diagnostics (`CITE404`, `ERR_UNVERIFIED_CITATION`, advisories)

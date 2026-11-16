@@ -1,0 +1,14 @@
+\begin{thebibliography}{2}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{LeCun et~al.(2015)LeCun, Bengio, and Hinton}]{lecun2015}
+Yann LeCun, Yoshua Bengio, and Geoffrey Hinton. 2015.
+\newblock Deep learning.
+\newblock \emph{Nature}, 521:436--444.
+
+\bibitem[{Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, and Polosukhin}]{vaswani2017}
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan~N. Gomez, Lukasz Kaiser, and Illia Polosukhin. 2017.
+\newblock Attention is all you need.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~30.
+
+\end{thebibliography}

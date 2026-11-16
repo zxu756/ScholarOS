@@ -948,4 +948,77 @@ struct LSPEngineAndSyncTeXTests {
         #expect(expLecunDiag.message.contains("2026-11-16"))
         #expect(expLecunDiag.localizedMessage(.zhHans).contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
     }
+
+    // MARK: - M2 Stage 02: Direct Library `ScholarLSPWorkspaceService.loadManuscript` Tests
+
+    @Test("M2 Stage 02: ScholarLSPWorkspaceService.loadManuscript handles nested \\import vs \\subimport, braced {\\input{...}}, inline \\verb skip, and fallbackBBLFiles")
+    func m2Stage02LoadManuscriptDirectLibraryEdgeCases() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scholaros-m2-loader-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let modADir = tempDir.appendingPathComponent("modA/nested", isDirectory: true)
+        let modBDir = tempDir.appendingPathComponent("modB", isDirectory: true)
+        let tblDir = tempDir.appendingPathComponent("tables", isDirectory: true)
+        try FileManager.default.createDirectory(at: modADir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: modBDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: tblDir, withIntermediateDirectories: true)
+
+        try """
+        \\documentclass{article}
+        \\newcommand{\\helperinput}[1]{\\input{macro_#1}}
+        \\begin{document}
+        \\section{Root}\\label{sec:root}
+        Inline \\verb|\\input{verb_trap}| and \\lstinline{\\bibliography{lst_trap}}.
+        {\\small \\input{tables/t1}}
+        \\import{modA/}{a}
+        \\bibliography{missing_refs}
+        \\end{document}
+        """.write(to: tempDir.appendingPathComponent("paper.tex"), atomically: true, encoding: .utf8)
+
+        try """
+        \\begin{tabular}{c}x\\end{tabular}\\label{tab:t1}
+        """.write(to: tblDir.appendingPathComponent("t1.tex"), atomically: true, encoding: .utf8)
+
+        // Inside `modA/a.tex`, `\subimport{nested/}{leaf}` resolves relative to `modA/`,
+        // while `\import{modB/}{b}` resets relative to root (`tempDir/modB/b.tex`).
+        try """
+        \\subsection{Module A}\\label{sec:modA}
+        \\subimport{nested/}{leaf}
+        \\import{modB/}{b}
+        """.write(to: tempDir.appendingPathComponent("modA/a.tex"), atomically: true, encoding: .utf8)
+
+        try """
+        \\subsubsection{Leaf}\\label{sec:leaf}
+        """.write(to: modADir.appendingPathComponent("leaf.tex"), atomically: true, encoding: .utf8)
+
+        try """
+        \\subsection{Module B}\\label{sec:modB}
+        """.write(to: modBDir.appendingPathComponent("b.tex"), atomically: true, encoding: .utf8)
+
+        try """
+        \\begin{thebibliography}{1}
+        \\bibitem{k1} Entry one.
+        \\end{thebibliography}
+        """.write(to: tempDir.appendingPathComponent("paper.bbl"), atomically: true, encoding: .utf8)
+
+        let service = try ScholarLSPWorkspaceService.loadManuscript(
+            atPath: tempDir.appendingPathComponent("paper.tex").path
+        )
+        let ast = service.currentWorkspaceAST
+        #expect(ast.includeGraph.documentReadingOrder == [
+            "paper.tex",
+            "tables/t1.tex",
+            "modA/a.tex",
+            "modA/nested/leaf.tex",
+            "modB/b.tex"
+        ])
+        #expect(Set(ast.symbolTable.labelsByKey.keys) == ["sec:root", "tab:t1", "sec:modA", "sec:leaf", "sec:modB"])
+        #expect(service.fallbackBBLFiles["paper.bbl"]?.contains("\\bibitem{k1}") == true)
+
+        let diags = service.diagnostics()
+        #expect(diags.filter { $0.code == "INC002" }.isEmpty, "Unexpected INC002: \(diags)")
+        #expect(diags.filter { $0.code == "BIB_FROM_BBL" }.count == 1)
+    }
 }

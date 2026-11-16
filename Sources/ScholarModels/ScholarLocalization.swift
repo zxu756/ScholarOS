@@ -521,6 +521,16 @@ extension LSPDiagnostic {
         if code.hasPrefix("SYM") && message.localizedCaseInsensitiveContains("unresolved") {
             return "存在未解析的交叉引用标签，请核对目标 \\label 声明。"
         }
+        if code == "ENC001" {
+            if let r = message.range(of: "File '"), let end = message[r.upperBound...].firstIndex(of: "'") {
+                let path = String(message[r.upperBound..<end])
+                return "文件 '\(path)' 不是合法的 UTF-8 编码，已按 Windows-1252 回退读取 (ENC001)。"
+            }
+            return "文件不是合法的 UTF-8 编码，已按 Windows-1252 回退读取 (ENC001)。"
+        }
+        if code == "BIB_FROM_BBL" {
+            return message
+        }
         return message
     }
 

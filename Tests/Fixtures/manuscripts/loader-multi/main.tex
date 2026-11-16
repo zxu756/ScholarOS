@@ -1,0 +1,16 @@
+\documentclass{report}
+\begin{document}
+\include{chapters/ch_one}
+\include{chapters/ch_two}
+\input{sections/braced_input}
+\input sections/unbraced_input
+\InputIfFileExists{sections/if_exists}{}{}
+\subfile{sections/sub_doc}
+\import{modules/mod_a/}{entry}
+\input{snippets/exact_name.inc}
+% \input{sections/commented_out}
+\begin{verbatim}
+\input{sections/verbatim_only}
+\bibliography{verbatim_bib}
+\end{verbatim}
+\end{document}

@@ -253,7 +253,11 @@ public struct ScholarCLIRunner: Sendable {
                         )
                     )
                 }
-                let lsp = try makeLSPServiceFromDirectManuscript(path: fileArg, explicitBibPath: nil)
+                let lsp = try ScholarLSPWorkspaceService.loadManuscript(
+                    atPath: fileArg,
+                    explicitBibPath: nil,
+                    clock: registryClock
+                )
                 return CLIExecutionOutput(
                     stdout: try formatOutline(lsp.documentOutline, asJSON: emitJSON, isDemo: false, lang: lang),
                     exitCode: 0
@@ -323,9 +327,10 @@ public struct ScholarCLIRunner: Sendable {
                         )
                     )
                 }
-                lsp = try makeLSPServiceFromDirectManuscript(
-                    path: fileArg,
-                    explicitBibPath: parsed.values["--bib"]
+                lsp = try ScholarLSPWorkspaceService.loadManuscript(
+                    atPath: fileArg,
+                    explicitBibPath: parsed.values["--bib"],
+                    clock: registryClock
                 )
                 isDemo = false
             } else {
@@ -1310,139 +1315,7 @@ public struct ScholarCLIRunner: Sendable {
     }
 
     private func readRequiredRegularFile(atPath path: String) throws -> String {
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), !isDir.boolValue else {
-            throw ScholarOSError.fileNotFound(path)
-        }
-        return try String(contentsOfFile: path, encoding: .utf8)
-    }
-
-    // MARK: - Direct `.tex` / `.bib` Workspace Loader
-
-    private func makeLSPServiceFromDirectManuscript(
-        path: String,
-        explicitBibPath: String?
-    ) throws -> ScholarLSPWorkspaceService {
-        let rootContent = try readRequiredRegularFile(atPath: path)
-        let rootURL = URL(fileURLWithPath: path).standardizedFileURL
-        let baseDir = rootURL.deletingLastPathComponent()
-        let rootKey = rootURL.lastPathComponent
-
-        var files: [String: String] = [rootKey: rootContent]
-        var visited = Set<String>([rootURL.path])
-        collectRelativeIncludes(in: rootContent, baseDir: baseDir, into: &files, visited: &visited)
-
-        var entries: [BibliographyEntry] = []
-        var bibSources: [DiagnosticsBibliographySource] = []
-        var entrySourceByKey: [String: String] = [:]
-
-        if let explicitBibPath {
-            let rawBib = try readRequiredRegularFile(atPath: explicitBibPath)
-            entries = try BibTeXCodec().parse(rawBib)
-            let displayPath = Self.displayRelativeBibliographyPath(explicitBibPath, baseDir: baseDir)
-            bibSources.append(
-                DiagnosticsBibliographySource(
-                    kind: "bib",
-                    path: displayPath,
-                    entries: Set(entries.map(\.citeKey)).count
-                )
-            )
-            for entry in entries {
-                entrySourceByKey[entry.citeKey] = displayPath
-            }
-        } else {
-            let bibCandidates = extractBibliographyPaths(from: rootContent, baseDir: baseDir)
-            for bibURL in bibCandidates {
-                if let rawBib = try? String(contentsOf: bibURL, encoding: .utf8),
-                   let parsed = try? BibTeXCodec().parse(rawBib)
-                {
-                    entries.append(contentsOf: parsed)
-                    let displayPath = Self.displayRelativeBibliographyPath(bibURL.path, baseDir: baseDir)
-                    bibSources.append(
-                        DiagnosticsBibliographySource(
-                            kind: "bib",
-                            path: displayPath,
-                            entries: Set(parsed.map(\.citeKey)).count
-                        )
-                    )
-                    for entry in parsed {
-                        entrySourceByKey[entry.citeKey] = displayPath
-                    }
-                }
-            }
-        }
-
-        let lsp = ScholarLSPWorkspaceService(
-            rootFilePath: rootKey,
-            files: files,
-            bibliography: entries,
-            clock: registryClock
-        )
-        lsp.configureSourceMetadata(
-            bibliographySources: bibSources,
-            entrySourceByKey: entrySourceByKey
-        )
-        return lsp
-    }
-
-    private static func displayRelativeBibliographyPath(_ rawPath: String, baseDir: URL) -> String {
-        let targetURL = URL(fileURLWithPath: rawPath).standardizedFileURL
-        let basePath = baseDir.standardizedFileURL.path
-        let targetPath = targetURL.path
-        let prefix = basePath.hasSuffix("/") ? basePath : (basePath + "/")
-        if targetPath.hasPrefix(prefix) {
-            return String(targetPath.dropFirst(prefix.count))
-        }
-        return targetURL.lastPathComponent
-    }
-
-    private func collectRelativeIncludes(
-        in content: String,
-        baseDir: URL,
-        into files: inout [String: String],
-        visited: inout Set<String>
-    ) {
-        guard let regex = try? NSRegularExpression(pattern: #"\\(?:input|include)\{([^}]+)\}"#) else {
-            return
-        }
-        let ns = content as NSString
-        for match in regex.matches(in: content, range: NSRange(location: 0, length: ns.length)) where match.numberOfRanges > 1 {
-            var rel = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !rel.isEmpty else { continue }
-            if !rel.lowercased().hasSuffix(".tex") {
-                rel += ".tex"
-            }
-            let targetURL = baseDir.appendingPathComponent(rel).standardizedFileURL
-            guard !visited.contains(targetURL.path),
-                  let subContent = try? String(contentsOf: targetURL, encoding: .utf8)
-            else { continue }
-            visited.insert(targetURL.path)
-            files[rel] = subContent
-            collectRelativeIncludes(in: subContent, baseDir: baseDir, into: &files, visited: &visited)
-        }
-    }
-
-    private func extractBibliographyPaths(from content: String, baseDir: URL) -> [URL] {
-        guard let regex = try? NSRegularExpression(pattern: #"\\(?:bibliography|addbibresource)\{([^}]+)\}"#) else {
-            return []
-        }
-        let ns = content as NSString
-        var urls: [URL] = []
-        for match in regex.matches(in: content, range: NSRange(location: 0, length: ns.length)) where match.numberOfRanges > 1 {
-            let rawList = ns.substring(with: match.range(at: 1))
-            for item in rawList.split(separator: ",") {
-                var rel = item.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !rel.isEmpty else { continue }
-                if !rel.lowercased().hasSuffix(".bib") {
-                    rel += ".bib"
-                }
-                let candidate = baseDir.appendingPathComponent(rel).standardizedFileURL
-                if FileManager.default.fileExists(atPath: candidate.path) {
-                    urls.append(candidate)
-                }
-            }
-        }
-        return urls
+        try ScholarTextFileReader.readRegularFile(atPath: path).text
     }
 
     private static func hasNonCommentContent(_ source: String) -> Bool {

@@ -108,6 +108,10 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         var fileEncodingsByPath: [String: String]
         var bibliographySourceRecords: [DiagnosticsBibliographySource]?
         var entrySourceByKey: [String: String]
+        var loaderDiagnostics: [LSPDiagnostic]
+        var ignoreBibliographyDirectives: Bool
+        var satisfiedMissingBibliographyPaths: Set<String>
+        var fallbackBBLFiles: [String: String]
         var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
         var cachedWorkspaceAST: MergedManuscriptWorkspaceAST?
         var cachedDiagnosticsReport: WorkspaceDiagnosticsReport?
@@ -124,6 +128,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         files: [String: String] = [:],
         bibliography: [BibliographyEntry] = [],
         bibliographyFiles: [String: String] = [:],
+        parseRawBibliographyFiles: Bool = true,
         syncTeXData: Data? = nil,
         citationStyle: CitationFormatStyle = .apa7,
         clock: any RegistryClock = SystemRegistryClock()
@@ -183,7 +188,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         for (bPath, bText) in bibliographyFiles.sorted(by: { $0.key < $1.key }) {
             let normBib = Self.normalizeWorkspacePath(bPath)
             rawBibs[normBib] = bText
-            if let parsed = try? bibCodec.parse(bText) {
+            if parseRawBibliographyFiles, let parsed = try? bibCodec.parse(bText) {
                 for entry in parsed {
                     if bibMap[entry.citeKey] == nil {
                         bibOrder.append(entry.citeKey)
@@ -211,6 +216,10 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             fileEncodingsByPath: [:],
             bibliographySourceRecords: nil,
             entrySourceByKey: derivedEntrySources,
+            loaderDiagnostics: [],
+            ignoreBibliographyDirectives: false,
+            satisfiedMissingBibliographyPaths: [],
+            fallbackBBLFiles: [:],
             inRunVerdictsByKey: [:],
             cachedWorkspaceAST: nil,
             cachedDiagnosticsReport: nil,
@@ -220,7 +229,26 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         )
     }
 
-    /// Loads an entire scholarly project directory from disk (`.tex`, `.typ`, `.md`, `.bib`, and optional `.synctex.gz` / `.synctex`).
+    /// Unified manuscript loader: resolves all 7 LaTeX include syntaxes via lexer tokens, decodes UTF-8 with
+    /// Windows-1252 fallback (`ENC001`), discovers `.bib` / `<main>.bbl` (`BIB_FROM_BBL`), and reports `INC002` only on genuinely missing files.
+    public static func loadManuscript(
+        atPath rootFilePath: String,
+        explicitBibPath: String? = nil,
+        syncTeXData: Data? = nil,
+        citationStyle: CitationFormatStyle = .apa7,
+        clock: any RegistryClock = SystemRegistryClock()
+    ) throws -> ScholarLSPWorkspaceService {
+        try ManuscriptWorkspaceLoader.load(
+            rootFilePath: rootFilePath,
+            explicitBibPath: explicitBibPath,
+            syncTeXData: syncTeXData,
+            citationStyle: citationStyle,
+            clock: clock
+        )
+    }
+
+    /// Loads a scholarly project directory from disk starting at `rootFilePath` using the unified manuscript loader,
+    /// attaching optional `.synctex.gz` / `.synctex` data if present in `projectDirectory`.
     public static func loadFromDirectory(
         projectDirectory: String,
         rootFilePath: String = "main.tex",
@@ -232,43 +260,26 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             throw ScholarOSError.fileNotFound(projectDirectory)
         }
 
-        let rootURL = URL(fileURLWithPath: projectDirectory, isDirectory: true).standardizedFileURL
-        let rootPathStd = rootURL.path
-        var manuscriptFiles: [String: String] = [:]
-        var bibFiles: [String: String] = [:]
+        let dirURL = URL(fileURLWithPath: projectDirectory, isDirectory: true).standardizedFileURL
         var discoveredSyncTeXData: Data? = nil
-
         if let enumerator = fm.enumerator(
-            at: rootURL,
+            at: dirURL,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) {
             for case let fileURL as URL in enumerator {
-                let stdFile = fileURL.standardizedFileURL.path
-                guard stdFile.hasPrefix(rootPathStd) else { continue }
-                var rel = String(stdFile.dropFirst(rootPathStd.count))
-                if rel.hasPrefix("/") { rel.removeFirst() }
-                let lower = rel.lowercased()
-
-                if lower.hasSuffix(".tex") || lower.hasSuffix(".typ") || lower.hasSuffix(".md") || lower.hasSuffix(".markdown") {
-                    if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
-                        manuscriptFiles[rel] = content
-                    }
-                } else if lower.hasSuffix(".bib") {
-                    if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
-                        bibFiles[rel] = content
-                    }
-                } else if discoveredSyncTeXData == nil && (lower.hasSuffix(".synctex.gz") || lower.hasSuffix(".synctex")) {
+                let lower = fileURL.lastPathComponent.lowercased()
+                if lower.hasSuffix(".synctex.gz") || lower.hasSuffix(".synctex") {
                     discoveredSyncTeXData = try? Data(contentsOf: fileURL)
+                    break
                 }
             }
         }
 
-        return ScholarLSPWorkspaceService(
-            rootFilePath: rootFilePath,
-            files: manuscriptFiles,
-            bibliography: [],
-            bibliographyFiles: bibFiles,
+        let mainURL = URL(fileURLWithPath: rootFilePath, relativeTo: dirURL).standardizedFileURL
+        return try loadManuscript(
+            atPath: mainURL.path,
+            explicitBibPath: nil,
             syncTeXData: discoveredSyncTeXData,
             citationStyle: citationStyle
         )
@@ -829,10 +840,18 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         }
     }
 
+    public var fallbackBBLFiles: [String: String] {
+        withLock { $0.fallbackBBLFiles }
+    }
+
     public func configureSourceMetadata(
         fileEncodingsByPath: [String: String] = [:],
-        bibliographySources: [DiagnosticsBibliographySource] = [],
-        entrySourceByKey: [String: String] = [:]
+        bibliographySources: [DiagnosticsBibliographySource]? = [],
+        entrySourceByKey: [String: String] = [:],
+        loaderDiagnostics: [LSPDiagnostic] = [],
+        ignoreBibliographyDirectives: Bool = false,
+        satisfiedMissingBibliographyPaths: Set<String> = [],
+        fallbackBBLFiles: [String: String] = [:]
     ) {
         withLock { st in
             var normalizedEncodings: [String: String] = [:]
@@ -842,6 +861,15 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             st.fileEncodingsByPath = normalizedEncodings
             st.bibliographySourceRecords = bibliographySources
             st.entrySourceByKey = entrySourceByKey
+            st.loaderDiagnostics = loaderDiagnostics
+            st.ignoreBibliographyDirectives = ignoreBibliographyDirectives
+            st.satisfiedMissingBibliographyPaths = Set(satisfiedMissingBibliographyPaths.map(Self.normalizeWorkspacePath))
+            var normalizedBBLs: [String: String] = [:]
+            for (rawPath, text) in fallbackBBLFiles {
+                normalizedBBLs[Self.normalizeWorkspacePath(rawPath)] = text
+            }
+            st.fallbackBBLFiles = normalizedBBLs
+            invalidateDerivedCaches(&st)
         }
     }
 
@@ -1231,7 +1259,12 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         if rawFiles[st.rootFilePath] == nil, let firstDocKey = st.documents.keys.sorted().first {
             st.rootFilePath = firstDocKey
         }
-        let resolved = includeResolver.resolveWorkspace(rootFilePath: st.rootFilePath, files: rawFiles)
+        let resolved = includeResolver.resolveWorkspace(
+            rootFilePath: st.rootFilePath,
+            files: rawFiles,
+            ignoreBibliographyDirectives: st.ignoreBibliographyDirectives,
+            satisfiedMissingBibliographyPaths: st.satisfiedMissingBibliographyPaths
+        )
         st.cachedWorkspaceAST = resolved
         return resolved
     }
@@ -1252,7 +1285,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             bibliography: bibList,
             sourcesByFile: sources,
             bibliographyFiles: st.bibliographyRawFiles,
-            inRunVerdictsByKey: st.inRunVerdictsByKey
+            inRunVerdictsByKey: st.inRunVerdictsByKey,
+            extraDiagnostics: st.loaderDiagnostics
         )
         st.cachedDiagnosticsReport = report
         st.cachedDiagnosticsUTCDay = currentUTCDay
