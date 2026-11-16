@@ -1,0 +1,12 @@
+diff --git a/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift b/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
+--- a/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
++++ b/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
+@@ -4113,6 +4113,8 @@ public struct CitationVerificationFirewall: Sendable {
+         remoteTitle: String,
+         sourceName: String
+     ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
++        // MUTATION (M1 acceptance row 21a): force title comparison to always match.
++        if true { return (nil, nil) }
+         let trimmedLocal = localTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+         if trimmedLocal.isEmpty {
+             return (
