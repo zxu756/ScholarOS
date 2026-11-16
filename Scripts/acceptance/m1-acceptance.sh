@@ -344,24 +344,91 @@ PY
     # ==================================================================
     if should_run_row 3; then
         echo "== [Row 3] Full 480-entry benchmark replay (0 misses, complete=true, manifest SHA-256 pinned in README) =="
+        ROW3_REASON_FILE="$WORK_SCRATCH/row3.reason"
+        : > "$ROW3_REASON_FILE"
         set +e
-        ROW3_OUT="$(python3 -I - "$BENCH_RUN1_JSON" "$REPO_ROOT/Benchmarks/citations/README.md" "$BENCH_RUN1_EXIT" <<'PY'
-import json, sys
-rep_path, readme_path, exit_code = sys.argv[1], sys.argv[2], int(sys.argv[3])
-with open(rep_path, encoding="utf-8") as f:
-    rep = json.load(f)
-with open(readme_path, encoding="utf-8") as rf:
-    readme_text = rf.read()
+        ROW3_OUT="$(python3 -I - "$BENCH_RUN1_JSON" "$REPO_ROOT/Benchmarks/citations/README.md" "$REPO_ROOT/Benchmarks/citations/recordings/manifest.json" "$BENCH_RUN1_EXIT" "$ROW3_REASON_FILE" <<'PY'
+import hashlib, json, os, re, sys
+
+rep_path, readme_path, manifest_path, exit_code, reason_path = (
+    sys.argv[1],
+    sys.argv[2],
+    sys.argv[3],
+    int(sys.argv[4]),
+    sys.argv[5],
+)
+
+rep = {}
+if os.path.isfile(rep_path):
+    with open(rep_path, encoding="utf-8") as f:
+        rep = json.load(f)
+
+readme_text = ""
+if os.path.isfile(readme_path):
+    with open(readme_path, encoding="utf-8") as rf:
+        readme_text = rf.read()
+
+disk_sha = ""
+if os.path.isfile(manifest_path):
+    disk_sha = hashlib.sha256(open(manifest_path, "rb").read()).hexdigest().lower()
+
+readme_matches = list(
+    dict.fromkeys(
+        m.lower()
+        for m in re.findall(r"manifest\.json[^\n]*?([0-9a-fA-F]{64})", readme_text)
+    )
+)
+if len(readme_matches) == 1:
+    readme_sha = readme_matches[0]
+elif len(readme_matches) == 0:
+    readme_sha = ""
+else:
+    readme_sha = "CONFLICT(" + ",".join(readme_matches) + ")"
 
 misses = rep.get("replay_miss_count")
 complete = rep.get("complete")
-sha = rep.get("recordings_manifest_sha256") or ""
-pinned = bool(sha) and (sha in readme_text)
-print(f"bench_exit={exit_code} replay_miss_count={misses} complete={complete} manifest_sha256={sha} pinned_in_readme={pinned}")
-if exit_code != 0 or misses != 0 or complete is not True or not pinned:
-    if rep.get("replay_misses"):
-        missing_groups = [m["group"] for m in rep["replay_misses"]]
-        print(f"unrecorded_groups({len(missing_groups)}): {', '.join(missing_groups)}")
+rep_sha = (rep.get("recordings_manifest_sha256") or "").lower()
+sha_match = (
+    len(readme_matches) == 1
+    and bool(disk_sha)
+    and disk_sha == readme_sha
+    and rep_sha == readme_sha
+)
+
+print(
+    f"bench_exit={exit_code} replay_miss_count={misses} complete={complete} "
+    f"manifest_sha256={disk_sha or 'missing'} report_sha256={rep_sha or 'missing'} "
+    f"readme_sha256={readme_sha or 'missing'} sha_match={sha_match}"
+)
+
+failures = []
+if not rep:
+    failures.append("benchmark replay JSON missing")
+if misses != 0:
+    miss_groups = [m.get("group", "?") for m in (rep.get("replay_misses") or [])]
+    if miss_groups:
+        print(f"replay_miss_groups({len(miss_groups)}): {', '.join(miss_groups)}")
+        failures.append(f"replay_miss_count={misses} ({','.join(miss_groups)})")
+    else:
+        failures.append(f"replay_miss_count={misses} (expected 0)")
+if complete is not True:
+    inc = rep.get("incomplete_reasons") or []
+    inc_suffix = f" ({'; '.join(str(x) for x in inc)})" if inc else ""
+    failures.append(f"complete={complete}{inc_suffix}")
+if not sha_match:
+    failures.append(
+        f"sha_match=False (manifest={disk_sha or 'missing'}, report={rep_sha or 'missing'}, readme={readme_sha or 'missing'})"
+    )
+if exit_code != 0:
+    failures.append(f"bench_exit={exit_code}")
+
+if failures:
+    summary = (
+        f"Failed check(s): {'; '.join(failures)} "
+        f"[replay_miss_count={misses}, complete={complete}, sha_match={sha_match}, bench_exit={exit_code}]"
+    )
+    with open(reason_path, "w", encoding="utf-8") as out_f:
+        out_f.write(summary)
     sys.exit(1)
 PY
 )"
@@ -369,9 +436,10 @@ PY
         set -e
         echo "$ROW3_OUT"
         if [[ "$ROW3_RC" -eq 0 ]]; then
-            record_pass 3 "Full 480-entry replay complete with 0 misses and pinned manifest SHA-256"
+            record_pass 3 "Full 480-entry replay complete (replay_miss_count=0, complete=true, manifest SHA-256 matches README)"
         else
-            record_fail 3 "Full benchmark replay incomplete or manifest SHA-256 not yet pinned (11 groups unrecorded)"
+            ROW3_REASON="$(cat "$ROW3_REASON_FILE" 2>/dev/null || true)"
+            record_fail 3 "${ROW3_REASON:-Row 3 check exited with $ROW3_RC}"
         fi
     fi
 
