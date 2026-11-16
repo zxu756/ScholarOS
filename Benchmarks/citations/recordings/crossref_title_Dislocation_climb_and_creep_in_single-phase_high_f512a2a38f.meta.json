@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 98233,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Dislocation_climb_and_creep_in_single-phase_high_f512a2a38f.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:40Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:42 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:42 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "a104649264f309397a8cc360e483bfcfd1a7606dcc373696bb1a357cda9ad79a",
+  "slug" : "crossref_title_Dislocation_climb_and_creep_in_single-phase_high_f512a2a38f",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Dislocation%20climb%20and%20creep%20in%20single-phase%20high-entropy%20alloys%20Huang%202021&rows=5"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 14472,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1016_j.apgeochem.2011.06.014_cab4da53f0.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:48Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:48 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:48 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "710",
+    "x-ratelimit-reset" : "70452"
+  },
+  "service" : "openalex",
+  "sha256" : "6cff875afc683639cb4b7726bcb7f65055a880569fd6f8eb86af3b126673707a",
+  "slug" : "openalex_doi_10.1016_j.apgeochem.2011.06.014_cab4da53f0",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.apgeochem.2011.06.014"
+}

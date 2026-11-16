@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 106368,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Phrase-edge_tone_alternations_in_a_western_Hmong_ea1df1655c.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:26Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:26 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:26 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "740",
+    "x-ratelimit-reset" : "70474"
+  },
+  "service" : "openalex",
+  "sha256" : "38832004e9afab66cabb166c8bdec4eee200ece1ef6fad1382e53a8cd29e11be",
+  "slug" : "openalex_title_Phrase-edge_tone_alternations_in_a_western_Hmong_ea1df1655c",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Phrase-edge%20tone%20alternations%20in%20a%20western%20Hmong-Mien%20variety"
+}

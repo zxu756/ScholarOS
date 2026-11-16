@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 20667,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Evidential_Systems_in_Tibeto-Burman_A_Comparativ_a0e31a84df.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:49Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:50 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:50 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "866341da37cd330b842ba88cc8ecd92522cf17cb304a0bc03e0531958a22a8a6",
+  "slug" : "crossref_title_Evidential_Systems_in_Tibeto-Burman_A_Comparativ_a0e31a84df",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Evidential%20Systems%20in%20Tibeto-Burman%3A%20A%20Comparative%20Study%20Zhou%202019&rows=5"
+}

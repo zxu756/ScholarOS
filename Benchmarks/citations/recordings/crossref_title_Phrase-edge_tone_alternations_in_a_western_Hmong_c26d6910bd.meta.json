@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 40098,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Phrase-edge_tone_alternations_in_a_western_Hmong_c26d6910bd.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:25Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:25 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:25 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "cd85c28f8d11c1dda4a8ce67b651dfdf812d5968a42c66d8152edd57a14380f9",
+  "slug" : "crossref_title_Phrase-edge_tone_alternations_in_a_western_Hmong_c26d6910bd",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Phrase-edge%20tone%20alternations%20in%20a%20western%20Hmong-Mien%20variety%20Vang%202019&rows=5"
+}

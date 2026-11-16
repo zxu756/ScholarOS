@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 62,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1051_matecconf_201930005012_682f96a914.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:23Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:23 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:25:23 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "8d331a88f763ca1715dad7de6260fc399ad4f36f02ad4be015fcd554960a281b",
+  "slug" : "doi_handle_10.1051_matecconf_201930005012_682f96a914",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1051/matecconf/201930005012"
+}

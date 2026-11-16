@@ -1,0 +1,22 @@
+{
+  "attempts" : 1,
+  "byte_length" : 1294,
+  "content_type" : "application/json; charset=UTF-8",
+  "raw_file" : "pubmed_pmid_27182904_5239e8feb2.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:52Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:52 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json; charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:26:52 GMT",
+    "x-ratelimit-limit" : "3",
+    "x-ratelimit-remaining" : "2"
+  },
+  "service" : "pubmed",
+  "sha256" : "cd021a1175bd1aa0064198330d190c609839f513dbc323d2c35011015b5475ff",
+  "slug" : "pubmed_pmid_27182904_5239e8feb2",
+  "status" : 200,
+  "url" : "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=27182904&retmode=json"
+}

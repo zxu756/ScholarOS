@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 87519,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Kiln_and_Kilometre_Ceramic_Production_and_Coasta_d34d6c32d1.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:37Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:37 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:37 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "630",
+    "x-ratelimit-reset" : "70403"
+  },
+  "service" : "openalex",
+  "sha256" : "e7dcf3256d0428190974067b9eba27423d435dc2e87eb3891d69addc7a06e360",
+  "slug" : "openalex_title_Kiln_and_Kilometre_Ceramic_Production_and_Coasta_d34d6c32d1",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Kiln%20and%20Kilometre%20Ceramic%20Production%20and%20Coastal%20Trade%20in%20the%20Medieval%20Swahili%20World"
+}

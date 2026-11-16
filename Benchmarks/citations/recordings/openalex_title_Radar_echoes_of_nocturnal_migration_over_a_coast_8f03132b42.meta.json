@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 88472,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Radar_echoes_of_nocturnal_migration_over_a_coast_8f03132b42.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:17Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:18 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:18 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "660",
+    "x-ratelimit-reset" : "70422"
+  },
+  "service" : "openalex",
+  "sha256" : "051debeed9a0c61bbf8919ee44b0c24dc6572b52e8339ba07881dbea4922df0d",
+  "slug" : "openalex_title_Radar_echoes_of_nocturnal_migration_over_a_coast_8f03132b42",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Radar%20echoes%20of%20nocturnal%20migration%20over%20a%20coastal%20strait%20density%20heading%20and%20wind%20drift"
+}

@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 3728,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.24963_ijcai.2021_595_2a063e7a25.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:24:26Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:24:26 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:24:26 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "2520ffa4236c2854225b3988e64a97a04ab59f8ce2262aef26ccb9f0aa851f17",
+  "slug" : "crossref_doi_10.24963_ijcai.2021_595_2a063e7a25",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.24963/ijcai.2021/595"
+}

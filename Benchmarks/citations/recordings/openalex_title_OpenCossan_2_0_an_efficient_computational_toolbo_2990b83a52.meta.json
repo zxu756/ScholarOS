@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 106005,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_OpenCossan_2_0_an_efficient_computational_toolbo_2990b83a52.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:43Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:44 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:44 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "870",
+    "x-ratelimit-reset" : "70636"
+  },
+  "service" : "openalex",
+  "sha256" : "ad0ffbcf520fec8875725ff7bbec21a49917315cebfaa0bb63efc898e991c1c5",
+  "slug" : "openalex_title_OpenCossan_2_0_an_efficient_computational_toolbo_2990b83a52",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=OpenCossan%202%200%20an%20efficient%20computational%20toolbox%20for%20risk%20reliability%20and%20resilience%20analysis"
+}

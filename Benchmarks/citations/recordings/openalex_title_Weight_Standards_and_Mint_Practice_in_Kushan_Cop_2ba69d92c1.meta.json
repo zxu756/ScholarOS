@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 75246,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Weight_Standards_and_Mint_Practice_in_Kushan_Cop_2ba69d92c1.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:57Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:57 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:57 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "690",
+    "x-ratelimit-reset" : "70443"
+  },
+  "service" : "openalex",
+  "sha256" : "c291b132fd0cb6cb393e89be291cdf2bbb6b9ac23046997121d9de9ff6f78dae",
+  "slug" : "openalex_title_Weight_Standards_and_Mint_Practice_in_Kushan_Cop_2ba69d92c1",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Weight%20Standards%20and%20Mint%20Practice%20in%20Kushan%20Copper%20Coinage"
+}

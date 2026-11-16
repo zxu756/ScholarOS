@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 14204,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_BERT_Pre-training_of_Deep_Bidirectional_Transfor_7d7c4fe88e.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:53Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:54 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:54 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "0c88e38d8c1317614c43462802c49ecab4fd7c803a5f6af436524787f3355eb3",
+  "slug" : "crossref_title_BERT_Pre-training_of_Deep_Bidirectional_Transfor_7d7c4fe88e",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=BERT%3A%20Pre-training%20of%20Deep%20Bidirectional%20Transformers%20for%20Language%20Understanding%20Devlin%202019&rows=5"
+}

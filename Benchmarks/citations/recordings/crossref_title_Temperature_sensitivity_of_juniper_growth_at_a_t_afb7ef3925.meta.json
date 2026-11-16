@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 37948,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Temperature_sensitivity_of_juniper_growth_at_a_t_afb7ef3925.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:28Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:28 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:28 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "d815c1fa78884146cbd7334996ad23642fa2fef600722e070a3477748db2a83f",
+  "slug" : "crossref_title_Temperature_sensitivity_of_juniper_growth_at_a_t_afb7ef3925",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Temperature%20sensitivity%20of%20juniper%20growth%20at%20a%20timberline%20site%20in%20the%20western%20Himalaya%20Bhatt%202006&rows=5"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 151459,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Anion_sublattice_disorder_and_ionic_transport_in_c8be87c248.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:04Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:04 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:04 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "680",
+    "x-ratelimit-reset" : "70436"
+  },
+  "service" : "openalex",
+  "sha256" : "748af10dc5f2f46b3872507eb8845d00c0455977668cf24b95549822d654f79b",
+  "slug" : "openalex_title_Anion_sublattice_disorder_and_ionic_transport_in_c8be87c248",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Anion%20sublattice%20disorder%20and%20ionic%20transport%20in%20lithium%20halide%20argyrodites"
+}

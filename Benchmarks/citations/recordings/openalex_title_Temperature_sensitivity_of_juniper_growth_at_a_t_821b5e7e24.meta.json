@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 158661,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Temperature_sensitivity_of_juniper_growth_at_a_t_821b5e7e24.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:28Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:29 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:29 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "640",
+    "x-ratelimit-reset" : "70411"
+  },
+  "service" : "openalex",
+  "sha256" : "ad647fac46bce01faa7791f4893509d1d07dc397ba9b64f74b04d0c32842e016",
+  "slug" : "openalex_title_Temperature_sensitivity_of_juniper_growth_at_a_t_821b5e7e24",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Temperature%20sensitivity%20of%20juniper%20growth%20at%20a%20timberline%20site%20in%20the%20western%20Himalaya"
+}

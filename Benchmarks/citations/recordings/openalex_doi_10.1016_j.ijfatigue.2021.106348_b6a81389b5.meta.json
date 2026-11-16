@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 16646,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1016_j.ijfatigue.2021.106348_b6a81389b5.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:21Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:21 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:21 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "750",
+    "x-ratelimit-reset" : "70479"
+  },
+  "service" : "openalex",
+  "sha256" : "472494197853a8d393ff98f7cb4d68c24f95d78eba409ce9f4b101c2c9f05d50",
+  "slug" : "openalex_doi_10.1016_j.ijfatigue.2021.106348_b6a81389b5",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.ijfatigue.2021.106348"
+}

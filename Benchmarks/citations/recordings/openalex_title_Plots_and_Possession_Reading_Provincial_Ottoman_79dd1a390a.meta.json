@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 95993,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Plots_and_Possession_Reading_Provincial_Ottoman_79dd1a390a.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:17Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:18 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:18 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "750",
+    "x-ratelimit-reset" : "70482"
+  },
+  "service" : "openalex",
+  "sha256" : "2cd803448bc409afa3ac18e935b69ab9e4ff2c321de212022837e8a1e996389a",
+  "slug" : "openalex_title_Plots_and_Possession_Reading_Provincial_Ottoman_79dd1a390a",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Plots%20and%20Possession%20Reading%20Provincial%20Ottoman%20Cadastral%20Maps"
+}

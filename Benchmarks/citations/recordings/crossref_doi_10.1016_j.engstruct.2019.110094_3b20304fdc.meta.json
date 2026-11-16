@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 15847,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1016_j.engstruct.2019.110094_3b20304fdc.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:04Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:04 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:04 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "6b9fa153d2d06b9aa251591cfe4dbc95c2bd2a5a26f3b5031c0dbdf5f9c0cc40",
+  "slug" : "crossref_doi_10.1016_j.engstruct.2019.110094_3b20304fdc",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1016/j.engstruct.2019.110094"
+}

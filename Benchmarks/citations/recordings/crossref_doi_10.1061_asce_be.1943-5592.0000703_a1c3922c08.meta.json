@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 5521,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1061_asce_be.1943-5592.0000703_a1c3922c08.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:23Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:23 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:23 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "e966f5ac8de39faf65ae2d90d2efaaca844518cf23679e7cb275da55a31b00e8",
+  "slug" : "crossref_doi_10.1061_asce_be.1943-5592.0000703_a1c3922c08",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1061/(asce)be.1943-5592.0000703"
+}

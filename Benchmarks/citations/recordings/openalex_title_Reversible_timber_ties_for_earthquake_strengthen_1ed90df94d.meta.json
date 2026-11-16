@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 101903,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Reversible_timber_ties_for_earthquake_strengthen_1ed90df94d.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:07Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:07 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:07 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "770",
+    "x-ratelimit-reset" : "70493"
+  },
+  "service" : "openalex",
+  "sha256" : "3ee9f4b2531857749b5f5b7a1ea9e6effbcf9f5acb49405f0d7cb2266f678676",
+  "slug" : "openalex_title_Reversible_timber_ties_for_earthquake_strengthen_1ed90df94d",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Reversible%20timber%20ties%20for%20earthquake%20strengthening%20of%20an%20unreinforced%20minaret"
+}

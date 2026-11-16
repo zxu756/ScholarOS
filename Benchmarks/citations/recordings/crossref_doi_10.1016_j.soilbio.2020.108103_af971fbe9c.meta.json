@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 30717,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1016_j.soilbio.2020.108103_af971fbe9c.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:24:59Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:24:59 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:24:59 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "023532a6c006d63c704d12f29c994cd704bed10edd8587c3e75894714d230772",
+  "slug" : "crossref_doi_10.1016_j.soilbio.2020.108103_af971fbe9c",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1016/j.soilbio.2020.108103"
+}

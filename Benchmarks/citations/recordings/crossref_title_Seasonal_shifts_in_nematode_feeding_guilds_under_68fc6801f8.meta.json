@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 46721,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Seasonal_shifts_in_nematode_feeding_guilds_under_68fc6801f8.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:01Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:02 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:02 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "8e2a01b1b32a57df491499cf50e4b0dc3e3722b7c9718bbc5c664d9f376cafc4",
+  "slug" : "crossref_title_Seasonal_shifts_in_nematode_feeding_guilds_under_68fc6801f8",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Seasonal%20shifts%20in%20nematode%20feeding%20guilds%20under%20long-term%20no-till%20wheat%20Feldmann%202013&rows=5"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 41009,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1016_j.soilbio.2020.108103_4eb27b89ed.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:00Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:00 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:00 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "790",
+    "x-ratelimit-reset" : "70500"
+  },
+  "service" : "openalex",
+  "sha256" : "cfe8e2ff7b512e325338244b299d9ad18344b44df189274dfb241105e7a3acb2",
+  "slug" : "openalex_doi_10.1016_j.soilbio.2020.108103_4eb27b89ed",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.soilbio.2020.108103"
+}

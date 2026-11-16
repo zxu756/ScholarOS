@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 84027,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Evidential_Systems_in_Tibeto-Burman_A_Comparativ_3ec3c9aa37.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:51Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:51 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:51 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "610",
+    "x-ratelimit-reset" : "70389"
+  },
+  "service" : "openalex",
+  "sha256" : "3053dbe9073e3136509abe7b520f38ee0159b6ea4f6142da4959d3de2920ae6e",
+  "slug" : "openalex_title_Evidential_Systems_in_Tibeto-Burman_A_Comparativ_3ec3c9aa37",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Evidential%20Systems%20in%20Tibeto-Burman%20A%20Comparative%20Study"
+}

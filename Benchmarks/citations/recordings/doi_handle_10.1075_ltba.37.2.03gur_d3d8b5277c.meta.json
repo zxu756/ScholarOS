@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 55,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1075_ltba.37.2.03gur_d3d8b5277c.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:45Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:46 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:26:46 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "25952f528e3e0203dcc87d56d41f4a19dafec789a9b9c643ec58ee14bfab4faf",
+  "slug" : "doi_handle_10.1075_ltba.37.2.03gur_d3d8b5277c",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1075/ltba.37.2.03gur"
+}

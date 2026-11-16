@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 10987,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Anion_sublattice_disorder_and_ionic_transport_in_6dab789b92.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:02Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:03 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:03 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "2daa0dbaf171d81a61bdcb56f54bc932cbf17b02f411bcf91789803e4e33de33",
+  "slug" : "crossref_title_Anion_sublattice_disorder_and_ionic_transport_in_6dab789b92",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Anion%20sublattice%20disorder%20and%20ionic%20transport%20in%20lithium%20halide%20argyrodites%20Ferreira%202020&rows=5"
+}

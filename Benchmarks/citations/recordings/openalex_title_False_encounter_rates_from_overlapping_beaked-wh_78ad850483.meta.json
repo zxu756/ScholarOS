@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 147823,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_False_encounter_rates_from_overlapping_beaked-wh_78ad850483.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:24:57Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:24:58 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:24:58 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "790",
+    "x-ratelimit-reset" : "70502"
+  },
+  "service" : "openalex",
+  "sha256" : "10c32dfaeba99f1b4522e1d434a8fc9ec7f8144034ede95748f8847c6fca99b1",
+  "slug" : "openalex_title_False_encounter_rates_from_overlapping_beaked-wh_78ad850483",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=False%20encounter%20rates%20from%20overlapping%20beaked-whale%20echolocation%20bouts"
+}

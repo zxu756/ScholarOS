@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 122987,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Learning_combinatorial_optimization_algorithms_o_321e8cbdca.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:58Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:59 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:59 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "840",
+    "x-ratelimit-reset" : "70621"
+  },
+  "service" : "openalex",
+  "sha256" : "f117cd6077efe62087385efbc5709b4a965788897be1315b61ef77a2bb9f0b66",
+  "slug" : "openalex_title_Learning_combinatorial_optimization_algorithms_o_321e8cbdca",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Learning%20combinatorial%20optimization%20algorithms%20over%20graphs"
+}

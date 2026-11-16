@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 25181,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Quantitative_proteomics_of_desiccation_and_rehyd_f72d927cf6.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:33Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:33 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:33 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "5568f52b3faa721cdaccca44c1150b78f8ceb084bf47f592919d32587cd407e9",
+  "slug" : "crossref_title_Quantitative_proteomics_of_desiccation_and_rehyd_f72d927cf6",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Quantitative%20proteomics%20of%20desiccation%20and%20rehydration%20in%20a%20tardigrade%20Lindberg&rows=5"
+}

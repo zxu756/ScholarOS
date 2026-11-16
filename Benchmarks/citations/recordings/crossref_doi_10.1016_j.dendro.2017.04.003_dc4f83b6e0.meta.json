@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 6694,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1016_j.dendro.2017.04.003_dc4f83b6e0.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:26Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:26 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:26 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "c518a2327cd27394949c166622c910356b6b5f112582a30cef5356dbb75a19c3",
+  "slug" : "crossref_doi_10.1016_j.dendro.2017.04.003_dc4f83b6e0",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1016/j.dendro.2017.04.003"
+}

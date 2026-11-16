@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 61,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1021_acs.jproteome.0c00112_cdad857508.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:32Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:32 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:26:32 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "4cf4d32941e50af9fbfc44f7a4e2a697928c7c513bff49d2e48aed2f5895d744",
+  "slug" : "doi_handle_10.1021_acs.jproteome.0c00112_cdad857508",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1021/acs.jproteome.0c00112"
+}

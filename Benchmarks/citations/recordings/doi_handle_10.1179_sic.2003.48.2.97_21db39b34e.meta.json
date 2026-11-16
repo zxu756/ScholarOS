@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 56,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1179_sic.2003.48.2.97_21db39b34e.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:27:05Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:27:05 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:27:05 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "a8e49f1e76ad45536176cd248a2f5105bff591fcd0e8359a66484ae94f5697d9",
+  "slug" : "doi_handle_10.1179_sic.2003.48.2.97_21db39b34e",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1179/sic.2003.48.2.97"
+}

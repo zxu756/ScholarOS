@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 135194,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_A_survey_of_electricity_spot_and_futures_price_m_21609bd470.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:23:21Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:23:21 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:23:21 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "35b5cf73516c20d0eca6e6abd466fe426a88c42dd4b97519379a6bcf542e9576",
+  "slug" : "crossref_title_A_survey_of_electricity_spot_and_futures_price_m_21609bd470",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=A%20survey%20of%20electricity%20spot%20and%20futures%20price%20models%20for%20risk%20management%20applications%20Deschatre%202021&rows=5"
+}

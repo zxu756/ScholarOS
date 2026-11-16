@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 109830,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Household_costs_of_snakebite_and_the_economics_o_7cc7f79c01.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:13Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:14 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:14 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "670",
+    "x-ratelimit-reset" : "70426"
+  },
+  "service" : "openalex",
+  "sha256" : "0079b96885b38ad5510f5061e2ab034d1b4feaffad4ec377a804573ba19518d0",
+  "slug" : "openalex_title_Household_costs_of_snakebite_and_the_economics_o_7cc7f79c01",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Household%20costs%20of%20snakebite%20and%20the%20economics%20of%20village-level%20antivenom%20stocks"
+}

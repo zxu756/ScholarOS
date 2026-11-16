@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 75819,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_A_survey_of_analytic_techniques_in_inventory_the_678b039039.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:23:23Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:23:24 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:23:24 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "810",
+    "x-ratelimit-reset" : "70596"
+  },
+  "service" : "openalex",
+  "sha256" : "e6c45bf64486c0b23918881b3ebb17c7c68af769012da99d7f25c322b5b8367f",
+  "slug" : "openalex_title_A_survey_of_analytic_techniques_in_inventory_the_678b039039",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=A%20survey%20of%20analytic%20techniques%20in%20inventory%20theory"
+}

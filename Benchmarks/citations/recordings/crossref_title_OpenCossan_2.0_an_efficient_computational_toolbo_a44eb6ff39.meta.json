@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 14828,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_OpenCossan_2.0_an_efficient_computational_toolbo_a44eb6ff39.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:42Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:43 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:43 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "6fcc908c0e851af69082d695f3337886e3c84976507ec922e1dbffc851d4a706",
+  "slug" : "crossref_title_OpenCossan_2.0_an_efficient_computational_toolbo_a44eb6ff39",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=OpenCossan%202.0%3A%20an%20efficient%20computational%20toolbox%20for%20risk%2C%20reliability%20and%20resilience%20analysis%20Patelli%202018&rows=5"
+}

@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 31253,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Cyclic_compression_of_graded_titanium_lattice_co_96d18c4297.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:24Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:24 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:24 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "9e2b6ed908e18656240b7afd8c4bbc555b0702679877f57843b69e369088c24c",
+  "slug" : "crossref_title_Cyclic_compression_of_graded_titanium_lattice_co_96d18c4297",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Cyclic%20compression%20of%20graded%20titanium%20lattice%20coupons%20after%20surface%20polishing%20Fabbri&rows=5"
+}

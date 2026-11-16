@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 13301,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1007_978-3-030-97281-3_15_f9c94871fb.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:24:23Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:24:24 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:24:24 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "800",
+    "x-ratelimit-reset" : "70536"
+  },
+  "service" : "openalex",
+  "sha256" : "359293b0030938aa4d5a2b9950a0ad356cd404c5e77fc077375653cbc91da65e",
+  "slug" : "openalex_doi_10.1007_978-3-030-97281-3_15_f9c94871fb",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1007/978-3-030-97281-3_15"
+}

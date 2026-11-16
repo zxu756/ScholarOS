@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 35102,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Root-associated_fungal_networks_and_seedling_sur_3d68d3d46a.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:21Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:21 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:21 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "b8b77915816c2518670ae1f6f7da82182ce20e1c75c7e74d76ae5934347dd72d",
+  "slug" : "crossref_title_Root-associated_fungal_networks_and_seedling_sur_3d68d3d46a",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Root-associated%20fungal%20networks%20and%20seedling%20survival%20in%20a%20peat-swamp%20forest%20under%20drainage%20Lim%202022&rows=5"
+}

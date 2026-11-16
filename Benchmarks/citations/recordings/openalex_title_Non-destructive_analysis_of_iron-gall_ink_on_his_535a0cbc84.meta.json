@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 127135,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Non-destructive_analysis_of_iron-gall_ink_on_his_535a0cbc84.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:27:08Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:27:09 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:27:09 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "590",
+    "x-ratelimit-reset" : "70371"
+  },
+  "service" : "openalex",
+  "sha256" : "61e748f94967eb1bcd32c8a152bf9c28eb06d4a8b448e99347748ca599e99d45",
+  "slug" : "openalex_title_Non-destructive_analysis_of_iron-gall_ink_on_his_535a0cbc84",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Non-destructive%20analysis%20of%20iron-gall%20ink%20on%20historical%20manuscripts"
+}

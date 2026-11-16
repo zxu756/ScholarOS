@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 81676,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Scheduling_with_start_time_related_deadlines_be4853629c.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:23:04Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:23:05 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:23:05 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "830",
+    "x-ratelimit-reset" : "70615"
+  },
+  "service" : "openalex",
+  "sha256" : "b84ad065d38b44623e4c0f777a9e4b46f19157e9cc9014c0413ec1571d31aa4b",
+  "slug" : "openalex_title_Scheduling_with_start_time_related_deadlines_be4853629c",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Scheduling%20with%20start%20time%20related%20deadlines"
+}

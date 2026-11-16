@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 347296,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Root-associated_fungal_networks_and_seedling_sur_495146001f.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:21Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:22 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:22 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "650",
+    "x-ratelimit-reset" : "70418"
+  },
+  "service" : "openalex",
+  "sha256" : "4021ceedb47bf43bf119a0fb66fd23aac358ca7a93b462adbb782bd2053f0d84",
+  "slug" : "openalex_title_Root-associated_fungal_networks_and_seedling_sur_495146001f",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Root-associated%20fungal%20networks%20and%20seedling%20survival%20in%20a%20peat-swamp%20forest%20under%20drainage"
+}

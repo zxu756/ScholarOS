@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 23509,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1103_physrevx.6.041001_c9453037e6.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:24:09Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:24:10 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:24:10 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "800",
+    "x-ratelimit-reset" : "70550"
+  },
+  "service" : "openalex",
+  "sha256" : "42273b41a1befa109b675792654cc14b0f87c2d8c78df033265a7e9544e55d10",
+  "slug" : "openalex_doi_10.1103_physrevx.6.041001_c9453037e6",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1103/physrevx.6.041001"
+}

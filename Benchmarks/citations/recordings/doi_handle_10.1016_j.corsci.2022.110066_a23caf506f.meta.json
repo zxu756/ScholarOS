@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 60,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1016_j.corsci.2022.110066_a23caf506f.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:45Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:45 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:25:45 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "27b89d5b9f20340f49bd3f7208a8b5e2f6a4b5bfbba427dc13f28b554a50c182",
+  "slug" : "doi_handle_10.1016_j.corsci.2022.110066_a23caf506f",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1016/j.corsci.2022.110066"
+}

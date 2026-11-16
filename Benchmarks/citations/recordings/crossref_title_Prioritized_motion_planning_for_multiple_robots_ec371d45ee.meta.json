@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 16435,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Prioritized_motion_planning_for_multiple_robots_ec371d45ee.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:23:34Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:23:35 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:23:35 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "81d52c0b0391bc723215edb95de1c2e7c4e9f1ee883fd3fcc8fb9db25ec4742d",
+  "slug" : "crossref_title_Prioritized_motion_planning_for_multiple_robots_ec371d45ee",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Prioritized%20motion%20planning%20for%20multiple%20robots%20van%20den%20Berg%202005&rows=5"
+}

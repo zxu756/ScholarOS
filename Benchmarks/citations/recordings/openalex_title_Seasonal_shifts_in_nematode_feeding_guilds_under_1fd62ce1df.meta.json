@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 148313,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Seasonal_shifts_in_nematode_feeding_guilds_under_1fd62ce1df.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:02Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:03 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:03 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "780",
+    "x-ratelimit-reset" : "70497"
+  },
+  "service" : "openalex",
+  "sha256" : "932c696663e92e32d117d90d5beaa6e365e6b0b960cb099375788d3fb693c372",
+  "slug" : "openalex_title_Seasonal_shifts_in_nematode_feeding_guilds_under_1fd62ce1df",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Seasonal%20shifts%20in%20nematode%20feeding%20guilds%20under%20long-term%20no-till%20wheat"
+}

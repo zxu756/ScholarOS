@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 23053,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1016_j.aquaculture.2021.737841_be2e8a51ab.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:31Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:32 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:32 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "730",
+    "x-ratelimit-reset" : "70468"
+  },
+  "service" : "openalex",
+  "sha256" : "24ba83ac613c987b6e03b9924a7514ab67131ca57d40887aaebaeef8b8488a95",
+  "slug" : "openalex_doi_10.1016_j.aquaculture.2021.737841_be2e8a51ab",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.aquaculture.2021.737841"
+}

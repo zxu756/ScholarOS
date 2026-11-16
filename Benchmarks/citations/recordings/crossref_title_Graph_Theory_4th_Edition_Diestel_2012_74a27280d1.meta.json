@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 11055,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Graph_Theory_4th_Edition_Diestel_2012_74a27280d1.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:55Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:55 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:55 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "8cb68e0e6450d52421ac09fc3cd65470edc95da0a9424543c9ecc51795c7bb58",
+  "slug" : "crossref_title_Graph_Theory_4th_Edition_Diestel_2012_74a27280d1",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Graph%20Theory%2C%204th%20Edition%20Diestel%202012&rows=5"
+}

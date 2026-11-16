@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 152620,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Late-season_fly_visitation_and_network_redundanc_21a7c2f5b5.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:40Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:41 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:41 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "710",
+    "x-ratelimit-reset" : "70459"
+  },
+  "service" : "openalex",
+  "sha256" : "cadb2c0e46280337bd02193f846a7064258ee44f0d146bce820dc9f7223f41ae",
+  "slug" : "openalex_title_Late-season_fly_visitation_and_network_redundanc_21a7c2f5b5",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Late-season%20fly%20visitation%20and%20network%20redundancy%20in%20an%20alpine%20grassland"
+}

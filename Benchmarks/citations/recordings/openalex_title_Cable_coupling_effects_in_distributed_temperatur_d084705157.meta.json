@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 99907,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Cable_coupling_effects_in_distributed_temperatur_d084705157.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:37Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:37 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:37 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "720",
+    "x-ratelimit-reset" : "70463"
+  },
+  "service" : "openalex",
+  "sha256" : "63424872d0bfbd2ca0d3f284269a46ab4c1b4e5b8e081c985a3198b57c2e0339",
+  "slug" : "openalex_title_Cable_coupling_effects_in_distributed_temperatur_d084705157",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Cable%20coupling%20effects%20in%20distributed%20temperature%20measurements%20from%20deep%20boreholes"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 207,
+  "content_type" : "text/html; charset=utf-8",
+  "raw_file" : "openalex_doi_10.1016_j.quascirev.2018.01.026_03e2ae4729.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:09Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:09 GMT",
+  "response_headers" : {
+    "Content-Type" : "text/html; charset=utf-8",
+    "Date" : "Mon, 16 Nov 2026 04:25:09 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "770",
+    "x-ratelimit-reset" : "70491"
+  },
+  "service" : "openalex",
+  "sha256" : "e9639e3c4681ce85f852fbac48e2eeee5ba51296dbfec57c200d59b76237ab80",
+  "slug" : "openalex_doi_10.1016_j.quascirev.2018.01.026_03e2ae4729",
+  "status" : 404,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1016/j.quascirev.2018.01.026"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 1261,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Shard-size_sorting_in_peat_sections_downwind_of_af17d4b327.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:12Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:13 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:13 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "760",
+    "x-ratelimit-reset" : "70487"
+  },
+  "service" : "openalex",
+  "sha256" : "6a03528624288ea96df4f5a36f151272423e419d1264e5ea99558e13c0d4ece7",
+  "slug" : "openalex_title_Shard-size_sorting_in_peat_sections_downwind_of_af17d4b327",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Shard-size%20sorting%20in%20peat%20sections%20downwind%20of%20Avachinsky%20volcano"
+}

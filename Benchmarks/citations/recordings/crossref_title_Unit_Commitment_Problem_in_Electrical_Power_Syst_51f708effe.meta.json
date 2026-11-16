@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 25549,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Unit_Commitment_Problem_in_Electrical_Power_Syst_51f708effe.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:22:45Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:22:46 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:22:46 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "6a357097c8b837044cac5bd2a016f0de368c62a81c2c70ac6d27e0b135e328bb",
+  "slug" : "crossref_title_Unit_Commitment_Problem_in_Electrical_Power_Syst_51f708effe",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Unit%20Commitment%20Problem%20in%20Electrical%20Power%20System%3A%20A%20Literature%20Review.%20Abdou%202018&rows=5"
+}

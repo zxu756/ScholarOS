@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 26786,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1093_nargab_lqad071_ea1de52842.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:23:49Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:23:49 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:23:49 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "3ac9d378b838a904988f74bd47e17949ee8e08dfefb8941838d034fed1ad6607",
+  "slug" : "crossref_doi_10.1093_nargab_lqad071_ea1de52842",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1093/nargab/lqad071"
+}

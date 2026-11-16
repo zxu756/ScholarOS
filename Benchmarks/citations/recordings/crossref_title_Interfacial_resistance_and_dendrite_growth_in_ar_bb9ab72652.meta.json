@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 6264,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Interfacial_resistance_and_dendrite_growth_in_ar_bb9ab72652.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:26:01Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:26:01 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:26:01 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "6ada8d036e696ac3f79a7fcd44200ce8e62b62657e16d145848a73c05dbe58d4",
+  "slug" : "crossref_title_Interfacial_resistance_and_dendrite_growth_in_ar_bb9ab72652",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Interfacial%20resistance%20and%20dendrite%20growth%20in%20argyrodite-type%20halide%20solid%20electrolytes%20Lindqvist&rows=5"
+}

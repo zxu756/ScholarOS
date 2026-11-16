@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 40926,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Pore-water_renewal_and_layered_corrosion_of_bron_a581a3714d.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:25:46Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:25:47 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:25:47 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "4877fa79d534b798b426a439dbf670de0d422a71da61269fdf9a2440d1ee8b20",
+  "slug" : "crossref_title_Pore-water_renewal_and_layered_corrosion_of_bron_a581a3714d",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Pore-water%20renewal%20and%20layered%20corrosion%20of%20bronze%20artefacts%20in%20marine%20silt%20Papadaki&rows=5"
+}
