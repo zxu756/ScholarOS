@@ -4,7 +4,7 @@
 
 面向 macOS 的 Swift 包与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供 LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、公开学术注册库引文核查、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
 
-> **当前状态说明（M1 进行中）：** `scholaros verify-citations`、MCP `scholar_verify_bibliography` 与 `scholaros diagnostics` 共用同一引文核查函数，默认联网查询公开学术注册库（Crossref、OpenAlex、`doi.org`、arXiv、PubMed），带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），`--no-cache` 跳过缓存读写。插入前核查与结论写回/有效期（`cite`、`scholar_cite_key`、`.bib` `x-firewall-class`）及 480 条基准集（`Benchmarks/citations/`）评测仍在 M1 后续阶段推进中。macOS 桌面窗口启动默认为空，当前**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**。
+> **当前状态说明（M1 进行中）：** `scholaros verify-citations`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、`scholaros cite` 与 MCP `scholar_cite_key` 共用同一引文核查函数，默认联网查询公开学术注册库（Crossref、OpenAlex、`doi.org`、arXiv、PubMed），带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），`--no-cache` 跳过缓存读写，忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，写回条目的结论按 30 天（`NOT_FOUND` 为 1 天）过期。M1 仅余 480 条基准集（`Benchmarks/citations/`）评测与验收脚本尚在进行中。macOS 桌面窗口启动默认为空，当前**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**。
 
 ---
 
@@ -75,9 +75,10 @@ ScholarOS format-bib "$WORK/refs.bib" --style ieee
 ScholarOS diagnostics "$WORK/paper.tex" --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang en
 ScholarOS diagnostics "$WORK/paper.tex" --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang zh
 
-# 4. 引文核查：离线（--offline）与录制回放（--registry-replay，输出带 REPLAY 标记）
+# 4. 引文核查与插入前核查：--offline 与录制回放（--registry-replay）
 ScholarOS verify-citations "$WORK/refs.bib" --offline --lang en || echo "expected_exit=$?"
 ScholarOS verify-citations "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang en || echo "expected_exit=$?"
+ScholarOS cite lecun2015deep --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry
 
 # 5. 通过标准输入输出验证 JSON-RPC 2.0 MCP 握手（--offline）
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | ScholarOS mcp --offline
@@ -102,7 +103,7 @@ Scripts/test.sh scope ScholarBibAndCSL
 ## 当前边界与后续计划
 
 - **桌面端界面（不带子命令运行 `ScholarOS`）**：默认打开空白窗口（`0` 份手稿、`0` 条文献），当前尚不能直接打开用户本地 `.tex`、`.bib` 或 `.pdf` 文件，**仅在传入 `--demo` 或点击“载入演示数据”时查看内置未核查示例数据**（顶部带有 `DEMO / 演示数据` 横幅）。
-- **M1 剩余项（联网引文核验）**：接入 `cite`、`scholar_cite_key` 插入前核查及 `.bib` `x-firewall-class` / 工程库结论有效期规则；并在 480 条标注基准集（`Benchmarks/citations/`）上评测准确率与误拒率。
+- **M1 剩余项（联网引文核验）**：在 480 条标注基准集（`Benchmarks/citations/`）上评测准确率与误拒率，并接入 M1 验收脚本。
 - **M2 计划（解析器、PDF 切分与 CiteStudio 对齐）**：完善 LaTeX `\verb`、`verbatim`、`lstlisting`、`\url{%}` 与 `\bibitem` 解析；支持 BibTeX 单条语法错误后的恢复解析；修复 APA 标题大小写与 IEEE 专著格式；改进双栏 PDF 章节标题与跨栏表格切分；暴露与 CiteStudio 对齐的 MCP 工具名称。
 - **冻结模块（尚未完成端到端验收，M3 之后再议）**：引文图谱分析（力导向布局、PageRank、Louvain 聚类、Kleinberg 突现检测、主路径分析）、PRISMA 筛查界面、偏倚风险与 Meta 分析界面、Myers 修订追踪界面、投稿归档打包器、Zotero SQLite 桥接、Typst 支持、`JavaScriptCore` 审稿插件、持久化撤销/重做以及仅用于测试的合成 PDF 生成器。
 

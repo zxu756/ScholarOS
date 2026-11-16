@@ -4,7 +4,7 @@
 
 macOS Swift package and bilingual (`--lang en|zh`) command-line tool (`scholaros`) for LaTeX/BibTeX parsing, APA 7th / IEEE reference formatting, citation verification against public scholarly registries, statistical agreement/meta-analysis library routines, and a stdio JSON-RPC 2.0 MCP server.
 
-> **Status (M1 in progress):** `scholaros verify-citations`, MCP `scholar_verify_bibliography`, and `scholaros diagnostics` share the same citation verification pipeline against public registries online by default (Crossref, OpenAlex, `doi.org`, arXiv, PubMed) with SQLite response caching, rate limiting, and retry backoff; `--offline` sends zero network requests, `--registry-replay <dir>` replays SHA-256-verified recorded fixtures offline (`REPLAY`), and `--no-cache` skips reading/writing the cache. Citation insertion writeback/gates (`cite`, `scholar_cite_key`, `.bib` `x-firewall-class`) and the 480-entry benchmark evaluation (`Benchmarks/citations/`) remain in progress for M1. The macOS desktop window starts empty and currently **only displays sample data** when `--demo` or **Load Demo** is explicitly selected.
+> **Status (M1 in progress):** `scholaros verify-citations`, MCP `scholar_verify_bibliography`, `scholaros diagnostics`, `scholaros cite`, and MCP `scholar_cite_key` share the same citation verification pipeline against public registries online by default (Crossref, OpenAlex, `doi.org`, arXiv, PubMed) with SQLite response caching, rate limiting, and retry backoff; `--offline` sends zero network requests, `--registry-replay <dir>` replays SHA-256-verified recorded fixtures offline (`REPLAY`), `--no-cache` skips reading/writing the cache, `.bib` `x-firewall-class`/`x-firewall-note` declarations are ignored, and written-back verdicts expire after 30 days (1 day for `NOT_FOUND`). Only the 480-entry benchmark evaluation (`Benchmarks/citations/`) and M1 acceptance script remain in progress for M1. The macOS desktop window starts empty and currently **only displays sample data** when `--demo` or **Load Demo** is explicitly selected.
 
 ---
 
@@ -75,9 +75,10 @@ ScholarOS format-bib "$WORK/refs.bib" --style ieee
 ScholarOS diagnostics "$WORK/paper.tex" --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang en
 ScholarOS diagnostics "$WORK/paper.tex" --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang zh
 
-# 4. Citation check: offline (--offline) and recorded fixture replay (--registry-replay, marked REPLAY)
+# 4. Citation check & pre-insertion verification: --offline and recorded fixture replay (--registry-replay)
 ScholarOS verify-citations "$WORK/refs.bib" --offline --lang en || echo "expected_exit=$?"
 ScholarOS verify-citations "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry --lang en || echo "expected_exit=$?"
+ScholarOS cite lecun2015deep --bib "$WORK/refs.bib" --registry-replay Tests/Fixtures/registry
 
 # 5. JSON-RPC 2.0 MCP initialize handshake over stdio (--offline)
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | ScholarOS mcp --offline
@@ -102,7 +103,7 @@ Scripts/test.sh scope ScholarBibAndCSL
 ## Current Limitations & Planned Work
 
 - **Desktop GUI (`ScholarOS` with no subcommand)**: Launches an empty window (`0` manuscripts, `0` bibliography entries). It cannot yet open user `.tex`, `.bib`, or `.pdf` files and **only views built-in unverified sample data** when launched with `--demo` or when **Load Demo** is clicked (marked with a window-wide `DEMO` banner).
-- **Remaining in M1 (Online Citation Verification)**: Wire pre-insertion verification and stored-verdict expiration rules for `cite`, `scholar_cite_key`, and `.bib` `x-firewall-class`; evaluate precision and false-rejection rates on the 480-entry labeled benchmark (`Benchmarks/citations/`).
+- **Remaining in M1 (Online Citation Verification)**: Evaluate precision and false-rejection rates on the 480-entry labeled benchmark (`Benchmarks/citations/`) and wire the M1 acceptance script.
 - **Planned for M2 (Parser, PDF & CiteStudio Alignment)**: Handle `\verb`, `verbatim`, `lstlisting`, `\url{%}`, and `\bibitem` in LaTeX; recover past malformed BibTeX entries; fix APA sentence-case and IEEE book formatting; improve two-column PDF section heading and cross-column table segmentation; expose CiteStudio-compatible MCP tool names.
 - **Frozen (unverified, paused until after M3)**: Citation graph analytics (force layout, PageRank, Louvain, Kleinberg bursts, main-path analysis), PRISMA screening UI, risk-of-bias and meta-analysis UI, Myers track-changes UI, submission archive bundler, Zotero SQLite bridge, Typst support, `JavaScriptCore` editorial plugins, persistent undo/redo, and test-only synthetic PDF generation.
 
