@@ -394,10 +394,10 @@ struct PluginSDKMCPAndShellTests {
         let cli = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
 
         let versionOut = try await cli.execute(arguments: ["version"])
-        #expect(versionOut.contains("ScholarOS 1.2.0"))
+        #expect(versionOut.contains("ScholarOS 1.3.0"))
 
         let versionWithLangOut = try await cli.execute(arguments: ["--lang", "zh", "version"])
-        #expect(versionWithLangOut.contains("ScholarOS 1.2.0"))
+        #expect(versionWithLangOut.contains("ScholarOS 1.3.0"))
 
         let helpOut = try await cli.execute(arguments: ["--help"])
         #expect(helpOut.contains("verify-citations"))

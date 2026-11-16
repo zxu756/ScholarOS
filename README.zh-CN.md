@@ -2,11 +2,11 @@
 
 **[English](README.md)** | **简体中文**
 
-面向 macOS 的 Swift 包（`1.2.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
+面向 macOS 的 Swift 包（`1.3.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
 
 > **编造的参考文献进不了你的 `.bib`。** 在一份 480 条真假混合的文献集上，没有一条编造的文献被判为已验证（`fabricated_model` 组 `0/80`；全集 `truth=fabricated` 条目 `0/86`；全部不可写入条目 `0/254`）；真实三组中的真实文献被误判为不存在或已撤稿（`NOT_FOUND` 或 `RETRACTED`）的比例是 **0%（`0/215`）**（真实三组合计 220 条亦为 `0/220`；全集 `truth=real` 条目为 `0/225`）。
 
-> **当前状态说明（M0 与 M1 验收已通过，`v1.2.0`）：** M0 与 M1 验收表各行均已通过，以 [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh) 与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh) 为准（需发真实联网请求的行——第 19 行实时 `--registry-record` 缓存双跑与第 23 行 480 条实时评测——仅在设置 `SCHOLAR_ONLINE=1` 时运行，未设时输出 `SKIP (没跑)`）。`scholaros verify-citations`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、`scholaros cite` 与 MCP `scholar_cite_key` 共用同一引文核查流程，默认联网查询公开学术注册库，带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，缓存与写回结论按 30 天（`NOT_FOUND` 为 1 天）过期。macOS 桌面窗口启动默认为空，**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**（带 `DEMO` 横幅）。
+> **当前状态说明（M0 与 M1 验收已通过，`v1.3.0`）：** M0 与 M1 验收表各行均已通过，以 [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh) 与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh) 为准（需发真实联网请求的行——第 19 行实时 `--registry-record` 缓存双跑与第 23 行 480 条实时评测——仅在设置 `SCHOLAR_ONLINE=1` 时运行，未设时输出 `SKIP (没跑)`）。`scholaros verify-citations`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、`scholaros cite` 与 MCP `scholar_cite_key` 共用同一引文核查流程，默认联网查询公开学术注册库，带本地 SQLite 响应缓存、限速与退避重试；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（输出带 `REPLAY` 标记），忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，缓存与写回结论按 30 天（`NOT_FOUND` 为 1 天）过期。macOS 桌面窗口启动默认为空，**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**（带 `DEMO` 横幅）。
 
 ---
 

@@ -180,8 +180,8 @@ public struct ScholarCLIRunner: Sendable {
         case "version", "--version":
             return CLIExecutionOutput(
                 stdout: lang.L(
-                    "ScholarOS 1.2.0 (macOS arm64 · LaTeX/BibTeX Parser, CSL Formatter & Citation Audit · 中文/EN)",
-                    "ScholarOS 1.2.0 (macOS arm64 · LaTeX/BibTeX 解析、CSL 引文排版与引文核查 · 中文/EN)"
+                    "ScholarOS 1.3.0 (macOS arm64 · LaTeX/BibTeX Parser, CSL Formatter & Citation Audit · 中文/EN)",
+                    "ScholarOS 1.3.0 (macOS arm64 · LaTeX/BibTeX 解析、CSL 引文排版与引文核查 · 中文/EN)"
                 ),
                 exitCode: 0
             )
@@ -1700,7 +1700,7 @@ public struct ScholarCLIRunner: Sendable {
         switch lang {
         case .en:
             return """
-            ScholarOS 1.2.0 - Bilingual (中文/EN) LaTeX/BibTeX Analysis, CSL Formatting & Citation Audit CLI
+            ScholarOS 1.3.0 - Bilingual (中文/EN) LaTeX/BibTeX Analysis, CSL Formatting & Citation Audit CLI
             Global Options:
               --lang zh|en                                           Select output / UI language (or set SCHOLAROS_LANG=zh|en)
 
@@ -1738,7 +1738,7 @@ public struct ScholarCLIRunner: Sendable {
             """
         case .zhHans:
             return """
-            ScholarOS 1.2.0 - 中英双语 (中文/EN) LaTeX/BibTeX 语法分析、CSL 引文格式化与引文核查命令行工具
+            ScholarOS 1.3.0 - 中英双语 (中文/EN) LaTeX/BibTeX 语法分析、CSL 引文格式化与引文核查命令行工具
             全局选项：
               --lang zh|en                                           指定命令行 / 界面语言（或设置环境变量 SCHOLAROS_LANG=zh|en）
 

@@ -823,7 +823,7 @@ public actor RegistryRateLimiter {
 public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
     public typealias RawDataLoader = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
-    public static let currentVersion: String = "1.2.0"
+    public static let currentVersion: String = "1.3.0"
     public static let defaultUserAgent: String = "ScholarOS/\(currentVersion)"
     public static let defaultTimeoutInterval: TimeInterval = 15.0
 
