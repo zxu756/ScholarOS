@@ -3,13 +3,23 @@
 # README command replay.
 #
 # The commands are NOT copied into this script. They are extracted from the ```bash fenced code
-# blocks of README.md and README.zh-CN.md and executed verbatim, in order, from the repository
-# root. Editing a command in either README therefore changes what runs here.
+# blocks of README.md and README.zh-CN.md and executed from the repository root. Editing a command
+# in either README therefore changes what runs here.
 #
 #   1. Both READMEs must carry the same commands. Comment lines and blank lines may differ (the
 #      comments are translated); every other line of the code blocks must be identical, otherwise
 #      this script fails before running anything.
-#   2. Each README's blocks are then replayed with `set -e`, so a failing command fails the replay.
+#   2. Each README's blocks are then replayed with `set -eo pipefail` (including under
+#      `sandbox-exec -p '(version 1)(allow default)(deny network*)'`, per M1 Acceptance Row 22):
+#      - Top-level milestone/release drivers (`Scripts/test.sh milestone ...` / `release`) that
+#        themselves invoke `readme-commands.sh` are checked for existence/executability without
+#        recursive re-entry.
+#      - Explicit live-network commands (`SCHOLAR_ONLINE=1 ...`) verify the `--live` offline guard
+#        (prints `没跑` and exits `2` when `SCHOLAR_ONLINE` is unset) and are logged as skipped in
+#        offline/sandboxed replay.
+#      - All other commands — including `python3 Scripts/acceptance/m1-citation-bench.py --replay`,
+#        `swift build`, every `ScholarOS` CLI/MCP invocation, and `Scripts/test.sh scope ...` — run
+#        verbatim, and the replay benchmark numbers are checked against the README tables.
 #
 # The replay never starts the graphical interface: `ScholarOS` is wrapped by the shell function
 # from lib-cli-guard.sh, which refuses argument lists that would open a window and gives the
@@ -20,8 +30,9 @@
 #   Scripts/acceptance/readme-commands.sh --record   report overwrites reports/readme-commands.txt
 #
 # Environment:
-#   SCHOLAR_REPORT_DIR   directory for the report (set by Scripts/test.sh); overrides the default
-#   SCHOLAR_BUILD_JOBS   optional cap for `swift build` / `swift test` parallelism (e.g. 3)
+#   SCHOLAR_REPORT_DIR          directory for the report (set by Scripts/test.sh); overrides default
+#   SCHOLAR_BUILD_JOBS          optional cap for `swift build` / `swift test` parallelism (e.g. 3)
+#   SCHOLAR_OUTER_NO_NETWORK=1  validates outer deny-network sandbox and passes --disable-sandbox
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -55,8 +66,9 @@ mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/readme-commands.txt"
 
 export SCHOLAR_SANDBOX_HOME="$WORK/home"
-mkdir -p "$SCHOLAR_SANDBOX_HOME"
-# README replay looks the executable up on PATH exactly as the README tells the reader to.
+mkdir -p "$SCHOLAR_SANDBOX_HOME" "$WORK/tmp"
+# README replay looks the executable up on PATH (after `swift build`) or lets m1-citation-bench.py
+# resolve `.build/debug/ScholarOS`, exactly as the README tells the reader.
 unset SCHOLAR_CLI_BIN
 GUARD_LIB="$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
 # Validate SCHOLAR_OUTER_NO_NETWORK=1 (exits 2 if not actually inside a network-denying sandbox)
@@ -80,10 +92,41 @@ command_lines_only() {
     grep -v -E '^[[:space:]]*(#.*)?$' "$1" || true
 }
 
+# Transforms a README blocks file so recursive top-level suite drivers and live-online commands
+# are validated offline without recursion or network access, while all other lines run verbatim.
+prepare_replay_body() {
+    python3 -I - "$1" <<'PY'
+import re, shlex, sys
+
+src_path = sys.argv[1]
+with open(src_path, encoding="utf-8") as f:
+    lines = f.readlines()
+
+re_recursive_driver = re.compile(r"^\s*Scripts/test\.sh\s+(milestone\s+\d+|release)(?:\s|$)")
+re_online_cmd = re.compile(r"^\s*SCHOLAR_ONLINE=1\s+(.+)$")
+
+for raw in lines:
+    stripped = raw.rstrip("\n")
+    if re_recursive_driver.match(stripped):
+        msg = shlex.quote(f"[SKIP-RECURSIVE] verified top-level suite driver: {stripped.strip()}")
+        print(f"test -x Scripts/test.sh && echo {msg}")
+    elif re_online_cmd.match(stripped):
+        msg = shlex.quote(f"[SKIP-ONLINE] 没跑 — online command skipped in offline/sandboxed README replay: {stripped.strip()}")
+        print(
+            "test -f Scripts/acceptance/m1-citation-bench.py && "
+            "{ set +e; _guard_out=\"$(env -u SCHOLAR_ONLINE python3 -I Scripts/acceptance/m1-citation-bench.py --live 2>&1)\"; _guard_rc=$?; set -e; "
+            "test \"$_guard_rc\" -eq 2 && printf '%s\\n' \"$_guard_out\" | grep -q '没跑'; } && "
+            f"echo {msg}"
+        )
+    else:
+        print(stripped)
+PY
+}
+
 {
     echo "# ScholarOS README.md & README.zh-CN.md Command Replay"
     echo "Date: $(date +%Y-%m-%d)"
-    echo "Commands are extracted from the bash code blocks of both READMEs and executed verbatim."
+    echo "Commands are extracted from the bash code blocks of both READMEs and executed."
     echo ""
 
     for README_FILE in "${README_FILES[@]}"; do
@@ -122,18 +165,33 @@ command_lines_only() {
         echo "FAIL: every 'ScholarOS verify-citations' command in README must pass --offline or --registry-replay so replay never touches the network"
         exit 1
     fi
-    echo "verify_citations_offline_and_replay_examples_present=true"
+    if ! grep -q -F 'Scripts/test.sh milestone 1' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include 'Scripts/test.sh milestone 1'"
+        exit 1
+    fi
+    if ! grep -q -F 'python3 Scripts/acceptance/m1-citation-bench.py --replay' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include 'python3 Scripts/acceptance/m1-citation-bench.py --replay'"
+        exit 1
+    fi
+    if ! grep -q -F 'SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include 'SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live'"
+        exit 1
+    fi
+    echo "verify_citations_and_m1_repro_examples_present=true"
     echo ""
 
     for README_FILE in "${README_FILES[@]}"; do
         echo "== Replay: bash code blocks of $README_FILE =="
+        prepare_replay_body "$WORK/$README_FILE.blocks.sh" > "$WORK/$README_FILE.prepared.sh"
         {
+            printf 'export TMPDIR=%q\n' "$WORK/tmp"
+            echo "unset SCHOLAR_REPORT_DIR"
             printf 'source %q\n' "$GUARD_LIB"
             echo "set -eo pipefail"
             # From here on bash echoes every input line before running it, so the report shows
             # the README text itself next to the output it produced.
             echo "set -v"
-            cat "$WORK/$README_FILE.blocks.sh"
+            cat "$WORK/$README_FILE.prepared.sh"
         } > "$WORK/replay.sh"
         set +e
         bash "$WORK/replay.sh" > "$WORK/$README_FILE.replay.out" 2>&1
@@ -148,6 +206,14 @@ command_lines_only() {
         fi
         if ! grep -q '^\[REPLAY' "$WORK/$README_FILE.replay.out"; then
             echo "FAIL: replaying $README_FILE did not emit [REPLAY] banner from verify-citations --registry-replay"
+            exit 1
+        fi
+        if ! grep -q -F 'Allow (VERIFIED): precision=206/206 (100.00%), recall=206/226 (91.15%)' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not reproduce expected M1 Allow precision/recall from m1-citation-bench.py --replay"
+            exit 1
+        fi
+        if ! grep -q -F 'Hard gate (non-insertable VERIFIED == 0): count=0 passed=True' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not confirm hard gate count=0 passed=True"
             exit 1
         fi
         echo ""
