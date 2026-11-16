@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 3826,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.46764_teknimedia.v3i1.58_3597808ccf.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T02:40:40Z",
+  "response_date_header" : "Mon, 16 Nov 2026 02:40:40 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 02:40:40 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "55599bb1c12565557ae0c92f901a40c4b7a6997633ebe4ccc1969dab8b28656a",
+  "slug" : "crossref_doi_10.46764_teknimedia.v3i1.58_3597808ccf",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.46764/teknimedia.v3i1.58"
+}

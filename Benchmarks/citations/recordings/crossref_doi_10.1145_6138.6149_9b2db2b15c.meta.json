@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 6293,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1145_6138.6149_9b2db2b15c.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T02:40:23Z",
+  "response_date_header" : "Mon, 16 Nov 2026 02:40:23 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 02:40:23 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "88da3f9f803adf08f78cedc2a80ef8437ea8d0a2d638f1b22d286416e569a168",
+  "slug" : "crossref_doi_10.1145_6138.6149_9b2db2b15c",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1145/6138.6149"
+}

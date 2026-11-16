@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 8065,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T02:39:42Z",
+  "response_date_header" : "Mon, 16 Nov 2026 02:39:43 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 02:39:43 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "292137862a506853534e9b3663c6826316de30b385242267aa94c3c90450830d",
+  "slug" : "crossref_title_The_Art_of_Computer_Programming_Volume_1_Fundame_46dd1a7787",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=The%20Art%20of%20Computer%20Programming%2C%20Volume%201%3A%20Fundamental%20Algorithms%20Knuth%201968&rows=5"
+}

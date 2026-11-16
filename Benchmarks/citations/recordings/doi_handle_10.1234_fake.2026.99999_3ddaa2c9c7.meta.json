@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 473,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T02:39:38Z",
+  "response_date_header" : "Mon, 16 Nov 2026 02:39:39 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 02:39:39 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "4eb2127d124d4abeab9393eaf56af14fe45670588cc3100da8b1d031e4ddfd15",
+  "slug" : "doi_handle_10.1234_fake.2026.99999_3ddaa2c9c7",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1234/fake.2026.99999"
+}

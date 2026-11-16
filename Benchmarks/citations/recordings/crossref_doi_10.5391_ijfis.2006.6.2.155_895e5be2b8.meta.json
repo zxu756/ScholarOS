@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 2838,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.5391_ijfis.2006.6.2.155_895e5be2b8.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T02:40:29Z",
+  "response_date_header" : "Mon, 16 Nov 2026 02:40:30 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 02:40:30 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "b73b1659843fc2c17a2d1869c75a74197c0c213e04c7ec1c62bf11fb82aaee2e",
+  "slug" : "crossref_doi_10.5391_ijfis.2006.6.2.155_895e5be2b8",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.5391/ijfis.2006.6.2.155"
+}
