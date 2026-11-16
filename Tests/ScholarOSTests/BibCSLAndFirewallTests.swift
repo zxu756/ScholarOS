@@ -4187,4 +4187,80 @@ struct BibCSLAndFirewallTests {
         #expect(knuthRun2URLs.first?.contains("api.crossref.org") == true)
         #expect(knuthV2.sources.first { $0.source == "OpenAlex" }?.origin == .cache)
     }
+
+    // MARK: - M1 Stage 09: S51 (.bib CRLF, CR, and Mixed Line Endings)
+
+    @Test("S51 regression: BibTeXCodec parses CRLF, standalone CR, and mixed line endings identically to LF without leaving carriage returns in any field")
+    func s51BibTeXCodecParsesCRLFStandaloneCRAndMixedLineEndingsIdenticallyToLF() throws {
+        let fixturesDir = Self.recordedRegistryFixturesURL.deletingLastPathComponent()
+        let crlfURL = fixturesDir.appendingPathComponent("crlf-two-entries.bib")
+        let mixedURL = fixturesDir.appendingPathComponent("mixed-line-endings.bib")
+
+        // Verify raw fixture bytes genuinely contain CRLF (0x0D 0x0A)
+        let crlfBytes = Array(try Data(contentsOf: crlfURL))
+        #expect(crlfBytes.contains(0x0D))
+        #expect(zip(crlfBytes, crlfBytes.dropFirst()).contains { $0 == 0x0D && $1 == 0x0A })
+
+        let mixedBytes = Array(try Data(contentsOf: mixedURL))
+        #expect(zip(mixedBytes, mixedBytes.dropFirst()).contains { $0 == 0x0D && $1 == 0x0A })
+        #expect(zip(mixedBytes, mixedBytes.dropFirst()).contains { $0 == 0x0D && $1 != 0x0A })
+        #expect(zip(mixedBytes, mixedBytes.dropFirst()).contains { $0 != 0x0D && $1 == 0x0A })
+
+        let crlfRaw = String(decoding: crlfBytes, as: UTF8.self)
+        let lfFromCRLF = crlfRaw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let crOnlyRaw = lfFromCRLF.replacingOccurrences(of: "\n", with: "\r")
+
+        let codec = BibTeXCodec()
+        let expectedLFDoc = try codec.parseDocument(lfFromCRLF)
+        let parsedCRLFDoc = try codec.parseDocument(crlfRaw)
+        let parsedCROnlyDoc = try codec.parseDocument(crOnlyRaw)
+
+        #expect(expectedLFDoc.entries.count == 2)
+        #expect(parsedCRLFDoc == expectedLFDoc)
+        #expect(parsedCROnlyDoc == expectedLFDoc)
+
+        let mixedRaw = String(decoding: mixedBytes, as: UTF8.self)
+        let lfFromMixed = mixedRaw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let expectedMixedLFDoc = try codec.parseDocument(lfFromMixed)
+        let parsedMixedDoc = try codec.parseDocument(mixedRaw)
+        #expect(expectedMixedLFDoc.entries.count == 2)
+        #expect(parsedMixedDoc == expectedMixedLFDoc)
+
+        // Ensure NO field value or unmapped field retains '\r' or '\r\n'
+        for doc in [parsedCRLFDoc, parsedCROnlyDoc, parsedMixedDoc] {
+            for entry in doc.entries {
+                let allStrings: [String?] = [
+                    entry.citeKey,
+                    entry.title,
+                    entry.venue,
+                    entry.publisher,
+                    entry.volume,
+                    entry.issue,
+                    entry.pages,
+                    entry.doi,
+                    entry.arxivID,
+                    entry.pmid,
+                    entry.url,
+                    entry.abstractText
+                ] + entry.authors.flatMap { [$0.givenName, $0.familyName, $0.orcid] }
+                for val in allStrings.compactMap({ $0 }) {
+                    #expect(!val.unicodeScalars.contains("\r"), "Found residual CR in '\(val)' for \(entry.citeKey)")
+                }
+            }
+            for (_, unmapped) in doc.unmappedFieldsByCiteKey {
+                for (_, val) in unmapped {
+                    #expect(!val.unicodeScalars.contains("\r"), "Found residual CR in unmapped value '\(val)'")
+                }
+            }
+        }
+
+        // Direct LaTeXTextCodec and BibTeXAuthorParser calls with CRLF / CR
+        #expect(LaTeXTextCodec().decode("Deep\r\nlearning\rmodels") == "Deep learning models")
+        let authors = BibTeXAuthorParser.parseAuthors("Bratteli, O.\r\nand\rRobinson, D.W.")
+        #expect(authors.map(\.familyName) == ["Bratteli", "Robinson"])
+    }
 }

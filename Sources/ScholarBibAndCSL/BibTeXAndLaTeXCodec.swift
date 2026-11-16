@@ -242,7 +242,8 @@ public struct LaTeXTextCodec: Sendable {
     /// Decodes BibTeX/LaTeX diacritics, character commands, ligatures, protective braces, and inline math into clean UTF-8 NFC text.
     public func decode(_ input: String) -> String {
         if input.isEmpty { return "" }
-        let chars = Array(input)
+        let normalizedInput = normalizeLineEndingsToLF(input)
+        let chars = Array(normalizedInput)
         var out = String()
         out.reserveCapacity(chars.count)
 
@@ -707,10 +708,12 @@ public struct BibTeXAuthorParser: Sendable {
         orcidField: String? = nil,
         codec: LaTeXTextCodec = LaTeXTextCodec()
     ) -> [BibAuthor] {
-        let segments = splitTopLevelAnd(rawAuthorField)
+        let normalizedAuthorField = normalizeLineEndingsToLF(rawAuthorField)
+        let normalizedORCIDField = orcidField.map(normalizeLineEndingsToLF)
+        let segments = splitTopLevelAnd(normalizedAuthorField)
         if segments.isEmpty { return [] }
 
-        let orcids: [String?] = parseORCIDList(orcidField)
+        let orcids: [String?] = parseORCIDList(normalizedORCIDField)
         var parsedAuthors: [BibAuthor] = []
         parsedAuthors.reserveCapacity(segments.count)
 
@@ -1832,6 +1835,13 @@ public struct BibTeXCodec: Sendable {
 
 // MARK: - Low-Level Character Scanner with Line & Column Tracking
 
+private func normalizeLineEndingsToLF(_ text: String) -> String {
+    guard text.utf8.contains(0x0D) else { return text }
+    return text
+        .replacingOccurrences(of: "\r\n", with: "\n")
+        .replacingOccurrences(of: "\r", with: "\n")
+}
+
 private struct BibTeXScanner {
     private let chars: [Character]
     private(set) var index: Int = 0
@@ -1839,10 +1849,11 @@ private struct BibTeXScanner {
     private(set) var column: Int = 1
 
     init(source: String) {
-        if source.hasPrefix("\u{FEFF}") {
-            self.chars = Array(source.dropFirst())
+        let normalized = normalizeLineEndingsToLF(source)
+        if normalized.hasPrefix("\u{FEFF}") {
+            self.chars = Array(normalized.dropFirst())
         } else {
-            self.chars = Array(source)
+            self.chars = Array(normalized)
         }
     }
 

@@ -1280,7 +1280,10 @@ public struct ScholarCLIRunner: Sendable {
     }
 
     private static func hasNonCommentContent(_ source: String) -> Bool {
-        for rawLine in source.split(separator: "\n", omittingEmptySubsequences: false) {
+        let normalizedSource = source.utf8.contains(0x0D)
+            ? source.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+            : source
+        for rawLine in normalizedSource.split(separator: "\n", omittingEmptySubsequences: false) {
             let lineChars = Array(rawLine)
             var idx = 0
             var codeSlice = ""

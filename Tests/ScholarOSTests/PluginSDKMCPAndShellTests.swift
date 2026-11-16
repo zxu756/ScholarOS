@@ -3935,6 +3935,36 @@ struct PluginSDKMCPAndShellTests {
             #expect(badRes.exitCode == 2, "Expected exit 2 for invalid args \(invalidArgs.joined(separator: " ")), got \(badRes.exitCode)")
         }
     }
+
+    // MARK: - 15. M1 Stage 09: S51 CLI Offline Verification on CRLF & Mixed-Newline .bib Fixtures
+
+    @Test("S51 regression: verify-citations --offline on CRLF and mixed-line-ending .bib fixtures exits 3 (not 2) with 0 ERR_BIB_SYNTAX")
+    func s51CLIVerifyCitationsOfflineOnCRLFAndMixedFixturesExits3Not2() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage09-s51")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(
+            environment: [
+                "HOME": isolatedHome.path,
+                "CFFIXED_USER_HOME": isolatedHome.path
+            ]
+        )
+
+        let crlfBibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/crlf-two-entries.bib")
+        let mixedBibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/mixed-line-endings.bib")
+
+        for fixtureURL in [crlfBibURL, mixedBibURL] {
+            let res = await runner.runWithExitStatus(
+                arguments: ["verify-citations", fixtureURL.path, "--offline", "--lang", "en"]
+            )
+            #expect(res.exitCode == 3, "Expected exit 3 (UNVERIFIED) on \(fixtureURL.lastPathComponent), got \(res.exitCode), stderr=\(res.stderr)")
+            #expect(!res.stderr.contains("ERR_BIB_SYNTAX"))
+            #expect(res.stdout.contains("Evaluated=2 Verified=0"))
+            #expect(res.stdout.contains("Unverified=2"))
+        }
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

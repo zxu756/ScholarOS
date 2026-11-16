@@ -1,0 +1,2 @@
+Tests/Fixtures/crlf-two-entries.bib -text
+Tests/Fixtures/mixed-line-endings.bib -text
