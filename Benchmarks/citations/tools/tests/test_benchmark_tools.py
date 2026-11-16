@@ -894,26 +894,13 @@ class BenchmarkToolsUnitTests(unittest.TestCase):
     # 9. check_benchmark.py on current repo skeleton AND complete 480-entry synthetic corpus
     # ------------------------------------------------------------------
     def test_check_benchmark_on_repo_and_complete_synthetic_corpus(self) -> None:
-        # Part A: Actual repository Benchmarks/citations/ state
+        # Part A: Actual repository Benchmarks/citations/ state (all 12 groups, 480 entries generated)
         ok_repo, rep_repo = check_benchmark.check_benchmark(BENCH_DIR)
-        self.assertFalse(ok_repo)
+        self.assertTrue(ok_repo)
         self.assertEqual(rep_repo["errors"], [])
-        self.assertEqual(rep_repo["entries_total"], 210)
-        self.assertEqual(rep_repo["gold_total"], 210)
-        self.assertEqual(
-            rep_repo["missing_or_incomplete_groups"],
-            [
-                "real_clean",
-                "real_typo",
-                "mut_year1",
-                "mut_year3",
-                "mut_author",
-                "mut_title",
-                "mut_doi_swap",
-                "mut_doi_missing",
-                "retracted",
-            ],
-        )
+        self.assertEqual(rep_repo["entries_total"], 480)
+        self.assertEqual(rep_repo["gold_total"], 480)
+        self.assertEqual(rep_repo["missing_or_incomplete_groups"], [])
 
         # Part B: Assemble a complete 480-entry benchmark directory in temp dir and verify exit 0
         with tempfile.TemporaryDirectory() as td:
