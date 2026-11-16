@@ -1,0 +1,1950 @@
+{
+  "cli_errors": [],
+  "complete": true,
+  "date": "2026-11-16",
+  "generated_at": "2026-11-16T07:44:14Z",
+  "git_commit": "5c63fc4",
+  "git_commit_full": "5c63fc42c4c02c6de44a443c2c2a4b96ecf58c53",
+  "git_dirty": false,
+  "hard_requirements": {
+    "non_insertable_verified_count": 0,
+    "non_insertable_verified_entries": [],
+    "passed": true,
+    "row10_mut_doi_missing": {
+      "bad_drift_entries": [],
+      "drift_true_doi_matched_all": true,
+      "evaluated_count": 20,
+      "not_found_rate": {
+        "denominator": 20,
+        "numerator": 1,
+        "rate": 0.05
+      },
+      "verified_count": 0
+    },
+    "row3_complete": true
+  },
+  "identifier_breakdown": {
+    "fabricated_model_by_identifier": {
+      "with_identifier": {
+        "allow_precision": {
+          "denominator": 0,
+          "numerator": 0,
+          "rate": null
+        },
+        "allow_recall": {
+          "denominator": 0,
+          "numerator": 0,
+          "rate": null
+        },
+        "block_by_non_insertable": {
+          "precision": {
+            "denominator": 56,
+            "numerator": 56,
+            "rate": 1.0
+          },
+          "recall": {
+            "denominator": 56,
+            "numerator": 56,
+            "rate": 1.0
+          }
+        },
+        "block_precision": {
+          "denominator": 56,
+          "numerator": 56,
+          "rate": 1.0
+        },
+        "block_recall": {
+          "denominator": 56,
+          "numerator": 56,
+          "rate": 1.0
+        },
+        "confusion_matrix": {
+          "TOTAL": {
+            "DRIFT": 41,
+            "NOT_FOUND": 15,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "fabricated": {
+            "DRIFT": 41,
+            "NOT_FOUND": 15,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "mutated": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "real": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "retracted": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          }
+        },
+        "in_expected": {
+          "denominator": 56,
+          "numerator": 56,
+          "rate": 1.0
+        },
+        "total_entries": 56,
+        "unverified": {
+          "by_reason": {},
+          "count": 0,
+          "rate": 0.0
+        },
+        "verdict_counts": {
+          "DRIFT": 41,
+          "NOT_FOUND": 15,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "verified_with_venue_hint_count": 0
+      },
+      "without_identifier": {
+        "allow_precision": {
+          "denominator": 0,
+          "numerator": 0,
+          "rate": null
+        },
+        "allow_recall": {
+          "denominator": 0,
+          "numerator": 0,
+          "rate": null
+        },
+        "block_by_non_insertable": {
+          "precision": {
+            "denominator": 0,
+            "numerator": 0,
+            "rate": null
+          },
+          "recall": {
+            "denominator": 24,
+            "numerator": 0,
+            "rate": 0.0
+          }
+        },
+        "block_precision": {
+          "denominator": 0,
+          "numerator": 0,
+          "rate": null
+        },
+        "block_recall": {
+          "denominator": 24,
+          "numerator": 0,
+          "rate": 0.0
+        },
+        "confusion_matrix": {
+          "TOTAL": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 24,
+            "VERIFIED": 0
+          },
+          "fabricated": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 24,
+            "VERIFIED": 0
+          },
+          "mutated": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "real": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          },
+          "retracted": {
+            "DRIFT": 0,
+            "NOT_FOUND": 0,
+            "RETRACTED": 0,
+            "UNVERIFIED": 0,
+            "VERIFIED": 0
+          }
+        },
+        "in_expected": {
+          "denominator": 24,
+          "numerator": 24,
+          "rate": 1.0
+        },
+        "total_entries": 24,
+        "unverified": {
+          "by_reason": {
+            "no_match_in_search": 24
+          },
+          "count": 24,
+          "rate": 1.0
+        },
+        "verdict_counts": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 24,
+          "VERIFIED": 0
+        },
+        "verified_with_venue_hint_count": 0
+      }
+    },
+    "with_identifier": {
+      "allow_precision": {
+        "denominator": 187,
+        "numerator": 187,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 193,
+        "numerator": 187,
+        "rate": 0.9689119170984456
+      },
+      "block_by_non_insertable": {
+        "precision": {
+          "denominator": 233,
+          "numerator": 229,
+          "rate": 0.9828326180257511
+        },
+        "recall": {
+          "denominator": 229,
+          "numerator": 229,
+          "rate": 1.0
+        }
+      },
+      "block_precision": {
+        "denominator": 233,
+        "numerator": 229,
+        "rate": 0.9828326180257511
+      },
+      "block_recall": {
+        "denominator": 230,
+        "numerator": 229,
+        "rate": 0.9956521739130435
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 180,
+          "NOT_FOUND": 21,
+          "RETRACTED": 32,
+          "UNVERIFIED": 2,
+          "VERIFIED": 187
+        },
+        "fabricated": {
+          "DRIFT": 41,
+          "NOT_FOUND": 20,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 135,
+          "NOT_FOUND": 1,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 1
+        },
+        "real": {
+          "DRIFT": 4,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 2,
+          "VERIFIED": 186
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 32,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "in_expected": {
+        "denominator": 422,
+        "numerator": 421,
+        "rate": 0.9976303317535545
+      },
+      "total_entries": 422,
+      "unverified": {
+        "by_reason": {
+          "registered_no_metadata": 2
+        },
+        "count": 2,
+        "rate": 0.004739336492890996
+      },
+      "verdict_counts": {
+        "DRIFT": 180,
+        "NOT_FOUND": 21,
+        "RETRACTED": 32,
+        "UNVERIFIED": 2,
+        "VERIFIED": 187
+      },
+      "verified_with_venue_hint_count": 3
+    },
+    "without_identifier": {
+      "allow_precision": {
+        "denominator": 19,
+        "numerator": 19,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 33,
+        "numerator": 19,
+        "rate": 0.5757575757575758
+      },
+      "block_by_non_insertable": {
+        "precision": {
+          "denominator": 4,
+          "numerator": 0,
+          "rate": 0.0
+        },
+        "recall": {
+          "denominator": 25,
+          "numerator": 0,
+          "rate": 0.0
+        }
+      },
+      "block_precision": {
+        "denominator": 4,
+        "numerator": 0,
+        "rate": 0.0
+      },
+      "block_recall": {
+        "denominator": 25,
+        "numerator": 0,
+        "rate": 0.0
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 4,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 35,
+          "VERIFIED": 19
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 25,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 4,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 10,
+          "VERIFIED": 19
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "in_expected": {
+        "denominator": 58,
+        "numerator": 49,
+        "rate": 0.8448275862068966
+      },
+      "total_entries": 58,
+      "unverified": {
+        "by_reason": {
+          "no_match_in_search": 35
+        },
+        "count": 35,
+        "rate": 0.603448275862069
+      },
+      "verdict_counts": {
+        "DRIFT": 4,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 35,
+        "VERIFIED": 19
+      },
+      "verified_with_venue_hint_count": 2
+    }
+  },
+  "incomplete_reasons": [],
+  "mode": "live",
+  "overall_metrics": {
+    "allow_precision": {
+      "denominator": 206,
+      "numerator": 206,
+      "rate": 1.0
+    },
+    "allow_recall": {
+      "denominator": 226,
+      "numerator": 206,
+      "rate": 0.911504424778761
+    },
+    "block_by_non_insertable": {
+      "precision": {
+        "denominator": 237,
+        "numerator": 229,
+        "rate": 0.9662447257383966
+      },
+      "recall": {
+        "denominator": 254,
+        "numerator": 229,
+        "rate": 0.9015748031496063
+      }
+    },
+    "block_precision": {
+      "denominator": 237,
+      "numerator": 229,
+      "rate": 0.9662447257383966
+    },
+    "block_recall": {
+      "denominator": 255,
+      "numerator": 229,
+      "rate": 0.8980392156862745
+    },
+    "confusion_matrix": {
+      "TOTAL": {
+        "DRIFT": 184,
+        "NOT_FOUND": 21,
+        "RETRACTED": 32,
+        "UNVERIFIED": 37,
+        "VERIFIED": 206
+      },
+      "fabricated": {
+        "DRIFT": 41,
+        "NOT_FOUND": 20,
+        "RETRACTED": 0,
+        "UNVERIFIED": 25,
+        "VERIFIED": 0
+      },
+      "mutated": {
+        "DRIFT": 135,
+        "NOT_FOUND": 1,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 1
+      },
+      "real": {
+        "DRIFT": 8,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 12,
+        "VERIFIED": 205
+      },
+      "retracted": {
+        "DRIFT": 0,
+        "NOT_FOUND": 0,
+        "RETRACTED": 32,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      }
+    },
+    "in_expected": {
+      "denominator": 480,
+      "numerator": 470,
+      "rate": 0.9791666666666666
+    },
+    "total_entries": 480,
+    "unverified": {
+      "by_reason": {
+        "no_match_in_search": 35,
+        "registered_no_metadata": 2
+      },
+      "count": 37,
+      "rate": 0.07708333333333334
+    },
+    "verdict_counts": {
+      "DRIFT": 184,
+      "NOT_FOUND": 21,
+      "RETRACTED": 32,
+      "UNVERIFIED": 37,
+      "VERIFIED": 206
+    },
+    "verified_with_venue_hint_count": 5
+  },
+  "per_group": {
+    "audit_manual": {
+      "allow_precision": {
+        "denominator": 9,
+        "numerator": 9,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 11,
+        "numerator": 9,
+        "rate": 0.8181818181818182
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 11,
+          "NOT_FOUND": 5,
+          "RETRACTED": 2,
+          "UNVERIFIED": 3,
+          "VERIFIED": 9
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 5,
+          "RETRACTED": 0,
+          "UNVERIFIED": 1,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 11,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 1
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 2,
+          "VERIFIED": 8
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 2,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 30,
+      "expected_group_count": 30,
+      "group": "audit_manual",
+      "in_expected": {
+        "denominator": 30,
+        "numerator": 30,
+        "rate": 1.0
+      },
+      "selected_count": 30,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {
+          "no_match_in_search": 2,
+          "registered_no_metadata": 1
+        },
+        "count": 3,
+        "rate": 0.1
+      },
+      "verdict_counts": {
+        "DRIFT": 11,
+        "NOT_FOUND": 5,
+        "RETRACTED": 2,
+        "UNVERIFIED": 3,
+        "VERIFIED": 9
+      },
+      "verified_with_venue_hint_count": 1
+    },
+    "fabricated_model": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 41,
+          "NOT_FOUND": 15,
+          "RETRACTED": 0,
+          "UNVERIFIED": 24,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 41,
+          "NOT_FOUND": 15,
+          "RETRACTED": 0,
+          "UNVERIFIED": 24,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 80,
+      "expected_group_count": 80,
+      "group": "fabricated_model",
+      "in_expected": {
+        "denominator": 80,
+        "numerator": 80,
+        "rate": 1.0
+      },
+      "selected_count": 80,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {
+          "no_match_in_search": 24
+        },
+        "count": 24,
+        "rate": 0.3
+      },
+      "verdict_counts": {
+        "DRIFT": 41,
+        "NOT_FOUND": 15,
+        "RETRACTED": 0,
+        "UNVERIFIED": 24,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_author": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_author",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 20,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_doi_missing": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 19,
+          "NOT_FOUND": 1,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 19,
+          "NOT_FOUND": 1,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_doi_missing",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 19,
+        "NOT_FOUND": 1,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_doi_swap": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_doi_swap",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 20,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_title": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_title",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 20,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_year1": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_year1",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 20,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "mut_year3": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 20,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "mut_year3",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 20,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "real_clean": {
+      "allow_precision": {
+        "denominator": 100,
+        "numerator": 100,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 100,
+        "numerator": 100,
+        "rate": 1.0
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 100
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 100
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 100,
+      "expected_group_count": 100,
+      "group": "real_clean",
+      "in_expected": {
+        "denominator": 100,
+        "numerator": 100,
+        "rate": 1.0
+      },
+      "selected_count": 100,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 0,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 100
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "real_human": {
+      "allow_precision": {
+        "denominator": 82,
+        "numerator": 82,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 100,
+        "numerator": 82,
+        "rate": 0.82
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 8,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 10,
+          "VERIFIED": 82
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 8,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 10,
+          "VERIFIED": 82
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 100,
+      "expected_group_count": 100,
+      "group": "real_human",
+      "in_expected": {
+        "denominator": 100,
+        "numerator": 90,
+        "rate": 0.9
+      },
+      "selected_count": 100,
+      "status": "OK",
+      "unexpected_entries": [
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_002",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_005",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_016",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_018",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_021",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_026",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_027",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_041",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_044",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "expected": [
+            "VERIFIED",
+            "DRIFT"
+          ],
+          "insertable": true,
+          "key": "real_human_067",
+          "reasons": [
+            "registered_no_metadata"
+          ],
+          "truth": "real",
+          "verdict": "UNVERIFIED"
+        }
+      ],
+      "unverified": {
+        "by_reason": {
+          "no_match_in_search": 9,
+          "registered_no_metadata": 1
+        },
+        "count": 10,
+        "rate": 0.1
+      },
+      "verdict_counts": {
+        "DRIFT": 8,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 10,
+        "VERIFIED": 82
+      },
+      "verified_with_venue_hint_count": 4
+    },
+    "real_typo": {
+      "allow_precision": {
+        "denominator": 15,
+        "numerator": 15,
+        "rate": 1.0
+      },
+      "allow_recall": {
+        "denominator": 15,
+        "numerator": 15,
+        "rate": 1.0
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 5,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 15
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 5,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 15
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 20,
+      "expected_group_count": 20,
+      "group": "real_typo",
+      "in_expected": {
+        "denominator": 20,
+        "numerator": 20,
+        "rate": 1.0
+      },
+      "selected_count": 20,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 5,
+        "NOT_FOUND": 0,
+        "RETRACTED": 0,
+        "UNVERIFIED": 0,
+        "VERIFIED": 15
+      },
+      "verified_with_venue_hint_count": 0
+    },
+    "retracted": {
+      "allow_precision": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "allow_recall": {
+        "denominator": 0,
+        "numerator": 0,
+        "rate": null
+      },
+      "confusion_matrix": {
+        "TOTAL": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 30,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "fabricated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "mutated": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "real": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 0,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        },
+        "retracted": {
+          "DRIFT": 0,
+          "NOT_FOUND": 0,
+          "RETRACTED": 30,
+          "UNVERIFIED": 0,
+          "VERIFIED": 0
+        }
+      },
+      "evaluated_count": 30,
+      "expected_group_count": 30,
+      "group": "retracted",
+      "in_expected": {
+        "denominator": 30,
+        "numerator": 30,
+        "rate": 1.0
+      },
+      "selected_count": 30,
+      "status": "OK",
+      "unexpected_entries": [],
+      "unverified": {
+        "by_reason": {},
+        "count": 0,
+        "rate": 0.0
+      },
+      "verdict_counts": {
+        "DRIFT": 0,
+        "NOT_FOUND": 0,
+        "RETRACTED": 30,
+        "UNVERIFIED": 0,
+        "VERIFIED": 0
+      },
+      "verified_with_venue_hint_count": 0
+    }
+  },
+  "provisional_thresholds": {
+    "passed": true,
+    "row12_retracted": {
+      "denominator": 30,
+      "min_threshold": 0.9,
+      "missing_source_or_field_keys": [],
+      "numerator": 30,
+      "passed": true,
+      "rate": 1.0
+    },
+    "row6_real_three_not_found_or_retracted": {
+      "denominator": 220,
+      "entries": [],
+      "max_threshold": 0.02,
+      "numerator": 0,
+      "passed": true,
+      "rate": 0.0
+    },
+    "row7_real_verified_rates": {
+      "passed": true,
+      "real_clean": {
+        "denominator": 100,
+        "min_threshold": 0.95,
+        "non_verified_entries": [],
+        "numerator": 100,
+        "rate": 1.0
+      },
+      "real_three_all_220": {
+        "denominator": 220,
+        "numerator": 197,
+        "rate": 0.8954545454545455
+      },
+      "real_three_insertable": {
+        "denominator": 215,
+        "min_threshold": 0.85,
+        "numerator": 197,
+        "rate": 0.9162790697674419
+      },
+      "real_three_non_verified_entries": [
+        {
+          "group": "real_human",
+          "key": "real_human_002",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_004",
+          "reasons": [
+            "title_mismatch",
+            "first_author_mismatch",
+            "author_count_mismatch"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_005",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_006",
+          "reasons": [
+            "year_diff_1",
+            "venue_mismatch"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_009",
+          "reasons": [
+            "first_author_mismatch"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_011",
+          "reasons": [
+            "author_count_mismatch"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_013",
+          "reasons": [
+            "year_diff_1"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_016",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_018",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_021",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_023",
+          "reasons": [
+            "year_diff_1"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_026",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_027",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_030",
+          "reasons": [
+            "year_diff_1",
+            "venue_mismatch"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_041",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_044",
+          "reasons": [
+            "no_match_in_search"
+          ],
+          "verdict": "UNVERIFIED"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_046",
+          "reasons": [
+            "year_diff_1"
+          ],
+          "verdict": "DRIFT"
+        },
+        {
+          "group": "real_human",
+          "key": "real_human_067",
+          "reasons": [
+            "registered_no_metadata"
+          ],
+          "verdict": "UNVERIFIED"
+        }
+      ]
+    },
+    "row8_mutation_detection": {
+      "groups": {
+        "mut_author": {
+          "denominator": 20,
+          "numerator": 20,
+          "passed": true,
+          "rate": 1.0,
+          "threshold": 0.9
+        },
+        "mut_doi_swap": {
+          "denominator": 20,
+          "numerator": 20,
+          "passed": true,
+          "rate": 1.0,
+          "threshold": 0.95
+        },
+        "mut_title": {
+          "denominator": 20,
+          "numerator": 20,
+          "passed": true,
+          "rate": 1.0,
+          "threshold": 0.8
+        },
+        "mut_year1": {
+          "all_drift_have_online_vs_print_notice": true,
+          "denominator": 20,
+          "missing_notice_keys": [],
+          "numerator": 20,
+          "passed": true,
+          "rate": 1.0,
+          "threshold": 0.9
+        },
+        "mut_year3": {
+          "denominator": 20,
+          "numerator": 20,
+          "passed": true,
+          "rate": 1.0,
+          "threshold": 0.95
+        }
+      },
+      "passed": true
+    }
+  },
+  "real_three_non_verified_entries": [
+    {
+      "group": "real_human",
+      "key": "real_human_002",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_004",
+      "reasons": [
+        "title_mismatch",
+        "first_author_mismatch",
+        "author_count_mismatch"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_005",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_006",
+      "reasons": [
+        "year_diff_1",
+        "venue_mismatch"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_009",
+      "reasons": [
+        "first_author_mismatch"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_011",
+      "reasons": [
+        "author_count_mismatch"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_013",
+      "reasons": [
+        "year_diff_1"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_016",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_018",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_021",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_023",
+      "reasons": [
+        "year_diff_1"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_026",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_027",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_030",
+      "reasons": [
+        "year_diff_1",
+        "venue_mismatch"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_041",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_044",
+      "reasons": [
+        "no_match_in_search"
+      ],
+      "verdict": "UNVERIFIED"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_046",
+      "reasons": [
+        "year_diff_1"
+      ],
+      "verdict": "DRIFT"
+    },
+    {
+      "group": "real_human",
+      "key": "real_human_067",
+      "reasons": [
+        "registered_no_metadata"
+      ],
+      "verdict": "UNVERIFIED"
+    }
+  ],
+  "recorded_only": {
+    "cache_hit_count": 0,
+    "crossref_max_in_flight": 1,
+    "elapsed_seconds": 631.202,
+    "http_request_count": 1015,
+    "hypothesis_measurements": {
+      "real_clean_online_vs_print_year_diff": {
+        "denominator": 100,
+        "numerator": 11,
+        "rate": 0.11
+      },
+      "real_human_venue_only_drift": {
+        "count": 0,
+        "keys": []
+      },
+      "retracted_source_field_hits": {
+        "crossref_relation": 0,
+        "crossref_update_to": 1,
+        "crossref_updated_by": 29,
+        "openalex_is_retracted": 22
+      }
+    },
+    "live_vs_replay_diff": [],
+    "openalex_credits_used": 390,
+    "replay_lookup_count": 0,
+    "unverified": {
+      "by_reason": {
+        "no_match_in_search": 35,
+        "registered_no_metadata": 2
+      },
+      "count": 37,
+      "rate": 0.07708333333333334
+    }
+  },
+  "recordings_manifest_count": 748,
+  "recordings_manifest_sha256": "81fd7b8e8a20c106fb186c170dedeb42541dc3b1f7d870e2afcd55fb333bbb7b",
+  "replay_miss_count": 0,
+  "replay_misses": [],
+  "selected_metrics": null,
+  "selection": {
+    "full_benchmark": true,
+    "groups": [
+      "audit_manual",
+      "real_clean",
+      "real_human",
+      "real_typo",
+      "fabricated_model",
+      "mut_year1",
+      "mut_year3",
+      "mut_author",
+      "mut_title",
+      "mut_doi_swap",
+      "mut_doi_missing",
+      "retracted"
+    ],
+    "seed": 20261116,
+    "subset": null
+  },
+  "structural_ok": true,
+  "transient_failure_entries": []
+}
