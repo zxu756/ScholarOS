@@ -1,0 +1,94 @@
+\section{Theoretical Background}
+\label{sec:background}
+
+\subsection{Constrained Reinforcement Learning}
+\label{sec:crl}
+
+Sequential decision-making problems such as robot control are commonly formulated as a Markov Decision Process (MDP). An MDP is defined by the tuple $(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma, \rho_0)$, where $\mathcal{S}$ and $\mathcal{A}$ denote the state and action spaces, $\mathcal{R}:\mathcal{S}\times\mathcal{A}\times\mathcal{S}\rightarrow\mathbb{R}$ is the reward function mapping transitions to scalar values, $\mathcal{P}:\mathcal{S}\times\mathcal{A}\times\mathcal{S}\rightarrow[0,1]$ specifies the transition dynamics, $\gamma\in[0,1)$ is the discount factor that balances short-term and long-term contributions, and $\rho_0$ denotes the initial state distribution. The objective is to learn a policy $\pi:\mathcal{S}\rightarrow\mathcal{A}$ that maximizes the expected discounted return, $J(\pi)$:
+%
+\begin{equation}
+    J(\pi) = \mathbb{E}\!\left[\sum_{t=0}^{\infty}\gamma^{t} r(s_t, a_t, s_{t+1})\right],
+\end{equation}
+%
+where $s_t, a_t$ are the state and actions at timestep $t$, and $r(s_t,a_t,s_{t+1})$ is a scalar value representing the reward obtained for applying action $a_t$ in state $s_t$, and transitioning to a new state $s_{t+1}$. 
+
+In practical robotic applications, however, direct access to the complete environmental state $\mathcal{S}$ is rarely available; instead, the system must rely on the limited information captured by onboard sensors. This constraint necessitates the use of the Partially Observable Markov Decision Process (POMDP) framework. Within this formulation, the agent operates over an observation space $\mathcal{O}$, representing the partial information available to the robot, such that at each timestep $t$, the system receives an observation $o_t \in \mathcal{O}$ rather than the underlying true state $s_t$. 
+
+In addition to limited access to the true state of the environment, many robotic tasks require the satisfaction of safety or performance constraints (e.g., joint limits, stability margins, power budgets) in addition to reward maximization. Constrained Markov Decision Processes (CMDPs) \citep{achiam2017constrained} extend the standard formulation by introducing a set of $N_C$ cost functions $\mathcal{C}=\{c_0, c_1, ...,c_i\}$ and associated limits $\mathcal{L}=\{l_0, l_1, ...,l_i\}$. Each constraint accumulates a discounted cost,
+%
+\begin{equation}
+    J_{c_i}(\pi) = \mathbb{E}\!\left[\sum_{t=0}^{\infty}\gamma^{t} c_i(s_t, a_t, s_{t+1})\right].
+\end{equation}
+%
+The constrained learning objective becomes:
+%
+\begin{equation}\label{eq:crl}
+\begin{aligned}
+    \pi^\star &= \arg\max_{\pi} J(\pi), \\
+    \text{s.t.}\quad & J_{c_i}(\pi) \le l_i, \quad \forall i\in\{0,\dots,N_C\}.
+\end{aligned}
+\end{equation}
+
+Intuitively, \cref{eq:crl} indicates that the optimal policy parameters that we seek in order to maximize the expected return must also maintain each of the discounted costs $J_{c_i}(\pi)$ within the boundaries specified by their limits, $l_i$.
+
+This formulation typically requires one critic per constraint, resulting in several coupled value functions and specialized optimization \citep{LeeCRL}. In addition, Lagrangian methods typically used in the base CRL formulation suffer from training instability and require tuning penalty coefficients (Lagrange multipliers). This complexity often limits the use of standard RL implementations and motivates alternative ways to handle constraints while preserving safety semantics.
+
+\subsection{Constraints as Terminations}
+\label{sec:cat}
+
+The Constraints-as-Terminations (CaT) framework~\citep{chane2024cat} addresses the
+practical challenges of CMDPs by reformulating constraint satisfaction through
+\emph{stochastic terminations of the reward stream}. Instead of learning separate cost
+critics, CaT enforces constraints by terminating the accrual of future reward with a
+probability that increases as constraint violations grow. In effect, unsafe behaviours reduce the amount of future reward the agent can collect, shaping the learned policy toward safe execution.
+
+The constraint inequalities in a CMDP imposed by \cref{eq:crl} may be viewed as introducing a per-constraint budget. By leveraging this, in CaT the authors reframe the problem to maximize the reward accrued while avoiding constraint violation at each time step:
+
+\begin{equation}
+    J_{c_i}(\pi)=\mathbb{E}\left[\sum_{t=0}^{\infty}\gamma^t\mathbb{1}_{c_i(s_t,a_t,s_{t+1})>0}\right] \leq l_i,
+\end{equation}
+
+where $1_{c_i(s_t,a_t,s_{t+1})>0}$ shows if the \textit{i}-th constraint is violated at time $t$. 
+
+CaT recasts this notion into the requirement that the probability of violating constraint $c_i$ remains below a threshold:
+%
+\begin{equation}\label{eq:cat-relax}
+    \mathcal{P}_{(s,a)\sim\pi}\bigl[c_i(s,a) > 0\bigr] \le \tilde{l}_i.
+\end{equation}
+%
+Although this relaxation does not apply to all CMDPs, it covers a broad class of constraints encountered in robotic control \citep{nemirovski2007convex}.
+
+CaT modifies the RL objective by introducing a random termination variable $\delta_t\in[0,1]$:
+%
+\begin{equation}\label{eq:cat}
+\max_{\pi} 
+\mathbb{E}_{\tau\sim\pi}\!\left[
+\sum_{t=0}^{\infty}
+\gamma^{t}\left(\prod_{t'=0}^{t}\bigl(1-\delta(s_{t'}, a_{t'})\bigr)\right)
+r(s_t, a_t, s_{t+1})
+\right].
+\end{equation}
+%
+Here, $\delta_t$ encodes the probability that the episode terminates at timestep $t$, thus eliminating all subsequent reward accumulation. Its value depends on the magnitude of constraint violations at that timestep. The product term in \cref{eq:cat} is the probability that the episode has survived up to step $t$; discounting therefore remains geometric, and the constraints enter the objective as a state-dependent survival weight rather than as an additive penalty.
+
+For each constraint, the termination probability is computed as
+%
+\begin{equation}\label{eq:cat-delta}
+    \delta = 
+    \max_{i\in\{0,\dots,N_c\}}\;
+    p_i^{\max} \cdot 
+    \mathrm{clip}\!\left(
+        \frac{c_i^{+}}{c_i^{\max}},\,0,\,1
+    \right),
+\end{equation}
+%
+where $c_i^{+}=\max(0,\,c_i(s,a))$ is the positive part of the violation, $c_i^{\max}$ is an adaptive running estimate of the largest violation observed during training, and $p_i^{\max}$ is a hyperparameter setting the maximum termination probability for that constraint. This normalisation ensures consistent scaling across constraints and stabilizes learning dynamics.
+
+Two properties of \cref{eq:cat-delta} are worth making explicit, as they govern how the constraint set should be interpreted. First, $\delta$ is the \emph{maximum} over constraints rather than an aggregate: at any timestep the termination probability is dictated by the single most severely violated constraint, and simultaneous violations of several constraints are no more penalised than the worst of them alone. Second, because each violation is normalised by its own running maximum $c_i^{\max}$, constraint magnitudes need not be commensurable, and a common $p_i^{\max}$ across soft constraints does not imply that all constraints exert equal influence on the policy: only the binding constraint shapes the return at each step.
+
+It is equally important to be precise about what \cref{eq:cat-relax} does and does not provide. The reformulation replaces a bound on the expected discounted cost by a bound on the \emph{probability} of violation, and enforces the latter through a termination probability that is proportional to the violation magnitude and capped at $p_i^{\max}$. A policy that violates a soft constraint with small magnitude therefore incurs a correspondingly small termination probability, and the optimal policy under \cref{eq:cat} will in general trade a nonzero residual violation rate against task return whenever the marginal reward gain exceeds the expected cost of early termination. Soft constraints are consequently to be read as strong behavioural preferences with a bounded enforcement pressure, not as guarantees; a nonzero steady-state violation rate is an expected property of the formulation rather than a failure of the trained policy. Hard constraints, for which $p_i^{\max}=1$, are the limiting case in which any
+violation deterministically eliminates all subsequent reward, so that no admissible
+trade-off against task return exists.
+
+By unifying safety constraints into the termination signal, CaT allows the use of standard algorithms like Proximal Policy Optimization (PPO) \citep{schulman2017proximalpolicyoptimizationalgorithms} only requiring the modification shown in \cref{eq:cat}, significantly simplifying the training pipeline for complex whole-body control tasks. In practice, one applies the multiplicative factor $(1-\delta)$ to the environment reward and augments the termination signal using $\delta$.
+

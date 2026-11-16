@@ -1,0 +1,129 @@
+\section{$cc$-Universality by Bochner-Integral Representation} \label{sec:bochner-cc}
+We summarize a general scheme to show the $cc$-universality by discretizing the integral representation.
+
+\subsection{Notes on Bochner Integral}
+We refer to Chapter~VI of \citet{Lang1993}, where the chapter title \emph{The General Integral} refers to Banach-valued integrals.
+
+Let $(X,\calM,\mu)$ be a measure space,
+and let $E$ be a Banach space.
+\begin{lemma}
+    A strongly $\calM$-measurable function $f:X\to E$ is Bochner $\mu$-integrable iff $\| f \|$ is $\mu$-integrable, i.e. $\int_X \| f(x) \| \dd\mu(x) < \infty$.
+\end{lemma}
+See \citet[Theorem~1, V.5][]{Yosida.new} for the proof.
+
+\begin{lemma}[Dominated Convergence Theorem for Bochner Integral] \label{lem:dct}
+Let $\{f_n:X\to E\}$ be a sequence of Bochner integrable functions. \begin{itemize}
+    \item Assume $\{f_n\}$ converges almost everywhere to some function $f:X\to E$.
+    \item Let $g:X\to\RR$ be an integrable function such that for all $n$, $\|f_n(x)\| \le g(x)$ for almost every $x \in X$.
+\end{itemize}
+ Then $f$ is Bochner integrable and $L^1$-convergent to $f$, i.e.
+\begin{align*}
+\lim_{n \to \infty} \int_X \| f - f_n \| \dd \mu = 0, \quad \mbox{and} \quad
+    \int_X f \dd\mu = \lim_{n\to\infty} \int_X f_n \dd\mu
+\end{align*}
+\end{lemma}
+See \citet[Theorem~5.8, VI, \S~5][]{Lang1993} for the proof.
+
+\begin{lemma}[Bounded Convergence Theorem] \label{lem:bct}
+Assume additionally that $X$ is a finite measure space.
+Let $\{f_n:X\to E\}$ be a sequence of Bochner integrable functions. \begin{itemize}
+    \item Assume $\{f_n\}$ converges almost everywhere to some function $f:X\to E$.
+    \item Let $G>0$ be a uniform constant such that for all $n$, $\| f_n(x) \| \le G$ for almost every $x \in X$.
+\end{itemize}
+ Then $f$ is Bochner integrable and $L^1$-convergent to $f$, i.e.
+\begin{align*}
+\lim_{n \to \infty} \int_X \| f - f_n \| \dd \mu = 0, \quad \mbox{and} \quad
+    \int_X f \dd\mu = \lim_{n\to\infty} \int_X f_n \dd\mu
+\end{align*}
+\end{lemma}
+This is an immediate corollary of DCT with dominant function being $g := G$.
+
+\subsection{Application to Discretization of Integral Representation}
+\begin{theorem}[Uniform Approximation of Integral Representation by Finite Networks] \label{thm:uniform.discretization}
+Let $X$ be a topological space,
+$Y$ be a Banach space, and $E := C(X;Y)$ be the Banach space of $Y$-valued continuous functions on $X$ equipped with the uniform norm $\| f \|_{C(X;Y)} := \sup_{x \in X} \| f(x) \|_Y$.
+
+Let $\Xi$ be a compact metric space with finite Borel measure, %
+let $\phi : X \times \Xi \to Y$ and $\gamma : \Xi \to \RR$ (or $\phi : X \times \Xi \to \RR$ and $\gamma : \Xi \to Y$) be measurable functions.
+Assume that the $E$-valued function $\varphi(\xi) := \gamma(\xi)\phi(\bullet,\xi)$ is 
+Lipschitz continuous, namely
+\begin{align*}
+    &L_{\varphi} := \sup_{\xi,\xi' \in \Xi} \frac{\| \varphi(\bullet,\xi) - \varphi(\bullet,\xi')\|_{E}}{d_\Xi(\xi,\xi')} < \infty.
+\end{align*}
+Then, the $Y$-valued continuous model
+\begin{align*}
+    \nn(x) := \int_\Xi \gamma(\xi)\phi(x,\xi)\dd\xi, \quad x \in X
+\end{align*}
+exists in the sense of $C(X;Y)$-valued Bochner integral, and
+there exists a sequence of finite models:
+For each $n$,
+\begin{align*}
+\fnn_n(x) := \sum_{i=1}^{N_n} w_{n,i}\phi(x,\xi_{n,i}), \quad x \in X
+\end{align*}
+with some $(w_{n,i},\xi_{n,i}) \in \RR \times \Xi$ (or $\in Y \times \Xi$)
+that uniformly converges to the continuous model, namely
+\begin{align*}
+    \lim_{n \to \infty} \| \nn - \fnn_n \|_{C(X;Y)} = 0.
+\end{align*}
+
+\begin{remark}
+We do not need to assume a measure on $X$ since we only consider continuous functions with sup-norm, neither the compactness of $X$ since the Lipschitzness of $\varphi$ is simply assumed.
+We use the compactness of $\Xi$ to take a finite covering and obtain a finite representative points $\{ \xi_{n,i} \}$,
+and to guarantee the existence of maximum $\sup_{\xi \in \Xi}\|\varphi(\xi)\|_E$ (with uniform continuity of $\varphi$).
+We use the metric of $\Xi$ to assume and use the Lipschitzness of $\varphi$ to show the a.e. convergence.
+We use the finiteness of $\vol(\Xi)$ to use the bounded convergence theorem instead of dominated convergence theorem,
+and to show the Bochner integrability of discretized models.
+We do not need to assume the Bochner integrability of $\varphi$ as it is a consequence.
+\end{remark}
+
+\end{theorem}
+
+\begin{proof}
+Let $\calA_n$ be a sequence of finite disjoint covering of $\Xi$ with diameter at most $1/n$. Namely each $\calA_n$ is a finite family $\{A_{n,i} \mid i \in [N_n]\}$ (with cardinarity $N_n < \infty$) of measurable sets satisfying $\Xi = \bigsqcup_{i=1}^{N_n} A_{n,i}$ and $\sup_{\xi,\xi' \in A_{n,i}} d_\Xi(\xi,\xi') \le 1/n$.
+
+Put a sequence $\{\varphi_n : \Xi \to E \mid n \in \NN\}$ of functions: For each $n$,
+\begin{align*}
+\varphi_n(\xi) := \sum_{i=1}^{N_n} \chi_{A_{n,i}}(\xi) \varphi(\xi_{n,i}), \quad \xi \in \Xi.
+\end{align*}
+Then, 
+(1) the sequence is uniformly bounded: For any $n$,
+\begin{align*}
+    \| \varphi_n(\xi) \|_E
+    = \Bigg\| \sum_{i=1}^{N_n} \chi_{A_{n,i}}(\xi) \varphi(\xi_{n,i}) \Bigg\|_E
+    \le \sum_{i=1}^{N_n} \chi_{A_{n,i}}(\xi) \big\| \varphi(\xi_{n,i}) \big\|_E
+    \le \sup_{\xi \in \Xi} \| \varphi(\xi) \|_E < \infty.
+\end{align*}
+The last maximum exists because $\Xi$ is compact and $\varphi$ is uniformly continuous.
+As a consequence, (2) each function is Bochner integrable: For any $n$,
+\begin{align*}
+    \int_\Xi \| \varphi_n(\xi) \|_E \dd \xi
+    \le
+    \vol(\Xi) \sup_{\xi \in \Xi} \big\| \varphi(\xi) \big\|_E < \infty.
+\end{align*}
+Finally, (3) it a.e.-converges to $\varphi$: At almost every $\xi \in \Xi$, there uniquely exists $A_{n,i}$ including $\xi$, so
+\begin{align*}
+    \|\varphi(\xi) - \varphi_n(\xi)\|_E
+    = 
+    \|\varphi(\xi) - \varphi(\xi_{n,i})\|_E
+    \le 
+    L_\varphi \|\xi - \xi_{n,i}\|_E
+    = L_\varphi/n \to 0, \quad n \to \infty.
+\end{align*}
+Hence, by the bounded convergence theorem (\cref{lem:bct}), $\varphi$ is Bochner integrable and 
+\begin{align*}
+    &\int_\Xi \varphi_n(\xi) \dd\xi
+    = \int_\Xi \sum_{i=1}^{N_n} \chi_{A_{n,i}}(\xi) \varphi(\xi_{n,i}) \dd\xi
+    = \sum_{i=1}^{N_n} \vol(A_{n,i}) \gamma(\xi_{n,i}) \phi(\bullet,\xi_{n,i})\\
+    &\qquad \to \int_\Xi \varphi(\xi) \dd \xi = \int_\Xi \gamma(\xi) \phi(\bullet,\xi)\dd\xi, \quad \mbox{as } n \to \infty.
+\end{align*}
+In other words, putting $w_{n,i} = \vol(A_{n,i}) \gamma(\xi_{n,i})$ for short, we have shown
+\begin{align*}
+    \lim_{n \to \infty} \Bigg\| \sum_{i=1}^{N_n} w_{n,i} \phi(\bullet,\xi_{n,i}) - \int_\Xi \gamma(\xi) \phi(\bullet,\xi)\dd\xi \Bigg\|_{C(X;Y)} = 0. %
+    \mbox{\qedhere}
+\end{align*}
+\end{proof}
+
+\paragraph{Notes.}
+In the proof, we only used the existence of the partition with diameter at most $\eps$ by the compactness.
+Once $\gamma$ and $\phi$ are specified, we may make use of the structures of them in a computable and effective manner.
+For example, a better discretization scheme is investigated in the so-called \emph{Maurey-Jones-Barron (MJB) theory} to achieve the dimension independent \emph{Barron's bound} \citep[see, e.g.,][]{kainen.survey}.

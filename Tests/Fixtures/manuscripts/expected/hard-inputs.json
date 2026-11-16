@@ -1,0 +1,35 @@
+{
+ "paper": "fixture-hard-inputs",
+ "generated_utc": "2026-11-16T21:20:27Z",
+ "generator": "Tectonic 0.17.0, bundle https://relay.fullyjustified.net/default_bundle_v33.tar, --untrusted --keep-intermediates --keep-logs",
+ "aux_files": [
+  "hard.aux"
+ ],
+ "cite_keys": [
+  "k1",
+  "k2",
+  "k3"
+ ],
+ "nocite_star": false,
+ "bibcite_keys": [
+  "k1",
+  "k2",
+  "k3"
+ ],
+ "labels": [
+  "sec:after",
+  "sec:url",
+  "sec:verb"
+ ],
+ "excluded_internal_labels": [],
+ "latex_log": {
+  "undefined_citations": [],
+  "undefined_references": [],
+  "multiply_defined_labels": []
+ },
+ "bibtex_log": {
+  "missing_entries": [],
+  "error_messages": 0,
+  "ran": false
+ }
+}

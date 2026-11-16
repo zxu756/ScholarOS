@@ -1,0 +1,60 @@
+\paragraph{Bayesian Inference.} Consider a family of neural networks $f_\vtheta(x)$, where the random variable $\vtheta$ represents the model parameters and takes values in the model space $\Theta \subset \mathbb{R}^d$. We are given a training set $\gS = \{(x_i, y_i)\}_{i = 1}^n$ of $n$ i.i.d observations from the data space $\gX \times \gY$, and the prior distribution of the parameters $p(\vtheta)$. In the literature on Bayesian inference problems, prior works typically focus on approximating the \textit{empirical posterior} $\mathbb{P}_{\theta|\gS}$, whose density function $p(\vtheta |\gS)$ is defined as:
+
+\begin{equation*}
+    p(\vtheta | \gS) \propto p(\vtheta)\prod_{i=1}^n p(y_i|x_i, \gS, \vtheta),
+\end{equation*}
+where the prior distribution $\mathbb{P}_\theta$ has the density function $p(\vtheta)$. The likelihood term is proportional to
+\begin{align*}
+    p(y|x, \gS, \vtheta) &\propto \exp \Bigg(-\frac{1}{n}\ell(f_\vtheta(x), y) \Bigg),
+\end{align*}
+with some loss function $\ell$, such as the CrossEntropy loss, and a sufficiently expressive model $f_\theta$. Then, the empirical posterior is:
+
+\begin{equation}
+\label{eq: empirical loss}
+    p(\vtheta| \gS) \propto \exp \Bigg(-\frac{1}{n} \sum_{i=1}^n\ell(f_\vtheta(x_i), y_i)\Bigg)p(\vtheta).
+\end{equation}
+
+More formally, the empirical posterior is equal to:
+
+\begin{equation}
+\label{eq: empirical loss closed form}
+    p(\vtheta| \gS) = \exp \Bigg(-\frac{1}{n} \sum_{i=1}^n\ell(f_\vtheta(x_i), y_i)\Bigg)p(\vtheta)/Z_{\gS},
+\end{equation}
+
+where $Z_\gS$ is the normalizing constant. We define the population and empirical losses as follows:
+\begin{gather*}
+    \gL_\gD(\vtheta) = \mathbb{E}_{(x, y) \sim \gD}[\ell(f_\vtheta(x), y)], \\
+    \gL_\gS(\vtheta) = \mathbb{E}_{(x, y) \sim \gS}[\ell(f_\vtheta(x), y)]=\frac{1}{n}\sum_{i=1}^n \ell(f_\vtheta(x_i), y_i).
+\end{gather*}
+The \textit{population loss} is defined as the expected loss over the entire data-label distribution. In contrast, the \textit{empirical loss} is the average loss computed over a given training set $\gS$. Based on these definitions, the empirical posterior in Eq. \ref{eq: empirical loss closed form} can be written as:
+
+\begin{equation*}
+    p(\vtheta|\gS) = \exp(-\gL_\gS(\vtheta))p(\vtheta)/Z_\gS.
+\end{equation*}
+
+Intuitively, models with parameters $\vtheta$ that fit well to the training set $\gS$ lead to lower empirical loss values, resulting in higher density in the empirical posterior. This formulation has appeared in prior works on Bayesian Inference, such as \cite{va2023_flat_Bayes}. However, simply fitting to the training samples can lead to overfitting. To improve generalization, we are more concerned with performance over the entire data distribution $\gD$ rather than just the specific sample $\gS$. Accordingly, we define the population posterior as $\mathbb{P}_\gD$ whose density is given by:
+\begin{equation}
+\label{eq: population posterior}
+    p(\vtheta| \gD) = \exp(-\gL_\gD(\vtheta))p(\vtheta)/Z_\gD,
+\end{equation}
+with the normalizing constant $Z_\gD$. This population posterior is more general than the empirical posterior, as it captures the true posterior of the parameters under the full data distribution. However, understanding the population posterior is particularly challenging because we can only access the empirical loss $\gL_\gS(\vtheta)$, not the population loss $\gL_\gD(\vtheta)$. In this paper, we deviate from prior approaches that primarily focus on approximating the empirical posterior and instead propose a particle-sampling method to approximate the population posterior.
+\vspace{-3mm}
+
+\paragraph{Reproducing Kernel Hilbert Space (RKHS).} Let $k(\vtheta, \vtheta'): \Theta \times \Theta \to \mathbb{R}$ be a positive definite kernel operating on the model space. The reproducing kernel Hilbert space (RKHS) $\gH$ of $k(\vtheta, \vtheta')$ is the closure of the linear span $\{f: f(\cdot) = \sum_{i} a_i k(\cdot, \vtheta_i), a_i \in \mathbb{R}, \vtheta_i \in \Theta\}$. For $f(\vtheta) = \sum_i a_i k(\vtheta, \vtheta_i)$ and $g(\vtheta) = \sum_j b_j k(\vtheta, \vtheta_j)$, $\gH$ is equipped with the inner product defined by $\left<f, g\right>_\gH = \sum_{ij}a_i b_j k(\vtheta_i, \vtheta_j)$. For all $\vtheta \in \Theta$, there exists a unique element $K_\vtheta \in \gH$ with the reproducing property that $f(\vtheta) = \left< f, K_\vtheta\right>_\gH$ for any $f \in \gH$.
+
+Given that $\mathcal{H}$ is a scalar-valued RKHS with kernel $k(\theta, \theta')$, $\gH^d = \gH \times \gH \times \cdots \times \gH$ is a vector-valued RKHS of functions $\vf = [f_1, f_2, \cdots, f_d]$ corresponding to the kernel $K(\vtheta, \vtheta')=k(\vtheta,\vtheta')\mI$. $\gH^d$ is equipped with the inner product $\left< \vf, \vg\right>_{\gH^d} = \sum_{i=1}^d \left<f_i, g_i \right>_\gH$. 
+
+Let $\mF[\vf]$ be a functional on $\vf\in\gH^d$. Similar to the definition by \cite{svgd}, the (functional) gradient of $\mF$ is defined as a function $\nabla_\vf \mF[\vf] \in \gH^d$ such that for any $\vg \in \gH^d$ and $\epsilon \in \mathbb{R}$
+\begin{equation}
+    \label{eq: functional gradient}
+    \mF[\vf+\epsilon \vg] = \mF[\vf]+\epsilon\left<\nabla_{\vf}\mF[\vf], g\right>_{\gH^d}+\gO(\epsilon^2).
+\end{equation}
+
+\vspace{-3mm}
+
+\paragraph{Stein Variational Gradient Descent (SVGD).} Given a general target distribution $p(\boldsymbol{\theta})$, SVGD \citep{svgd} aims to find a flow of distributions $\{q^{(k)}\}_k$ that minimizes the KL distance to the target distribution. Motivated by the Stein identity and Kernelized Stein Discrepancy, SVGD proposes the update $q^{(k+1)} = q^{(k)}_{[\mT]}$, in which $\mT: \Theta \to \Theta$ is a smooth one-to-one push-forward map of the form $\mT(\vtheta) = \vtheta + \epsilon \phi^*_{p,q}(\vtheta)$ in which:
+\begin{align*}
+    \phi^*_{p, q}(\cdot) &= \mathbb{E}_{\vtheta \sim q}[\gA_p k(\vtheta, \cdot)] \\ \gA_p \phi(\vtheta) &= \phi(\vtheta) \nabla_\vtheta \log p(\vtheta)^\top + \nabla_\vtheta \phi(\vtheta).
+\end{align*}
+
+$\gA_p$ is known as the Stein operator, which acts on $\phi$ and produces a zero-mean function $\gA_p \phi(\vtheta)$ when $\vtheta \sim p$. While SVGD is designed for general target distributions $p$, in the context of Bayesian inference, it is only applicable to the empirical posterior rather than the population posterior, which we will discuss in detail in the next section.

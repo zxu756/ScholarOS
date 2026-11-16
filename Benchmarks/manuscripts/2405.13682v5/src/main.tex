@@ -1,0 +1,116 @@
+
+\documentclass{article}
+
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} %
+
+\usepackage{hyperref}
+
+
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+
+\usepackage[accepted]{icml2025}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+\usepackage[capitalize,noabbrev]{cleveref}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+
+\usepackage{bm}
+\input{head}
+\allowdisplaybreaks
+
+\icmltitlerunning{Deep Ridgelet Transform and Unified Universality Theorem for Deep and Shallow Joint-Group-Equivariant Machines}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Deep Ridgelet Transform and Unified Universality Theorem\\for Deep and Shallow Joint-Group-Equivariant Machines}
+
+
+
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Sho Sonoda}{riken,ca}
+\icmlauthor{Yuka Hashimoto}{ntt,riken}
+\icmlauthor{Isao Ishikawa}{kyoto,riken} %
+\icmlauthor{Masahiro Ikeda}{osaka,riken} %
+\end{icmlauthorlist}
+
+\icmlaffiliation{riken}{RIKEN AIP}
+\icmlaffiliation{ca}{CyberAgent, Inc.}
+\icmlaffiliation{ntt}{NTT Corporation}
+\icmlaffiliation{kyoto}{Kyoto University}
+\icmlaffiliation{osaka}{The University of Osaka}
+
+\icmlcorrespondingauthor{Sho Sonoda}{sho.sonoda@riken.jp}
+
+\icmlkeywords{ridgelet transform}
+
+\vskip 0.3in
+]
+
+
+
+\printAffiliationsAndNotice{}  %
+
+\input{src/abstract}
+
+
+\input{src/01intro}
+\input{src/02pre}
+\input{src/03main}
+\input{src/04ex00deep-jem}
+\input{src/04ex01fc-finite}
+\input{src/04ex02gconv}
+\input{src/04ex03quad}
+\input{src/05conc}
+
+\section*{Acknowledgements}
+This work was supported by JSPS KAKENHI 24K21316, 25H01453, JST PRESTO JPMJPR2125, JST BOOST JPMJBY24E2, JST CREST JPMJCR2015 and JPMJCR1913.
+
+
+\section*{Impact Statement}
+This paper presents work whose goal is to advance the field of 
+Machine Learning. There are many potential societal consequences 
+of our work, none which we feel must be specifically highlighted here.
+
+\bibliographystyle{icml2025}
+\input{main.bbl}
+
+\newpage
+\appendix
+\onecolumn
+
+\input{src/supp-proof}
+\input{src/04ex00fc-depth2}
+\newpage
+\input{src/supp-bochner}
+\input{src/supp-bdd}
+\input{src/supp-irrep-affine}
+
+
+
+
+
+\end{document}
+
+

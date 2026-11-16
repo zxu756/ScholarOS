@@ -1,0 +1,146 @@
+Consider the Bayesian inference problem of approximating a posterior distribution. In prior works, such as SVGD \citep{svgd}, when applying to the context of Bayesian inference, the methods are only applicable to the \textit{empirical posterior} $p(\vtheta|\gS)$ because we only have access to the empirical loss. It is evident that when sampling a set of $m$ particle models $\vtheta_{1:m}$ from $p(\vtheta|\gS)$, these particles congregate in the high-density regions of the empirical posterior $p(\vtheta|\gS)$, corresponding to the areas with low \textit{empirical loss} $\gL_\gS(\vtheta)$. However, to avoid overfitting, it is preferable to sample the particle models $\vtheta_{1:m}$ from the \textit{population posterior} $p(\vtheta| \gD) \propto \exp(-   \gL_\gD(\vtheta))p(\vtheta)$, as this approach directs the particle models $\vtheta_{1:m}$ towards regions with low values of the \textit{population loss} $\gL_\gD(\vtheta)$, thus improving generalization ability. To better understand this motivation from a theoretical perspective, consider the following proposition, with the proof provided in Appendix \ref{proof: proposition 1}:
+\begin{proposition}
+    \label{proposition 1}
+    Consider the problem of finding the distribution $\mathbb{Q}$ that solves:
+    \begin{equation}
+        \mathbb{Q}^* = \min_{\mathbb{Q} \ll \mathbb{P}_{\mathbf{\theta}}} \Bigg\{\mathbb{E}_{\theta \sim \mathbb{Q}}[\mathcal{L}_\mathcal{D}(\vtheta)] + \KL(\mathbb{Q} \| \mathbb{P}_{\mathbf{\theta}}) \Bigg\}
+    \end{equation}
+    where we search over $\mathbb{Q}$ absolutely continuous w.r.t $\mathbb{P}_\vtheta$, and the second term is the regularization term. The closed-form solution to this problem is exactly the \textit{population posterior} defined in Eq. \ref{eq: population posterior}.
+\end{proposition}
+
+In this proposition, we aim to identify the posterior distribution that minimizes the \textit{expected population loss}, where the expectation is taken over the entire parameter space with $\vtheta \sim \mathbb{Q}^*$ while maintaining proximity to the prior distribution to ensure simplicity. With access to this posterior $\mathbb{Q}^*$, we can sample a set of particles whose average performance optimally minimizes the population loss. Since the solution to this optimization problem corresponds precisely to the population posterior, the \textit{ensemble of the particles} sampled from $ \mathbb{Q}^* \equiv p(\theta|\mathcal{D})$ effectively minimizes the average value of the population loss. This is because $\mathbb{Q}^* $ is explicitly chosen to minimize the expected value of the population loss $ \mathcal{L}_\mathcal{D}$, which means the ensemble fits the whole data distribution instead of overfitting to the specific dataset $\mathcal{S}$, therefore establishes improved generalizability. Consequently, this proposition theoretically asserts that sampling from $p(\vtheta | \mathcal{D})$ enhances the generalizability of the ensemble.
+
+\subsection{Theoretical analysis}
+
+Motivated by this observation, we advance prior work by \textit{approximating the population posterior}. Specifically, to improve generalizability, our objective is to approximate the target population posterior distribution $p(\vtheta | \gD)$ using a simpler distribution $q^*(\vtheta)$ drawn from a predefined set of distributions $\gF$. This is achieved by minimizing the KL divergence:
+\begin{equation}
+    \label{eq: optimization problem}
+    q^* = \argmin_{q \in \gF} \KL\Bigg(q(\vtheta) \| p(\vtheta | \gD)\Bigg).
+\end{equation}
+Ideally, the set $\gF$ should be simple enough for a simple solution and effective inference while sufficiently broad to approximate a wide range of target distributions closely. Let $q(\vtheta)$ be the density of a reference distribution. We define $\gF$ as the set of distributions for random variables of the form $\mathbf{\vartheta} = \mT(\vtheta)$, where $\mT: \Theta \to \Theta$ is a smooth, bijective mapping, and $\vtheta$ is sampled from $q$. By variable change, the density of $\mathbf{\vartheta}$, denoted as $q_{[\mT]}(\cdot)$, is expressed as follows:
+\begin{equation*}
+    q_{[\mT]}(\mathbf{\vartheta}) = q(\mT^{-1}(\vartheta))|\det(\nabla_\mathbf{\vartheta} \mT^{-1}(\mathbf{\vartheta}))|.
+\end{equation*}
+We restrict the set of the smooth transformations $\mT$ to the set of push-forward maps of the form $\mT(\vtheta) = \vtheta + \vf(\vtheta)$, where $\vf \in \gH^d$. When $\|\vf\|_{\gH^d}$ is sufficiently small, the Jacobian of $\mT = \mI + \vf$ is full-rank where $\mI$ denotes the identity map, in which case $\mT$ is guaranteed to be a one-to-one map according to the inverse function theorem. Under this restriction, the problem is equivalent to solving an optimization problem over the RKHS:
+\begin{align*}
+    \vf^* = \argmin_{\vf\in\gH^d, \|\vf\|_{\gH^d} \leq \epsilon} \KL\Bigg(q_{[\mI + \vf]}(\vtheta)\|p(\vtheta|\gD)\Bigg).
+\end{align*}
+The challenge with this optimization problem lies in our lack of access to the population loss function $\gL_\gD(\vtheta)$ and the population posterior distribution $p(\vtheta | \gD)$. We present our first theorem to address this issue, which characterizes generalization ability in the functional space $\gH^d$. The proof of this theorem can be found in Appendix \ref{proof: flow sharpness}.
+\begin{theorem} [Informal]
+\label{theorem: flow sharpness}
+Let $\Tilde{\ell}: \gH^d \times \gX \times \gY \to \mathbb{R}^+$ be a loss function on the RKHS $\gH^d$ and the data space. Define $\Tilde{L}_\gD(\vf) = \mathbb{E}_{(x, y) \sim \gD}[\Tilde{\ell}(\vf, x, y)]$ and $\Tilde{L}_\gS(\vf) = \frac{1}{n}\sum_{i=1}^n\Tilde{\ell}(\vf, x_i, y_i)$ be the corresponding population and empirical losses. Then for any $\rho >0$ and any distribution $\gD$, with probability of $1-\delta$ over the choice of the training set $\gS \sim \gD^n$, we have:
+\begin{align*}
+     \Tilde{L}_\gD (\vf) &\leq \max_{\vf' \in \gH^d, \|\vf' - \vf\|_{\gH^d} \leq \rho}\Tilde{L}_\gS(\vf') 
+     \\&+\mathcal{O}\left(\sqrt{\frac{\log(1+\frac{1}{\rho^2})+ \log\left(\frac{n}{\delta}\right)}{n-1}}\right),
+\end{align*}
+\end{theorem}
+This theorem extends prior results, such as the generalization bounds established by \citet{sam} and \citet{fishersam}, from Euclidean space to a broader, more general reproducing kernel Hilbert space. It is noteworthy that this is not a straightforward extension, as the previous generalization bounds rely on the dimensionality of the domain, while the RKHS is typically infinite-dimensional for many widely used kernels such as the RBF kernels \citep{rkhsinfinitedim}. Building on the first theorem, we present the second theorem, which directly addresses the population posterior and serves as the primary motivation for our method. The proof of this theorem can be found in Appendix \ref{proof: pac-bayes}.
+\begin{theorem}[Informal]
+\label{theorem: pac-bayes}
+Let $q$ be any distribution and $d_{\mathrm{VC}}$ denotes the VC dimension of he hypothesis space $\mathcal{F} = \{f_\vtheta: \vtheta \in \Theta\}$. For any $\rho > 0$, with probability of $1 - \delta$ over the training set $\gS$ generated by distribution $\gD$, we have:
+    \begin{align*}
+    &\KL\Big(q_{[\mI+ \vf]} || p(\vtheta|\gD)\Big)\\ 
+    &\leq \max_{\vf' \in \gH^d, \|\vf' - \vf\| \leq \rho}\KL\Big(q_{[\mI + \vf']} || p(\vtheta | \gS)\Big) \\
+    &+ \mathcal{O}\left(\sqrt{\frac{\log(1+\frac{1}{\rho^2})+ \log\left(\frac{n}{\delta}\right)}{n-1}}+ \frac{\sqrt{d_{VC}\log\frac{2en}{d_{VC}}}}{\delta\sqrt{2n}}\right).
+    \end{align*}
+\end{theorem}
+  Our objective is to learn the function $\vf^* \in \gH^d$ that minimizes $\KL(q_{[\mI + \vf]}\| p(\vtheta| \gD))$. Motivated by Theorem \ref{theorem: pac-bayes}, we propose to \textit{implicitly} minimize $\KL(q_{[\mI + \vf]} || p(\vtheta|\gD))$ by minimizing the right-hand side term $\max_{\|\vf'-\vf\|_{\gH^d} \leq \rho}\KL\Big(q_{[\mI + \vf']} || p(\vtheta | \gS)\Big)$. For any $\vf \in \gH^d$, let $\mF[\vf] = \KL\Big(q_{[\mI + \vf]} \|p(\vtheta | \gS)\Big)$ and $\vf' = \vf + \rho \hat{\vf}$, it follows that:
+\begin{align}
+    &\argmax_{\|\vf'-\vf\|_{\gH^d} \leq \rho}\KL\Big(q_{[\mI + \vf']} || p(\vtheta | \gS)\Big) \\
+    &= \argmax_{\|\hat{\vf}\|_{\gH^d} \leq 1}\mF[\vf+\rho \hat{\vf}] \\
+    &= \argmax_{\|\hat{\vf}\|_{\gH^d} \leq 1}\mF[\vf]+\rho\left<\hat{\vf}, \nabla_\vf \mF[\vf]\right>_{\gH^d} + \gO(\rho^2)\\
+    &\approx\argmax_{\|\hat{\vf}\|_{\gH^d} \leq 1}\left<\hat{\vf}, \nabla_\vf \mF[\vf]\right>_{\gH^d}.
+    \label{eq: max approximation}
+\end{align}
+Let $\vg = \nabla_\vf \mF[\vf] \in \gH^d$. The Cauchy-Schwarz inequality on Hilbert spaces \citep{functional_analysis} implies:
+\begin{equation*}
+    \Bigg| \left<\hat{\vf}, \vg\right>_{\gH^d}\Bigg| \leq \left<\hat{\vf}, \vg\right>_{\gH^d} \leq \|\hat{\vf}\|_{\gH^d} \|\vg\|_{\gH^d} \leq \|\vg\|_{\gH^d}. 
+\end{equation*}
+In turn, the solution $\hat{\vf}^*$ that solves the maximization problem in Eq. \ref{eq: max approximation} is given by:
+\begin{equation}
+    \label{eq: sharpness perturbation}
+    \hat{\vf}^* = \frac{\vg}{\|\vg\|_{\gH^d}} = \frac{\nabla_\vf \KL \Big(q_{[\mI + \vf]} \| p(\cdot | \gS)\Big)}{\Bigg\|\nabla_\vf \KL \Big(q_{[\mI + \vf]}\| p(\cdot | \gS)\Big)\Bigg\|_{\gH^d}}.
+\end{equation}
+
+Recall that our goal is to find a sequence of functions $\{\vf_k\}_k \subset \gH^d$ that converges toward the optimal solution $\vf^*$. With the sequence $\{\vf_k\}_k$, we can obtain the flow of distributions $\{q^{(k)}\}_k$, in which $q^{(k)} = q_{[\mI + \vf_k]}$, that gradually approaches the optimal solution of Eq. \ref{eq: optimization problem}. Motivated by Eq.~\ref{eq: sharpness perturbation}, we propose the following \textit{functional sharpness-aware} update procedure:
+
+% At each step, the reference distribution becomes $q \equiv q^{(k)}$, while $\vf_k$ captures the perturbation of the transformation from $q^{(k)}$ to $q^{(k+1)}$. 
+
+
+\begin{align}
+    \label{eq: functional perturbation}
+    \hat{\vf}^*_k &= \rho\frac{\nabla_{\vf}\KL\Big(q_{[\mI + \vf]} \| p(\cdot|\gS)\Big)\Big|_{\vf = \vf_k}}{\Big\| \nabla_{\vf}\KL\Big(q_{[\mI + \vf]} \| p(\cdot|\gS)\Big)\Big|_{\vf = \vf_k} \Big\|_{\gH^d}}\\ 
+    \label{eq: functional descend}
+    \vf_{k+1} &=\vf_k -\epsilon \nabla_{\vf}\KL\Big(q_{[\mI + \vf]} \| p(\cdot|\gS)\Big) \Big|_{\vf = \vf_k +  \hat{\vf}^*_k} \\
+    q^{(k+1)} & = q_{[\mI + \vf_{k+1}]}. 
+\end{align}
+
+
+To implement this iterative procedure, we must work with the functional gradient terms. For this, we rely on the following lemma, with the proof provided in Appendix B of \citet{svgd}:
+\begin{lemma}
+\label{theorem: functional gradient on RKHS}
+Let $\mF[\vf]=\KL(q_{[\mI + \vf]}\|p(\cdot | \gS))$. When $\|\vf\|$ is sufficiently small,
+    \begin{align}
+        &\nabla_{\vf} \mF[\vf] \\
+        % &= -\mathbb{E}_q[\nabla_\vtheta \log p(\vtheta+\vf(\vtheta) | \gS)k(\vtheta,\cdot)+(I+\nabla_\vtheta \vf(\vtheta))^{-1}\nabla_\vtheta k(\vtheta,\cdot)]\\
+        % \label{eq: KL gradient}
+        &\approx -\mathbb{E}_q[\nabla_\vtheta \log p(\vtheta+\vf(\vtheta)| \gS)k(\vtheta,\cdot)+\nabla_\vtheta k(\vtheta,\cdot)].
+    \end{align}
+\end{lemma}
+
+Denote the right-hand side of the equation above $\mD(\vf)$. Substituting into Eq.~(\ref{eq: functional perturbation}) and~(\ref{eq: functional descend}), the iterative procedure described from equations~(\ref{eq: functional perturbation})-(\ref{eq: functional descend}) becomes:
+\begin{align}
+    \hat{\vf}^*_k &= \rho\frac{\mD(\vf_k)}{\|\mD(\vf_k)\|_{\gH^d}},
+        \label{first step}\\
+    \vf_{k+1} &= \vf_k -\epsilon \mD(\vf_k + \hat{\vf}^*_k),    \label{second step}\\
+    q^{(k+1)} &=q_{[\mI + \vf_{k+1}]}.
+        \label{third step}
+\end{align}
+Even though we do not have access to $p(\vtheta | \gS)$, we can compute $\nabla_\vtheta \log p(\vtheta | \gS)$ because $\nabla_\vtheta \log p(\vtheta | \gS) = \nabla_\vtheta \log p(\vtheta) -   \nabla_\vtheta \gL_\gS(\vtheta)$. To implement the procedure above, we first draw a set of $m$ particles $\{\vtheta_i^{(0)}\}^m_{i=1}$ on the model space from the initial density, and then iteratively update the particles with an empirical version of $\mD(\vf)$. Consequently, we obtain the practical procedure summarized in Algorithm \ref{alg: FHBI}, which deterministically transports the set of particles to match the empirical posterior distribution $p(\vtheta | \gS)$, therefore match the general posterior $p(\vtheta | \gD)$ as supported by Theorem \ref{theorem: pac-bayes}. In Algorithm \ref{alg: FHBI}, at each iteration $k$, we have $m$ particles $\{\vtheta^{(k)}_j\}_{j=1}^m$. Eq. \ref{first step} computes the $m$ ascend steps $\hat{\varepsilon}_i^{(k)}$; then, Eq. \ref{second step} and Eq. \ref{third step} use these ascend steps to transport the $m$ model particles to $\{\vtheta^{(k+1)}_j\}_{j=1}^m$. It is noteworthy that FHBI is a generalization of both SVGD and SAM. In particular, if we set $\rho = 0$, we get SVGD; when $m=\textsc{\#particles} = 1$, we obtain SAM. 
+
+\begin{algorithm}[tb]
+   \caption{\textsc{Flat Hilbert Bayesian Inference (FHBI)}}
+   \label{alg: FHBI}
+\begin{algorithmic}
+   \STATE {\bfseries Input:} Initial particles $\{\vtheta^{(0)}_i\}^m_{i=1}$, number of epochs $N$, step size $\rho > 0$
+\STATE {\bfseries Output:} A set of particles $\{\vtheta_i\}^m_{i=1}$ that approximates the population posterior distribution $p(\vtheta|\gD)$
+   \FOR{iteration $k$}
+    \STATE $\hat{\varepsilon}_i^{(k)} \leftarrow \rho\frac{\mathbb{\phi}(\vtheta^{(k)}_i)}{\|\phi(\vtheta_i^{(k)})\|}$ where  $\mathbb{\phi}(\vtheta) = -\frac{1}{n}\sum_{j=1}^m[k(\vtheta, \vtheta_j^{(k)})\nabla_{\vtheta_j^{(k)}}\log p(\vtheta_j^{(k)} | \gS) + \nabla_{\vtheta_j^{(k)}} k(\vtheta, \vtheta_j^{(k)})]$ 
+    \STATE $\vtheta_i^{(k+1)} \leftarrow \vtheta_i^{(k)} - \epsilon_i \psi(\vtheta_i^{(k)}, \hat{\varepsilon}^{(k)}_i)$ \\ 
+    where $\psi(\vtheta, \varepsilon) = -\frac{1}{n}\sum_{j=1}^m[k(\vtheta, \vtheta_j^{(k)})\nabla_{\vtheta_j^{(k)}}\log p(\vtheta_j^{(k)}+\varepsilon| \gS) + \nabla_{\vtheta_j^{(k)}} k(\vtheta, \vtheta_j^{(k)})]$.
+   \ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+% \textbf{Connections to Stein Variational Gradient Descent (SVGD) \quad} This algorithm has a close connection to Stein Variational Gradient Descent (SVGD). To see this connection, recall the iterative procedure of SVGD which deterministically transport the particles: 
+% \begin{align*}
+    
+% \end{align*}
+
+% \color{red} Recall the original form of SVGD here\color{black}
+
+% Hence, SVGD takes the following update: 
+% \begin{align*}
+%     \vf_{k+1} &= -\epsilon\mD(q^{(k)}, \mathbf{0})\\
+%     q^{(k+1)} &= q^{(k)}_{[\mI + \vf_{k+1}]} 
+% \end{align*}
+
+% \paragraph{Connection to Stein Variational Gradient Descent (SVGD).} Our method has a close connection to SVGD. In SVGD, the update step is taken as
+% \begin{align*}
+%     \vtheta_i^{(k+1)} \leftarrow \vtheta_i^{(k)} + \epsilon_k \phi(\vtheta) && \text{ where} && \mathbb{\phi}(\vtheta) = -\frac{1}{n}\sum_{j=1}^n[k(\vtheta, \vtheta_j^{(k)})\nabla_{\vtheta_j^{(k)}}\log p(\vtheta_j^{(l)}) + \nabla_{\vtheta_j^{(k)}} k(\vtheta, \vtheta_j^{(k)})],
+% \end{align*}
+% which results from the problem of minimizing the Kernelized Stein Discrepancy. Equivalently, the distributional update is 
+% \begin{align*}
+%     \vf_{k+1} &= \epsilon \mD(q^{(k)}, \textbf{0}) \\
+%     q^{(k+1)} &= q^{(k)}_{[\mI + \vf_{k+1}]}
+% \end{align*}
+% This approach is analogous to performing gradient descent in the functional space. On the other hand, our algorithm uses a two-step sharpness-aware update procedure to approximate the population posterior, which theoretically enhances generalization compared to SVGD as suggested by Theorem \ref{theorem: flow sharpness}, as well as the discussion on the generalization ability of sharpness-aware minimizers \citep{sam}. It is also worth noting that FHBI is a generalization of SVGD, since we can obtain SVGD by setting $\rho = 0$. Accordingly, Section \ref{section: experiments} will empirically compare the generalization performance of FHBI to SVGD and other baselines in Bayesian inference. Additionally, Section \ref{section: ablation} will also highlight the ability of FHBI to minimize the sharpness of each particle and demonstrate how the particles interact with each other as compared to SVGD.
+\label{section: connections to SAM}
+
+\textbf{Interactive gradient directions and Connections to SAM.} To gain further insight into the mechanism of FHBI and its connections to SAM, consider the term $\nabla_{\vtheta_j}\log(\vtheta_j+\hat{\varepsilon}_i)$ in the descending step, which is related to $\nabla_{\vtheta_j} \gL_\gS(\vtheta_j + \hat{\varepsilon}_i)$. 
+
+The perturbed loss can be approximated as:
+\begin{equation*}
+\gL_\gS(\vtheta_j+\hat{\varepsilon}_i)\approx\gL_\gS(\vtheta_j) + \hat{\varepsilon}_i\nabla_{\vtheta_j} \gL_\gS(\vtheta_j),
+\end{equation*} 
+ where $\hat{\varepsilon}_i$ involves the average $\sum_{k = 1}^m k(\vtheta_k, \vtheta_j)\nabla_{\vtheta_k} \gL_\gS (\vtheta_k)$. Consequently, the gradient of this perturbed loss indicates a direction that simultaneously minimizes $\|\nabla_{\vtheta_j} \gL_\gS (\vtheta_j)\|^2$ - which approximates the sharpness of the $j-$th particle, as discussed by \citet{sam} - and $\nabla_{\vtheta_j} \gL_\gS (\vtheta_j) \cdot \nabla_{\vtheta_k} \gL_\gS (\vtheta_k)$ for all $j, k$, which reflects the angular similarity in the directions of the two particles. Thus, in addition to minimizing the sharpness of each particle, the first term of the descent step acts as an \textit{angular repulsive force}, promoting diverse traveling directions for the particles. Besides, as discussed by \citet{svgd}, the second term acts as a \textit{spatial repulsive force}, driving the particles apart to prevent them from collapsing into a single mode. Consequently, FHBI is not a straightforward extension of SAM to multiple independent particles; it enables the sharpness and gradient directions of the particles to interact with one another. This insight on our algorithm is summarized in Figure \ref{fig:schematic}. In Section \ref{section: ablation}, we empirically demonstrate that, compared to SVGD, FHBI not only effectively minimizes particle-wise sharpness and loss values but also fosters greater diversity in the travel directions of the particles during training. This increased directional diversity, combined with the kernel gradient term, further mitigates the risk of particles collapsing into a single mode and improve the final performance as presented in Section \ref{section: experiments}.

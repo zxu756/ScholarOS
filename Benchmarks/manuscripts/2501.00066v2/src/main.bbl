@@ -1,0 +1,88 @@
+\begin{thebibliography}{16}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bueno~Momčilović et~al.(2024)Bueno~Momčilović, Buesser, Zizzo, Purcell, and Balta]{bueno2024}
+Tomas Bueno~Momčilović, Beat Buesser, Giulio Zizzo, Mark Purcell, and Dian Balta.
+\newblock Towards assurance of llm adversarial robustness using ontology-driven argumentation.
+\newblock Valletta, Malta, July 2024. xAI 2024: World Conference on eXplainable Artificial Intelligence.
+
+\bibitem[Devlin(2018)]{devlin2018bert}
+Jacob Devlin.
+\newblock Bert: Pre-training of deep bidirectional transformers for language understanding.
+\newblock \emph{arXiv preprint arXiv:1810.04805}, 2018.
+
+\bibitem[Du et~al.(2023)Du, He, Zou, Tao, and Hu]{du2023shortcut}
+Mengnan Du, Fengxiang He, Na~Zou, Dacheng Tao, and Xia Hu.
+\newblock Shortcut learning of large language models in natural language understanding.
+\newblock \emph{Communications of the ACM}, 67\penalty0 (1):\penalty0 110--120, 2023.
+
+\bibitem[Gekhman et~al.(2024)Gekhman, Yona, Aharoni, Eyal, Feder, Reichart, and Herzig]{gekhman2024does}
+Zorik Gekhman, Gal Yona, Roee Aharoni, Matan Eyal, Amir Feder, Roi Reichart, and Jonathan Herzig.
+\newblock Does fine-tuning llms on new knowledge encourage hallucinations?
+\newblock \emph{arXiv preprint arXiv:2405.05904}, 2024.
+
+\bibitem[Gururangan et~al.(2020)Gururangan, Marasovi{\'c}, Swayamdipta, Lo, Beltagy, Downey, and Smith]{gururangan2020don}
+Suchin Gururangan, Ana Marasovi{\'c}, Swabha Swayamdipta, Kyle Lo, Iz~Beltagy, Doug Downey, and Noah~A Smith.
+\newblock Don't stop pretraining: Adapt language models to domains and tasks.
+\newblock \emph{arXiv preprint arXiv:2004.10964}, 2020.
+
+\bibitem[Hendrycks et~al.(2023)Hendrycks, Mazeika, and Woodside]{hendrycks2023overview}
+Dan Hendrycks, Mantas Mazeika, and Thomas Woodside.
+\newblock An overview of catastrophic ai risks.
+\newblock \emph{arXiv preprint arXiv:2306.12001}, 2023.
+
+\bibitem[Hu et~al.(2021)Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang, and Chen]{hu2021lora}
+Edward~J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu~Wang, and Weizhu Chen.
+\newblock Lora: Low-rank adaptation of large language models.
+\newblock \emph{arXiv preprint arXiv:2106.09685}, 2021.
+
+\bibitem[Jin et~al.(2020)Jin, Jin, Zhou, and Szolovits]{jin2020bert}
+Di~Jin, Zhijing Jin, Joey~Tianyi Zhou, and Peter Szolovits.
+\newblock Is bert really robust? a strong baseline for natural language attack on text classification and entailment.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, volume~34, pp.\  8018--8025, 2020.
+
+\bibitem[Liu(2019)]{liu2019roberta}
+Yinhan Liu.
+\newblock Roberta: A robustly optimized bert pretraining approach.
+\newblock \emph{arXiv preprint arXiv:1907.11692}, 2019.
+
+\bibitem[Luo et~al.(2023)Luo, Yang, Meng, Li, Zhou, and Zhang]{luo2023empirical}
+Yun Luo, Zhen Yang, Fandong Meng, Yafu Li, Jie Zhou, and Yue Zhang.
+\newblock An empirical study of catastrophic forgetting in large language models during continual fine-tuning.
+\newblock \emph{arXiv preprint arXiv:2308.08747}, 2023.
+
+\bibitem[Radford et~al.(2019)Radford, Wu, Child, Luan, Amodei, Sutskever, et~al.]{radford2019language}
+Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, Ilya Sutskever, et~al.
+\newblock Language models are unsupervised multitask learners.
+\newblock \emph{OpenAI blog}, 1\penalty0 (8):\penalty0 9, 2019.
+
+\bibitem[Schwinn et~al.(2023)Schwinn, Dobre, G{\"u}nnemann, and Gidel]{schwinn2023adversarial}
+Leo Schwinn, David Dobre, Stephan G{\"u}nnemann, and Gauthier Gidel.
+\newblock Adversarial attacks and defenses in large language models: Old and new threats.
+\newblock In \emph{Proceedings on}, pp.\  103--117. PMLR, 2023.
+
+\bibitem[Wessel et~al.(2023)Wessel, Horych, Ruas, Aizawa, Gipp, and Spinde]{wessel2023introducing}
+Martin Wessel, Tomas Horych, Terry Ruas, Akiko Aizawa, Bela Gipp, and Timo Spinde.
+\newblock Introducing mbib-the first media bias identification benchmark task and dataset collection.
+\newblock In \emph{Proceedings of the 46th International ACM SIGIR Conference on Research and Development in Information Retrieval}, pp.\  2765--2774, 2023.
+
+\bibitem[Xiong et~al.(2024)Xiong, Tegegn, Sarin, Pal, and Rubin]{xiong2024all}
+Peiyu Xiong, Michael Tegegn, Jaskeerat~Singh Sarin, Shubhraneel Pal, and Julia Rubin.
+\newblock It is all about data: A survey on the effects of data on adversarial robustness.
+\newblock \emph{ACM Computing Surveys}, 56\penalty0 (7):\penalty0 1--41, 2024.
+
+\bibitem[Yang et~al.(2024)Yang, Meng, Zheng, and Wattenhofer]{yang2024assessing}
+Zeyu Yang, Zhao Meng, Xiaochen Zheng, and Roger Wattenhofer.
+\newblock Assessing adversarial robustness of large language models: An empirical study.
+\newblock \emph{arXiv preprint arXiv:2405.02764}, 2024.
+
+\bibitem[Yoo \& Qi(2021)Yoo and Qi]{yoo2021towards}
+Jin~Yong Yoo and Yanjun Qi.
+\newblock Towards improving adversarial training of nlp models.
+\newblock \emph{arXiv preprint arXiv:2109.00544}, 2021.
+
+\end{thebibliography}

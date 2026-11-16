@@ -1,0 +1,189 @@
+
+\section{Main Results} \label{sec:main} %
+We introduce unitary representations $\pi$ and $\pihat$,
+a \emph{joint-equivariant feature map} $\phi : X \times \Xi \to Y$,
+a \emph{joint-equivariant machine} $\lm[\gamma;\phi]:X \to Y$, and present the ridgelet transform $\ridge[f;\psi] : \Xi \to \CC$ for joint-equivariant machines, yielding the universality $\lm[ \ridge[f;\psi]; \phi ]= c_{\phi,\psi} f$. We note that $\pi$ plays a key role in the main theorem, and the joint-equivariance is an essential property of depth-$n$ fully-connected network.
+
+Let $G$ be a locally compact group equipped with a left invariant measure $\dd g$.
+Let $X$ and $\Xi$ be $G$-spaces equipped with $G$-invariant measures $\dd x$ and $\dd \xi$, called the \emph{data domain} and the \emph{parameter domain}, respectively. %
+Let $Y$ be a separable Hilbert space, called the \emph{output domain}.
+Let $\calU(Y)$ be the space of unitary operators on $Y$, and let $\urep:G \to \calU(Y)$ be a unitary representation of $G$ on $Y$.
+We call a $Y$-valued map $\phi$ on the data-parameter domain $X \times \Xi$, i.e. $\phi : X \times \Xi \to Y$, a \emph{feature map}.
+
+Let $L^2(X;Y)$ denote the space of $Y$-valued square-integrable functions on $X$ equipped with the inner product $\iprod{\phi,\psi}_{L^2(X;Y)} := \int_X \iprod{\phi(x), \psi(x)}_{Y}\dd x$; and let $L^2(\Xi)$ denote the space of $\CC$-valued square-integrable functions on $\Xi$.
+
+If there is no risk of confusion, we use the same symbol $\cdot$ for the $G$-actions on $X$, $Y$, and $\Xi$ (e.g., $g \cdot x$, $g \cdot y$, and $g \cdot \xi$).
+On the other hand, to avoid the confusion between $G$-actions on output domain $Y$ and $Y$-valued function $f:X\to Y$, both ``$g \cdot f(x)$'' and ``$\urep_g[f(x)]$'' \emph{always} imply $G$-action on $Y$, and ``$\pi_g[f](x)$'' (introduced soon below) for $G$-actions on $f:X \to Y$.
+
+Additionally, we introduce two unitary representations $\pi$ and $\pihat$ of $G$ on function spaces $L^2(X;Y)$ and $L^2(\Xi)$ as follows.
+\begin{definition} \label{dfn:urep}
+For each $g \in G$, $f \in L^2(X;Y)$ and $\gamma \in L^2(\Xi)$,%
+\begin{align*}
+    \pi_g[f](x)
+    &:= \urep_g[ f(g^{-1} \cdot x) ]
+    = g \cdot f(g^{-1} \cdot x), x \in X, \\ %
+    \pihat_g[\gamma](\xi)
+    &:= \gamma(g^{-1} \cdot \xi), \quad \xi \in \Xi.
+\end{align*}
+\end{definition}
+In the main theorem, the irreducibility of $\pi$ will be a sufficient condition for the universality. On the other hand, the irreducibility of $\pihat$ is not necessary.
+We have shown that $\pi$ and $\pihat$ are unitary representations in Lemmas~\ref{lem:pi.unitary} and \ref{lem:pihat.unitary}.
+
+\subsection{Joint-Equivariant Feature Map}
+We introduce the joint-group-equivariant feature map, extending the classical notion of group-equivariant feature maps. One of the major motivation to introduce this is that the depth-$n$ fully-connected network, the main subject of this study, is not equivariant but joint-equivariant.
+
+\begin{definition}[Joint-$G$-Equivariant Feature Map]
+We say a feature map $\phi : X \times \Xi \to Y$ is \emph{joint-$G$-equivariant} when
+\begin{align*}
+\phi(g\cdot x,g\cdot \xi) = g \cdot \phi(x,\xi), \quad (x,\xi) \in X \times \Xi,
+\end{align*}
+holds for all $g \in G$.
+Especially, when $G$-action on $Y$ is trivial, i.e. $\phi(g \cdot x, g \cdot \xi) = \phi(x,\xi)$, we say \emph{joint-$G$-invariant}.
+\end{definition}
+
+A basic example is the fully-connected layer
+\[\phi(\xx,(\aa,b)) = \sigma(\aa\cdot\xx-b),\]
+which is \emph{not} $G$-equivariant \emph{but} joint-$G$-equivariant. See \cref{sec:depth2} for more details.
+
+\begin{remark}[Relation to classical $G$-equivariance] \label{rem:classic}
+The joint-$G$-equivariance is not a restriction but an extension of the classical notion of \emph{$G$-equivariance}, i.e. $\phi(g\cdot x,\xi) = g \cdot \phi(x,\xi)$. In fact, $G$-equivariance is a special case of joint-$G$-equivariance where $G$ acts trivially on parameter domain, i.e. $g \cdot \xi = \xi$ (see \cref{fig:joint}). Thus, all $G$-equivariant maps are automatically joint-$G$-equivariant.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth, trim=65 110 65 110, clip]{pics/joint-equivariance}
+    \vskip -0.1in
+    \caption{The classical $G$-equivariant feature map $\phi:X \times \Xi \to Y$ is a subclass of joint-$G$-equivariant map where the $G$-action on parameter domain $\Xi$ is  \emph{trivial}, i.e. $g \cdot \xi = \xi$}
+    \label{fig:joint}
+    \vskip -0.1in
+\end{figure}
+\end{remark}
+
+\subsubsection{Interpretation of Joint-Equivariant Maps} \label{sec:interpretation}
+Obviously, 
+$\phi$ is a $G$-map, namely a homomorphism between $G$-sets $X \times \Xi$ and $Y$. We denote the collection of all joint-$G$-equivariant maps as $\hom_G(X \times \Xi, Y)$.
+Equivalently, 
+$\phi$ is identified with a $G$-map $\phi_c:\Xi \to Y^X$ through \emph{currying} $\phi_c(\xi)(x) = \phi(x,\xi)$, satisfying $\phi_c(g \cdot \xi)(x) = \pi_g[\phi_c(\xi)](x)$.
+Further, $\phi$ is identified with the third $G$-map $\phi_c':X \to Y^\Xi$ through $\phi_c'(\xi)(x) = \phi(x,\xi)$.
+These identifications are summarized as tensor-hom adjunction: $\hom_G(X \times \Xi, Y) \cong \hom_G(\Xi, Y^X) \cong \hom_G(X, Y^\Xi)$.
+
+In terms of geometric deep learning, for example, \citet{Cohen2019} formulate the feature map as a vector field (or \emph{section}). In their formulation, the joint-equivariant feature map $\phi_c : \Xi \to Y^X$ is understood as a global section of a trivial $G$-bundle $p:\Xi \times Y^X \to \Xi$ over base $\Xi$ with fiber $Y^X$, where structure group $G$ acts on fiber $Y^X$ by $\pi$.
+
+We note, however, such geometric understanding is not unique. For example, in terms of learning equation $\lm \circ \ridge = \id_{Y^X}$, the learning machine $\lm : \Xi \to Y^X$ is a feature map, and the ridgelet transform $\ridge:Y^X \to \Xi$ is a section (right-inverse). In this perspective, we can conversely understand the feature map $\phi_c : \Xi \to Y^X$ itself as a vector bundle (or \emph{projection}) with base space $Y^X$ and total space $\Xi$.
+
+
+
+\subsubsection{Construction of Joint-Equivariant Maps}
+In the following, we list several construction methods of joint-equivariant maps in Lemmas \ref{lem:construct-equivalent}, \ref{lem:deep-equivalent} and \ref{lem:jem-equivariant} (in the next subsection), indicating the richness of the proposed concept. Whereas to construct a (non-joint) $G$-equivariant network, we must carefully and precisely design the network architecture \citep[see, e.g., a textbook of geometric deep learning][]{Bronstein2021gdl}, to construct a joint-$G$-equivariant network, we can easily and systematically obtain the one. 
+
+First, we can synthesize a joint-equivariant map from \emph{any} map $\phi_0:X \to Y$.
+\begin{lemma} \label{lem:construct-equivalent}
+    Let $X$ and $Y$ be $G$-sets.
+    Fix an arbitrary map $\phi_0:X \to Y$, and put $\phi(x,g) := \pi_g[\phi_0](x) = g \cdot \phi_0(g^{-1} \cdot x)$ for every $x \in X$ and $g \in G$. Then, $\phi : X \times G \to Y$ is joint-$G$-equivariant.
+\end{lemma}
+\begin{proof}
+    For any $g,h \in G$, we have $\phi( g \cdot x, g \cdot h )
+    = (gh) \cdot \phi_0( (gh)^{-1} \cdot (g \cdot x) ) 
+    = g \cdot \phi(x,h)$.
+\end{proof}
+In particular, the case of $X=Y=\Xi=G$, namely $\phi:G \times G \to G$, is understood as a primitive type of joint-$G$-equivariant maps.
+
+The next lemma suggests the compatibility with function compositions, or deep structures.
+\begin{lemma}[Depth-$n$ Joint-Equivariant Feature Map $\phi_{1:n}$] \label{lem:deep-equivalent}%
+Given a sequence of joint-$G$-equivariant feature maps $\phi_i : X_{i-1} \times \Xi_i \to X_i \ (i=1,\ldots,n)$, 
+let $\Xi_{1:n} := \Xi_1 \times \cdots \times \Xi_n$ be the $n$-fold parameter space with the component-wise $G$-action $g \cdot \xi_{1:n} := (g \cdot \xi_1, \ldots, g \cdot \xi_n)$ for each $n$-fold parameters $\xi_{1:n} \in \Xi_{1:n}$, and let $\phi_{1:n} : X_0 \times \Xi_{1:n} \to X_n$ be the depth-$n$ feature map given by
+\begin{align*}
+\phi_{1:n}(x, \xi_{1:n}) := \phi_n(\bullet,\xi_n) \circ \cdots \circ \phi_1(x, \xi_1).    
+\end{align*}
+Then, $\phi_{1:n}$ is joint-$G$-equivariant.
+\end{lemma}
+See \cref{sec:proof.deep-equivalent} for the proof. In other words, the composition of joint-equivariant maps defines a cascade product of morphisms: $\hom_G(\Xi_2, X_2^{X_1}) \times \hom_G(\Xi_1, X_1^{X_0}) \to \hom_G(\Xi_1 \times \Xi_2, X_2^{X_0})$.
+
+\subsection{Joint-Equivariant Machine}
+We introduce the joint-equivariant \emph{machine}, extending the integral representation.
+\begin{definition}[Joint-Equivariant Machine]%
+Fix an arbitrary joint-equivariant feature map $\phi:X \times \Xi \to Y$. For any scalar-valued measurable function $\gamma:\Xi\to\CC$, define a $Y$-valued map on $X$ by
+\begin{align*}
+    \lm[\gamma;\phi](x) :=
+    \int_\Xi \gamma(\xi) \phi(x,\xi) \dd \xi, \quad x \in X,
+\end{align*}
+where the integral is understood as the Bochner integral. 
+We also write $\lm_\phi := \lm[\bullet;\phi]$ for short.
+If needed, we call the image $\lm[\gamma;\phi] : X \to Y$ a joint-equivariant \emph{machine},
+and the integral transform $\lm[\bullet;\phi]$ of $\gamma$ a joint-equivariant \emph{transform}.
+\end{definition}
+The joint-equivariant machine inherits the concept of 
+the original integral representation---integrate all the available parameters $\xi$ to indirectly select which parameters to use by weighting on them, which \emph{linearize} parametrization by lifting nonlinear parameters $\xi$ to linear parameter $\gamma$.
+
+Moreover, the $G$-action $g \cdot \xi$ on parameter domain $\Xi$ is also linearized to linear representation $\pihat$ of $G$ on $L^2(\Xi)$ (defined in \cref{dfn:urep}). 
+As an important consequence, a \emph{joint-$G$-equivariant machine $\lm_\phi$ is joint-$G$-equivariant}. For later use, we formulate this slogan as the following formula.
+\begin{lemma} \label{lem:jem-equivariant}
+Suppose $\phi : \Xi \to Y^X$ be joint-$G$-equivariant.
+Then, the associated joint-$G$-equivariant machine $\lm_\phi : L^2(\Xi) \to L^2(X;Y)$ intertwines $\pihat$ and $\pi$: For every $g \in G$, $\lm_\phi \circ \pihat_g = \pi_g \circ \lm_\phi$.
+\end{lemma}
+See \cref{sec:proof.jem-equivariant} for the proof. In other words, $\lm$ is a functor from $\hom_G(\Xi,Y^X)$ to $\hom_G( L^2(\Xi), L^2(X;Y) )$.
+
+\subsection{Ridgelet Transform}
+We introduce the ridgelet transform for joint-equivariant machines, extending the one for depth-2 fully-connected networks.
+\begin{definition}[Ridgelet Transform]
+For any joint-equivariant feature map $\psi:X \times \Xi \to Y$ and $Y$-valued Borel measurable function $f$ on $X$, put a scalar-valued map by
+\begin{align*}
+    \ridge[f;\psi](\xi) := 
+    \int_X \iprod{f(x), \psi(x,\xi)}_{Y} \dd x, \quad \xi \in \Xi.
+\end{align*}
+We also write $\ridge_\psi := \ridge[\bullet;\psi]$ for short.
+If there is no risk of confusion, we call both the image $\ridge[f;\psi] : X \to Y$ and the integral transform $\ridge[\bullet;\psi]$ of $f$ a ridgelet transform.
+\end{definition}
+Formally, it measures the similarity between target function $f$ and feature $\psi(\bullet,\xi)$ at $\xi$.
+As long as the integrals are convergent, the ridgelet transform is the dual operator of the joint-equivariant transform (with common $\phi$):
+\begin{align*}
+    \iprod{ \gamma, \ridge[f;\phi] }_{L^2(\Xi)}
+    &= \int_{X \times \Xi} \gamma(\xi) \iprod{\phi(x,\xi), f(x)}_{Y} \dd x \dd \xi\\
+    &= \iprod{ \lm[\gamma;\phi], f }_{L^2(X;Y)}.
+\end{align*}
+As a dual statement for \cref{lem:jem-equivariant}, 
+the ridgelet transform is also joint-$G$-invariant and particularly an intertwiner. 
+\begin{lemma} \label{lem:ridge-equivariant}
+Suppose $\psi \in \hom_G(\Xi,Y^X)$, then we have $\ridge_\psi \circ \pi_g = \pihat_g \circ \ridge_\psi$ for every $g \in G$.
+\end{lemma}
+In other words, $\ridge_\psi \in \hom_G(L^2(X;Y),L^2(\Xi))$.
+See \cref{sec:proof.ridge-equivariant} for the proof.
+
+\subsection{Main Theorem}
+At last, we state the main theorem, that is, the reconstruction formula for joint-equivariant machines.
+
+\begin{theorem}[Reconstruction Formula] \label{thm:main}
+Assume (1) feature maps $\phi,\psi : X \times \Xi \to Y$ are joint-$G$-equivariant, (2) composite operator $\lm_\phi \circ \ridge_\psi : L^2(X;Y) \to L^2(X;Y)$ is bounded (i.e., Lipschitz continuous), and (3) the unitary representation $\pi : G \to \calU(L^2(X;Y))$ defined in \cref{dfn:urep} is irreducible.
+Then, there exists a bilinear form $\iiprod{\phi,\psi} \in \CC$ (independent of $f$) such that for any $Y$-valued square-integrable function $f \in L^2(X;Y)$,
+\begin{align*}
+    \lm_\phi [\ridge_\psi [f]]
+    = \int_{\Xi} \int_X \iprod{f(x), \psi(x,\xi)}_Y \dd x \phi(\bullet,\xi) \dd \xi 
+    = \iiprod{\phi,\psi} f. %
+\end{align*}
+\end{theorem}
+In practice, once the irreducibility of the representation $\pi$ on $L^2(X;Y)$ is verified, the ridgelet transform $\ridge_\psi$ becomes a right inverse operator of joint-equivariant transform $\lm_\phi$ as long as $\iiprod{\phi,\psi} \neq 0,\infty$. Despite the wide coverage of examples, the proof is brief and simple as follows.
+\begin{proof}
+Put $T := \lm_\phi \circ \ridge_\psi: L^2(X;Y) \to L^2(X;Y)$. By \cref{lem:jem-equivariant,lem:ridge-equivariant}, $T$ commutes with $\pi$ as follows
+\begin{align*}
+    \lm_\phi \circ \ridge_\psi \circ \pi_g
+    = \lm_\phi \circ \pihat_g \circ \ridge_\psi
+    = \pi_g \circ \lm_\phi \circ \ridge_\psi
+\end{align*}
+for all $g \in G$.
+Hence by Schur's lemma (\cref{thm:schur}), there exist a constant $C_{\phi,\psi} \in \CC$ such that 
+    $\lm_\phi \circ \ridge_\psi = C_{\phi,\psi} \id_{L^2(X)}$.
+Since $\lm_\phi \circ \ridge_\psi$ is bilinear in $\phi$ and $\psi$, $C_{\phi,\psi}$ is bilinear in $\phi$ and $\psi$.
+\end{proof}
+
+\begin{remark}
+\begin{enumerate}
+\item When $\pi$ is not irreducible (thus reducible) and admits an irreducible decomposition such as $L^2(X;Y) = \bigoplus_{i=1}^\infty \calH_i$, then the reconstruction formula $\lm \circ \ridge[f] = f$ holds for every $f \in \calH_k$ for some $k$. This is another consequence from Schur's lemma.
+\item The irreducibility is required only for $\pi$, and not for $\pihat$. This asymmetry originates from the fact that our main theorem focuses on the universality of the learning machine, namely $\lm_\phi[\gamma]:X \to Y$, not on its dual $\ridge_\psi[f]:\Xi \to \RR$. When $\pihat$ is irreducible, we can further conclude $\ridge_\psi \circ \lm_\phi[\gamma] = \gamma$ for any $\gamma \in L^2(\Xi)$ (the order of composition is reverted from $\lm_\phi \circ \ridge_\psi$). In practical examples such as fully-connected networks and wavelet analysis, however, $\ridge_\psi \circ \lm_\phi$ is only a projection due to the redundancy of parameter distribution $\gamma(\aa,b)$.
+\item Relations to $cc$-universality, and sufficient conditions on $L^2$-boundedness of $\lm \circ \ridge$, are discussed in \cref{sec:bddness,sec:bochner-cc} respectively.
+\item %
+As also mentioned in \cref{sec:interpretation}, $\lm_\phi : L^2(\Xi) \to L^2(X;Y)$ is a $G$-equivariant vector bundle, and $\ridge_\psi : L^2(X;Y) \to L^2(\Xi)$ is a $G$-equivariant section.
+\item
+The assumptions on feature maps $\phi,\psi$ that they are joint-equivariant and not orthogonal need to be verified in a case-by-case manner. Fortunately, we can use the closed-form expression of the ridgelet transform to our advantage.
+    For example, for fully-connected networks (\cref{sec:ex-depth-n}) and quadratic-form networks (\cref{sec:quad}), the joint-equivariance holds for any activation function.
+    For the case of depth-2 fully-connected networks, it is known that the constant is zero if and only if the activation function is a polynomial function \citep[see e.g.,][]{Sonoda2015acha}.
+\end{enumerate}
+\end{remark}
+

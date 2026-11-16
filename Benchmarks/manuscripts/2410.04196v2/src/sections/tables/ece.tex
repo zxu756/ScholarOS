@@ -1,0 +1,271 @@
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% Beamer presentation requires \usepackage{colortbl} instead of \usepackage[table,xcdraw]{xcolor}
+\begin{table*}[ht]
+\centering
+\caption{\texttt{VTAB-1K} results evaluated on the Expected Calibration Error (ECE) metric. All methods are applied to finetune the same set of LoRA parameters on ViT-B/16 pre-trained with \texttt{ImageNet-21K} dataset.}
+\renewcommand\arraystretch{1.05}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{cccccccc|cccc|cccccccc|c}
+\hline
+\cellcolor[HTML]{FFFFFF}&
+ \multicolumn{7}{c|}{\textbf{Natural}}&
+ \multicolumn{4}{c|}{\textbf{Specialized}}&
+ \multicolumn{8}{c|}{\textbf{Structured}}&
+  \cellcolor[HTML]{FFFFFF} \\ 
+  \cmidrule(lr){2-8} \cmidrule(lr){9-12} \cmidrule(lr){13-20}
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}\textbf{Method}} &
+  \cellcolor[HTML]{FFFFFF}\rot{CIFAR100} &
+  \cellcolor[HTML]{FFFFFF}\rot{Caltech101} &
+  \cellcolor[HTML]{FFFFFF}\rot{DTD} &
+  \cellcolor[HTML]{FFFFFF}\rot{Flower102} &
+  \cellcolor[HTML]{FFFFFF}\rot{Pets} &
+  \cellcolor[HTML]{FFFFFF}\rot{SVHN} &
+  \cellcolor[HTML]{FFFFFF}\rot{Sun397} &
+  \cellcolor[HTML]{FFFFFF}\rot{Camelyon} &
+  \cellcolor[HTML]{FFFFFF}\rot{EuroSAT} &
+  \cellcolor[HTML]{FFFFFF}\rot{Resisc45} &
+  \cellcolor[HTML]{FFFFFF}\rot{Retinopathy} &
+  \cellcolor[HTML]{FFFFFF}\rot{Clevr-Count} &
+  \cellcolor[HTML]{FFFFFF}\rot{Clevr-Dist} &
+  \cellcolor[HTML]{FFFFFF}\rot{DMLab} &
+  \cellcolor[HTML]{FFFFFF}\rot{KITTI} &
+  \cellcolor[HTML]{FFFFFF}\rot{dSpr-Loc} &
+  \cellcolor[HTML]{FFFFFF}\rot{dSpr-Ori} &
+  \cellcolor[HTML]{FFFFFF}\rot{sNORB-Azi} &
+  \cellcolor[HTML]{FFFFFF}\rot{sNORB-Ele} &
+  \cellcolor[HTML]{FFFFFF}\textbf{AVG} \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF} FFT} &
+  0.29 &
+  0.23 &
+  0.20 &
+  0.13 &
+  0.27 &
+  0.19 &
+  0.45 &
+  0.21 &
+  0.13 &
+  0.18 &
+  0.17 &
+  0.41 &
+  0.44 &
+  0.42 &
+  0.22 &
+  \cellcolor[HTML]{9AFF99}\textbf{0.14} &
+  0.23 &
+  0.24 &
+  0.40 &
+  \cellcolor[HTML]{FFFFFF}0.26 \\ 
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}AdamW }&
+  0.38 &
+  0.19 &
+  0.18 &
+  0.05 &
+  0.09 &
+  0.10 &
+  0.14 &
+  0.11 &
+  0.09 &
+  0.12 &
+  0.11 &
+  \cellcolor[HTML]{9AFF99}\textbf{0.12} &
+  0.19 &
+  0.34 &
+  0.18 &
+  0.14 &
+  0.21 &
+  0.18 &
+  0.31 &
+  \cellcolor[HTML]{FFFFFF}0.17 \\ 
+\rowcolor[HTML]{FFFFFF} 
+
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}SAM} &
+  0.21 &
+  0.25 &
+  0.20 &
+  0.11 &
+  0.12 &
+  0.15 &
+  \cellcolor[HTML]{9AFF99}\textbf{0.14} &
+  0.17 &
+  0.16 &
+  0.14 &
+  0.09 &
+  0.12 &
+  0.17 &
+  0.24 &
+  0.16 &
+  0.21 &
+  0.19 &
+  0.13 &
+  0.16 &
+  \cellcolor[HTML]{FFFFFF}0.16 \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+
+
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}DeepEns} &
+  0.24 &
+  0.12 &
+  0.22 &
+  0.04 &
+  0.10 &
+  0.13 &
+  0.23 &
+  0.16 &
+  0.07 &
+  0.15 &
+  0.21 &
+  0.31 &
+  0.32 &
+  0.36 &
+  \cellcolor[HTML]{9AFF99}$\mathbf{0.13}$ & 
+  0.32 & 
+  0.31& 
+  0.16 & 
+  0.29 &
+  \cellcolor[HTML]{FFFFFF}0.20 \\ 
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} BayesTune}} &
+  0.32 &
+  \cellcolor[HTML]{9AFF99}\textbf{0.08}&
+  0.20 &
+  \cellcolor[HTML]{9AFF99}\textbf{0.03} &
+  0.85 &
+  0.12 &
+  0.22 &
+  0.13 &
+  0.07 &
+  0.13 &
+  0.22 &
+  0.12 &
+  0.23 &
+  0.30 &
+  0.24 &
+  0.28 &
+  0.28 &
+  0.31 &
+  0.26 &
+  \cellcolor[HTML]{FFFFFF}0.23\\ 
+   \rowcolor[HTML]{FFFFFF}
+   \multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} SGLD}} &
+  0.26 & %cifar100
+  0.20 & %caltech
+  0.17 & %dtd
+  0.05& %flower
+  0.18 & %pets
+  0.14 & %svhn
+  0.23 & %sun
+  0.18 & %camelyon
+  0.09 & %eurosat
+  \cellcolor[HTML]{9AFF99}\textbf{0.12} & %resisc45
+  0.32 & %retinopathy
+  0.26 & %clevr-count
+  0.29 & %clevr-Dist
+  0.21 & %dmlab
+  0.26 & %kitti
+  0.42 & %dsprloc
+  0.39 & %dsprori
+  \cellcolor[HTML]{9AFF99}$\bf{0.11}$ & %snorb-azi
+  0.24 & %snorb-ele
+  \cellcolor[HTML]{FFFFFF}0.22\\ 
+  \rowcolor[HTML]{FFFFFF}
+   \cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} 
+   
+    SADA-JEM} &
+   0.22 &
+   0.11 &
+   0.20 &
+   0.05 &
+   0.13 &
+   0.16 &
+   0.18 &
+   0.15 &
+   0.21 &
+   0.23 &
+   0.26 &
+   0.19 &
+   0.20 &
+   0.25 &
+   0.27 &
+   0.35 &
+   0.20 &
+   0.14 &
+   0.13 &
+  \cellcolor[HTML]{FFFFFF} 0.19\\ 
+  
+  \rowcolor[HTML]{FFFFFF}
+   \cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} 
+   
+    SA-BNN} &
+   0.22 &
+   0.08 &
+   0.19 &
+   0.15 &
+   0.12 &
+   0.12 &
+   0.24 &
+   0.13 &
+   0.06 &
+   0.12 &
+   0.18 &
+   0.14 &
+   0.21 &
+   0.22 &
+   0.24 &
+   0.25 &
+   0.41 &
+   0.46 &
+   0.34 &
+  \cellcolor[HTML]{FFFFFF}0.20\\ 
+  
+  \rowcolor[HTML]{FFFFFF}
+  \multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}SVGD} &
+  0.20 & %cifar100
+  0.13 & %caltech
+  0.19 & %dtd
+  0.04 & %flower
+  0.16 & %pets
+  0.09 & %svhn
+  0.20 & %sun
+  0.15 & %camelyon
+  0.11 & %eurosat
+  0.13 & %resisc45
+  0.12 & %retinopathy
+  0.17 & %clevr-count
+  0.21 & %clevr-Dist
+  0.30 & %dmlab
+  0.18 & %kitti
+  0.21 & %dsprloc
+  0.25 & %dsprori
+  0.14 & %snorb-azi
+  0.26 & %snorb-ele
+  \cellcolor[HTML]{FFFFFF}0.18 \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\textbf{FHBI}} &
+  \cellcolor[HTML]{9AFF99}\textbf{0.19} & %cifar
+  0.10 & %caltech
+  \cellcolor[HTML]{9AFF99}\textbf{0.16} & %dtd
+  0.06 & %flower
+  \cellcolor[HTML]{9AFF99}\textbf{0.06} & %pets
+  \cellcolor[HTML]{9AFF99}\textbf{0.09} & %svhn
+  0.16 & %sun397
+  \cellcolor[HTML]{9AFF99}\textbf{0.09} & %camelyon
+  \cellcolor[HTML]{9AFF99}\textbf{0.05} & %eurosat
+   0.12 & %resics45
+  \cellcolor[HTML]{9AFF99}\textbf{0.08} & %retinopathy
+   0.14& %clevr-count
+  \cellcolor[HTML]{9AFF99}\textbf{0.15} & %clevr-Dist
+  \cellcolor[HTML]{9AFF99}\textbf{0.21} & %dmlab
+  0.15 & %kitti
+   0.16 & %dspr-loc
+   \cellcolor[HTML]{9AFF99}\textbf{0.18 }& %dspr-ori
+   0.11 & %snorb-azi
+   \cellcolor[HTML]{9AFF99}\textbf{0.07}& %snorb-ele
+  \cellcolor[HTML]{9AFF99}$\bf{0.12}$ \\ \hline
+  \label{table: ece}
+\end{tabular}
+}
+\end{table*}

@@ -1,0 +1,341 @@
+\section{Method}
+\label{sec:method}
+
+We propose a CRL framework to achieve whole-body control for a quadrupedal mobile manipulator. Unlike standard RL, which relies solely on reward engineering to discourage unsafe behaviours, our approach explicitly enforces safety specifications through the CaT mechanism. The imposed constraints shape the learning process so that violating any of them results in the agent not receiving part of the reward accrued while the constraint is not satisfied. This constraint-dependent reward modulation naturally drives the policy toward constraint-satisfying behaviours in order to maximize the expected return \citep{chane2024cat, chanesane2024solo}.
+
+In this section, we describe our framework for tracking a desired 6D end-effector pose in task space via whole-body control of a legged locomanipulator operating in lunar environments  (see \cref{fig:problem}). We first specify the components of the underlying Markov Decision Process (MDP), with particular emphasis on the reward function required to obtain precise and efficient task-space tracking. We then detail the set of constraints enforced during learning to embed safety guarantees into the resulting behaviour, as well as the considerations followed to implement lunar-analogue environmental conditions that allow our system to operate in these conditions. An overview of the proposed methodology is shown in \cref{fig:overview}, and each of its modules is described in the following subsections.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{figures/Acta_ProblemStatement.jpg}
+    \caption{\textbf{Problem statement:} The robot starts with its desired EE pose out of reach. It must locomote towards a vicinity of the target pose, and then coordinate both arm and legged platform to reach the commanded pose.}
+    \label{fig:problem}
+\end{figure*}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{figures/AIS_overview.pdf}
+    \caption{Overview of the proposed methodology.}
+    \label{fig:overview}
+\end{figure*}
+
+\subsection{Problem Statement}
+\label{sec:problem}
+
+We consider a legged mobile manipulator consisting of a quadrupedal base with $\kappa$ legs of $\zeta_{legs}$ actuated joints each, and a serial manipulator of $\zeta_{arm}$ actuated joints rigidly mounted on the base. The system operates on an unstructured, non-planar surface under reduced gravity, on a compliant granular substrate whose friction and contact parameters are unknown to the controller.
+
+The task is the following: Given a desired end-effector pose $\boldsymbol{p}^{*}_{ee} \in SE(3)$, specified in an inertial task frame by a higher-level mission planner and held constant over an episode, learn a single state-feedback policy $\pi_\theta: \mathcal{O} \rightarrow \mathcal{A}$ that maps onboard observations to joint position targets for all $\zeta_{arm} + \kappa\,\zeta_{legs}$ actuated joints, such that the end-effector pose converges to $\boldsymbol{p}^{*}_{ee}$ while a user-specified set of safety and behavioural constraints is satisfied throughout the trajectory.
+
+Three properties distinguish this formulation from the loco-manipulation problems most commonly addressed in the literature, and each motivates a specific element of the method that follows.
+
+The command is expressed in the task frame, not the body frame. Under a body-frame formulation, displacing the base displaces the target with it, so the commanded pose is not a fixed point in the environment and the base has no incentive to reposition itself in service of the arm. A task-frame command makes base motion and arm motion substitutable means to the same end, which is what makes the problem genuinely whole-body: reaching a commanded pose beyond the arm's reach \emph{requires} coordinated locomotion, and the division of labour between base and arm is a solution to the problem rather than a modelling assumption.
+
+Control is exercised through a single policy over the full actuated state, without a separate manipulation module, mode switch or task-space controller. Consequently the transition between locomotion-dominated and manipulation-dominated behaviour is not scheduled externally but must emerge from the objective, which places a corresponding burden on the reward formulation (\cref{sec:reward}).
+
+Constraint satisfaction is part of the specification rather than a preference. The constraints are supplied by the designer in physical units and enforced during learning, so that the resulting policy is admissible with respect to actuator limits, postural safety and terrain interaction, and not merely high-scoring. \cref{sec:constraints} defines the specific set; \cref{sec:cat} states precisely what the chosen enforcement mechanism does and does not guarantee.
+
+\subsection{Whole-Body Legged Mobile Manipulation}\label{sec:command}
+
+We formulate the problem as a tracking task where the policy must coordinate the legged
+base and the 6-DoF manipulator to reach a desired end-effector pose $\boldsymbol{p}_{ee}^* \in SE(3)$ defined in the global task space, for the reasons given in \cref{sec:problem}.
+
+During training, this command is sampled as a random 6D pose within a bounded vicinity of the robot, such that the robot may need to traverse some terrain to reach it, but is not required to travel over long distances. This design choice is consistent with our intended use case, in which the learned policy is deployed when the robot is already in a local area of interest where it must inspect the environment or retrieve samples, rather than perform long-range navigation.
+
+\subsubsection{Action and Observation Spaces}
+\label{sec:spaces}
+
+We define the policy actions $\boldsymbol{a}_t \in \mathcal{A}$ as the desired joint positions for both the arm and the quadrupedal legs, $\boldsymbol{q}_t^*$. In our setup, the robotic arm has $\zeta_{arm}$ DoF and the quadruped has $\kappa$ legs with $\zeta_{legs}$ DoF each, resulting in an action vector $ \boldsymbol{a}_t \in \mathbb{R}^{\zeta_{arm}+\kappa \cdot \zeta_{legs}} $. For the platform considered in this work, $\kappa=4$, $\zeta_{legs}=3$ and $\zeta_{arm}=6$, giving $\boldsymbol{a}_t \in \mathbb{R}^{18}$. The target joint positions output by the policy are processed before being sent to two separate low-level PD controllers for the arm and the legs. Specifically, the raw policy action $\boldsymbol{a}_t$ is scaled and offset from a default configuration:
+%
+\begin{equation}\label{eq:action-scaling}
+    \boldsymbol{q}_t^{*} = \boldsymbol{a}_t \odot \boldsymbol{\sigma} + \boldsymbol{q}_{\text{default}},
+\end{equation}
+%
+where $\boldsymbol{\sigma}$ is an element-wise scaling factor, $\odot$ denotes the Hadamard (element-wise) product, and $\boldsymbol{q}_{\text{default}}$ is the nominal joint configuration.
+
+
+The observation space $\mathcal{O}$ must contain all relevant information for the locomanipulator to accomplish the task-space tracking objective. This includes both proprioceptive feedback, describing the internal state of the robot, and exteroceptive information, capturing the structure of the surrounding lunar terrain that the robot must traverse to reach the desired end-effector pose.
+
+Concretely, our observation vector $\boldsymbol{o}_t \in \mathcal{O}$ comprises the body orientation represented by the projected gravity vector, as well as the body linear and angular velocities. We include joint positions and velocities for all joints to provide complete joint-space state information, as well as the action applied by the policy at the previous timestep. To assess stability and contact patterns, we add a four-dimensional Boolean vector encoding the contact state of each quadruped foot. For exteroceptive perception we incorporate a terrain height scan, obtained by ray-casting a body-aligned $17\times11$ grid of $0.1\,$m resolution spanning $1.6\,\mathrm{m}\times1.0\,\mathrm{m}$ around the base. Each element encodes the vertical offset between the sensor frame and the terrain surface, clipped to $[-1,1]\,$m. We model this as an idealized elevation measurement, as is standard in perceptive locomotion \citep{MikiWildAnymal}; it abstracts the output of the mapping pipeline of a body-mounted depth sensor rather than simulating a specific device. The implications of this abstraction for lunar illumination and dust conditions are examined in \cref{sec:discussion}.
+
+Finally, we include the current desired end-effector pose in task space. Although the command is generated in the task frame as described in \cref{sec:command}, we transform the desired pose into the body frame before appending it to the observation vector. This preserves the benefits of using local body-centric information for learning while maintaining a task-space definition of the goal consistent with what a mission planner would specify.
+
+For clarity of notation, the complete set of observations is summarized in \cref{tab:observations}.
+
+\begin{table}
+    \centering
+    \caption{Policy observations. Dimensions correspond to the $\kappa=4$-legged platform with $\zeta_{legs}=3$ and $\zeta_{arm}=6$ used in this work.}
+    \label{tab:observations}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}llr@{}}
+        \toprule
+        \textbf{Observation} & \textbf{Expression} & \textbf{Dim.} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Proprioceptive}} \\
+        Projected gravity vector  & $\boldsymbol{\phi}_{b}$          & 3 \\
+        Body linear velocity      & $\boldsymbol{v}_b$               & 3 \\
+        Body angular velocity     & $\boldsymbol{\omega}_b$          & 3 \\
+        Leg joint positions       & $\boldsymbol{q}_{legs}$          & 12 \\
+        Arm joint positions       & $\boldsymbol{q}_{arm}$           & 6 \\
+        Leg joint velocities      & $\dot{\boldsymbol{q}}_{legs}$    & 12 \\
+        Arm joint velocities      & $\dot{\boldsymbol{q}}_{arm}$     & 6 \\
+        Feet contact state        & $\boldsymbol{f}_i$               & 4 \\
+        Previous actions          & $\boldsymbol{a}_{t-1}$           & 18 \\
+        \addlinespace
+        \multicolumn{3}{@{}l}{\textit{Exteroceptive}} \\
+        Terrain height scan       & $\boldsymbol{h}$                 & 187 \\
+        \addlinespace
+        \multicolumn{3}{@{}l}{\textit{Task}} \\
+        Desired end-effector pose & $\boldsymbol{p}_{ee}^{\ast}$     & 7 \\
+        \midrule
+        \textbf{Total}            &                                  & \textbf{261} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Reward Function Formulation}
+\label{sec:reward}
+
+Task-space end-effector pose tracking raises two main challenges for reward design, which is central in driving the policy toward the desired behaviour.
+
+First, mobile manipulation is inherently a two-stage hierarchical problem: the robot must initially exploit its locomotion capabilities to move its base close enough to the target pose so that the end-effector is within reach, and subsequently maintain a stable base configuration from which the manipulator can accurately reach the commanded pose. In the literature, locomotion and manipulation are often treated separately, as each is a complex control problem on its own and their combination further increases difficulty \citep{fu2022deep, portela2025wholebodyendeffectorposetracking}. However, such a separation fails to exploit the full whole-body control capabilities of the system, which can, for example, reposition the quadruped to make difficult poses reachable, or use the manipulator while the base is moving to reduce operation time or improve balance on rough terrain.
+
+Second, successful 6D pose tracking requires precise control of both 3D position and 3D orientation. These components are frequently rewarded separately via independent position and orientation tracking terms. While this is a valid approach, it requires careful tuning to balance the relative importance of each term and is complicated by the fact that position and orientation errors have different scales. In particular, achieving accurate orientation tracking is often more challenging \citep{portela2025wholebodyendeffectorposetracking}.
+
+\paragraph{Whole-Body 6D End-Effector Tracking Reward.}
+
+To address both challenges, we propose a reward formulation that implicitly handles the locomotion and manipulation phases and inherently balances position and orientation tracking, such that neither component is favored at the expense of the other.
+
+We first define position and orientation errors. The position error is the Euclidean distance between the current and desired end-effector positions, while the orientation error is the geodesic distance between the current and desired orientations, both expressed in the base frame:
+%
+\begin{equation}
+    e_{\text{pos}} = \lVert \boldsymbol{p}_{ee} - \boldsymbol{p}_{ee}^{*} \rVert, 
+    \quad
+    e_{\text{rot}} = \bigl\lVert \mathrm{quat}_{ee} \ominus \mathrm{quat}_{ee}^{*} \bigr\rVert,
+    \label{eq:pos-and-rot-errors}
+\end{equation}
+%
+where $\ominus$ denotes the relative rotation between the two quaternions and $e_{\text{rot}}\in[0,\pi]$ is the magnitude of its axis--angle representation, in radians. The individual rewards for position and orientation are then given by exponential kernels:
+%
+\begin{equation}
+    r_{\text{pos}} = \exp\!\left(-\frac{e_{\text{pos}}}{\sigma_{\text{pos}}(e_{\text{pos}})}\right),
+    \quad
+    r_{\text{rot}} = \exp\!\left(-\frac{e_{\text{rot}}}{\sigma_{\text{rot}}(e_{\text{rot}})}\right),
+    \label{eq:pos-rot-rew}
+\end{equation}
+%
+where $\sigma_{\text{pos}}$ and $\sigma_{\text{rot}}$ are kernel widths controlling the decay rate with respect to the errors.
+
+\paragraph{Error-adaptive kernel widths.} A single fixed kernel width cannot serve the full range of errors encountered in task-space loco-manipulation. Commanded poses are sampled up to $2.5\,$m from the robot, so the position error spans roughly three orders of magnitude between the beginning of an episode and successful tracking. A wide kernel provides a usable gradient during the approach phase but saturates near the target, where it no longer discriminates between a $10\,$cm and a $2\,$cm error; a narrow kernel resolves fine tracking but is numerically indistinguishable from zero at the start of an episode, leaving the policy without a learning signal precisely when it must decide where to walk.
+
+We therefore make the kernel widths piecewise-constant functions of the instantaneous error, contracting as the error decreases according to the schedule listed in \cref{tab:sigma_schedule}. The effect is a reward that remains within a well-conditioned range across the whole error span, so that the gradient with respect to the tracking error never vanishes either far from or close to the target. This acts as an automatic precision curriculum: as the policy improves, the reward landscape sharpens around the current performance level without any explicit scheduling on training iterations, and without requiring the kernel widths to be retuned for different command distributions.
+
+To balance the two terms, we define the pose tracking reward as their product:
+%
+\begin{equation}
+    r_{\text{pose}} = r_{\text{pos}} \cdot r_{\text{rot}}.
+    \label{eq:pose-rew}
+\end{equation}
+%
+In this formulation, increasing one component of the reward while degrading the other does not lead to a higher overall reward. Instead, the only way to maximize $r_{\text{pose}}$ is to improve both position and orientation tracking simultaneously.
+
+\paragraph{Mobile Manipulation Reward.}
+
+The reward in \cref{eq:pose-rew} alone does not exploit the mobility of the quadrupedal base, which may cause the policy to rely excessively on the arm and develop aggressive motions to reach distant poses. To explicitly encourage the robot to leverage its base to position itself near the target, we introduce a saturating base-proximity term.
+
+Let $d_{\text{base}} = \lVert \boldsymbol{p}^{*\,b}_{ee,xy} \rVert$ denote the distance between the base origin and the commanded end-effector position, expressed in the base frame, where the $xy$ subscript indicates that only the planar components are used. We define the base positioning reward as
+%
+\begin{equation}
+    r_{\text{base}} = \mathrm{clip}\!\left(
+    \exp\!\left(-\frac{d_{\text{base}} - \beta}{\sigma_{\text{base}}}\right),\,0,\,1\right),
+    \label{eq:base-rew}
+\end{equation}
+%
+so that $r_{\text{base}}$ saturates at unity once the base is within the proximity threshold $\beta$ of the target and decays smoothly outside it. The combined task reward is the product
+%
+\begin{equation}
+    r_{\text{task}} = r_{\text{pose}} \cdot r_{\text{base}}.
+    \label{eq:task-reward}
+\end{equation}
+
+This composition realises an implicit phase switch between locomotion and manipulation without any gating function, state machine, or discrete threshold. Far from the target, $r_{\text{base}}$ carries essentially the whole gradient of $r_{\text{task}}$, since $r_{\text{pose}}$ is uniformly small at distances beyond the arm's reach; the policy is therefore driven to locomote towards the commanded pose. Once the base enters the proximity region, $r_{\text{base}}$ saturates and its gradient vanishes, so the remaining gradient acts entirely through $r_{\text{pose}}$ and the policy is driven to refine the end-effector pose. The transition between locomotion-dominated and manipulation-dominated behaviour is thus a consequence of the geometry of the reward rather than an externally imposed schedule, and it is continuous by construction.
+
+Saturation is essential to this mechanism. An unsaturated proximity term would continue to reward reductions of $d_{\text{base}}$ beyond $\beta$, driving the base directly onto the target and into configurations from which the commanded pose lies inside the manipulator's inner workspace boundary and is no longer comfortably reachable. Clipping at unity makes the interior of the proximity region reward-neutral with respect to base placement, leaving the policy free to position the base wherever the arm can best satisfy the 6D command.
+
+\subsubsection{Stability Reward}
+\label{sec:stability}
+
+Our target scenarios involve locomotion on harsh, unstructured lunar-like terrain, including rough rocky surfaces, hills, and craters with significant slopes. In such settings, reward terms based solely on tracking performance may drive the policy toward behaviours that reduce pose error at the expense of stability, potentially causing falls that are catastrophic and difficult to recover from. To mitigate this, we incorporate an explicit notion of stability into the reward.
+
+In many terrestrial locomotion works, stability is encouraged indirectly by penalising undesired collisions and favouring body orientations heuristically associated with stable gaits \citep{chanesane2024solo, rudin2022learning}. While often sufficient in lab settings, this is inadequate for planetary applications, where falls must be avoided with high confidence.
+
+The choice of stability criterion is itself affected by the operating environment. Static criteria based on the projection of the centre of mass onto the support polygon implicitly assume that gravitational acceleration dominates the inertial contribution to the net acceleration acting on the body. Under lunar gravity this assumption weakens considerably: with $\lVert\boldsymbol{g}\rVert\approx1.63\,\mathrm{m/s^2}$, accelerations of the order of $0.5\,\mathrm{m/s^2}$, which are routinely produced by the swing-leg and manipulator motion of the platform considered here, represent a substantial fraction of the gravitational term and materially reorient the net acceleration vector. A criterion that accounts for the combined gravitational and inertial contribution is therefore not merely a refinement but a requirement in reduced gravity.
+
+Following \citep{Valsecchi2023}, we adopt the Gravito-Inertial Inclination Margin (GIIM) \citep{Ribeiro2020GIIM}, which is defined in terms of the Gravito-Inertial Acceleration (GIA) vector and measures its margin within a stability polyhedron defined by the robot's contact points.
+
+The GIA vector is defined as
+%
+\begin{equation}
+    \boldsymbol{\alpha}_{\text{gi}} = \boldsymbol{g} - \boldsymbol{\alpha}_{\text{CoM}},
+    \label{eq:gia}
+\end{equation}
+%
+where $\boldsymbol{g}$ is the gravity vector and $\boldsymbol{\alpha}_{\text{CoM}}$ is the acceleration of the robot's center of mass. Physically, $\boldsymbol{\alpha}_{\text{gi}}$ is the net acceleration that the body must resist through its contacts: it coincides with gravity when the centre of mass is not accelerating, and tilts away from the vertical as the robot accelerates, which is the mechanism by which dynamic motion erodes the stability margin.
+
+The stability polyhedron is the pyramid whose apex is the robot's center of mass and whose base is the polygon formed by its current contact points, ordered by azimuth in the local ground plane. The robot is stable if the GIA vector lies inside this polyhedron, and becomes increasingly unstable as the vector approaches or exits its boundary. Denoting by $\mathcal{F}$ the set of non-degenerate faces of the polyhedron and by $\boldsymbol{n}_f$ the normal of face $f$, oriented towards the local vertical, GIIM quantifies the stability margin as the smallest angle between the GIA vector and any face normal:
+%
+\begin{equation}
+    \phi_{\text{GIIM}} = \min_{f\in\mathcal{F}} \left[
+        \arccos\left(
+            \frac{\boldsymbol{n}_{f} \cdot \boldsymbol{\alpha}_{\text{gi}}}
+                 {\lVert \boldsymbol{n}_{f} \rVert \,\lVert \boldsymbol{\alpha}_{\text{gi}} \rVert}
+        \right)
+    \right].
+    \label{eq:giim}
+\end{equation}
+
+While \cref{eq:giim} is a sound stability \emph{metric}, it is a poor training signal. The minimum is non-smooth, as the arg-min face switches at every contact transition, and it provides no gradient towards improving the margin along non-binding directions: a policy can increase $\phi_{\text{GIIM}}$ only by acting on the single worst face. We therefore use the mean over faces as a smooth surrogate that promotes configurations with a large margin in all directions simultaneously, and retain $\phi_{\text{GIIM}}$ itself as an evaluation diagnostic. Let
+%
+\begin{equation}
+    \Phi = \frac{1}{|\mathcal{F}|}\sum_{f\in\mathcal{F}}
+    \left[
+        \arccos\left(
+            \frac{\boldsymbol{n}_{f} \cdot \boldsymbol{\alpha}_{\text{gi}}}
+                 {\lVert \boldsymbol{n}_{f} \rVert \,\lVert \boldsymbol{\alpha}_{\text{gi}} \rVert}
+        \right) - \frac{\pi}{2}
+    \right] \in \left[-\tfrac{\pi}{2},\, \tfrac{\pi}{2}\right],
+    \label{eq:phi-mean}
+\end{equation}
+%
+which is negative for configurations in which the GIA vector lies outside the polyhedron. Using $\Phi$ directly as a reward would interact adversely with the multiplicative factor $(1-\delta)$ of \cref{eq:cat}, for the reasons developed in \cref{sec:positive-rewards}. We therefore map it affinely onto the unit interval:
+%
+\begin{equation}
+    r_{\text{GIIM}} =
+    \mathbb{1}\!\left[N_c \ge 3\right]\cdot
+    \mathrm{clip}\!\left(\frac{\Phi + \pi/2}{\pi},\,0,\,1\right),
+    \label{eq:giim-rew}
+\end{equation}
+%
+where $N_c$ is the number of feet in contact. The indicator sets the reward to zero whenever fewer than three contacts are available, since the polyhedron is then degenerate and the margin undefined. Under this mapping, $r_{\text{GIIM}}=0.5$ corresponds to a marginally stable configuration in which the GIA vector lies in the plane of the average face, values above $0.5$ to configurations with positive margin, and values below to configurations whose average margin has already been lost.
+
+\subsubsection{Positive Reward Formulation under Termination-Based Constraints}
+\label{sec:positive-rewards}
+
+The remaining reward terms are regularizers: they discourage excessive power consumption and abrupt changes in the commanded joint positions. In standard RL these are almost universally implemented as penalties, that is, as negative reward terms proportional to the magnitude of the quantity being discouraged. Under the CaT objective this convention is actively counterproductive, since it constrains the design of every regularizer in the framework, and it is not addressed in the original formulation \citep{chane2024cat}.
+
+Consider a reward $r_t = r^{+}_t - \lambda\, \psi_t$, where $r^{+}_t \ge 0$ is the task reward, $\psi_t \ge 0$ is a penalised quantity such as instantaneous joint power, and $\lambda>0$ its weight. Under \cref{eq:cat} the agent accumulates the modulated reward $(1-\delta_t)\,r_t = (1-\delta_t)\,r^{+}_t - \lambda (1-\delta_t)\,\psi_t$. The termination probability $\delta_t$ therefore attenuates the penalty by the same factor as it attenuates the task reward. Whenever a constraint violation raises $\delta_t$, the effective cost of the penalised behaviour is reduced.
+
+This is pathological precisely for the regularizers of interest, because the penalised quantities are dynamically coupled to the constrained ones. Joint power grows with joint torque and velocity, which are exactly the quantities bounded by $c_{\tau_j}$ and $c_{\dot{q}_j}$; action rate grows with the aggressive motions that trigger the base-velocity and joint-deviation constraints. A policy that violates such a constraint is thus rewarded twice over: it obtains whatever task benefit motivated the violation, and it simultaneously pays a discounted penalty for the associated regularized quantity. In the limit $\delta_t \to 1$, characteristic of hard-constraint violations, the penalty vanishes entirely, and the agent is indifferent between an arbitrarily large violation of the regularized quantity and none at all. The formulation therefore introduces a local incentive gradient that points towards constraint violation, in direct opposition to the intent of the constraint set.
+
+Our resolution is to require every reward term to be non-negative, and to express regularization as a bounded reward for the desired behaviour rather than as a penalty for the undesired one. Concretely, each regularized quantity $\psi_t$ enters through a decaying exponential kernel $\exp(-\psi_t/\mu)$, which is maximal when $\psi_t=0$ and decays monotonically, with $\mu$ a normalisation constant. Under this construction the modulation $(1-\delta_t)$ acts uniformly as an attenuation of all accrued value, so that constraint violations can only ever reduce the return. The ordering of policies induced by the regularizers is then preserved under the CaT modulation, which is not the case for the penalty formulation. The stability reward of \cref{eq:giim-rew} is mapped onto the unit interval for the same reason.
+
+\subsubsection{Power Minimization Rewards}
+
+We encourage the policy to generate energy-efficient motions, i.e., to achieve the task objective with minimal power consumption. Following \cref{sec:positive-rewards}, we reward low power consumption instead of penalising high power. Let
+$P_{g} = \sum_{j \in g} \lvert \dot{q}_{j}\, \tau_{j} \rvert$
+denote the total absolute mechanical power of joint group $g \in \{\text{legs}, \text{arm}\}$, where $\dot{q}_j$ and $\tau_j$ are the velocity and applied torque of joint $j$. The power reward is
+%
+\begin{equation}
+    r_{\text{power}} =
+    \omega_{\text{legs}} \exp\!\left(-\frac{P_{\text{legs}}}{\mu_{\text{legs}}}\right)
+    + \omega_{\text{arm}} \exp\!\left(-\frac{P_{\text{arm}}}{\mu_{\text{arm}}}\right),
+    \label{eq:power-rew}
+\end{equation}
+%
+where $\omega_{\text{legs}}$ and $\omega_{\text{arm}}$ are weighting coefficients and $\mu_{\text{legs}}$, $\mu_{\text{arm}}$ are normalisation constants set to half the nominal peak group power of the corresponding actuators, so that the kernel decays over the range of power values actually encountered in nominal operation rather than over the full actuator envelope.
+
+\subsubsection{Action Smoothness Rewards}
+
+Lastly, we want the policy to produce smooth changes in its output actions, ensuring soft and stable motion of all robot joints and avoiding oscillatory behaviours that could destabilize the system or waste energy. This is usually framed as a penalty on the difference between consecutive actions; for the reasons given in \cref{sec:positive-rewards}, we again express it as a bounded positive reward.
+
+For each joint group $g$ with $n_g$ joints, we average a decaying kernel over the per-joint action increments:
+%
+\begin{equation}
+    r_{\text{act}} = \!\!\sum_{g \in \{\text{legs},\text{arm}\}}\!\!
+    \frac{\omega_{\text{act},g}}{n_g}
+    \sum_{j \in g}
+    \exp\!\left(-\frac{\lvert a_{j,t} - a_{j,t-1} \rvert}{\sigma_{\text{act}}}\right),
+    \label{eq:act-rew}
+\end{equation}
+%
+where $a_{j,t}$ and $a_{j,t-1}$ are the actions commanded for joint $j$ at the current and previous timesteps, $\omega_{\text{act},g}$ are weighting coefficients, and $\sigma_{\text{act}}$ is a sensitivity hyperparameter. Averaging per joint, instead of summing over the group, keeps the term bounded in $[0,\omega_{\text{act},g}]$ independently of the number of joints, so that the relative weighting of the leg and arm groups is not implicitly determined by their dimensionality.
+
+\subsubsection{Total Reward}
+
+The complete reward is the weighted sum of the terms defined above, scaled by the control timestep $\Delta t$ so that the weights reported in \cref{tab:rew_params} are expressed as per-second rates:
+%
+\begin{equation}
+    r_t = \Delta t \left(
+    \omega_{\text{pose}}\, r_{\text{task}}
+    + \omega_{s}\, r_{\text{GIIM}}
+    + r_{\text{power}}
+    + r_{\text{act}}
+    \right),
+    \label{eq:total-reward}
+\end{equation}
+%
+where $r_{\text{power}}$ and $r_{\text{act}}$ carry their own per-group weights as defined in \cref{eq:power-rew,eq:act-rew}. Every term is non-negative by construction, so $r_t \ge 0$ for all states and actions. Following \cref{eq:cat}, the quantity actually accumulated by the agent is the modulated reward $\tilde{r}_t = (1-\delta_t)\, r_t$. The weighting factors and hyperparameters of each term are listed in the Appendix.
+
+\subsection{Environment Design for Lunar Surface Operations} \label{sec:lunar-design}
+
+Our goal is to train and deploy a learned policy in a lunar-analogue environment to assess its suitability for autonomous mobile manipulation on the Moon. To this end, we design a simulation environment that captures the key challenges the robot would face on the lunar surface. These challenges are presented in three major areas: low gravity conditions, irregular terrain geometry, and loose regolith soil simulation.
+
+First, we set the gravitational acceleration to one sixth of Earth’s value to approximate lunar gravity. Second, the lunar surface is highly irregular, so we introduce terrain morphologies representative of lunar topography. Specifically, we consider three terrain types: rough terrain, small hills, and steep craters. The rough terrain emulates regions with irregular contact surfaces, such as accumulations of rocks and obstacles that may cause foot stumbling. The hills terrain represents areas with continuous but moderate elevation changes. Finally, the steep crater terrain models one of the most challenging scenarios, in which the robot must descend into or climb out of a crater, requiring stable motion on steep slopes. Examples of the three terrain types are shown in \cref{fig:terrains}.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth]{figures/terrain-overview.png}
+  \caption{Terrains used in simulation to mimic lunar surface challenges.}
+  \label{fig:terrains}
+\end{figure}
+
+Beyond geometry, the properties of lunar soil are also distinctive and further complicate safe locomotion. Dry regolith can cause the robot’s feet to slip or sink, especially on slopes and at elevation changes. While some prior work attempts to model extraterrestrial terrains in detail \citep{Zhou2014Mars}, the underlying properties are not fully characterised, making exact simulation difficult. Following \citep{Valsecchi2023}, we argue that broad randomization of surface friction and robot mass can approximate the uncertainty and variability encountered in practice.
+
+Consequently, we randomize the static and dynamic friction coefficients in the ranges $\mu_s \in [0.3, 1.25]$ and $\mu_d \in [0.2, 1.0]$, respectively, while enforcing $\mu_d \leq \mu_s$ for physical consistency. We also add a random mass perturbation to the robot body in the range $\pm [0.0, 5.0]$ kg. This mass randomization accounts for possible foot sinking in regolith accumulations, thus strengthening the policy against variations in the terrain.
+
+\subsection{Constraints for Safe and Robust Legged Locomanipulation in Lunar Environments}\label{sec:constraints}
+
+With the main task reward specified, we now define the constraints that the policy must satisfy while learning the task. These constraints may correspond to physical limits (e.g., joint ranges, torque bounds) or desired behavioural properties (e.g., limits on body orientation, impact forces, or velocities).
+
+Following \citep{chane2024cat}, we distinguish two types of stochastic constraints: \emph{hard} constraints, whose violation leads to immediate termination of all future rewards, and \emph{soft} constraints, whose violation induces probabilistic termination of future rewards. Conceptually, hard constraints represent situations that are unacceptable under any circumstances (e.g., collisions with sensitive robot parts), whereas soft constraints encode preferences that may be temporarily violated if necessary (e.g., momentary exceedance of a velocity limit).
+
+All constraints follow the standard CaT form, in which the constraint function is the signed margin of a monitored quantity $\psi_i$ with respect to its limit $l_i$,
+%
+\begin{equation}
+    c_i = \psi_i - l_i,
+    \label{eq:generic-constraint}
+\end{equation}
+%
+so that $c_i>0$ denotes a violation whose magnitude drives the termination probability of \cref{eq:cat-delta}. We therefore specify each constraint by its monitored quantity, giving explicit expressions only where $\psi_i$ is not immediate, and report the corresponding limits in \cref{tab:constraint_lims}. Considering the specific platform, task, and safety requirements of lunar operation, we define the following constraints:
+
+\paragraph{Soft constraints.} We first constrain leg joint motion via $c_{\dot{q}_j}$ and $c_{\tau_j}$, which bound joint velocities and torques within their nominal operational limits. While higher peak torques and velocities are physically achievable, we explicitly discourage sustained operation in those regimes, both to preserve actuator life over long-duration missions and to keep thermal dissipation within the margins available to a passively cooled system. Torque limits are set separately for the hip and thigh joints and for the knee joints, reflecting their differing actuator ratings.
+
+To shape the overall motion style, we further introduce constraints on body motion. We set $c_{v}$ to limit the base linear velocity to a maximum of $0.25\,\mathrm{m/s}$, preventing excessively fast maneuvers that could jeopardize operational safety. We additionally prevent the leg joints from reaching configurations far from their nominal values, since large deviations compromise both postural stability and gait regularity. To this end we define a joint deviation constraint $c_{dev}$, whose monitored quantity is the per-joint absolute deviation $\lvert \boldsymbol{q}_{legs} - \boldsymbol{q}_{\text{default}} \rvert$ from the nominal configuration.
+
+Lastly, foot contact management is crucial to ensure platform stability and minimize failure cases, and we define two constraints regulating the interaction between the feet and the terrain. First, we constrain the foot from stumbling against irregular elevations. We define stumbling as a contact in which the horizontal force on the foot is large relative to its vertical component:
+%
+\begin{equation}
+    c_{f_{\text{stumble}}} = 
+    \lVert \boldsymbol{f}_{foot,i_{xy}} \rVert - K_f \cdot \lvert f_{foot,i_{z}} \rvert,
+    \label{eq:stumble}
+\end{equation}
+%
+where $K_f$ specifies the maximum admissible ratio of lateral to vertical force at the foot.
+
+Second, we constrain foot slippage on loose regolith, a dominant failure mode in lunar-analog locomotion. A foot in contact should not translate laterally; lateral motion is admissible only once the foot has been unloaded to continue the gait cycle. We therefore constrain the lateral velocity of loaded feet:
+%
+\begin{equation}
+    c_{f_{\text{slippage}}} =
+    \Bigl( \lVert \boldsymbol{v}_{foot, i_{xy}} \rVert - v_{\text{slip}} \Bigr)
+    \cdot \mathbb{1}\!\left[\lVert \boldsymbol{f}_{foot,i}\rVert_2 > f_{\text{th}}\right],
+    \label{eq:slippage}
+\end{equation}
+%
+where $v_{\text{slip}}$ is the admissible lateral foot velocity and $f_{\text{th}}$ the contact-detection force threshold, so that the constraint is inactive for feet in swing phase.
+
+\paragraph{Hard constraints.} We define a set of hard constraints ($p_i^{\max}=1$) representing events that must be avoided under all circumstances, so that any violation deterministically eliminates all subsequent reward. The constraint $c_{\text{contact}}$ forbids contact forces on any body other than the feet, monitoring the net contact force on the base, head, hips and manipulator links. The constraint $c_{\text{fall}}$ is triggered when the body roll or pitch exceeds $90^\circ$, corresponding to configurations from which recovery is highly unlikely and which would in practice end the mission.
+
+To account for the specific hazards of reduced gravity, we introduce a third hard constraint. The constraint $c_{f,\max}$ limits the peak impact force exerted by the feet. On the Moon this serves a dual purpose: it avoids structural damage and the associated risk of an emergency stop, and it limits the vertical impulse imparted to the body, which under $1/6$ gravity can be sufficient to break contact with the ground entirely and produce an uncontrolled ballistic phase from which the policy has no authority to recover.
+
+\paragraph{Scope of the constraint set.} Constraints are imposed on the legs and on the base, but not on the arm joints. This reflects the failure modes specific to lunar surface operation targeted in this work, which arise from the interaction between the legged base and a compliant, low-friction regolith surface under reduced gravity: slippage, sinkage, stumbling, impact loading, and loss of postural stability. The manipulator operates in free space throughout the task considered here, and its actuation limits are enforced by the low-level controller rather than through the learning process. Contact-rich manipulation would require an equivalent constraint set on the arm, in particular on interaction forces and joint torques; we return to this point in \cref{sec:discussion}.
+
+The specific limit values used for each constraint are reported in \cref{tab:constraint_lims}.

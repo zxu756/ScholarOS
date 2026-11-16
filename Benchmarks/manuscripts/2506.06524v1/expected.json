@@ -1,0 +1,80 @@
+{
+ "paper": "2506.06524v1",
+ "generated_utc": "2026-11-16T21:20:26Z",
+ "generator": "Tectonic 0.17.0, bundle https://relay.fullyjustified.net/default_bundle_v33.tar, --untrusted --keep-intermediates --keep-logs",
+ "aux_files": [
+  "main.aux"
+ ],
+ "cite_keys": [
+  "abagames2024claude",
+  "browne2008automatic",
+  "cook2013mechanic",
+  "gallotta2024large",
+  "gonzalez2023mechanic",
+  "gpt4o",
+  "hu2024game",
+  "jaech2024openai",
+  "khalifa2015automatic",
+  "khalifa2017general",
+  "liapis2018orchestrating",
+  "ma2018survey",
+  "nielsen2015towards",
+  "o3-mini",
+  "pedro2019database",
+  "perez2019general",
+  "sudhakaran2024mariogpt",
+  "todd2023level",
+  "todd2024gavel",
+  "togelius2008experiment",
+  "togelius2011search",
+  "treanor2012game",
+  "yannakakis2018artificial",
+  "zhao2023survey"
+ ],
+ "nocite_star": false,
+ "bibcite_keys": [
+  "abagames2024claude",
+  "browne2008automatic",
+  "cook2013mechanic",
+  "gallotta2024large",
+  "gonzalez2023mechanic",
+  "gpt4o",
+  "hu2024game",
+  "jaech2024openai",
+  "khalifa2015automatic",
+  "khalifa2017general",
+  "liapis2018orchestrating",
+  "ma2018survey",
+  "nielsen2015towards",
+  "o3-mini",
+  "pedro2019database",
+  "perez2019general",
+  "sudhakaran2024mariogpt",
+  "todd2023level",
+  "todd2024gavel",
+  "togelius2008experiment",
+  "togelius2011search",
+  "treanor2012game",
+  "yannakakis2018artificial",
+  "zhao2023survey"
+ ],
+ "labels": [
+  "fig:pipeline",
+  "fig:pushpull",
+  "fig:trio_quest",
+  "tab:ctx",
+  "tab:fewshot_21",
+  "tab:models"
+ ],
+ "excluded_internal_labels": [],
+ "latex_log": {
+  "undefined_citations": [],
+  "undefined_references": [],
+  "multiply_defined_labels": []
+ },
+ "bibtex_log": {
+  "missing_entries": [],
+  "error_messages": 0,
+  "ran": true
+ }
+}

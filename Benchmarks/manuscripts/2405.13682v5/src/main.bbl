@@ -1,0 +1,238 @@
+\begin{thebibliography}{46}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Barron(1993)]{Barron1993}
+Barron, A.~R.
+\newblock \href{http://doi.org/10.1109/18.256500}{{Universal approximation bounds for superpositions of a sigmoidal function}}.
+\newblock \emph{IEEE Transactions on Information Theory}, 39\penalty0 (3):\penalty0 930--945, 1993.
+
+\bibitem[Bronstein et~al.(2021)Bronstein, Bruna, Cohen, and Veli{\v{c}}kovi{\'{c}}]{Bronstein2021gdl}
+Bronstein, M.~M., Bruna, J., Cohen, T., and Veli{\v{c}}kovi{\'{c}}, P.
+\newblock \href{http://arxiv.org/abs/2104.13478}{{Geometric Deep Learning: Grids, Groups, Graphs, Geodesics, and Gauges}}.
+\newblock \emph{arXiv preprint: 2104.13478}, 2021.
+
+\bibitem[Cai(2023)]{cai2023achieve}
+Cai, Y.
+\newblock \href{https://openreview.net/forum?id=hfUJ4ShyDEU}{{Achieve the Minimum Width of Neural Networks for Universal Approximation}}.
+\newblock In \emph{The Eleventh International Conference on Learning Representations}, 2023.
+
+\bibitem[Cand{\`{e}}s(1998)]{Candes.PhD}
+Cand{\`{e}}s, E.~J.
+\newblock \emph{\href{https://searchworks.stanford.edu/view/9949708}{{Ridgelets: theory and applications}}}.
+\newblock PhD thesis, Standford University, 1998.
+
+\bibitem[Carroll \& Dickinson(1989)Carroll and Dickinson]{Carroll.Dickinson}
+Carroll, S.~M. and Dickinson, B.~W.
+\newblock \href{http://doi.org/10.1109/IJCNN.1989.118639}{{Construction of neural nets using the Radon transform}}.
+\newblock In \emph{International Joint Conference on Neural Networks 1989}, volume~1, pp.\  607--611. IEEE, 1989.
+
+\bibitem[Chen et~al.(2018)Chen, Rubanova, Bettencourt, and Duvenaud]{Chen2018a}
+Chen, R. T.~Q., Rubanova, Y., Bettencourt, J., and Duvenaud, D.
+\newblock \href{https://papers.nips.cc/paper_files/paper/2018/hash/69386f6bb1dfed68692a24c8686939b9-Abstract.html}{{Neural Ordinary Differential Equations}}.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~31, pp.\  6572--6583, 2018.
+
+\bibitem[Cohen et~al.(2022)Cohen, DeVore, Petrova, and Wojtaszczyk]{Cohen2022}
+Cohen, A., DeVore, R., Petrova, G., and Wojtaszczyk, P.
+\newblock \href{http://doi.org/10.1007/s10208-021-09494-z}{{Optimal Stable Nonlinear Approximation}}.
+\newblock \emph{Foundations of Computational Mathematics}, 22\penalty0 (3):\penalty0 607--648, 2022.
+
+\bibitem[Cohen et~al.(2016)Cohen, Sharir, and Shashua]{Cohen2016}
+Cohen, N., Sharir, O., and Shashua, A.
+\newblock \href{http://jmlr.csail.mit.edu/proceedings/papers/v49/cohen16.pdf}{{On the Expressive Power of Deep Learning: A Tensor Analysis}}.
+\newblock In \emph{29th Annual Conference on Learning Theory}, volume~49, pp.\  1--31, 2016.
+
+\bibitem[Cohen et~al.(2019)Cohen, Geiger, and Weiler]{Cohen2019}
+Cohen, T.~S., Geiger, M., and Weiler, M.
+\newblock \href{https://proceedings.neurips.cc/paper/2019/file/b9cfe8b6042cf759dc4c0cccb27a6737-Paper.pdf}{{A General Theory of Equivariant CNNs on Homogeneous Spaces}}.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~32, 2019.
+
+\bibitem[Cybenko(1989)]{Cybenko1989}
+Cybenko, G.
+\newblock \href{http://doi.org/10.1007/BF02551274}{{Approximation by superpositions of a sigmoidal function}}.
+\newblock \emph{Mathematics of Control, Signals, and Systems (MCSS)}, 2\penalty0 (4):\penalty0 303--314, 1989.
+
+\bibitem[Daubechies et~al.(2022)Daubechies, DeVore, Foucart, Hanin, and Petrova]{Daubechies2022}
+Daubechies, I., DeVore, R., Foucart, S., Hanin, B., and Petrova, G.
+\newblock \href{http://doi.org/10.1007/s00365-021-09548-z}{{Nonlinear Approximation and (Deep) {ReLU} Networks}}.
+\newblock \emph{Constructive Approximation}, 55\penalty0 (1):\penalty0 127--172, 2022.
+
+\bibitem[E(2017)]{E2017}
+E, W.
+\newblock \href{http://doi.org/10.1007/s40304-017-0103-z}{{A Proposal on Machine Learning via Dynamical Systems}}.
+\newblock \emph{Communications in Mathematics and Statistics}, 5\penalty0 (1):\penalty0 1--11, 2017.
+
+\bibitem[Evans \& Gariepy(2015)Evans and Gariepy]{Evans2015}
+Evans, L.~C. and Gariepy, R.~F.
+\newblock \emph{\href{https://www.crcpress.com/Measure-Theory-and-Fine-Properties-of-Functions-Revised-Edition/Evans-Gariepy/p/book/9781482242386}{{Measure Theory and Fine Properties of Functions}}}.
+\newblock CRC Press, revised edition, 2015.
+
+\bibitem[Folland(2015)]{Folland2015}
+Folland, G.~B.
+\newblock \emph{\href{https://doi.org/10.1201/b19172}{{A Course in Abstract Harmonic Analysis}}}.
+\newblock Chapman and Hall/CRC, New York, second edition, 2015.
+
+\bibitem[Funahashi(1989)]{Funahashi1989}
+Funahashi, K.-I.
+\newblock \href{http://doi.org/10.1016/0893-6080(89)90003-8}{{On the approximate realization of continuous mappings by neural networks}}.
+\newblock \emph{Neural Networks}, 2\penalty0 (3):\penalty0 183--192, 1989.
+
+\bibitem[Grohs et~al.(2023)Grohs, Klotz, and Voigtlaender]{Grohs2023}
+Grohs, P., Klotz, A., and Voigtlaender, F.
+\newblock \href{http://doi.org/10.1007/s10208-021-09546-4}{{Phase Transitions in Rate Distortion Theory and Deep Learning}}.
+\newblock \emph{Foundations of Computational Mathematics}, 23\penalty0 (1):\penalty0 329--392, 2023.
+
+\bibitem[Haber \& Ruthotto(2017)Haber and Ruthotto]{Haber2017}
+Haber, E. and Ruthotto, L.
+\newblock \href{http://iopscience.iop.org/article/10.1088/1361-6420/aa9a90/meta}{{Stable architectures for deep neural networks}}.
+\newblock \emph{Inverse Problems}, 34\penalty0 (1):\penalty0 1--22, 2017.
+
+\bibitem[Hanin \& Sellke(2017)Hanin and Sellke]{Hanin2017}
+Hanin, B. and Sellke, M.
+\newblock \href{http://doi.org/10.48550/arxiv.1710.11278}{{Approximating Continuous Functions by ReLU Nets of Minimal Width}}.
+\newblock \emph{arXiv preprint: 1710.11278}, 2017.
+
+\bibitem[Hornik et~al.(1989)Hornik, Stinchcombe, and White]{Hornik1989}
+Hornik, K., Stinchcombe, M., and White, H.
+\newblock \href{http://doi.org/10.1016/0893-6080(89)90020-8}{{Multilayer feedforward networks are universal approximators}}.
+\newblock \emph{Neural Networks}, 2\penalty0 (5):\penalty0 359--366, 1989.
+
+\bibitem[Kainen et~al.(2013)Kainen, K\r{u}rkov\'{a}, and Sanguineti]{kainen.survey}
+Kainen, P.~C., K\r{u}rkov\'{a}, V., and Sanguineti, M.
+\newblock \href{http://doi.org/10.1007/978-3-642-36657-4}{{Approximating multivariable functions by feedforward neural nets}}.
+\newblock In \emph{Handbook on Neural Information Processing}, volume~49 of \emph{Intelligent Systems Reference Library}, pp.\  143--181. Springer Berlin Heidelberg, 2013.
+
+\bibitem[Kidger \& Lyons(2020)Kidger and Lyons]{Kidger2020}
+Kidger, P. and Lyons, T.
+\newblock \href{https://proceedings.mlr.press/v125/kidger20a.html}{{Universal Approximation with Deep Narrow Networks}}.
+\newblock In \emph{Proceedings of Thirty Third Conference on Learning Theory}, volume 125, pp.\  2306--2327, 2020.
+
+\bibitem[Kim et~al.(2024)Kim, Min, and Park]{kim2024minimum}
+Kim, N., Min, C., and Park, S.
+\newblock \href{https://openreview.net/forum?id=dpDw5U04SU}{{Minimum width for universal approximation using Re{LU} networks on compact domain}}.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+
+\bibitem[Kobayashi \& Oshima(2005)Kobayashi and Oshima]{KobayashiOshima.LieRep.book}
+Kobayashi, T. and Oshima, T.
+\newblock \emph{\href{https://www.iwanami.co.jp/book/b265794.html}{Lie group and representation theory (in Japanese)}}.
+\newblock Iwanami Shoten, 2005.
+
+\bibitem[Lang(1993)]{Lang1993}
+Lang, S.
+\newblock \emph{\href{http://doi.org/10.1007/978-1-4612-0897-6}{{Real and Functional Analysis}}}.
+\newblock Graduate Texts in Mathematics. Springer New York, 3 edition, 1993.
+
+\bibitem[Li et~al.(2023)Li, Duan, Ji, and Cai]{Li2023minimum}
+Li, L., Duan, Y., Ji, G., and Cai, Y.
+\newblock \href{https://proceedings.mlr.press/v202/li23g.html}{{Minimum Width of Leaky-{R}e{LU} Neural Networks for Uniform Universal Approximation}}.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine Learning}, volume 202, pp.\  19460--19470, 2023.
+
+\bibitem[Li \& Hao(2018)Li and Hao]{Li2018b}
+Li, Q. and Hao, S.
+\newblock \href{http://proceedings.mlr.press/v80/li18b/li18b.pdf}{{An Optimal Control Approach to Deep Learning and Applications to Discrete-Weight Neural Networks}}.
+\newblock In \emph{Proceedings of The 35th International Conference on Machine Learning}, volume~80, pp.\  2985--2994, 2018.
+
+\bibitem[Lin \& Jegelka(2018)Lin and Jegelka]{Lin2018}
+Lin, H. and Jegelka, S.
+\newblock \href{https://proceedings.neurips.cc/paper/2018/hash/03bfc1d4783966c69cc6aef8247e0103-Abstract.html}{{ResNet with one-neuron hidden layers is a Universal Approximator}}.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~31, 2018.
+
+\bibitem[Lu et~al.(2017)Lu, Pu, Wang, Hu, and Wang]{Lu2017expressive}
+Lu, Z., Pu, H., Wang, F., Hu, Z., and Wang, L.
+\newblock \href{https://papers.nips.cc/paper/2017/hash/32cbf687880eb1674a07bf717761dd3a-Abstract.html}{{The Expressive Power of Neural Networks: A View from the Width}}.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~30, 2017.
+
+\bibitem[Murata(1996)]{Murata1996}
+Murata, N.
+\newblock \href{http://doi.org/10.1016/0893-6080(96)00000-7}{{An integral representation of functions using three-layered networks and their approximation bounds}}.
+\newblock \emph{Neural Networks}, 9\penalty0 (6):\penalty0 947--956, 1996.
+
+\bibitem[Park et~al.(2021)Park, Yun, Lee, and Shin]{park2021minimum}
+Park, S., Yun, C., Lee, J., and Shin, J.
+\newblock \href{https://openreview.net/forum?id=O-XJwyoIF-k}{{Minimum Width for Universal Approximation}}.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+
+\bibitem[Petrova \& Wojtaszczyk(2023)Petrova and Wojtaszczyk]{Petrova2023}
+Petrova, G. and Wojtaszczyk, P.
+\newblock \href{http://jmlr.org/papers/v24/22-1381.html}{{Limitations on approximation by deep and shallow neural networks}}.
+\newblock \emph{Journal of Machine Learning Research}, 24\penalty0 (353):\penalty0 1--38, 2023.
+
+\bibitem[Siegel(2023)]{Siegel2023}
+Siegel, J.~W.
+\newblock \href{http://jmlr.org/papers/v24/23-0025.html}{{Optimal Approximation Rates for Deep ReLU Neural Networks on Sobolev and Besov Spaces}}.
+\newblock \emph{Journal of Machine Learning Research}, 24\penalty0 (357):\penalty0 1--52, 2023.
+
+\bibitem[Sonoda \& Murata(2017{\natexlab{a}})Sonoda and Murata]{Sonoda2015acha}
+Sonoda, S. and Murata, N.
+\newblock \href{http://doi.org/10.1016/j.acha.2015.12.005}{{Neural network with unbounded activation functions is universal approximator}}.
+\newblock \emph{Applied and Computational Harmonic Analysis}, 43\penalty0 (2):\penalty0 233--268, 2017{\natexlab{a}}.
+
+\bibitem[Sonoda \& Murata(2017{\natexlab{b}})Sonoda and Murata]{Sonoda2017otml}
+Sonoda, S. and Murata, N.
+\newblock \href{https://arxiv.org/pdf/1712.04145.pdf}{{Transportation analysis of denoising autoencoders: a novel method for analyzing deep neural networks}}.
+\newblock In \emph{NIPS 2017 Workshop on Optimal Transport \& Machine Learning (OTML)}, pp.\  1--10, Long Beach, 2017{\natexlab{b}}.
+
+\bibitem[Sonoda et~al.(2021{\natexlab{a}})Sonoda, Ishikawa, and Ikeda]{Sonoda2021aistats}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{http://proceedings.mlr.press/v130/sonoda21a.html}{{Ridge Regression with Over-Parametrized Two-Layer Networks Converge to Ridgelet Spectrum}}.
+\newblock In \emph{Proceedings of The 24th International Conference on Artificial Intelligence and Statistics}, volume 130, pp.\  2674--2682, 2021{\natexlab{a}}.
+
+\bibitem[Sonoda et~al.(2021{\natexlab{b}})Sonoda, Ishikawa, and Ikeda]{Sonoda2021ghost}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{http://arxiv.org/abs/2106.04770}{{Ghosts in Neural Networks: Existence, Structure and Role of Infinite-Dimensional Null Space}}.
+\newblock \emph{arXiv preprint: 2106.04770}, 2021{\natexlab{b}}.
+
+\bibitem[Sonoda et~al.(2022{\natexlab{a}})Sonoda, Ishikawa, and Ikeda]{Sonoda2022gconv}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{https://papers.nips.cc/paper_files/paper/2022/hash/fcc3dc27672a12510babe448d665e152-Abstract-Conference.html}{{Universality of Group Convolutional Neural Networks Based on Ridgelet Analysis on Groups}}.
+\newblock In \emph{Advances in Neural Information Processing Systems 35}, pp.\  38680--38694, 2022{\natexlab{a}}.
+
+\bibitem[Sonoda et~al.(2022{\natexlab{b}})Sonoda, Ishikawa, and Ikeda]{Sonoda2022symmetric}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{https://proceedings.mlr.press/v162/sonoda22a.html}{{Fully-Connected Network on Noncompact Symmetric Space and Ridgelet Transform based on Helgason-Fourier Analysis}}.
+\newblock In \emph{Proceedings of the 39th International Conference on Machine Learning}, volume 162, pp.\  20405--20422, 2022{\natexlab{b}}.
+
+\bibitem[Sonoda et~al.(2024{\natexlab{a}})Sonoda, Ishi, Ishikawa, and Ikeda]{sonoda2023joint}
+Sonoda, S., Ishi, H., Ishikawa, I., and Ikeda, M.
+\newblock \href{https://proceedings.mlr.press/v228/sonoda24a.html}{{Joint Group Invariant Functions on Data-Parameter Domain Induce Universal Neural Networks}}.
+\newblock In \emph{Proceedings of the 2nd NeurIPS Workshop on Symmetry and Geometry in Neural Representations}, Proceedings of Machine Learning Research, pp.\  129--144. PMLR, 2024{\natexlab{a}}.
+
+\bibitem[Sonoda et~al.(2024{\natexlab{b}})Sonoda, Ishikawa, and Ikeda]{Sonoda2024fourier}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{http://doi.org/https://doi.org/10.1016/j.jspi.2024.106184}{{A unified Fourier slice method to derive ridgelet transform for a variety of depth-2 neural networks}}.
+\newblock \emph{Journal of Statistical Planning and Inference}, 233:\penalty0 106184, 2024{\natexlab{b}}.
+
+\bibitem[Telgarsky(2016)]{Telgarsky2016}
+Telgarsky, M.
+\newblock \href{https://proceedings.mlr.press/v49/telgarsky16.html}{{Benefits of depth in neural networks}}.
+\newblock In \emph{29th Annual Conference on Learning Theory}, pp.\  1--23, 2016.
+
+\bibitem[Yamasaki et~al.(2023)Yamasaki, Subramanian, Hayakawa, and Sonoda]{Yamasaki2023icml}
+Yamasaki, H., Subramanian, S., Hayakawa, S., and Sonoda, S.
+\newblock \href{https://proceedings.mlr.press/v202/yamasaki23a.html}{{Quantum Ridgelet Transform: Winning Lottery Ticket of Neural Networks with Quantum Computation}}.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine Learning}, volume 202, pp.\  39008--39034, 2023.
+
+\bibitem[Yarotsky(2017)]{Yarotsky2017}
+Yarotsky, D.
+\newblock \href{http://doi.org/10.1016/j.neunet.2017.07.002}{{Error bounds for approximations with deep ReLU networks}}.
+\newblock \emph{Neural Networks}, 94:\penalty0 103--114, 2017.
+
+\bibitem[Yarotsky(2018)]{Yarotsky2018}
+Yarotsky, D.
+\newblock \href{https://proceedings.mlr.press/v75/yarotsky18a.html}{{Optimal approximation of continuous functions by very deep ReLU networks}}.
+\newblock In \emph{Proceedings of the 31st Conference On Learning Theory}, volume~75, pp.\  639--649, 2018.
+
+\bibitem[Yarotsky \& Zhevnerchuk(2020)Yarotsky and Zhevnerchuk]{Yarotsky2020}
+Yarotsky, D. and Zhevnerchuk, A.
+\newblock \href{https://papers.nips.cc/paper/2020/hash/979a3f14bae523dc5101c52120c535e9-Abstract.html}{{The phase diagram of approximation rates for deep neural networks}}.
+\newblock In \emph{Advances in Neural Information Processing Systems}, volume~33, pp.\  13005--13015, 2020.
+
+\bibitem[Yosida(1995)]{Yosida.new}
+Yosida, K.
+\newblock \emph{\href{http://doi.org/10.1007/978-3-642-61859-8}{{Functional Analysis}}}.
+\newblock Springer-Verlag Berlin Heidelberg, 6 edition, 1995.
+
+\end{thebibliography}

@@ -1,0 +1,81 @@
+{
+ "paper": "2501.00066v2",
+ "generated_utc": "2026-11-16T21:20:26Z",
+ "generator": "Tectonic 0.17.0, bundle https://relay.fullyjustified.net/default_bundle_v33.tar, --untrusted --keep-intermediates --keep-logs",
+ "aux_files": [
+  "main.aux"
+ ],
+ "cite_keys": [
+  "bueno2024",
+  "devlin2018bert",
+  "du2023shortcut",
+  "gekhman2024does",
+  "gururangan2020don",
+  "hendrycks2023overview",
+  "hu2021lora",
+  "jin2020bert",
+  "liu2019roberta",
+  "luo2023empirical",
+  "radford2019language",
+  "schwinn2023adversarial",
+  "wessel2023introducing",
+  "xiong2024all",
+  "yang2024assessing",
+  "yoo2021towards"
+ ],
+ "nocite_star": false,
+ "bibcite_keys": [
+  "bueno2024",
+  "devlin2018bert",
+  "du2023shortcut",
+  "gekhman2024does",
+  "gururangan2020don",
+  "hendrycks2023overview",
+  "hu2021lora",
+  "jin2020bert",
+  "liu2019roberta",
+  "luo2023empirical",
+  "radford2019language",
+  "schwinn2023adversarial",
+  "wessel2023introducing",
+  "xiong2024all",
+  "yang2024assessing",
+  "yoo2021towards"
+ ],
+ "labels": [
+  "app: social statement",
+  "app: trade",
+  "app:transf_raw",
+  "fig:asr_by_model",
+  "fig:experiment_setup",
+  "fig:model_size_asr_increase",
+  "sec:experimental_setup",
+  "table:adversarial_combined_impact_a2t",
+  "table:adversarial_combined_impact_textfooller",
+  "table:adversarial_impact",
+  "table:asr_increase_horizontal_gemma",
+  "table:bert_attack_comparison",
+  "table:bert_large_attack_comparison",
+  "table:comparison",
+  "table:gemma_2b_attack_comparison",
+  "table:gpt2_attack_comparison",
+  "table:gpt2_large_attack_comparison",
+  "table:gpt2_medium_attack_comparison",
+  "table:gpt2_xl_attack_comparison",
+  "table:phi2_attack_comparison",
+  "table:roberta_attack_comparison",
+  "table:roberta_large_attack_comparison",
+  "trade_off"
+ ],
+ "excluded_internal_labels": [],
+ "latex_log": {
+  "undefined_citations": [],
+  "undefined_references": [],
+  "multiply_defined_labels": []
+ },
+ "bibtex_log": {
+  "missing_entries": [],
+  "error_messages": 0,
+  "ran": true
+ }
+}

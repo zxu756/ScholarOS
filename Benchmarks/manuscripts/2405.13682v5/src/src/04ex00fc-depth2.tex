@@ -1,0 +1,32 @@
+\section{Example: Depth-$2$ Fully-Connected Network} \label{sec:depth2}
+Here we reproduce the ridgelet transform for depth-$2$ fully-connected network, originally presented in \citet{sonoda2023joint}.
+
+
+
+Set $X := \RR^m$ (data domain), $\Xi := \RR^m\times\RR$ (parameter domain),
+and $G := \aff(m) = GL(m) \ltimes \RR^m$ be the $m$-dimensional affine group, acting on data domain $X$ by
+\begin{align*}
+g \cdot \xx := L\xx + \tt, \quad g = (L,\tt) \in GL(m) \ltimes \RR^m, \ \xx \in X.
+\end{align*}
+Addition to this, let $\pi$ be the regular representation of $\aff(m)$ on $L^2(X)$, namely
+\begin{align*}
+    \pi(g)[f](\xx) := |\det L|^{-1/2} f(L^{-1}(\xx-\tt)), \quad f \in L^2(X) \mbox{ and } g = (L,\tt) \in GL(m) \ltimes \RR^m.
+\end{align*}
+
+Further, define a \emph{dual action} of $\aff(m)$ on the parameter domain $\Xi$ as 
+	\begin{align*}
+		g \cdot (\aa,b) = (L^{-\top}\aa, b + \tt^\top L^{-\top}\aa), \quad g = (L,\tt) \in GL(m) \ltimes \RR^m, \ (\aa,b) \in \Xi. %
+	\end{align*}
+	Then, we can see the feature map $\phi(\xx,(\aa,b)) := \sigma( \aa\cdot\xx-b )$ is joint-$G$-invariant. In fact,
+	\begin{align*}
+		\phi( g \cdot \xx, g \cdot (\aa,b) )
+		= \sigma\left( L^{-\top} \aa \cdot (L\xx+\tt) - (b + \tt^\top L^{-\top} \aa)\right) = \sigma(\aa\cdot\xx-b)
+		= \phi( \xx, (\aa,b) ).
+	\end{align*}
+	Because the regular representation $\pi$ of $G = \aff(m)$ is irreducible, by \cref{thm:main}, the depth-$2$ neural network and corresponding ridgelet transform:
+	\begin{align*}
+		\nn[\gamma](\xx) = \int_{\RR^m\times\RR} \gamma(\aa,b) \sigma(\aa\cdot\xx-b)\dd\aa\dd b,
+		\quad \mbox{and} \quad 
+		\ridge[f](\aa,b) = \int_{\RR^m} f(\xx) \overline{\rho(\aa\cdot\xx-b)}\dd\xx,
+	\end{align*}
+	satisfy the reconstruction formula $\nn \circ \ridge = \iiprod{\sigma,\rho} \id_{L^2(\RR^m)}$.

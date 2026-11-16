@@ -1,0 +1,409 @@
+\begin{thebibliography}{79}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Alquier(2021)]{alquier2021user}
+Alquier, P.
+\newblock User-friendly introduction to {PAC}-{B}ayes bounds.
+\newblock \emph{arXiv preprint arXiv:2110.11216}, 2021.
+
+\bibitem[Alquier \& Guedj(2018)Alquier and Guedj]{alquier2018simpler}
+Alquier, P. and Guedj, B.
+\newblock Simpler {PAC}-{B}ayesian bounds for hostile data.
+\newblock \emph{Machine Learning}, 107\penalty0 (5):\penalty0 887--902, 2018.
+
+\bibitem[Ambroladze et~al.(2007)Ambroladze, Parrado-Hern{\'a}ndez, and Shawe-Taylor]{ambroladze2007tighter}
+Ambroladze, A., Parrado-Hern{\'a}ndez, E., and Shawe-Taylor, J.
+\newblock Tighter {PAC}-{B}ayes bounds.
+\newblock \emph{Advances in neural information processing systems}, 19:\penalty0 9, 2007.
+
+\bibitem[Aminian et~al.(2015)Aminian, Arjmandi, Gohari, Nasiri-Kenari, and Mitra]{aminian2015capacity}
+Aminian, G., Arjmandi, H., Gohari, A., Nasiri-Kenari, M., and Mitra, U.
+\newblock Capacity of diffusion-based molecular communication networks over {LTI}-{P}oisson channels.
+\newblock \emph{IEEE Transactions on Molecular, Biological and Multi-Scale Communications}, 1\penalty0 (2):\penalty0 188--201, 2015.
+
+\bibitem[Aminian et~al.(2020)Aminian, Toni, and Rodrigues]{aminian2020jensen}
+Aminian, G., Toni, L., and Rodrigues, M.~R.
+\newblock Jensen-{S}hannon information based characterization of the generalization error of learning algorithms.
+\newblock In \emph{2020 IEEE Information Theory Workshop (ITW)}. IEEE, 2020.
+
+\bibitem[Aminian et~al.(2021{\natexlab{a}})Aminian, Bu, Toni, Rodrigues, and Wornell]{aminian2021exact}
+Aminian, G., Bu, Y., Toni, L., Rodrigues, M., and Wornell, G.
+\newblock An exact characterization of the generalization error for the gibbs algorithm.
+\newblock \emph{Advances in Neural Information Processing Systems}, 34:\penalty0 8106--8118, 2021{\natexlab{a}}.
+
+\bibitem[Aminian et~al.(2021{\natexlab{b}})Aminian, Toni, and Rodrigues]{aminian2021information}
+Aminian, G., Toni, L., and Rodrigues, M.~R.
+\newblock Information-theoretic bounds on the moments of the generalization error of learning algorithms.
+\newblock In \emph{2021 IEEE International Symposium on Information Theory (ISIT)}, pp.\  682--687. IEEE, 2021{\natexlab{b}}.
+
+\bibitem[Aminian et~al.(2023)Aminian, Cohen, and Szpruch]{aminian2023mean}
+Aminian, G., Cohen, S.~N., and Szpruch, {\L}.
+\newblock Mean-field analysis of generalization errors.
+\newblock \emph{arXiv preprint arXiv:2306.11623}, 2023.
+
+\bibitem[Asadi \& Abbe(2020)Asadi and Abbe]{asadi2020chaining}
+Asadi, A.~R. and Abbe, E.
+\newblock Chaining meets chain rule: Multilevel entropic regularization and training of neural networks.
+\newblock \emph{Journal of Machine Learning Research}, 21\penalty0 (139):\penalty0 1--32, 2020.
+
+\bibitem[Asadi et~al.(2018)Asadi, Abbe, and Verd{\'u}]{asadi2018chaining}
+Asadi, A.~R., Abbe, E., and Verd{\'u}, S.
+\newblock Chaining mutual information and tightening generalization bounds.
+\newblock In \emph{Advances in Neural Information Processing Systems}, pp.\  7234--7243, 2018.
+
+\bibitem[Bartlett \& Mendelson(2002)Bartlett and Mendelson]{bartlett2002rademacher}
+Bartlett, P.~L. and Mendelson, S.
+\newblock Rademacher and gaussian complexities: Risk bounds and structural results.
+\newblock \emph{Journal of Machine Learning Research}, 3\penalty0 (Nov):\penalty0 463--482, 2002.
+
+\bibitem[Bartlett et~al.(1998)Bartlett, Maiorov, and Meir]{DBLP:journals/neco/BartlettMM98}
+Bartlett, P.~L., Maiorov, V., and Meir, R.
+\newblock Almost linear vc-dimension bounds for piecewise polynomial networks.
+\newblock \emph{Neural Comput.}, 10\penalty0 (8):\penalty0 2159--2173, 1998.
+\newblock \doi{10.1162/089976698300017016}.
+\newblock URL \url{https://doi.org/10.1162/089976698300017016}.
+
+\bibitem[Bartlett et~al.(2019)Bartlett, Harvey, Liaw, and Mehrabian]{bartlett19}
+Bartlett, P.~L., Harvey, N., Liaw, C., and Mehrabian, A.
+\newblock Nearly-tight vc-dimension and pseudodimension bounds for piecewise linear neural networks.
+\newblock \emph{Journal of Machine Learning Research}, 20\penalty0 (63):\penalty0 1--17, 2019.
+\newblock URL \url{http://jmlr.org/papers/v20/17-612.html}.
+
+\bibitem[B{\'e}gin et~al.(2016)B{\'e}gin, Germain, Laviolette, and Roy]{begin2016pac}
+B{\'e}gin, L., Germain, P., Laviolette, F., and Roy, J.-F.
+\newblock {PAC}-{B}ayesian bounds based on the {R}{\'e}nyi divergence.
+\newblock In \emph{Artificial Intelligence and Statistics}, pp.\  435--444. PMLR, 2016.
+
+\bibitem[Behnamnia et~al.(2025)Behnamnia, Aminian, Aghaei, Shi, Tan, and Rabiee]{behnamnialog}
+Behnamnia, A., Aminian, G., Aghaei, A., Shi, C., Tan, V.~Y., and Rabiee, H.~R.
+\newblock Log-sum-exponential estimator for off-policy evaluation and learning.
+\newblock \emph{Proceedings of the International Conference on Machine Learning (ICML)}, 2025.
+
+\bibitem[Ben-David et~al.(2006)Ben-David, Blitzer, Crammer, and Pereira]{ben2006analysis}
+Ben-David, S., Blitzer, J., Crammer, K., and Pereira, F.
+\newblock Analysis of representations for domain adaptation.
+\newblock \emph{Advances in neural information processing systems}, 19, 2006.
+
+\bibitem[Boucheron et~al.(2013)Boucheron, Lugosi, and Massart]{boucheron2013concentration}
+Boucheron, S., Lugosi, G., and Massart, P.
+\newblock \emph{Concentration inequalities: A nonasymptotic theory of independence}.
+\newblock Oxford University Press, 2013.
+
+\bibitem[Bousquet \& Elisseeff(2002{\natexlab{a}})Bousquet and Elisseeff]{Bousquet-Elisseeff}
+Bousquet, O. and Elisseeff, A.
+\newblock Stability and generalization.
+\newblock \emph{J. Mach. Learn. Res.}, 2:\penalty0 499–526, March 2002{\natexlab{a}}.
+\newblock ISSN 1532-4435.
+\newblock \doi{10.1162/153244302760200704}.
+\newblock URL \url{https://doi.org/10.1162/153244302760200704}.
+
+\bibitem[Bousquet \& Elisseeff(2002{\natexlab{b}})Bousquet and Elisseeff]{bousquet2002stability}
+Bousquet, O. and Elisseeff, A.
+\newblock Stability and generalization.
+\newblock \emph{Journal of Machine Learning Research}, 2\penalty0 (Mar):\penalty0 499--526, 2002{\natexlab{b}}.
+
+\bibitem[Bousquet et~al.(2003)Bousquet, Boucheron, and Lugosi]{bousquet2003introduction}
+Bousquet, O., Boucheron, S., and Lugosi, G.
+\newblock Introduction to statistical learning theory.
+\newblock In \emph{Summer school on machine learning}, pp.\  169--207. Springer, 2003.
+
+\bibitem[Bousquet et~al.(2020)Bousquet, Klochkov, and Zhivotovskiy]{bousquet/klochkov/zhivotovskiy:2020}
+Bousquet, O., Klochkov, Y., and Zhivotovskiy, N.
+\newblock Sharper bounds for uniformly stable algorithms.
+\newblock In \emph{Conference on Learning Theory}, pp.\  610--626, 2020.
+
+\bibitem[Bu et~al.(2020)Bu, Zou, and Veeravalli]{bu2020tightening}
+Bu, Y., Zou, S., and Veeravalli, V.~V.
+\newblock Tightening mutual information-based bounds on generalization error.
+\newblock \emph{IEEE Journal on Selected Areas in Information Theory}, 1\penalty0 (1):\penalty0 121--130, 2020.
+
+\bibitem[Calafiore et~al.(2019)Calafiore, Gaubert, and Possieri]{calafiore2019log}
+Calafiore, G.~C., Gaubert, S., and Possieri, C.
+\newblock Log-sum-exp neural networks and posynomial models for convex and log-log-convex data.
+\newblock \emph{IEEE transactions on neural networks and learning systems}, 31\penalty0 (3):\penalty0 827--838, 2019.
+
+\bibitem[Cardaliaguet et~al.(2019)Cardaliaguet, Delarue, Lasry, and Lions]{cardaliaguet2019master}
+Cardaliaguet, P., Delarue, F., Lasry, J.-M., and Lions, P.-L.
+\newblock \emph{The master equation and the convergence problem in mean field games}.
+\newblock Princeton University Press, 2019.
+
+\bibitem[Catoni(2003)]{catoni2003pac}
+Catoni, O.
+\newblock A pac-bayesian approach to adaptive classification.
+\newblock \emph{preprint}, 840:\penalty0 2, 2003.
+
+\bibitem[Catoni(2007)]{catoni2007pac}
+Catoni, O.
+\newblock {PAC}-{B}ayesian supervised classification: the thermodynamics of statistical learning.
+\newblock \emph{arXiv preprint arXiv:0712.0248}, 2007.
+
+\bibitem[Chen et~al.(2018)Chen, Jin, and Yu]{chen2018stability}
+Chen, Y., Jin, C., and Yu, B.
+\newblock Stability and convergence trade-off of iterative optimization algorithms.
+\newblock \emph{arXiv preprint arXiv:1804.01619}, 2018.
+
+\bibitem[Christmann \& Steinwart(2004)Christmann and Steinwart]{christmann2004robustness}
+Christmann, A. and Steinwart, I.
+\newblock On robustness properties of convex risk minimization methods for pattern recognition.
+\newblock \emph{The Journal of Machine Learning Research}, 5:\penalty0 1007--1034, 2004.
+
+\bibitem[Cortes et~al.(2019)Cortes, Greenberg, and Mohri]{cortes2019relative}
+Cortes, C., Greenberg, S., and Mohri, M.
+\newblock Relative deviation learning bounds and generalization with unbounded loss functions.
+\newblock \emph{Annals of Mathematics and Artificial Intelligence}, 85:\penalty0 45--70, 2019.
+
+\bibitem[Dvijotham \& Todorov(2012)Dvijotham and Todorov]{dvijotham2012unifying}
+Dvijotham, K. and Todorov, E.
+\newblock A unifying framework for linearly solvable control.
+\newblock \emph{arXiv preprint arXiv:1202.3715}, 2012.
+
+\bibitem[Dziugaite \& Roy(2018)Dziugaite and Roy]{dziugaite2018entropy}
+Dziugaite, G.~K. and Roy, D.
+\newblock Entropy-{SGD} optimizes the prior of a {PAC}-{B}ayes bound: Generalization properties of entropy-{SGD} and data-dependent priors.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  1377--1386. PMLR, 2018.
+
+\bibitem[Golowich et~al.(2018)Golowich, Rakhlin, and Shamir]{Golowich18a}
+Golowich, N., Rakhlin, A., and Shamir, O.
+\newblock Size-independent sample complexity of neural networks.
+\newblock In Bubeck, S., Perchet, V., and Rigollet, P. (eds.), \emph{Proceedings of the 31st Conference On Learning Theory}, volume~75 of \emph{Proceedings of Machine Learning Research}, pp.\  297--299. PMLR, 06--09 Jul 2018.
+\newblock URL \url{https://proceedings.mlr.press/v75/golowich18a.html}.
+
+\bibitem[Haddouche \& Guedj(2022)Haddouche and Guedj]{haddouche2022pac}
+Haddouche, M. and Guedj, B.
+\newblock Pac-bayes generalisation bounds for heavy-tailed losses through supermartingales.
+\newblock \emph{arXiv preprint arXiv:2210.00928}, 2022.
+
+\bibitem[Hafez-Kolahi et~al.(2020)Hafez-Kolahi, Golgooni, Kasaei, and Soleymani]{hafez2020conditioning}
+Hafez-Kolahi, H., Golgooni, Z., Kasaei, S., and Soleymani, M.
+\newblock Conditioning and processing: Techniques to improve information-theoretic generalization bounds.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33, 2020.
+
+\bibitem[Hellstr{\"o}m \& Durisi(2020)Hellstr{\"o}m and Durisi]{hellstrom2020generalization}
+Hellstr{\"o}m, F. and Durisi, G.
+\newblock Generalization bounds via information density and conditional information density.
+\newblock \emph{IEEE Journal on Selected Areas in Information Theory}, 2020.
+
+\bibitem[Holden \& Niranjan(1995)Holden and Niranjan]{holden1995practical}
+Holden, S.~B. and Niranjan, M.
+\newblock On the practical applicability of vc dimension bounds.
+\newblock \emph{Neural Computation}, 7\penalty0 (6):\penalty0 1265--1288, 1995.
+
+\bibitem[Holland(2019)]{holland2019pac}
+Holland, M.
+\newblock Pac-bayes under potentially heavy tails.
+\newblock \emph{Advances in Neural Information Processing Systems}, 32, 2019.
+
+\bibitem[Howard \& Matheson(1972)Howard and Matheson]{howard1972risk}
+Howard, R.~A. and Matheson, J.~E.
+\newblock Risk-sensitive markov decision processes.
+\newblock \emph{Management science}, 18\penalty0 (7):\penalty0 356--369, 1972.
+
+\bibitem[Kakade et~al.(2008)Kakade, Sridharan, and Tewari]{kakade2008complexity}
+Kakade, S.~M., Sridharan, K., and Tewari, A.
+\newblock On the complexity of linear prediction: Risk bounds, margin bounds, and regularization.
+\newblock \emph{Advances in neural information processing systems}, 21, 2008.
+
+\bibitem[Kuzborskij \& Szepesv{\'a}ri(2019)Kuzborskij and Szepesv{\'a}ri]{kuzborskij2019efron}
+Kuzborskij, I. and Szepesv{\'a}ri, C.
+\newblock Efron-stein pac-bayesian inequalities.
+\newblock \emph{arXiv preprint arXiv:1909.01931}, 2019.
+
+\bibitem[Lee et~al.(2020)Lee, Park, and Shin]{lee2020learning}
+Lee, J., Park, S., and Shin, J.
+\newblock Learning bounds for risk-sensitive learning.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33:\penalty0 13867--13879, 2020.
+
+\bibitem[Li et~al.(2021)Li, Beirami, Sanjabi, and Smith]{li2020tilted}
+Li, T., Beirami, A., Sanjabi, M., and Smith, V.
+\newblock Tilted empirical risk minimization.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+
+\bibitem[Li et~al.(2023{\natexlab{a}})Li, Beirami, Sanjabi, and Smith]{li2023tilted}
+Li, T., Beirami, A., Sanjabi, M., and Smith, V.
+\newblock On tilted losses in machine learning: Theory and applications.
+\newblock \emph{Journal of Machine Learning Research}, 24\penalty0 (142):\penalty0 1--79, 2023{\natexlab{a}}.
+
+\bibitem[Li et~al.(2023{\natexlab{b}})Li, Zhao, Chen, and Zheng]{li2023heterogeneity}
+Li, X., Zhao, S., Chen, C., and Zheng, Z.
+\newblock Heterogeneity-aware fair federated learning.
+\newblock \emph{Information Sciences}, 619:\penalty0 968--986, 2023{\natexlab{b}}.
+
+\bibitem[Lowy \& Razaviyayn(2021)Lowy and Razaviyayn]{lowy2021output}
+Lowy, A. and Razaviyayn, M.
+\newblock Output perturbation for differentially private convex optimization with improved population loss bounds, runtimes and applications to private adversarial training.
+\newblock \emph{arXiv preprint arXiv:2102.04704}, 2021.
+
+\bibitem[Lugosi \& Neu(2022)Lugosi and Neu]{lugosi2022generalization}
+Lugosi, G. and Neu, G.
+\newblock Generalization bounds via convex analysis.
+\newblock In \emph{Conference on Learning Theory}, pp.\  3524--3546. PMLR, 2022.
+
+\bibitem[Lugosi \& Neu(2023)Lugosi and Neu]{lugosi2023online}
+Lugosi, G. and Neu, G.
+\newblock Online-to-pac conversions: Generalization bounds via regret analysis.
+\newblock \emph{arXiv preprint arXiv:2305.19674}, 2023.
+
+\bibitem[Marceau \& Rioux(2001)Marceau and Rioux]{marceau2001robustness}
+Marceau, {\'E}. and Rioux, J.
+\newblock On robustness in risk theory.
+\newblock \emph{Insurance: Mathematics and Economics}, 29\penalty0 (2):\penalty0 167--185, 2001.
+
+\bibitem[Massart(2000)]{massart2000some}
+Massart, P.
+\newblock Some applications of concentration inequalities to statistics.
+\newblock In \emph{Annales de la Facult{\'e} des sciences de Toulouse: Math{\'e}matiques}, volume~9, pp.\  245--303, 2000.
+
+\bibitem[McAllester(1999)]{mcallester1999some}
+McAllester, D.~A.
+\newblock Some {PAC}-{B}ayesian theorems.
+\newblock \emph{Machine Learning}, 37\penalty0 (3):\penalty0 355--363, 1999.
+
+\bibitem[McAllester(2003)]{mcallester2003pac}
+McAllester, D.~A.
+\newblock {PAC}-{B}ayesian stochastic model selection.
+\newblock \emph{Machine Learning}, 51\penalty0 (1):\penalty0 5--21, 2003.
+
+\bibitem[Mohri et~al.(2018)Mohri, Rostamizadeh, and Talwalkar]{mohri2018foundations}
+Mohri, M., Rostamizadeh, A., and Talwalkar, A.
+\newblock \emph{Foundations of machine learning}.
+\newblock MIT press, 2018.
+
+\bibitem[Mou et~al.(2017)Mou, Wang, Zhai, and Zheng]{mou2017generalization}
+Mou, W., Wang, L., Zhai, X., and Zheng, K.
+\newblock Generalization bounds of {SGLD} for non-convex learning: Two theoretical viewpoints.
+\newblock \emph{arXiv preprint arXiv:1707.05947}, 2017.
+
+\bibitem[Murphy(2012)]{murphy2012machine}
+Murphy, K.~P.
+\newblock \emph{Machine learning: a probabilistic perspective}.
+\newblock MIT press, 2012.
+
+\bibitem[Polyanskiy \& Wu(2022)Polyanskiy and Wu]{polyanskiy2022information}
+Polyanskiy, Y. and Wu, Y.
+\newblock Information theory: From coding to learning, 2022.
+
+\bibitem[Resnick(2007)]{resnick2007heavy}
+Resnick, S.~I.
+\newblock \emph{Heavy-tail phenomena: probabilistic and statistical modeling}, volume~10.
+\newblock Springer Science \& Business Media, 2007.
+
+\bibitem[Rivasplata et~al.(2020)Rivasplata, Kuzborskij, Szepesv{\'a}ri, and Shawe-Taylor]{rivasplata2020pac}
+Rivasplata, O., Kuzborskij, I., Szepesv{\'a}ri, C., and Shawe-Taylor, J.
+\newblock {PAC}-{B}ayes analysis beyond the usual bounds.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33:\penalty0 16833--16845, 2020.
+
+\bibitem[Rodrigues \& Eldar(2021)Rodrigues and Eldar]{rodrigues2021information}
+Rodrigues, M.~R. and Eldar, Y.~C.
+\newblock \emph{Information-theoretic methods in data science}.
+\newblock Cambridge University Press, 2021.
+
+\bibitem[Ronchetti \& Huber(2009)Ronchetti and Huber]{ronchetti2009robust}
+Ronchetti, E.~M. and Huber, P.~J.
+\newblock \emph{Robust statistics}.
+\newblock John Wiley \& Sons Hoboken, NJ, USA, 2009.
+
+\bibitem[Russo \& Zou(2019)Russo and Zou]{russo2019much}
+Russo, D. and Zou, J.
+\newblock How much does your data exploration overfit? controlling bias via information usage.
+\newblock \emph{IEEE Transactions on Information Theory}, 66\penalty0 (1):\penalty0 302--323, 2019.
+
+\bibitem[Shalev-Shwartz \& Ben-David(2014)Shalev-Shwartz and Ben-David]{shalev2014understanding}
+Shalev-Shwartz, S. and Ben-David, S.
+\newblock \emph{Understanding machine learning: From theory to algorithms}.
+\newblock Cambridge university press, 2014.
+
+\bibitem[Shawe-Taylor \& Williamson(1997)Shawe-Taylor and Williamson]{shawe1997pac}
+Shawe-Taylor, J. and Williamson, R.~C.
+\newblock A {PAC} analysis of a {B}ayesian estimator.
+\newblock In \emph{Proceedings of the tenth annual conference on Computational learning theory}, pp.\  2--9, 1997.
+
+\bibitem[Steinke \& Zakynthinou(2020)Steinke and Zakynthinou]{steinke2020reasoning}
+Steinke, T. and Zakynthinou, L.
+\newblock Reasoning about generalization via conditional mutual information.
+\newblock In \emph{Conference on Learning Theory}, pp.\  3437--3452, 2020.
+
+\bibitem[Swaminathan \& Joachims(2015)Swaminathan and Joachims]{swaminathan2015batch}
+Swaminathan, A. and Joachims, T.
+\newblock Batch learning from logged bandit feedback through counterfactual risk minimization.
+\newblock \emph{The Journal of Machine Learning Research}, 16\penalty0 (1):\penalty0 1731--1755, 2015.
+
+\bibitem[Szab{\'o} et~al.(2021)Szab{\'o}, Jamali-Rad, and Mannava]{szabo2021tilted}
+Szab{\'o}, A., Jamali-Rad, H., and Mannava, S.-D.
+\newblock Tilted cross-entropy (tce): Promoting fairness in semantic segmentation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pp.\  2305--2310, 2021.
+
+\bibitem[Talagrand(1996)]{talagrand1996new}
+Talagrand, M.
+\newblock New concentration inequalities in product spaces.
+\newblock \emph{Inventiones mathematicae}, 126\penalty0 (3):\penalty0 505--563, 1996.
+
+\bibitem[Vapnik(1999)]{vapnik1999overview}
+Vapnik, V.~N.
+\newblock An overview of statistical learning theory.
+\newblock \emph{IEEE transactions on neural networks}, 10\penalty0 (5):\penalty0 988--999, 1999.
+
+\bibitem[Vapnik \& Chervonenkis(1971)Vapnik and Chervonenkis]{vapnik2015uniform}
+Vapnik, V.~N. and Chervonenkis, A.~Y.
+\newblock On the uniform convergence of relative frequencies of events to their probabilities.
+\newblock In \emph{Theory of probability and its applications}, pp.\  11--30. Springer, 1971.
+
+\bibitem[Vershynin(2010)]{vershynin2010introduction}
+Vershynin, R.
+\newblock Introduction to the non-asymptotic analysis of random matrices.
+\newblock \emph{arXiv preprint arXiv:1011.3027}, 2010.
+
+\bibitem[Wang et~al.(2023)Wang, Chen, Liu, He, Gong, Fu, and Tao]{wang2023tilted}
+Wang, Y., Chen, H., Liu, W., He, F., Gong, T., Fu, Y., and Tao, D.
+\newblock Tilted sparse additive models.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  35579--35604. PMLR, 2023.
+
+\bibitem[Williams \& Barber(1998)Williams and Barber]{williams1998bayesian}
+Williams, C.~K. and Barber, D.
+\newblock Bayesian classification with gaussian processes.
+\newblock \emph{IEEE Transactions on pattern analysis and machine intelligence}, 20\penalty0 (12):\penalty0 1342--1351, 1998.
+
+\bibitem[Xu \& Raginsky(2017)Xu and Raginsky]{xu2017information}
+Xu, A. and Raginsky, M.
+\newblock Information-theoretic analysis of generalization capability of learning algorithms.
+\newblock \emph{Advances in Neural Information Processing Systems}, 30, 2017.
+
+\bibitem[Xu \& Mannor(2012)Xu and Mannor]{xu2012robustness}
+Xu, H. and Mannor, S.
+\newblock Robustness and generalization.
+\newblock \emph{Machine learning}, 86\penalty0 (3):\penalty0 391--423, 2012.
+
+\bibitem[Ye et~al.(2021)Ye, Xie, Cai, Li, Li, and Wang]{ye2021towards}
+Ye, H., Xie, C., Cai, T., Li, R., Li, Z., and Wang, L.
+\newblock Towards a theoretical framework of out-of-distribution generalization.
+\newblock \emph{Advances in Neural Information Processing Systems}, 34:\penalty0 23519--23531, 2021.
+
+\bibitem[Zhang et~al.(2022)Zhang, Malekmohammadi, Chen, and Yu]{zhang2022proportional}
+Zhang, G., Malekmohammadi, S., Chen, X., and Yu, Y.
+\newblock Proportional fairness in federated learning.
+\newblock \emph{arXiv preprint arXiv:2202.01666}, 2022.
+
+\bibitem[Zhang(2006)]{zhang2006information}
+Zhang, T.
+\newblock Information-theoretic upper and lower bounds for statistical estimation.
+\newblock \emph{IEEE Transactions on Information Theory}, 52\penalty0 (4):\penalty0 1307--1321, 2006.
+
+\bibitem[Zhang et~al.(2023)Zhang, Wang, Zhu, Chen, Li, and Wu]{zhang2023robust}
+Zhang, X., Wang, Y., Zhu, L., Chen, H., Li, H., and Wu, L.
+\newblock Robust variable structure discovery based on tilted empirical risk minimization.
+\newblock \emph{Applied Intelligence}, 53\penalty0 (14):\penalty0 17865--17886, 2023.
+
+\bibitem[Zhou et~al.(2020)Zhou, Wang, and Bilmes]{zhou2020robust}
+Zhou, T., Wang, S., and Bilmes, J.
+\newblock Robust curriculum learning: from clean label detection to noisy label self-correction.
+\newblock In \emph{International Conference on Learning Representations}, 2020.
+
+\bibitem[Zou et~al.(2024)Zou, Kawaguchi, Liu, Liu, Lee, and Hsu]{zou2024towards}
+Zou, Y., Kawaguchi, K., Liu, Y., Liu, J., Lee, M.-L., and Hsu, W.
+\newblock Towards robust out-of-distribution generalization bounds via sharpness.
+\newblock \emph{arXiv preprint arXiv:2403.06392}, 2024.
+
+\end{thebibliography}

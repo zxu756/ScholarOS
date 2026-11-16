@@ -1,0 +1,53 @@
+\input{sections/tables/accuracy}
+
+\begin{figure*}[h]
+    \centering
+    % Subfigure 1
+    \begin{subfigure}[b]{0.27\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/natural.pdf} % Replace with your image file
+        %\caption{Natural}
+        \label{fig:ablate_LG}
+    \end{subfigure}
+    \hfill
+    % Subfigure 2
+    \begin{subfigure}[b]{0.27\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/specialized.pdf} % Replace with your image file
+        %\caption{Specialized}
+        \label{fig:ablateOT}
+    \end{subfigure}
+    \hfill
+    % Subfigure 3
+    \begin{subfigure}[b]{0.27\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figs/structured.pdf} % Replace with your image file
+        %\caption{Structured}
+        \label{fig:ablate_alphabeta}
+    \end{subfigure}
+
+    \caption{Domain-wise average scores on Natural (left), Specialized (middle), and Structured (right) datasets. FHBI performs best in all three domains compared to the Bayesian inference baselines.}
+    \label{fig: accuracy by domain}
+\end{figure*}
+
+\paragraph{Applications to Model Fine-tuning.} Bayesian inference methods have promising applications in model fine-tuning. We are given a pre-trained model $\Phi$ in standard fine-tuning scenarios. The objective is to find the optimal parameters $\vtheta = \Phi + \mathbf{\beta}$, where $\mathbf{\beta}$ represents an additional module, often lightweight and small relative to the full model. Several parameter-efficient finetuning strategies have been developed, including LoRA \citep{lora}, Adapter \citep{adapter}, and others. Our experiments focus on finetuning the ViT-B/16 architecture \citep{vit}, pre-trained with the \texttt{ImageNet-21K} dataset \citep{imagenet}, where $\beta$ is defined by the LoRA framework. For the Bayesian approaches, we aim to learn $m$ LoRA particles $\beta^{(i)}$ to obtain $m$ model instances $\vtheta^{(i)}$. The final output is then computed as the average of the outputs from all these model instances.
+\input{sections/tables/ece}
+\paragraph{Experimental Details.} To assess the efficacy of FHBI, we experiment on \texttt{VTAB-1K} \citep{vtab}, a challenging image classification/prediction benchmark consisting of 19 datasets from various domains. \texttt{VTAB-1K} covers various tasks across different semantics and object categories. The datasets are organized into Natural, Specialized, and Structured domains. We compared FHBI against nine baselines with three deterministic finetuning strategies, including full finetuning, AdamW, and SAM, and four Bayesian inference techniques, including Bayesian Deep Ensembles \citep{deepens}, BayesTune \citep{bayestune}, Sharpness-Aware Bayesian Neural Network (SA-BNN) \citep{va2023_flat_Bayes}, Sharpness-aware Joint Energy-based Model (SADA-JEM) \citep{sada_jem}, Stochastic Gradient Langevin Dynamics (SGLD) \citep{sgld}, and Stein Variational Gradient Descent (SVGD) \citep{svgd}. The experiments were conducted on a single Tesla V100 GPU. Appendix \ref{appendix: experimental details} provides more details regarding the chosen hyperparameters.
+
+
+% We used ten warm-up epochs, batch size 64, the Gaussian kernel, and the cosine annealing learning rate scheduler for all settings. The experiments were run with PyTorch on a Tesla V100 GPU with 40GB of RAM. FHBI involves three hyperparameters: the learning rate $\epsilon$, ascent step size $\rho$, and kernel width $\sigma$. We tuned these hyperparameters using the provided validation set, where the candidate sets are formed as $\epsilon \in \{0.15, 1, 1.5, 2.5\}, \rho \in \{0.01, 0.03, 0.05\}, \sigma \in \{0.7, 1, 1.2\}$. Detailed chosen hyperparameters and data augmentations for each dataset are reported in Appendix \ref{appendix: experimental details}. For each experiment, we conducted five runs of FHBI and reported the mean and standard deviation. All Bayesian methods were trained with four particles on the same set of LoRA parameters.
+
+\paragraph{Experimental Results.} We present the classification accuracy results in Table \ref{table: accuracy}. FHBI notably improves upon the baselines, outperforming them in most settings. Compared to other particle sampling methods, including SGLD and SVGD, FHBI consistently performs better across all settings. Moreover, FHBI improves upon SAM by a margin of $3.2 \%$, highlighting the advantages of using multiple particles with the underlying interactive gradient directions as previously discussed in Section \ref{section: connections to SAM}. Additionally, as illustrated in Figure \ref{fig: accuracy by domain}, FHBI shows the highest performance across all three domains, further solidifying its advantage over the Bayesian inference baselines. Besides, FHBI also outperforms SA-BNN, which resembles the combination of SVGD and SAM, as well as SADA-JEM, which resembles SGLD and SAM, highlighting that FHBI is substantially different from a combination of SVGD and SAM as discussed in Section \ref{section: connections to SAM} and in the ablation study in Section \ref{section: ablation}.
+
+%  \begin{figure}[ht]
+%     \centering
+%     \includegraphics[width=\textwidth]{figs/domainacc.pdf}
+%     \caption{Domain-wise average scores on \texttt{VTAB-1K} benchmark. Our FHBI performs best in all three domains compared to the Bayesian inference baselines.}
+%     \label{fig: accuracy by domain}
+% \end{figure}
+
+
+
+To further assess the robustness of FHBI, we evaluate the Expected Calibration Error (ECE) of each setting. This score measures the maximum discrepancy between the model's accuracy and confidence. As indicated in Table \ref{table: ece}, even though there is typically a trade-off between accuracy and ECE, our approach achieves a good balance between the ECE and the classification accuracy. 
+
+A potential concern regarding our algorithm is the additional computational overhead compared to SVGD due to the gradient ascent step. Nevertheless, in Appendix \ref{appendix: number of particles}, we have conducted an experiment to assess the immpact of different number of particles. Figure \ref{fig:wt_a} and \ref{table: accuracy by particles} shows that with a negotiable tradeoff in runtime, multiple particles result in significant performance improvements compared to a single particle, and we found that $\texttt{\#Particles} = 4$ provides an optimal balance between performance gains and computational overhead for this particular application. Another potential concern is the effect of the kernel choice $k$. Indeed, we have chosen the RBF kernel due to its effectiveness in the literature of kernel methods. As we have shown in Appendix \ref{appendix: kernel choices}, the performance gap between different kernel choices is insignificant, showing the robustness of FHBI with respect to the kernel choice.  

@@ -1,0 +1,21 @@
+\section{Example: Depth-$n$ Joint-Equivariant Machine} \label{sec:deep-ridgelet}
+As pointed out in \cref{lem:deep-equivalent}, the depth-$n$ feature map $\phi_{1:n}(x,\xi_{1:n}) = \phi_n(\bullet, \xi_n) \circ \cdots \circ \phi_1(x,\xi_1)$ is joint-$G$-equivariant when each component map $\phi_i$ is joint-equivariant. Hence, we can construct an $L^2(X;Y)$-universal deep joint-equivariant machine $\dlm[\gamma;\phi_{1:n}]$ (see also \cref{fig:universal}).
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth, trim=40 110 40 110, clip]{pics/equivariant-dnn.pdf}
+    \vskip -0.1in
+    \caption{Deep $Y$-valued joint-$G$-equivariant machine on $G$-space $X$ is $L^2(X;Y)$-universal when unitary representation $\pi$ of $G$ on $L^2(X;Y)$ is irreducible, and the distribution of parameters for the machine to represent a given map $f:X \to Y$ is exactly given by the ridgelet transform $\ridge[f]$}
+    \label{fig:universal}
+    \vskip -0.1in
+\end{figure}
+\begin{corollary}[Deep Ridgelet Transform] \label{cor:deep-ridgelet}
+    For any maps $\gamma \in L^2(\Xi_{1:n})$ and $f \in L^2(X;Y)$, put 
+    \begin{align*}
+    \dlm[\gamma;\phi_{1:n}](x)
+    &:= \int_{\Xi_{1:n}} \gamma(\xi_{1:n}) \phi_{1:n}(x,\xi_{1:n}) \dd \xi_{1:n}, \ x \in X,\\
+    \ridge[f;\psi_{1:n}](\xi_{1:n})
+    &:= \int_{X} \iprod{f(x),\psi_{1:n}(x,\xi_{1:n})}_Y \dd x, \ \xi_{1:n} \in \Xi_{1:n}.
+\end{align*}
+Under the assumptions that $\dlm_{\phi_{1:n}} \circ \ridge_{\psi_{1:n}}$ is bounded, and that $\pi$ is irreducible, there exists a bilinear form $\iiprod{\phi_{1:n},\psi_{1:n}}$ satisfying $\dlm_{\phi_{1:n}} \circ \ridge_{\psi_{1:n}} = \iiprod{\phi_{1:n},\psi_{1:n}} \id_{L^2(X;Y)}$.
+\end{corollary}
+Again, it extends the original integral representation, and inherits the \emph{linearization} trick of nonlinear parameters $\xi_{1:n}$ by integrating all the possible parameters (beyond the difference of layers) and indirectly select which parameters to use by weighting on them.

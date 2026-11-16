@@ -1,0 +1,25 @@
+\section{Example: Quadratic-form with Nonlinearity} \label{sec:quad}
+Here, we present a new network for which the universality was not known.
+
+Let $M$ denote the class of all $m \times m$-symmetric matrices
+equipped with the Lebesgue measure $\dd A = \bigwedge_{i \ge j} \dd a_{ij}$.
+Set $X=\RR^m$, $\Xi = M \times \RR^m \times \RR$, and 
+\begin{align*}
+    \phi(\xx,\xi) := \sigma( \xx^\top A \xx + \xx^\top \bb + c )
+\end{align*}
+for any fixed function $\sigma:\RR\to\RR$.
+Namely, it is a quadratic-form in $x$ followed by nonlinear activation function $\sigma$.
+
+Then, it is joint-invariant with $G = \aff(m)$ under the following group actions of $g = (\tt,L) \in \RR^m\rtimes GL(m)$:
+\begin{align*}
+    (\tt,L) \cdot \xx &:= \tt + L\xx, \\
+    (\tt,L) \cdot (A,\bb,c)
+    &:= (L^{-\top}AL^{-1}, L^{-\top}\bb-2L^{-\top}AL^{-1}\tt,\\
+    &\qquad c + \tt^\top L^{-\top}AL^{-1}\tt - \tt^\top L^{-\top}\bb).
+\end{align*}
+See \cref{sec:proof.quad-equivariant} for the proof of joint-invariance. By \cref{thm:aff.irrep}, the regular representation $\pi$ of $\aff(m)$ on $L^2(\RR^m)$ is irreducible. 
+Hence as a consequence of the general result, the following network is $L^2(\RR^m)$-universal.
+\begin{align*}
+    \qnn[\gamma](\xx)
+    := \int_\Xi \gamma(A,\bb,c) \sigma(\xx^\top A \xx + \xx^\top \bb + c) \dd A \dd \bb \dd c.
+\end{align*}

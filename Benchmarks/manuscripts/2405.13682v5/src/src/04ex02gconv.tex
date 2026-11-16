@@ -1,0 +1,71 @@
+\section{Example: Depth-$n$ Group Convolutional Network} \label{sec:gconv}
+As mentioned in \cref{rem:classic}, all the classical equivariant feature maps, namely $\phi: X \times \Xi \to Y$ with trivial $G$-action on parameters: $\phi( g \cdot x, \xi) = g \cdot \phi(x,\xi)$, are automatically joint-equivariant.
+Therefore, once the irreducibility of representation $\pi$ is verified, our main theorem can state the ridgelet transform for classical $G$-equivariant networks.
+
+In fact, in the case of group convolutional networks (GCNs) with \emph{vector} inputs, we can reuse the irreducible representation for affine groups $\aff(m)$.
+In the following, we explain the ridgelet transform for \emph{depth-$n$} GCNs, extending a general \emph{depth-2} GCNs formulated by \citet{Sonoda2022gconv}, which
+covers a wide range of typical group equivariant networks such as an ordinary $G$-convolution, DeepSets and $\mathrm{E}(n)$-equivariant maps in a unified manner.
+
+In the previous study, the ridgelet transform was derived only for depth-2 GCNs, which is due to the proof technique based on the \emph{Fourier expression method} \citep[see][for more details]{Sonoda2024fourier}, another proof technique for ridgelet transforms that does not require the irreducibility assumption but is limited to depth-2 learning machines.
+
+In the following, we extend the GCNs from depth-$2$ to \emph{depth-$n$} and derive the ridgelet transform by reviewing it from the group theoretic perspective.
+The main idea is to turn the depth-$n$ fully-connected network (FCN) $\phi_{1:n}$ in \cref{sec:ex-depth-n} to a depth-$n$ $G$-convolutional network, denoted $\phi^\tau_{1:n}$, by following the construction of the previous study.
+
+\subsection{Notations}
+Besides the primary group $G$ for convolution, we introduce an auxiliary group $A := O(m) \times \aff(m) = O(m) \times (GL(m) \ltimes \RR^m)$, where $A$ and $G$ need not be homomorphic.
+Eventually, the irreducibility assumption of $\pi$ is required not for $G$ but for $A$.
+Hence, different from \cref{sec:ex-depth-n}, 
+the group acting on $L^2(X;Y)$ by $\pi$ is not $G$ but $A$.
+In accordance with the previous study, we write $T_g [\bullet]$ for $G$-action, $\alpha \cdot \bullet$ for $A$-action if needed, and $\tau_g[f](x) := T_g[f(T_{g^{-1}}[x])]$ for $G$-action on function $f:X\to Y$.
+By $L^2_G(X;Y)$, we denote the space of $G$-equivariant $Y$-valued functions $f$ on $X$ that is square-integrable at the identity element $1_G$ of $G$, namely $L^2_G(X;Y) = \{ f \in \hom_G(X,Y^G) \mid \| f(\bullet)(1_G) \|_{L^2(X;Y)} < \infty\} \cong \{ \tau_\bullet[f_1] \mid f_1 \in L^2(X;Y)\}$.
+
+From the next subsections, we will turn a joint-$A$-equivariant map $\phi_{1:n}$ to $G$-equivariant map $\phi^\tau_{1:n}$.
+\subsection{$G$-Convolutional Feature Map}
+For each $i$, let $\phi_i : X_i \times \Xi_i \to X_{i+1}$ be the 
+fully-connected map $\phi_i(\xx_i,\xxi_i) := C_i \sigma_i( A_i \xx_i - \bb_i )$ (as in \cref{sec:ex-depth-n}). We define the $G$-convolutional map $\phi^\tau_i : X_i \times \Xi_i \to X_{i+1}^G$ as follows: For every $\xx_i \in X_i$ and $\xxi_i = (A_i, \bb_i, C_i) \in \Xi_i$,
+\begin{align*}
+    \phi^\tau_i( \xx_i, \xxi_i )(g)
+    &:= \tau_g[\phi_i](\xx_i,\xxi_i) \\
+    &= T_g[(C_i \sigma_i( A_i T_{g^{-1}}[\xx_i] - \bb_i )], \quad g \in G. %
+\end{align*}
+By appropriately specifying the $G$-action $T$, the expression $A_i T_{g^{-1}}[\xx_i]$ can reproduce a variety of general $G$-convolution products, say $a *_T x$, such as an ordinary $G$-convolution, the ones employed in DeepSets and $\mathrm{E}(n)$-equivariant maps \citep[see Section~5 of][]{Sonoda2022gconv}.
+
+Similarly to \cref{lem:construct-equivalent}, each $G$-convolutional map $\phi^\tau_i$ is $G$-equivariant in the classical sense
+because for any $g,h \in G$,
+\begin{align*}
+&\phi^\tau_i( T_g[\xx_i], \xxi_i )(h)
+= T_h[\phi_i( T_{h^{-1}}[T_g[\xx_i]], \xxi_i )] \notag \\
+&= T_g[T_{g^{-1}h}[\phi_i( T_{(g^{-1}h)^{-1}}[\xx_i], \xxi_i )]] 
+= \tau_g[\phi^\tau_i( \xx_i, \xxi_i )](h).
+\end{align*}
+Remarkably, the $G$-equivariance holds for any activation function $\sigma_i$, because it is applied element-wise in $G$.
+
+\subsection{$G$-Convolutional Network and Ridgelet Transform}
+Next, we define the depth-$n$ $G$-convolutional map $\phi^\tau_{1:n} : X \times \Xi_{1:n} \to Y^G$ by their compositions:
+\begin{align*}
+    \phi^\tau_{1:n}(\xx, \xxi_{1:n})(g)
+    &:= \phi^\tau_n(\bullet, \xxi_n)(g) \circ \cdots \circ \phi^\tau_1(\xx, \xxi_1)(g),
+\end{align*}
+and define the depth-$n$ $G$-convolutional network and ridgelet transform 
+as follows. For any $\gamma \in L^2(\Xi_{1:n})$ and $f \in L^2_G(X:Y)$, %
+\begin{align*}
+    \gcn[\gamma;\phi^\tau_{1:n}](\xx)(g) &:= \int_{\Xi_{1:n}} \gamma(\xxi_{1:n}) \phi^\tau_{1:n}(\xx,\xxi_{1:n})(g)\dd\xxi_{1:n},\\
+    \cridge[f;\psi_{1:n}](\xxi_{1:n})
+    &:= \int_{\RR^m} \iprod{f(\xx)(1_G), \psi_{1:n}(\xx,\xxi_{1:n})}_Y\dd\xx.
+\end{align*}
+
+See \cref{sec:gcn.detail} for more technical details on GCNs. 
+The ridgelet transform encodes the information of function $f$ only at a single point $1_G$ (see also \cref{lem:gcn.ridge.fcn}). This is due to the $G$-equivariance of $f$ that the image at $g$ can be copied from the image at $1_G$ by translation: $f(\bullet)(g) = \tau_g[f|_{1_G}]$. In fact, the $G$-convolutions in depth-$n$ GCN has mechanism to expand the image at $1_G$ to entire $G$ by using $G$-equivariance (see \cref{lem:gcn.tau.fcn} for more precise meanings).
+
+\begin{theorem}[Reconstruction Formula] \label{thm:reconst.gconv}
+There exists a bilinear form $\iiprod{\phi_{1:n},\psi_{1:n}}$ such that
+for any $f \in L^2_G(X:Y)$, $\gcn[ \cridge[f;\psi_{1:n}];\phi^\tau_{1:n} ] = \iiprod{\phi_{1:n},\psi_{1:n}}f$.
+\end{theorem}
+See \cref{sec:proof.reconst.gconv} for the proof.
+When $n=2$, the argument here reproduces the one for depth-2 GCNs presented in \citet{Sonoda2022gconv}.
+We remark that the base feature map $\phi$ and auxiliary group $A$ need not be the fully-connected network and affine group. 
+In fact, we have never used the specific property of $C \sigma( A\xx-\bb )$, but only used the group actions. Thus $A$ and $\phi$ can be arbitrary group and joint-$A$-equivariant map. When $A$ is the affine group, then the irreducibility of $\pi$ has already been verified in \ref{lem:oaff.irrep}. On the other hand, when $A$ is another general group, we need to verify the irreducibility of representation $\pi$ of $A$ on $L^2(X;Y)$.
+
+
+
+

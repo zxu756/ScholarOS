@@ -1,0 +1,178 @@
+\section{Reward Formulation}
+\label{sec:rewards}
+\setcounter{table}{0}
+\renewcommand{\thetable}{A.\arabic{table}}
+
+\Cref{tab:rew_params} lists the weights of the total reward of
+\cref{eq:total-reward} together with the hyperparameters of the individual
+terms.
+
+\begin{table}[H]
+    \centering
+    \caption{Reward weights and hyperparameters}
+    \label{tab:rew_params}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}llr@{}}
+        \toprule
+        \textbf{Description} & \textbf{Symbol} & \textbf{Value} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Term weights}} \\
+        Pose tracking          & $\omega_{pose}$      & 5.0 \\
+        Stability              & $\omega_{s}$         & 0.4 \\
+        Leg power              & $\omega_{legs}$      & 0.5 \\
+        Arm power              & $\omega_{arm}$       & 0.2 \\
+        Leg action smoothness  & $\omega_{act,legs}$  & 0.2 \\
+        Arm action smoothness  & $\omega_{act,arm}$   & 0.25 \\
+        \addlinespace
+        \multicolumn{3}{@{}l}{\textit{Term hyperparameters}} \\
+        Base proximity threshold     & $\beta$          & 0.3 m \\
+        Base proximity sensitivity   & $\sigma_{base}$  & 0.5 \\
+        Leg power normalisation      & $\mu_{legs}$     & 450 W \\
+        Arm power normalisation      & $\mu_{arm}$      & 20 W \\
+        Action smoothness sensitivity& $\sigma_{act}$   & 0.25 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The kernel widths of \cref{eq:pos-rot-rew} are piecewise-constant functions
+of the instantaneous tracking error, selected at each step by the interval containing
+that error, as listed in \cref{tab:sigma_schedule}.
+
+\begin{table}[H]
+    \centering
+    \caption{Error-adaptive kernel width schedules}
+    \label{tab:sigma_schedule}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}cc@{\hskip 1.5em}cc@{}}
+        \toprule
+        \multicolumn{2}{@{}c}{\textbf{Position}} & \multicolumn{2}{c@{}}{\textbf{Orientation}} \\
+        \cmidrule(r){1-2}\cmidrule(l){3-4}
+        $e_{\text{pos}}$ [m] & $\sigma_{\text{pos}}$ & $e_{\text{rot}}$ [rad] & $\sigma_{\text{rot}}$ \\
+        \midrule
+        $[0.75,\infty)$ & 0.500 & $[1.00,\infty)$ & 0.50 \\
+        $[0.50, 0.75)$  & 0.400 & $[0.50, 1.00)$  & 0.40 \\
+        $[0.25, 0.50)$  & 0.250 & $[0.25, 0.50)$  & 0.25 \\
+        $[0.10, 0.25)$  & 0.150 & $[0.10, 0.25)$  & 0.15 \\
+        $[0.05, 0.10)$  & 0.050 & $[0.00, 0.10)$  & 0.05 \\
+        $[0.00, 0.05)$  & 0.025 & ---             & ---  \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Task and Environment Configuration}
+\label{sec:terrain}
+\setcounter{table}{0}
+\renewcommand{\thetable}{B.\arabic{table}}
+
+\Cref{tab:env_config} reports the sampling ranges of the commanded end-effector
+pose, expressed in the base frame, and the parameters governing procedural terrain
+generation at each difficulty level. Command positions are expanded linearly from the
+initial to the final range over the course of the command curriculum, while
+orientations are sampled from the stated ranges throughout training.
+
+\begin{table}[H]
+    \centering
+    \caption{Command sampling ranges and terrain generation parameters}
+    \label{tab:env_config}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}lcc@{}}
+        \toprule
+        \multicolumn{3}{@{}l}{\textit{Command ranges}} \\
+        \textbf{Component} & \textbf{Initial} & \textbf{Final} \\
+        \midrule
+        $x$ [m] & $[-0.30,\ 0.30]$ & $[-0.30,\ 2.50]$ \\
+        $y$ [m] & $[-0.30,\ 0.30]$ & $[-1.00,\ 1.00]$ \\
+        $z$ [m] & $[-0.10,\ 0.10]$ & $[-0.35,\ 0.20]$ \\
+        Roll [rad]  & \multicolumn{2}{c@{}}{$0$} \\
+        Pitch [rad] & \multicolumn{2}{c@{}}{$[-\pi/4,\ \pi/2]$} \\
+        Yaw [rad]   & \multicolumn{2}{c@{}}{$[-\pi/2,\ \pi/2]$} \\
+        \addlinespace
+        \multicolumn{3}{@{}l}{\textit{Terrain parameters}} \\
+        \textbf{Terrain} & \textbf{Level 1} & \textbf{Level 5} \\
+        \midrule
+        Rough, noise scale [m]  & 0.01 & 0.16 \\
+        Hills, amplitude [m]    & 0.10 & 0.50 \\
+        Craters, slope [deg]    & 10   & 30 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Intermediate difficulty levels are obtained by linear interpolation between the
+extremes reported above.
+
+\section{Constraint Limits}
+\setcounter{table}{0}
+\renewcommand{\thetable}{C.\arabic{table}}
+
+\Cref{tab:constraint_lims} reports the limits $l_i$ of \cref{eq:generic-constraint}
+for each constraint. When a monitored quantity exceeds its limit, the CaT mechanism
+induces a termination of the reward stream with a probability proportional to the
+magnitude of the violation and capped at $p_i^{\max}$.
+
+\begin{table}[H]
+    \centering
+    \caption{Constraint limits. Soft constraints use $p_i^{\max}=0.25$; hard constraints use $p_i^{\max}=1$.}
+    \label{tab:constraint_lims}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}llr@{}}
+        \toprule
+        \textbf{Constraint} & \textbf{Symbol} & \textbf{Limit} \\
+        \midrule
+        \multicolumn{3}{@{}l}{\textit{Soft}} \\
+        Hip and thigh joint torque & $c_{\tau,hip}$   & 23.5 N$\cdot$m \\
+        Knee joint torque          & $c_{\tau,knee}$  & 35.0 N$\cdot$m \\
+        Leg joint velocity         & $c_{\dot{q}}$    & 30.0 rad/s \\
+        Base linear velocity       & $c_v$            & 0.25 m/s \\
+        Leg joint deviation        & $c_{dev}$        & 0.4 rad \\
+        Foot stumble force ratio   & $K_f$            & 4 \\
+        Foot slippage velocity     & $v_{\text{slip}}$& 0.2 m/s \\
+        \addlinespace
+        \multicolumn{3}{@{}l}{\textit{Hard}} \\
+        Non-foot contact force & $c_{\text{contact}}$ & 1.0 N \\
+        Body roll / pitch      & $c_{\text{fall}}$    & 90 deg \\
+        Foot impact force      & $c_{f,\max}$         & 150.0 N \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Training Configuration}
+\setcounter{table}{0}
+\renewcommand{\thetable}{D.\arabic{table}}
+
+\Cref{tab:training} summarises the policy architecture, the control and simulation
+rates, the action scaling of \cref{eq:action-scaling}, and the
+hyperparameters of the constrained PPO implementation.
+
+\begin{table}[H]
+    \centering
+    \caption{Training configuration}
+    \label{tab:training}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}lr@{}}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} \\
+        \midrule
+        \multicolumn{2}{@{}l}{\textit{Policy and control}} \\
+        Hidden layers            & 512, 256, 128 \\
+        Activation               & ELU \\
+        Policy rate              & 50 Hz \\
+        PD controller rate       & 200 Hz \\
+        Episode duration         & 10 s \\
+        Leg action scale         & 0.25 \\
+        Arm action scale         & 0.50 \\
+        \addlinespace
+        \multicolumn{2}{@{}l}{\textit{Constrained PPO}} \\
+        Parallel environments    & 4096 \\
+        Batch size               & 98\,304 (4096 $\times$ 24) \\
+        Mini-batch size          & 24\,576 (4096 $\times$ 6) \\
+        Epochs                   & 5 \\
+        Clip range               & 0.2 \\
+        Entropy coefficient      & 0.005 \\
+        Discount factor $\gamma$ & 0.99 \\
+        GAE discount factor      & 0.95 \\
+        Target KL divergence     & 0.01 \\
+        Learning rate            & $3\times10^{-4}$ (adaptive) \\
+        Training iterations      & 10\,000 \\
+        \bottomrule
+    \end{tabular}
+\end{table}

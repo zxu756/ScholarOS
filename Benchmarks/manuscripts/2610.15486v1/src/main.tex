@@ -1,0 +1,235 @@
+%% 
+%% Copyright 2019-2024 Elsevier Ltd
+%% 
+%% Version 2.4
+%% 
+%% This file is part of the 'CAS Bundle'.
+%% --------------------------------------
+%% 
+%% It may be distributed under the conditions of the LaTeX Project Public
+%% License, either version 1.2 of this license or (at your option) any
+%% later version.  The latest version of this license is in
+%%    http://www.latex-project.org/lppl.txt
+%% and version 1.2 or later is part of all distributions of LaTeX
+%% version 1999/12/01 or later.
+%% 
+%% The list of all files belonging to the 'CAS Bundle' is
+%% given in the file `manifest.txt'.
+%% 
+%% Template article for cas-dc documentclass for 
+%% double column output.
+
+%\documentclass[a4paper,fleqn,longmktitle]{cas-dc}
+\documentclass[a4paper,fleqn]{cas-dc}
+
+%\usepackage[authoryear,longnamesfirst]{natbib}
+%\usepackage[authoryear]{natbib}
+\usepackage[numbers]{natbib}
+
+% Latex packages to be used
+\usepackage{graphicx} % for pdf, bitmapped graphics files
+\usepackage{subcaption}
+%\usepackage{epsfig} % for postscript graphics files
+%\usepackage{mathptmx} % assumes new font selection scheme installed
+%\usepackage{times} % assumes new font selection scheme installed
+\usepackage{amsmath} % assumes amsmath package installed
+\usepackage{amssymb}  % assumes amsmath package installed
+\usepackage{cite}
+\usepackage{cleveref}
+\usepackage{tabularx}
+
+\usepackage{booktabs} % For cleaner horizontal lines (\toprule, \midrule, \bottomrule)
+\usepackage{geometry} % Optional: to adjust margins if the table is wide
+\usepackage{makecell} % To handle the line break in the header
+\usepackage{array}    % For advanced column formatting\textbf
+\usepackage{float}
+
+%\usepackage[T1]{fontenc}
+%\usepackage{lmodern}
+
+% For figures
+\crefname{figure}{Figure}{Figure}
+\Crefname{figure}{Figure}{Figure}
+
+% For equations
+\crefname{equation}{Equation}{Equation}
+\Crefname{equation}{Equation}{Equation}
+
+% For tables
+\crefname{table}{Table}{Tables}
+\Crefname{table}{Table}{Tables}
+
+% For sections
+\crefname{section}{Section}{Sections}
+\Crefname{section}{Section}{Sections}
+
+
+%%%Author definitions
+\def\tsc#1{\csdef{#1}{\textsc{\lowercase{#1}}\xspace}}
+%\tsc{WGM}
+%\tsc{QE}
+%\tsc{EP}
+%\tsc{PMS}
+%\tsc{BEC}
+%\tsc{DE}
+%%%
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+\shorttitle{Learning Safety-Constrained Whole-Body Loco-Manipulation for Lunar Surface Operations}
+\shortauthors{Á. Belmonte-Baeza et~al.}
+
+\title [mode = title]{Learning Safety-Constrained Whole-Body Loco-Manipulation for Lunar Surface Operations}                      
+\tnotemark[1]
+
+\tnotetext[1]{This research was supported by the project PID2024-160373OB-C22 funded by MICIU/AEI/10.13039/501100011033/FEDER, EU, and by the Spanish Ministry of Universities (grant FPU21/02586).
+}
+
+%\tnotetext[2]{The second title footnote which is a longer text matter
+%   to fill through the whole text width and overflow into
+%   another line in the footnotes area of the first page.}
+
+%\address[1]{, Street 129, 1043 NX Amsterdam, The Netherlands}
+\affiliation[1]{organization={Department of Computer Science and Artificial Intelligence, University of Alicante},
+                addressline={Ctra. San Vicente S/N}, 
+                city={San Vicente del Raspeig},
+%               citysep={}, % Uncomment if no comma needed between city and postcode
+                postcode={03690}, 
+                state={Alicante},
+                country={Spain}}
+\affiliation[2]{organization={Department of Physics, Systems Engineering and Signal Theory, University of Alicante},
+                addressline={Ctra. San Vicente S/N}, 
+                city={San Vicente del Raspeig},
+%               citysep={}, % Uncomment if no comma needed between city and postcode
+                postcode={03690}, 
+                state={Alicante},
+                country={Spain}}
+\affiliation[3]{organization={Space Robotics Laboratory, University of Málaga},
+                addressline={C/ Dr. Ortiz Ramos s/n}, 
+                city={Málaga},
+%               citysep={}, % Uncomment if no comma needed between city and postcode
+                postcode={29071}, 
+                state={Málaga},
+                country={Spain}}
+
+
+\author[1]{Alvaro Belmonte-Baeza}[orcid=0000-0001-9741-9497]
+\cormark[1]
+%\fnmark[1]
+
+\credit{Conceptualization, Methodology, Software, Validation, Formal analysis, Investigation, Writing - Original Draft, Visualization, Funding Acquisition}
+
+\author[1]{Miguel Cazorla}[orcid=0000-0001-6805-3633]
+\credit{Writing - Review \& Editing, Supervision, Funding acquisition}
+
+\author[2]{Gabriel J. Garc\'ia}[orcid=0000-0002-3919-9606]
+\credit{Writing - Review \& Editing, Supervision, Project administration, Funding acquisition}
+
+\author[3]{Carlos J. P\'erez-Del-Pulgar}[orcid=0000-0001-5819-8310]
+\credit{Conceptualization, Writing - Review \& Editing, Supervision, Project administration, Funding acquisition}
+
+\author[2]{Jorge Pomares}[orcid=0000-0002-7523-9118]
+\credit{Conceptualization, Writing - Review \& Editing, Supervision, Project administration, Funding acquisition}
+
+
+\cortext[cor1]{Corresponding author (alvaro.belmonte@ua.es)}
+
+%\nonumnote{This note has no numbers. In this work we demonstrate $a_b$
+%  the formation Y\_1 of a new type of polariton on the interface
+%  between a cuprous oxide slab and a polystyrene micro-sphere placed
+%  on the slab.
+%  }
+
+\begin{abstract}
+Robotic systems for lunar surface operations must act autonomously and preserve their own integrity in an environment where failures are unrecoverable and continuous supervision is impossible. This paper presents a Constrained Reinforcement Learning framework for quadrupedal mobile manipulators that learns a single whole-body policy for tracking a 6D end-effector pose specified in task space, with operational limits enforced during learning through a constrained learning mechanism. We introduce a reward formulation in which the transition between locomotion and manipulation emerges from the reward geometry rather than from an explicit gating mechanism, a stability term derived from the Gravito-Inertial Inclination Margin and motivated by the reduced-gravity dynamics of the lunar surface, and a design rule for reward regularization that follows from the multiplicative structure of the termination-based objective. The framework is evaluated in a lunar-analog simulation spanning three terrain morphologies at five difficulty levels under lunar gravity, with regolith contact properties calibrated to the JSC-1a simulant and varied from loose to dense. The learned policy attains mean position and orientation errors of $3.22\,$cm and $6.83^{\circ}$ under nominal conditions, retains this precision across regolith densities and over the operationally representative range of terrain difficulty, and reduces soft-constraint violation time by up to an order of magnitude relative to an unconstrained baseline while incurring no hard-constraint violations.
+\end{abstract}
+
+\begin{graphicalabstract}
+\includegraphics[width=\textwidth]{figures/AIS_overview.pdf}
+\end{graphicalabstract}
+
+\begin{highlights}
+    \item Single RL policy unifies quadrupedal locomotion and 6-DoF arm control
+    \item Task-space 6D pose commands force whole-body coordination of base and arm
+    \item Mean errors of 3.22 cm and 6.83$^\circ$ under lunar gravity on rough terrain
+    \item Gravito-inertial stability reward suits reduced-gravity legged locomotion
+    \item Safety limits enforced in training across terrains and regolith densities
+\end{highlights}
+
+\begin{keywords}
+Constrained Reinforcement Learning \sep Legged Mobile Manipulation \sep Whole-Body Control \sep Planetary Robotics \sep Lunar Surface Operations
+\end{keywords}
+
+\maketitle
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/background}
+\input{sections/method}
+\input{sections/experimental_section}
+\input{sections/discussion}
+\input{sections/conclusions}
+
+\appendix
+\section*{Appendix}
+\input{sections/appendix}
+
+
+% \verb+\printcredits+ command is used after appendix sections to list 
+% author credit taxonomy contribution roles tagged using \verb+\credit+ 
+% in frontmatter.
+
+\printcredits
+
+\section*{Declaration of generative AI and AI-assisted technologies in the manuscript preparation process}
+
+During the preparation of this work the authors used Claude (Anthropic) to assist with drafting and revising the manuscript text, including restructuring sections and improving clarity and language. The authors reviewed and edited all content, verified all technical claims and results against their implementation and data, and take full responsibility for the content of the published article.
+
+%% Loading bibliography style file
+\bibliographystyle{model1-num-names}
+%\bibliographystyle{cas-model2-names}
+
+% Loading bibliography database
+\bibliography{cas-refs}
+
+
+% %\vskip3pt
+
+% \bio{}
+% Author biography without author photo.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% \endbio
+
+% \bio{figs/cas-pic1}
+% Author biography with author photo.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% \endbio
+
+% \bio{figs/cas-pic1}
+% Author biography with author photo.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% Author biography. Author biography. Author biography.
+% \endbio
+
+\end{document}
+

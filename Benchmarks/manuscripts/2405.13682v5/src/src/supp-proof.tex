@@ -1,0 +1,163 @@
+\section{Proofs}
+
+\subsection{Unitarity of Representations}
+In \cref{dfn:urep}, $\pi$ and $\pihat$ are defined as below:
+For each $g \in G$, $f \in L^2(X;Y)$ and $\gamma \in L^2(\Xi)$,
+\begin{align*}
+    \pi_g[f](x)
+    &:= \urep_g[ f(g^{-1} \cdot x) ]
+    = g \cdot f(g^{-1} \cdot x), \\ %
+    \pihat_g[\gamma](\xi)
+    &:= \gamma(g^{-1} \cdot \xi). %
+\end{align*}
+
+\begin{lemma} \label{lem:pi.unitary}
+    $\pi$ is a unitary representation of $G$ on $L^2(X;Y)$.
+\end{lemma}
+\begin{proof} %
+Recall that the representation $\urep$ of $G$ on $Y$ is unitary. So, for any $g,h \in G$ and $f \in L^2(X;Y)$,
+\begin{align*}
+\pi_g[ \pi_h [f] ](x) = g \cdot (h \cdot f( h^{-1} \cdot (g^{-1} \cdot x) )) = (gh) \cdot f( (gh)^{-1} \cdot x ) = \pi_{gh}[f](x),
+\end{align*}
+and for any $g \in G$ and $f_1,f_2 \in L^2(X;Y)$,
+\begin{align*}
+\iprod{ \pi_g[f_1], \pi_g[f_2] }_{L^2(X;Y)}
+&= \int_X \iprod{ \urep_g[f_1(g^{-1}\cdot x)], \urep_g[f_2(g^{-1}\cdot x)]}_{Y} \dd x \\
+&= \int_X \iprod{ f_1(x), \urep_g^*[\urep_g[f_2(x)]]}_{Y} \dd x = \iprod{f_1, f_2}_{L^2(X;Y)}.    \qedhere
+\end{align*}
+\end{proof}
+
+\begin{lemma} \label{lem:pihat.unitary}
+    $\pihat$ is a unitary representation of $G$ on $L^2(\Xi)$.
+\end{lemma}
+\begin{proof} For any $g,h \in G$ and $\gamma \in L^2(\Xi)$,
+\begin{align*}
+\pihat_g[ \pihat_h [\gamma] ](\xi) = \gamma( h^{-1} \cdot (g^{-1} \cdot \xi) = \gamma( (gh)^{-1} \cdot \xi ) = \pihat_{gh}[f](x),
+\end{align*}
+and for any $g \in G$ and $\gamma_1,\gamma_2 \in L^2(\Xi)$,
+\begin{align*}
+\iprod{ \pihat_g[\gamma_1], \pihat_g[\gamma_2] }_{L^2(\Xi)}
+&= \int_{\Xi} \gamma_1(g^{-1}\cdot \xi) \overline{\gamma_2(g^{-1}\cdot \xi)} \dd \xi\\
+&= \int_{\Xi} \gamma_1(\xi) \overline{\gamma_2(\xi)} \dd \xi = \iprod{\gamma_1, \gamma_2}_{L^2(\Xi)}.    \qedhere
+\end{align*}
+\end{proof}
+
+
+\subsection{{Proof of \cref{lem:deep-equivalent}}} \label{sec:proof.deep-equivalent}
+\begin{proof}
+For any $g \in G, x \in X$, and $\xi_{1:n} \in \Xi_{1:n}$, we have
+\begin{align*}
+    \phi_{1:n}(g\cdot x, g\cdot\xi_{1:n})
+    &= \phi_n(\bullet,g\cdot\xi_n) \circ \cdots \circ \phi_2(\bullet,g\cdot\xi_2)\circ \phi_1(\blue{g\wdot} x, \blue{g\wdot}\xi_1)\\
+    &= \phi_n(\bullet,g\cdot\xi_n) \circ \cdots \circ \phi_2(\blue{g \wdot} \bullet,\blue{g\wdot}\xi_2)\circ \phi_1(x,\xi_1)\\
+    &\phantom{==} \vdots\\
+    &= \phi_n(\blue{g \wdot} \bullet,\blue{g\wdot}\xi_n) \circ \cdots \circ \phi_2(\bullet,\xi_2)\circ \phi_1(x,\xi_1)\\
+    &= \blue{g \wdot} \phi_n(\bullet,\xi_n) \circ \cdots \circ \phi_2(\bullet,\xi_2)\circ \phi_1(x,\xi_1)\\
+    &= g \cdot \phi_{1:n}(x, \xi_{1:n}). \qedhere
+\end{align*}
+\end{proof}
+
+\subsection{{Proof of \cref{lem:jem-equivariant}}} \label{sec:proof.jem-equivariant}
+\begin{proof}
+We use the 
+left-invariance of measure $\dd \xi$, and joint-$G$-equivariance of $\phi : X \times \Xi \to Y$. For any $g \in G, x \in X$, we have
+\begin{align*}
+\lm_\phi[ \pihat_g[\gamma]](x)
+&= \int_\Xi \gamma(g^{-1} \cdot \xi) \phi(x,\xi) \dd \xi\\
+&= \int_\Xi \gamma(\xi) \phi(x,g\cdot\xi) \dd \xi\\
+&= \int_\Xi \gamma(\xi) \urep_g[\phi(g^{-1} \cdot x, \xi)] \dd \xi
+= \pi_g[ \lm_\phi[\gamma]](x). \qedhere
+\end{align*}
+\end{proof}
+
+\subsection{{Proof of \cref{lem:ridge-equivariant}}} \label{sec:proof.ridge-equivariant}
+\begin{proof}
+We use the
+unitarity of representation $\urep : G \to \calU(Y)$, 
+left-invariance of measure $\dd x$, and joint-$G$-equivariance of $\psi : X \times \Xi \to Y$. For any $g \in G, \xi \in \Xi$, we have
+\begin{align*}
+\ridge_\psi[\pi_g[f]](\xi) 
+&= \int_X \iprod{ \urep_g[ f(g^{-1} \cdot x) ], \psi(x,\xi) }_Y \dd x\\
+&= \int_X \iprod{ f(g ^{-1} \cdot x), \urep_g^*[\psi(x,\xi)] }_Y \dd x\\
+&= \int_X \iprod{ f(x), \urep_g^*[\psi(g \cdot x,\xi)] }_Y \dd x\\
+&= \int_X \iprod{ f(x), \psi(x,
+g^{-1} \cdot \xi) }_Y \dd x
+= \pihat_g[\ridge_\psi[f]](\xi).    \qedhere
+\end{align*}
+\end{proof}
+
+\subsection{{Proof of \cref{lem:oaff.irrep}}} \label{sec:proof.oaff.irrep}
+\begin{proof}
+We use the following fact.
+\begin{lemma}[{\citet[Theorem 7.12]{Folland2015}}] \label{lem:tensor.irrep}
+Let $\pi_1$ and $\pi_2$ be representations of locally compact groups $G_1$ and $G_2$, and let $\pi_1 \otimes \pi_2$ be their outer tensor product, which is a representation of the product group $G_1 \times G_2$.
+Then, $\pi_1$ and $\pi_2$ are irreducible if and only if $\pi_1 \otimes \pi_2$ is irreducible.
+\end{lemma}
+Recall the representations of $O(m)$ on $\RR^m$ and of $\aff(m)$ on $L^2(\RR^m)$ are respectively irreducible (see \cref{thm:aff.irrep}), and $L^2(\RR^m;\RR^m)$ is equivalent to the tensor product $\RR^m \otimes L^2(\RR^m)$. Hence by \cref{lem:tensor.irrep},
+the representation $\pi$ of the product group $O(m) \times \aff(m)$ on the tensor product $\RR^m \otimes L^2(\RR^m) = L^2(\RR^m;\RR^m)$ is irreducible.
+\end{proof}
+
+\subsection{Connection between GCN and FCN} \label{sec:gcn.detail}
+Recall that the depth-$n$ FCN and its ridgelet transform introduced in \cref{sec:ex-depth-n} are given as below.
+\begin{align*}
+		\dnn[\gamma;\phi_{1:n}](\xx) &:= \int_{\Xi_{1:n}} \gamma(\xxi_{1:n}) \phi_{1:n}(\xx,\xxi_{1:n}) \dd \xxi_{1:n}, \\
+        \fridge[f;\psi_{1:n}](\xxi_{1:n}) &= \int_{\RR^m} \iprod{f(\xx),\psi_{1:n}(\xx,\xxi_{1:n})}_Y\dd\xx.    
+\end{align*}
+As a consequence of \cref{lem:deep-equivalent,lem:jem-equivariant}, we have the following.
+\begin{lemma} \label{lem:gcn.tau.fcn}
+$\gcn[\gamma;\phi^\tau_{1:n}](\xx)(g) = \tau_g[\dnn[\gamma;\phi_{1:n}]](\xx)$.
+\end{lemma}
+
+\begin{proof}
+\begin{align*}
+\phi^\tau_{1:n}(\xx, \xxi_{1:n})(g)
+&= T_g[\phi_n(\bullet, \xxi_n) \circ \cdots \circ \phi_1(T_{g^{-1}}[\xx], \xxi_1)]\\
+&= T_g[\phi_{1:n}(T_{g^{-1}}[\xx],\xxi_{1:n})]\\
+&= \tau_g[\phi_{1:n}](\xx,\xxi_{1:n}),    
+\end{align*}
+and thus
+\[
+\gcn[\gamma;\phi^\tau_{1:n}](\xx)(g) = \int_{\Xi_{1:n}} \gamma(\xxi_{1:n}) \tau_g[\phi_{1:n}](\xx,\xxi_{1:n})\dd\xxi_{1:n} = \tau_g[ \dnn[\gamma;\phi_{1:n}]](\xx). \qedhere
+\]
+\end{proof}
+
+\begin{lemma} \label{lem:gcn.ridge.fcn}
+    $\cridge[f;\psi_{1:n}](\xxi_{1:n}) = \fridge[f(\bullet)(1_G);\psi_{1:n}](\xxi_{1:n})$.
+\end{lemma}
+
+\begin{proof}
+    Immediate from the definition.
+\end{proof}
+
+\subsection{{Proof of \cref{thm:reconst.gconv}}} \label{sec:proof.reconst.gconv}
+
+\begin{proof} By \cref{lem:gcn.tau.fcn,lem:gcn.ridge.fcn},
+\begin{align*}
+    \gcn[ \cridge[f;\psi_{1:n}];\phi^\tau_{1:n} ](\xx)(g)
+    &= \tau_g[ \dnn[ \fridge[f(\bullet)(1_G);\psi_{1:n}];\phi_{1:n} ] ](\xx)\\
+    &= \tau_g[ \iiprod{\phi_{1:n},\psi_{1:n}}f(\bullet)(1_G) ](\xx)\\
+    &= \iiprod{\phi_{1:n},\psi_{1:n}}f(\xx)(g). \qedhere
+\end{align*}    
+\end{proof}
+
+\subsection{Joint-equivariance of quadratic-form network} \label{sec:proof.quad-equivariant}
+
+The feature map and group actions are given as follows.
+\begin{align*}
+    \phi(\xx,\xi) &:= \sigma( \xx^\top A \xx + \xx^\top \bb + c ),\\
+    (\tt,L) \cdot \xx &:= \tt + L\xx, \\
+    (\tt,L) \cdot (A,\bb,c)
+    &:= (L^{-\top}AL^{-1}, L^{-\top}\bb-2L^{-\top}AL^{-1}\tt,
+    c + \tt^\top L^{-\top}AL^{-1}\tt - \tt^\top L^{-\top}\bb).
+\end{align*}
+
+Then, it is joint-invariant. In fact,
+\begin{align*}
+    \phi(g \cdot \xx, g \cdot \xxi)
+    &= \sigma( (L \xx + \tt)^\top L^{-\top}AL^{-1} (L\xx+\tt)
+     + (L\xx+\tt)^\top(L^{-\top}\bb-2L^{-\top}AL^{-1}\tt) + ... )\\
+    &= \sigma( \xx^\top A \xx + 2 \xx^\top A L^{-1}\tt + \tt^\top L^{-\top}AL^{-1}\tt
+     + \xx^\top\bb - 2 \xx^\top A L^{-1}\tt + \tt^\top L^{-\top}\bb\\
+     &\qquad - 2\tt^\top L^{-\top}AL^{-1}\tt + c + \tt^\top L^{-\top}AL^{-1}\tt - \tt^\top L^{-\top}\bb)\\
+    &= \sigma(\xx^\top A \xx + \xx^\top\bb + c) = \phi(g \cdot \xx, g \cdot \xxi).
+\end{align*}

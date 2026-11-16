@@ -1,0 +1,54 @@
+\section{Related Work}
+\label{sec:related}
+
+This section positions our contribution with respect to three converging lines of research: legged mobility for planetary surfaces, learning-based whole-body loco-manipulation, and constrained reinforcement learning for legged systems.
+
+\subsection{Legged Mobility for Planetary Surfaces}
+
+Legged locomotion for planetary exploration has progressed from statically stable walking prototypes towards dynamic, terrain-adaptive systems. SpaceClimber \citep{5756948} and ATHLETE \citep{Wilcox2007} established the feasibility of multi-legged mobility for space applications, prioritising static stability and payload handling. SpaceBok \citep{8794136} shifted the emphasis towards dynamic gaits explicitly designed for reduced gravity, demonstrating that the low gravitational acceleration of the Moon and Mars alters the dynamics of legged locomotion sufficiently to warrant purpose-designed controllers rather than direct transfer of terrestrial gaits.
+
+Subsequent field studies have characterised locomotion on granular planetary analogues. \citet{Kolvenbach2022} traversed steep granular Martian analogue slopes with a dynamic quadruped, and \citet{Valsecchi2023} showed that crawling gait adaptation and explicit stability metrics substantially improve climbing robustness on sandy slopes up to $25^\circ$. These works establish two premises we adopt: that granular, low-cohesion substrates constitute the dominant source of locomotion failure on planetary surfaces, and that stability criteria accounting for inertial effects, rather than purely static support-polygon criteria, are required in this regime. They address locomotion alone, however, and do not consider manipulation or the whole-body coordination it demands.
+
+\subsection{Learning-Based Whole-Body Loco-Manipulation}
+
+Reinforcement learning has produced controllers that transfer across terrain and platform variation for quadrupedal and humanoid locomotion \citep{HoellerAnymalParkour, MikiWildAnymal, RLHumanoid} and for integrated navigation \citep{rudin2022advancedskillslearninglocomotion, shah2022viking}. Extending these results to mobile manipulation raises the question of how tightly the two subsystems should be coupled.
+
+A first family of approaches keeps them separate. \citet{Ma2022Locomanip} employs distinct controllers or operating modes for locomotion and manipulation, while \citet{fu2022deep} learns a single policy but with reward terms that treat the two objectives independently, so that whole-body coordination is not explicitly promoted. Decoupling simplifies learning but forgoes the coordination that makes difficult poses reachable: the base cannot be repositioned in service of the arm, and arm motion cannot be recruited to assist balance.
+
+A second family addresses whole-body control directly. \citet{portela2025wholebodyendeffectorposetracking} learns accurate 6D end-effector pose tracking for a legged manipulator, but under static stance conditions, delegating locomotion to a separate module. \citet{ha2024umilegs} and \citet{He2024} achieve simultaneous locomotion and manipulation, yet rely on an additional dedicated manipulation policy to generate arm trajectories, increasing system complexity and limiting end-to-end generality. \citet{MaBadminton} demonstrates highly dynamic coordinated whole-body behaviour for a legged manipulator, at the cost of a task-specific formulation.
+
+Across this literature the evaluation setting is terrestrial, with nominal gravity, rigid or mildly compliant ground, and recoverable failures. None of these methods incorporates explicit limits on body orientation, contact forces, actuation effort or power consumption; safety, where addressed at all, is encouraged through reward shaping. Such omissions are reasonable in a laboratory, where a fall costs a reset, but not in a planetary context where failures are unrecoverable.
+
+\subsection{Constrained Reinforcement Learning for Legged Systems}
+
+Constrained Markov Decision Processes (CMDPs) \citep{achiam2017constrained} provide the natural formalism for embedding operational limits into the learning problem. Applied to legged locomotion, \citet{LeeCRL} and \citet{KimNotOnlyRewards} show that explicit constraints yield more interpretable and more readily tuned controllers than equivalent reward-shaping formulations, since limits are expressed in physical units rather than traded off through weights. Their Lagrangian and cost-critic formulations, however, require one value function per constraint and specialised optimisation, which complicates implementation and destabilises training as the constraint set grows.
+
+Constraints as Terminations (CaT) \citep{chane2024cat} avoids this by converting constraint violations into stochastic episode terminations, allowing unmodified PPO to be used and scaling to large constraint sets at negligible cost. It has since been applied to visual locomotion from privileged experience \citep{chanesane2024solo} and to dynamic object pushing with mobile manipulators \citep{dadiotis2025dynamicobjectgoalpushing}. These works remain terrestrial, and none addresses the interaction between the termination-based objective and the design of the reward terms it modulates, which we examine in \cref{sec:positive-rewards}.
+
+\begin{table*}[t]
+\centering
+\caption{Positioning of this work with respect to representative learning-based loco-manipulation and constrained locomotion methods. \emph{Unified WBC} indicates a single policy controlling base and arm without a separate manipulation module; \emph{6D task-space} indicates end-effector pose commands expressed in an inertial frame rather than the robot body frame; \emph{Explicit constraints} indicates safety limits enforced through a constrained formulation rather than reward shaping; \emph{Reduced gravity} and \emph{Regolith} indicate evaluation under lunar gravity and on compliant granular substrates, respectively.}
+\label{tab:related}
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Work} & \textbf{Task} & \textbf{Unified} & \textbf{6D task-} & \textbf{Explicit} & \textbf{Reduced} & \textbf{Regolith} \\
+ & & \textbf{WBC} & \textbf{space} & \textbf{constraints} & \textbf{gravity} & \\
+\midrule
+\citet{Valsecchi2023}      & Locomotion            & ---        & ---        & ---        & ---        & \checkmark \\
+\citet{Kolvenbach2022}     & Locomotion            & ---        & ---        & ---        & ---        & \checkmark \\
+\citet{fu2022deep}         & Loco-manipulation     & Partial    & ---        & ---        & ---        & ---        \\
+\citet{Ma2022Locomanip}    & Loco-manipulation     & ---        & ---        & ---        & ---        & ---        \\
+\citet{ha2024umilegs}      & Loco-manipulation     & Partial    & \checkmark & ---        & ---        & ---        \\
+\citet{portela2025wholebodyendeffectorposetracking} & EE pose tracking & Partial & \checkmark & --- & --- & --- \\
+\citet{MaBadminton}        & Dynamic manipulation  & \checkmark & ---        & \checkmark & ---        & ---        \\
+\citet{LeeCRL}             & Locomotion            & ---        & ---        & \checkmark & ---        & ---        \\
+\citet{chane2024cat}       & Locomotion            & ---        & ---        & \checkmark & ---        & ---        \\
+\citet{dadiotis2025dynamicobjectgoalpushing} & Object pushing & \checkmark & --- & \checkmark & --- & --- \\
+\citet{belmonte2025isparo} & EE pose tracking      & \checkmark & \checkmark & \checkmark & \checkmark & ---        \\
+\midrule
+\textbf{This work}         & EE pose tracking      & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\cref{tab:related} summarises this positioning. The gap we address is the conjunction of the last five columns: a single policy that tracks a 6D pose specified in task space, subject to explicitly enforced safety limits, and validated under the gravitational and substrate conditions that characterise lunar surface operation.

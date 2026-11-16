@@ -1,0 +1,45 @@
+{
+ "paper": "fixture-bib-recovery",
+ "generated_utc": "2026-11-16T21:25:21Z",
+ "generator": "Tectonic 0.17.0, bundle https://relay.fullyjustified.net/default_bundle_v33.tar, --untrusted --keep-intermediates --keep-logs",
+ "aux_files": [
+  "main.aux"
+ ],
+ "cite_keys": [
+  "e1",
+  "e10",
+  "e2",
+  "e3",
+  "e4",
+  "e5",
+  "e6",
+  "e7",
+  "e8",
+  "e9"
+ ],
+ "nocite_star": false,
+ "bibcite_keys": [
+  "e1",
+  "e10",
+  "e2",
+  "e3",
+  "e4",
+  "e5",
+  "e6",
+  "e7",
+  "e8",
+  "e9"
+ ],
+ "labels": [],
+ "excluded_internal_labels": [],
+ "latex_log": {
+  "undefined_citations": [],
+  "undefined_references": [],
+  "multiply_defined_labels": []
+ },
+ "bibtex_log": {
+  "missing_entries": [],
+  "error_messages": 1,
+  "ran": true
+ }
+}

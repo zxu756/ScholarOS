@@ -1,0 +1,301 @@
+% Please add the following required packages to your document preamble:
+% \usepackage[table,xcdraw]{xcolor}
+% Beamer presentation requires \usepackage{colortbl} instead of \usepackage[table,xcdraw]{xcolor}
+\begin{table*}[ht]
+\centering
+\caption{\texttt{VTAB-1K} results evaluated on Top-1 accuracy. All methods are applied to finetune the same set of LoRA parameters on ViT-B/16 pre-trained with \texttt{ImageNet-21K} dataset.}
+\renewcommand\arraystretch{1.05 }
+\resizebox{\linewidth}{!}{
+\begin{tabular}{cccccccc|cccc|cccccccc|c}
+\hline
+\cellcolor[HTML]{FFFFFF}&
+ \multicolumn{7}{c|}{\textbf{Natural}}&
+ \multicolumn{4}{c|}{\textbf{Specialized}}&
+ \multicolumn{8}{c|}{\textbf{Structured}}&
+  \cellcolor[HTML]{FFFFFF} \\ 
+  \cmidrule(lr){2-8} \cmidrule(lr){9-12} \cmidrule(lr){13-20}
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF}\textbf{Method}} &
+  \cellcolor[HTML]{FFFFFF}\rot{CIFAR100} &
+  \cellcolor[HTML]{FFFFFF}\rot{Caltech101} &
+  \cellcolor[HTML]{FFFFFF}\rot{DTD} &
+  \cellcolor[HTML]{FFFFFF}\rot{Flower102} &
+  \cellcolor[HTML]{FFFFFF}\rot{Pets} &
+  \cellcolor[HTML]{FFFFFF}\rot{SVHN} &
+  \cellcolor[HTML]{FFFFFF}\rot{Sun397} &
+  \cellcolor[HTML]{FFFFFF}\rot{Camelyon} &
+  \cellcolor[HTML]{FFFFFF}\rot{EuroSAT} &
+  \cellcolor[HTML]{FFFFFF}\rot{Resisc45} &
+  \cellcolor[HTML]{FFFFFF}\rot{Retinopathy} &
+  \cellcolor[HTML]{FFFFFF}\rot{Clevr-Count} &
+  \cellcolor[HTML]{FFFFFF}\rot{Clevr-Dist} &
+  \cellcolor[HTML]{FFFFFF}\rot{DMLab} &
+  \cellcolor[HTML]{FFFFFF}\rot{KITTI} &
+  \cellcolor[HTML]{FFFFFF}\rot{dSpr-Loc} &
+  \cellcolor[HTML]{FFFFFF}\rot{dSpr-Ori} &
+  \cellcolor[HTML]{FFFFFF}\rot{sNORB-Azi} &
+  \cellcolor[HTML]{FFFFFF}\rot{sNORB-Ele} &
+  \cellcolor[HTML]{FFFFFF}\textbf{AVG} \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+\multicolumn{1}{c}{\cellcolor[HTML]{FFFFFF} FFT} &
+  68.9 &
+  87.7 &
+  64.3 &
+  97.2 &
+  86.9 &
+  \cellcolor[HTML]{9AFF99}\textbf{87.4} &
+  38.8 &
+  79.7 &
+  95.7 &
+  84.2 &
+  73.9 &
+  56.3 &
+  58.6 &
+  41.7 &
+  65.5 &
+  57.5 &
+  46.7 &
+  25.7 &
+  29.1 &  
+  \cellcolor[HTML]{FFFFFF}65.6 \\ 
+\rowcolor[HTML]{FFFFFF} 
+\cellcolor[HTML]{FFFFFF}AdamW &
+  67.1 &
+  90.7 &
+  68.9 &
+  98.1 &
+  90.1 &
+  84.5 &
+  54.2 &
+  84.1 &
+  94.9 &
+  84.4 &
+  73.6 &
+  82.9 &
+  69.2 &
+  49.8 &
+  78.5 &
+  \cellcolor[HTML]{9AFF99}$\bf{75.7}$ &
+  47.1 &
+  31.0 &
+  \cellcolor[HTML]{9AFF99}$\bf{44.0}$ &
+  
+  
+  \cellcolor[HTML]{FFFFFF}72.0 \\ %\hline
+\rowcolor[HTML]{FFFFFF} 
+
+\cellcolor[HTML]{FFFFFF}SAM &
+  72.7 &
+  90.3 &
+  71.4 &
+  99.0 &
+  90.2 &
+  84.4 &
+  52.4 & %sun
+  82.0 &
+  92.6 &
+  84.1 &
+  74.0 &
+  76.7 &
+  68.3 &
+  47.9 &
+  74.3 &
+  71.6 &
+  43.4 &
+  26.9 &
+  39.1 &
+  
+  \cellcolor[HTML]{FFFFFF}70.5 \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+
+
+\cellcolor[HTML]{FFFFFF}DeepEns &
+  69.1 &
+  88.9 &
+  67.7 &
+  98.9 &
+  90.7 &
+  85.1 &
+  54.5 &
+  82.6 &
+  94.8 &
+  82.7 &
+  75.3 &
+  46.6 &
+  47.1 &
+  47.4& 
+    68.2  & 
+    71.1  & 
+  36.6 & 
+    30.1  & 
+    35.6 &
+  \cellcolor[HTML]{FFFFFF}67.0 \\ 
+\rowcolor[HTML]{FFFFFF} 
+\cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} BayesTune} &
+  67.2 &
+  91.7 &
+  69.5 &
+  99.0 &
+  90.7 &
+  86.4 &
+  54.7 &
+  84.9 &
+  \cellcolor[HTML]{9AFF99}\textbf{95.3} &
+  84.1 &
+  75.1 &
+  \cellcolor[HTML]{9AFF99}\textbf{82.8} &
+  68.9 &
+  49.7 &
+  79.3 &
+  74.3 &
+  46.6 &
+  30.3 &
+  42.8 &
+  \cellcolor[HTML]{FFFFFF}72.2\\ 
+  \rowcolor[HTML]{FFFFFF}
+  \cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} SGLD} &
+  68.7 &
+  91.0 &
+  67.0 &
+  98.6 &
+  89.3 &
+  83.0 &
+  51.6 &
+  81.2 &
+  93.7 &
+  83.2 &
+  76.4 &
+  80.0 &
+  70.1 &
+  48.2 &
+  76.2 &
+  71.1 &
+  39.3 &
+  31.2 &
+  38.4 &
+  \cellcolor[HTML]{FFFFFF}70.4\\ 
+  \rowcolor[HTML]{FFFFFF}
+ 
+   \cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} 
+   
+    SADA-JEM} &
+   70.3 &
+   91.9 &
+   70.2 &
+   98.2 &
+   91.2 &
+   85.6 &
+   54.7 &
+   84.3 &
+   94.1 &
+   83.4 &
+   77.0 &
+   79.9 &
+   72.1 &
+   51.6 &
+   79.4 &
+   70.7 &
+   45.3 &
+   29.6 &
+   40.1 &
+  \cellcolor[HTML]{FFFFFF} 72.1\\ 
+  
+  \rowcolor[HTML]{FFFFFF}
+   \cellcolor[HTML]{FFFFFF}{\color[HTML]{000000} 
+   
+    SA-BNN} &
+   65.1 &
+   91.5 &
+   71.0 &
+   98.9 &
+   89.4 &
+   89.3 &
+   55.2 &
+   83.2 &
+   94.5 &
+   86.4 &
+   75.2 &
+   61.4 &
+   63.2 &
+   40.0 &
+   71.3 &
+   64.5 &
+   34.5 &
+   27.2 &
+   31.2 &
+  \cellcolor[HTML]{FFFFFF} 68.1\\ 
+  
+  \rowcolor[HTML]{FFFFFF}
+  \cellcolor[HTML]{FFFFFF}SVGD &
+  71.3 &
+  90.2 &
+  71.0 &
+  98.7 &
+  90.2 &
+  84.3 &
+  52.7 &
+  83.4 &
+  93.2 &
+  86.7 &
+  75.1 &
+  75.8 &
+  70.7 &
+  49.6 &
+  79.9 &
+  69.1 &
+  41.2 &
+  30.6 &
+  33.1 &
+  \cellcolor[HTML]{FFFFFF}70.9 \\ \hline
+\rowcolor[HTML]{FFFFFF} 
+ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{74.1}$ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{93.0}$ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{74.3}$ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{99.1}$ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{92.4}$ &
+  87.3 & %svhn
+  \cellcolor[HTML]{9AFF99}$\mathbf{56.5}$ & %sun
+  \cellcolor[HTML]{9AFF99}$\mathbf{85.3}$ &
+  95.0 &
+  \cellcolor[HTML]{9AFF99}$\mathbf{87.2}$ &
+  \cellcolor[HTML]{9AFF99}$\mathbf{79.6}$ &
+   80.1 &
+  \cellcolor[HTML]{9AFF99}$\bf{72.3}$ & %clevr-distance$
+\cellcolor[HTML]{9AFF99}$\bf{52.2}$ & %dmlab
+  \cellcolor[HTML]{9AFF99}$\bf{80.4}$ & %Kitti
+   72.8& %dspr-loc
+    \cellcolor[HTML]{9AFF99}\textbf{51.2}&
+   \cellcolor[HTML]{9AFF99}$\bf{31.9}$&
+   41.3& 
+   
+   
+  \cellcolor[HTML]{9AFF99}$\bf{73.7}$ \\ 
+ \rowcolor[HTML]{FFFFFF}
+ \multirow{-2}{*}{\textbf{FHBI}}
+  \cellcolor[HTML]{FFFFFF} &
+    (.17)&
+    (.42)&
+    (.15)&
+    (0.20)&
+    (0.21)&
+    (.52) &
+    (.12)&
+    (.31) &
+    (.57) &
+    (.21) &
+    (.20) &
+    (.16) &
+    (.27) &
+    (.47) &
+    (.31) &
+    (.50) &
+    (.32) &
+    (.36) &
+    (.59) & 
+    
+  \cellcolor[HTML]{FFFFFF}\\ \hline
+  \label{table: accuracy}
+\end{tabular}
+}
+\end{table*}

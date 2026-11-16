@@ -1,0 +1,32 @@
+\documentclass{article}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{comment}
+\begin{document}
+\section{Verbatim}\label{sec:verb}
+Inline \verb+\cite{fake} { %+ then \cite{k1}.
+Also \verb|\label{fakelabel}| and \lstinline|\cite{fake2}|.
+\begin{verbatim}
+\cite{fake3} \begin{foo} { unbalanced
+\end{verbatim}
+\begin{lstlisting}
+\cite{fake4} } \label{fake5}
+\end{lstlisting}
+\begin{comment}
+\cite{fake6} \label{fake7}
+\end{comment}
+\iffalse
+\cite{fake8}
+\fi
+\section{URLs}\label{sec:url}
+See \url{http://a.com/x%20y} and \cite{k2}.
+Also \href{http://a.com/%7Ex}{home} then \cite{k3}.
+And \url{http://b.com/{x}%} \label{sec:after}
+Ref \ref{sec:after} and \ref{sec:verb}.
+\begin{thebibliography}{9}
+\bibitem{k1} A. One, ``First,'' 2020.
+\bibitem{k2} B. Two, ``Second,'' 2021.
+\bibitem{k3} C. Three, ``Third,'' 2022.
+\end{thebibliography}
+\end{document}

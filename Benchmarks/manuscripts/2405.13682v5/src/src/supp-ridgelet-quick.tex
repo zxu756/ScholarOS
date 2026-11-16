@@ -1,0 +1,42 @@
+\subsection{Integral Representation and Ridgelet Transform for Depth-2 Fully-Connected Network}
+
+\begin{definition} For any measurable functions $\sigma:\RR\to\CC$ and $\gamma:\RR^m\times\RR\to\CC$, put
+	\begin{align*}
+		\lm_\sigma[\gamma](\xx) := \int_{\RR^m\times\RR} \gamma(\aa,b)\sigma(\aa\cdot\xx-b)\dd\aa\dd b, \ \xx \in \RR^m.
+	\end{align*}
+	We call
+	$\lm_\sigma[\gamma]$ an (integral representation of) neural network, and $\gamma$ a parameter distribution.
+\end{definition}
+The integration over all the hidden parameters $(\aa,b) \in \RR^m\times\RR$ means all the neurons $\{ \xx\mapsto\sigma(\aa\cdot\xx-b) \mid (\aa,b) \in \RR^m\times\RR \}$ are summed (or integrated, to be precise) with weight $\gamma$, hence formally $\lm_\sigma[\gamma]$ is understood as a continuous neural network with a single hidden layer.
+We note, however, when $\gamma$ is a finite sum of point measures such as $\gamma_p = \sum_{i=1}^p c_i \delta_{(\aa_i,b_i)}$ (by appropriately extending the class of $\gamma$ to Borel measures), then it can also reproduce a finite width network
+\begin{align*}
+	\lm_\sigma[\gamma_p](\xx) = \sum_{i=1}^p c_i \sigma(\aa_i\cdot\xx-b_i).
+\end{align*}
+In other words, the integral representation is a mathematical model of depth-2 network with \emph{any} width (ranging from finite to continuous).
+
+Next, we introduce the ridgelet transform, which is known to be a right-inverse operator to $\lm_\sigma$.
+\begin{definition}
+	For any measurable functions $\rho:\RR\to\CC$ and $f:\RR^m\to\CC$, put
+	\begin{align*}
+		\ridge_\rho[f](\aa,b) := \int_{\RR^m} f(\xx) \overline{\rho(\aa\cdot\xx-b)} \dd \xx, \ (\aa,b) \in \RR^m \times \RR. 
+	\end{align*}    
+	We call $\ridge_\rho$ a ridgelet transform.
+\end{definition}
+To be precise, it satisfies the following reconstruction formula.
+\begin{theorem}[Reconstruction Formula] \label{thm:reconst.ridgelet}
+	Suppose $\sigma$ and $\rho$ are a tempered distribution ($\calS'$) and a rapid decreasing function ($\calS$) respectively.
+	There exists a bilinear form $\iiprod{\sigma,\rho}$ such that 
+	\begin{align*}
+		\lm_\sigma \circ \ridge_\rho [f] = \iiprod{\sigma,\rho} f,
+	\end{align*}
+	for any square integrable function $f \in L^2(\RR^m)$. Further, the bilinear form is given by
+		$\iiprod{\sigma,\rho} = \int_{\RR} \sigma^\sharp(\omega) \overline{\rho^\sharp(\omega)} |\omega|^{-m}\dd\omega,$
+	where $\sharp$ denotes the 1-dimensional Fourier transform.
+\end{theorem}
+See \citet[Theorem~6]{Sonoda2021ghost} for the proof.
+In particular, according to \citet[Lemma~9]{Sonoda2021ghost}, for any activation function $\sigma$, there always exists $\rho$ satisfying $\iiprod{\sigma,\rho}=1$. 
+Here, $\sigma$ being a tempered distribution means that typical activation functions are covered such as ReLU, step function, $\tanh$, gaussian, etc...
+We can interpret the reconstruction formula as a universality theorem of continuous neural networks, since for any given data generating function $f$, a network with output weight $\gamma_f = \ridge_\rho[f]$ reproduces $f$ (up to factor $\iiprod{\sigma,\rho}$), i.e. $S[\gamma_f] = f$. In other words, the ridgelet transform indicates how the network parameters should be organized so that the network represents an individual function $f$. 
+
+The original ridgelet transform was discovered by \citet{Murata1996} and \citet{Candes.PhD}. It is recently extended to a few modern networks by the Fourier slice method \citep[see e.g.][]{Sonoda2024fourier}.
+In this study, we present a systematic scheme to find the ridgelet transform for a variety of given network architecture based on the group theoretic arguments.

@@ -1,0 +1,27 @@
+\begin{thebibliography}{1}
+
+\bibitem{web2}
+Dan Brown.
+\newblock Web page.
+\newblock \href{https://example.org/x}{Example}, 2019.
+
+\bibitem{conf2020}
+Ed~Itor, editor.
+\newblock {\em Proceedings of the 10th Conference on Things}. ACM, 2020.
+
+\bibitem{paper1}
+Alice Smith, Bob Jones, et~al.
+\newblock A paper in proceedings.
+\newblock In Itor \cite{conf2020}, pages 1--10.
+
+\bibitem{paper2}
+Carol White.
+\newblock Another paper.
+\newblock In Itor \cite{conf2020}.
+
+\bibitem{web1}
+{World Health Organization}.
+\newblock Some report.
+\newblock \url{https://www.who.int/report%20one}, 2021.
+
+\end{thebibliography}

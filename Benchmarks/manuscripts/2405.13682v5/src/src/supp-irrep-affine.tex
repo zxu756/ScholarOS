@@ -1,0 +1,88 @@
+\section{Irreducibility of the infinite-dimensional representation of the Affine group} \label{sec:irrep.affine}
+
+We refer to \citet[Theorem~6.42]{Folland2015} for more details on the infinite-dimensional irreducible representations. The following proofs are attributed to \citet{KobayashiOshima.LieRep.book}, a Japanese textbook.
+
+
+\begin{lemma}[{\citet[Lemma~2.8]{KobayashiOshima.LieRep.book}}]\label{lem:structure.translation.l2}
+Let $T = \RR^m$ be the translation group in dimension $m$,
+and $\tau : T \to \calU(L^2(\RR^m))$ be the unitary representation of $T$ defined by the regular action.
+A closed subspace $V$ of $L^2(\RR^m)$ is $\tau$-invariant iff there exists a measurable set $E$ of $\RR^m$ such that 
+\begin{align*}
+    V = \calF^{-1}[ L^2(E) ].
+\end{align*}
+\end{lemma}
+
+\begin{proof}
+Let $V^\perp$ denote the orthocomplement of $V$.
+Since $V$ is $\tau$-invariant, for all $f \in V$ and $g \in V^\perp$,
+\begin{align*}
+    f * g^*(x)
+    = \int_{\RR^m} f(x-y) g^*(y) \dd y
+    = \int_{\RR^m} f(x+y) \overline{g(y)} \dd y
+    = \iprod{ \tau_{-x}[f], g } = 0.
+\end{align*}
+Therefore, for all $f \in V$ and $g \in V^\perp$,
+\begin{align}
+\fhat(\xi) \overline{\ghat(\xi)} = 0, \quad \almost \xi \in \RR^m. \label{eq:ortho.f.g}
+\end{align}
+Let $\mu$ be the Gaussian measure on $\RR^m$ defined by $\dd\mu(\xi) := \exp(-|\xi|^2)\dd\xi$. Put
+\begin{align*}
+    \calE(V) := \bigcup_{f \in V} \{ E \subset \RR^m \mbox{ measurable} \mid E \subset \supp \fhat \},
+\end{align*}
+and 
+\begin{align*}
+    A := \sup_{E \in \calE(V)} \mu(E) \le \mu(\RR^m) < \infty.
+\end{align*}
+Let $E_j$ be a sequence of measurable sets of $\calE(V)$ satisfying $\lim_{j\to\infty} \mu(E_j) = A$, and set $F := \bigcup_j E_j$. Then $F$ is measurable, and $\mu(F) \ge A$ because $\limsup \mu(E_j) \le \mu( \limsup E_j )$ in general.
+By \cref{eq:ortho.f.g}, $\ghat(\xi) = 0$ at $\almost \xi \in E_j$ for all $j$ and $g \in V^\perp$. Hence
+\begin{align*}
+    V^\perp \subset \calF^{-1}\left[ L^2( \RR^m \setminus F ) \right],
+\end{align*}
+thus
+\begin{align*}
+    V \supset \left( \calF^{-1}\left[ L^2( \RR^m \setminus F)\right] \right)^\perp \supset \calF^{-1}\left[ L^2( F ) \right].
+\end{align*}
+Conversely, suppose that there exist an $f \in V$ and a measurable subset $F' \subset \RR^m \setminus F$ satisfying $\fhat(\xi) \neq 0 \almost \xi \in F'$.
+Then $\ghat(\xi) = 0$ at $\almost \xi \in F'$ for all $g \in V^\perp$, and we have
+\begin{align*}
+V^\perp \subset \calF^{-1}\left[ L^2( \RR^m \setminus(F \cup F'))\right],
+\end{align*}
+thus
+\begin{align*}
+V \supset \left( \calF^{-1}\left[ L^2( \RR^m \setminus(F \cup F'))\right] \right)^\perp  \supset \calF^{-1}\left[ L^2( F \cup F')\right],
+\end{align*}
+which means $F \cup F' \in \calE(V)$. By the definition of $A$, $A \ge \mu(F \cup F') = \mu(F) + \mu(F')$. On the other hand, $\mu(F) \ge A$. So, $\mu(F') = 0$, but this implies $\fhat(\xi) = 0 \almost \xi \in \RR^m \setminus F$. Therefore
+\begin{align*}
+    V \subset \calF^{-1}\left[ L^2(F) \right],
+\end{align*}
+thus 
+\begin{align*}
+    V = \calF^{-1}\left[ L^2(F) \right].
+\end{align*}
+\end{proof}
+
+\begin{theorem}[{\citet[Theorem~2.10]{KobayashiOshima.LieRep.book}}]%
+Let $G = \aff(\RR^m) \cong GL(m,\RR) \ltimes \RR^m$ be the affine group.
+For any $\lambda \in \CC$, let $\pi$ be the representation of $G$ on $L^2(\RR^m)$ defined by
+\begin{align*}
+    \pi_g[f](x) := |\det A|^{-\lambda} f(g^{-1} \cdot x), \quad x \in \RR^m, g = (A,b) \in GL(m,\RR) \ltimes \RR^m.
+\end{align*}
+Additionaly, let $\pihat$ be another representation of $G$ on $L^2(\RR^m)$ defined by
+\begin{align*}
+    \pihat_g[h](\xi) := e^{i b \cdot \xi} |\det A|^{1-\lambda} h(A^\top \xi), \quad \xi \in \RR^m, g = (A,b) \in GL(m,\RR) \ltimes \RR^m
+\end{align*}
+so that $\calF$ intertwines $\pi$ and $\pihat$, namely $\calF \circ \pi_g = \pihat_g \circ \calF$ for all $g \in G$.
+Suppose $\lambda \in \frac{1}{2} + i\RR$, then $\pi$ is an irreducible unitary representation of $G$ on $L^2(\RR^m)$.
+\end{theorem}
+
+\begin{proof}
+    Note that $\pi$ is unitary iff $\lambda \in \frac{1}{2} + i \RR$.
+    We identify the translation group $T=\RR^m$ as a subgroup of the affine group $G=\aff(\RR^m)$ by embedding $b \in T$ to $(I,b) \in G$.
+    Suppose $V \neq 0$ be a $\pi$-invariant closed subspace of $L^2(\RR^m)$. Then it is also $\tau$-invariant because $\pi(I,b) = \tau(b)$. Hence by \cref{lem:structure.translation.l2}, there exists a measurable subset $E$ of $\RR^m$ satisfying $V = \calF^{-1}\left[ 
+L^2(E) \right]$. Further, the image $\calF(V) = L^2(\RR^m)$ is $\pihat$-invariant. Therefore by the definition of $\pihat$, $E$ has to be invariant (except a measure zero subset) under the dual action of $A \in GL(m,\RR)$ given by
+\begin{align*}
+    \xi \mapsto A^{-\top} \xi, \quad \xi \in \RR^m.
+\end{align*}
+But this action is known to be ergodic, that is, such a measurable set is either $\RR^m$ or $\empty$. Hence $E=\RR^m$ and $V = \calF^{-1}\left[ L^2(E) \right] = L^2(\RR^m)$, which yields the irreducibility of $\pi$.
+\end{proof}
+

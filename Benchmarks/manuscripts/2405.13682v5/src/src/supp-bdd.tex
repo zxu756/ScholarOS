@@ -1,0 +1,67 @@
+\section{Boundedness of $\lm \circ \ridge$} \label{sec:bddness}
+We present several sufficient conditions for the $L^2$-boundedness of $\lm \circ \ridge$.
+
+\begin{lemma}
+For any $f \in L^2(X;Y)$, put
+\begin{align*}
+T[f](x) := \lm \circ \ridge [f](x) = \int_\Xi \left[ \int_X f(y) \overline{\psi(y,\xi)} \dd y \right] \phi(x,\xi) \dd \xi, \quad x \in X.
+\end{align*}
+The $T$ is bounded, namely there exists a constant $C_T$ such that for any $f \in L^2(X;Y)$,
+\begin{align*}
+    \| T[f] \|_{L^2(X;Y)} \le C_T \| f \|_{L^2(X;Y)},
+\end{align*}
+when at least one of the following conditions hold:
+\begin{itemize}
+    \item[T1.] The integral kernel $k(x,y) := \int_\Xi \psi(y,\xi) \overline{\phi(x,\xi)} \dd \xi$ is square integrable.
+    \item[T2.] The two feature maps $\phi,\psi$ are square integrable.
+    \item[T3.] For some topological vector space $\Gamma$, both $\ridge : L^2(X) \to \Gamma$ and $\lm : \Gamma \to L^2(X)$ are bounded.
+\end{itemize}
+\end{lemma}
+
+\begin{proof}%
+Case~T1.
+\begin{align*}
+    \| T[f] \|_{L^2(X)}^2
+    &= \int_X \bigg| \int_\Xi \left[ \int_X f(y) \overline{\psi(y,\xi)} \dd y \right] \phi(x,\xi) \dd \xi \bigg|^2 \dd x\\
+    &= \int_X \bigg| \int_X f(y) \left[ \int_\Xi \overline{\psi(y,\xi)} \phi(x,\xi) \dd \xi \right] \dd y \bigg|^2 \dd x\\
+    &= \int_X \bigg| \int_X f(y) \overline{k(x,y)} \dd y \bigg|^2 \dd x\\
+    &\le \left[ \int_X |f(y)|^2 \dd y \right] \left[ \int_{X \times X} |k(x,y)|^2 \dd y \dd x \right]
+    = \| f \|_{L^2(X)}^2 \| k \|_{L^2(X \times X)}^2.
+\end{align*}
+Case~T2.
+\begin{align*}
+    \| T[f] \|_{L^2(X)}^2
+    &= \int_X \bigg| \int_\Xi \ridge[f](\xi) \phi(x,\xi) \dd \xi \bigg|^2 \dd x\\
+    &\le \int_X \int_\Xi |\ridge[f](\xi) \phi(x,\xi)|^2 \dd \xi \dd x\\
+    &\le \| \phi \|_{L^2(X,\Xi)}^2 \int_\Xi \bigg| \int_X f(y) \overline{\psi(y,\xi)} \dd y \bigg|^2 \dd \xi\\
+    &\le \| \phi \|_{L^2(X,\Xi)}^2 \int_\Xi \int_X |f(y) \overline{\psi(y,\xi)}|^2 \dd y \dd \xi\\
+    &\le \| \phi \|_{L^2(X,\Xi)}^2 \| \psi \|_{L^2(X,\Xi)}^2 \|f \|_{L^2(X)}^2
+\end{align*}
+Case~T3.
+\begin{align*}
+    \| T[f] \|_{L^2(X)}
+    &= \| \lm \circ \ridge[f] \|_{L^2(X)}
+    \le C_{\lm} \| \ridge[f] \|_{\Gamma}
+    \le C_{\lm} C_{\ridge} \|f\|_{L^2(X)}
+\end{align*}
+\end{proof}
+
+\begin{lemma}
+    Suppose $\phi_2 : X_2 \times \Xi_2 \to \RR$ is square integrable, and $\phi_1 : X_1 \times \Xi_1 \to X_2$ has inverse jacobian $J_1(\xi_1,y) := |\det D[\phi_1](\xi_1,\phi_1^{-1}(y))|^{-1}$ satisfying $\| J_1 \|_{L^1(\Xi_1) \otimes L^\infty(Y)} < \infty$. Then, $\phi_2 \circ \phi_1 : X_1 \times \Xi_{1:2} \to \RR$ is square integrable.
+\end{lemma}
+\begin{remark}
+When input and output dimensions differ, replace the jacobian $J_1$ with $\sqrt{J_1 \circ J_1^\top}$. See \citet{Evans2015} for more details.
+\end{remark}
+\begin{proof}
+    For almost every $\xi_1 \in \Xi_1$, put $x = \phi_1^{-1}(\xi_1,y)$, 
+    so $\dd x = J_1(\xi_1,y) \dd y$ with $J_1(\xi_1,y) := |\det D[\phi_1](\xi_1,\phi_1^{-1}(y))|^{-1}$.
+    Put $Y := \bigcup_{\xi_1 \in \Xi_1} \phi_1(\xi_1, X)$.
+    Then,
+    \begin{align*}
+        \int_{X \times \Xi_{1:2}} | \phi_2( \xi_2, \phi_1( \xi_1, x ) ) |^2 \dd x \dd \xi_{1:2}
+        &=\int_{\Xi_{1:2}} \int_{\phi_1(\xi_1,X)} | \phi_2( \xi_2, y ) |^2 J_1(\xi_1,y) \dd y \dd \xi_{1:2}\\
+        &\le \int_{\Xi_{1:2}} \left[\int_{\phi_1(\xi_1,X)} | \phi_2( \xi_2, y ) |^2 \dd y \right] \left[ \sup_{y \in \phi_1(\xi_1,X)} J_1(\xi_1,y) \right] \dd \xi_{1:2}\\
+        &\le \int_{\Xi_{1:2}} \left[\int_Y | \phi_2( \xi_2, y ) |^2 \dd y \right] \left[ \sup_{y \in Y} J_1(\xi_1,y) \right] \dd \xi_{1:2}\\
+        &= \| \phi_2 \|_{L^2(\Xi_2 \times Y)}^2 \| J_1 \|_{L^1(\Xi_1) \otimes L^\infty(Y)}. \qedhere
+    \end{align*}
+\end{proof}

@@ -1,0 +1,23 @@
+\section{Discussion}
+We have developed a systematic method for deriving a ridgelet transform for a wide range of learning machines defined by joint-group-equivariant feature maps, yielding the universal approximation theorems as corollaries. 
+Traditionally, the techniques used in the expressive power analysis of deep networks were different from those used in the analysis of shallow networks, as overviewed in the introduction. Our main theorem unifies the approximation schemes of both deep and shallow networks from the perspective of joint-group-action on the data-parameter domain. Technically, this unification is due to the irreducibility of group representations. %
+From the traditional analytical viewpoint, universality refers to density. In this study, we have reviewed universality as irreducibility (or more generally, \emph{simplicity} of objects) from an algebraic viewpoint. This switch of viewpoints has enabled us to reunify various universality theorems in a clear perspective.
+
+
+\subsection*{Additional Comments on Significance after Rebuttal}
+
+The main theorem of this work is not merely a unification of existing results; a key strength lies in its ability to systematically and mechanically assess universality even for novel architectures. For example, it enables the straightforward design of expressive networks with universal approximation capability, such as quadratic networks.
+
+In the era of large language models, the diversity of proposed architectures has significantly increased. Manually analyzing the expressive power of each new model on a case-by-case basis is no longer feasible from a theoretical standpoint. Our framework addresses this challenge by offering a general principle.
+
+In particular, algebraic tools such as Schur's lemma provide a notable advantage in that they allow us to assess universality (or density) even when the inputs and outputs are not vectors—something that traditional techniques often struggle with. While classical theorems like the Stone–Weierstrass or Hahn–Banach theorems offer generic tools for establishing universality, applying them to deep neural networks with hierarchical structures requires considerable ingenuity.
+
+By contrast, proof techniques originating with \citet{Hornik1989}, which rely on repeatedly differentiating activation functions to construct polynomial approximations, often obscure the intuitive mechanism by which neural networks perform approximation. In comparison, our use of joint group equivariance and ridgelet transforms as inverse operators provides a more direct and interpretable understanding of the approximation process in deep networks.
+
+Regarding generalization: Theoretical analysis of generalization error is often based on estimates of the Rademacher complexity of the hypothesis class. However, in deep learning, the Rademacher complexity typically scales exponentially with network depth. This is at odds with practical observations, where deeper networks tend to generalize better.
+
+This discrepancy arises from the limitations of current techniques for analyzing composite functions: the reliance on coarse Lipschitz estimates leads to overly pessimistic bounds. To address this gap, we revisited expressive power analysis and developed the deep ridgelet transform as a theoretical framework that can precisely handle compositions of functions.
+
+
+
+

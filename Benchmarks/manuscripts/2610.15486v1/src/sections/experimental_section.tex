@@ -1,0 +1,198 @@
+\section{Experimental Section} \label{sec:results}
+
+We designed an experimental campaign to characterise the proposed CRL framework along three axes: (1) task-space tracking precision, (2) sensitivity to terrain morphology and regolith properties, and (3) constraint satisfaction relative to policies trained with reduced or absent constraint sets. All experiments are conducted in simulation, under the environment model of \cref{sec:lunar-design}.
+
+\subsection{Training Details} \label{sec:implementation}
+
+%The robot employed for all our experiments is a Unitree Go2 quadrupedal robot (4 legs, 3 DoF per leg) with an Interbotix WidowX 250s 6 DoF robotic arm mounted on its top and a LIDAR scan on its chin, which can be used to map the terrain around the robot and provide information about the surface geometry. \cref{fig:intro} shows the proposed system in the simulation environment. Even if the proposed system is not the best suited for deployment in lunar-like environments, it is a low-end, affordable system that is easily reproducible. Furthermore, as explained in \cref{sec:method}, the proposed method is robot-agnostic, and can be implemented in any legged mobile manipulator.
+
+The robotic platform used for all experimental evaluations is a Unitree Go2 quadrupedal robot, featuring four legs with 3 Degrees of Freedom (DoF) per limb, integrated with an Interbotix WidowX 250s 6-DoF manipulator mounted dorsally and a body-mounted depth sensor providing the terrain height scan described in \cref{sec:spaces}. The system configuration within the simulation environment is illustrated in \cref{fig:intro}. This platform is not representative of a flight-qualified lunar system; it is a low-cost, widely available configuration chosen for reproducibility, and its actuators are less capable and less precise than those of a purpose-built planetary manipulator. The formulation of \cref{sec:method} makes no assumptions specific to this morphology beyond the presence of a legged base and a serial manipulator, so we expect it to transfer to other legged mobile manipulators.
+
+We train our locomanipulation policy for reaching a desired end-effector 6D pose while satisfying a user-defined set of constraints. The policy must learn to operate the robot in lunar-analog conditions, so the simulation needs to emulate the hazardous conditions present during lunar surface operations. To achieve this, we reduce the magnitude of the gravity vector to 1/6th of Earth's gravity, and generate a suite of different terrain morphologies that represent typical scenarios present in the Moon, as described in \cref{sec:lunar-design} and illustrated in \cref{fig:terrains}. We implement three different terrain morphologies: Rough, Hills, and Craters. The \textit{Rough} terrain represents flat terrains with irregular small elevations, simulating rocks or regolith accumulations. The \textit{Hills} terrain shows smooth, continuous elevation changes that aim to resemble the small ``mountains'' present in planetary-analog environments. Finally, the \textit{Craters} terrain presents steep elevation changes that emulate the steepness of craters present in the Moon, which are of critical interest for the scientific community, making its exploration a crucial capability for lunar robotics.
+
+At each training episode we sample a target end-effector pose in task space within a bounded region around the robot's initial position. Target poses are drawn uniformly within the ranges reported in \cref{tab:env_config}. Orientation ranges are chosen to restrict commands to end-effector attitudes that are
+physically meaningful for inspection and sampling.
+
+We employ a dual-curriculum strategy to increase task complexity over training. First, the sampling ranges of the commanded pose are expanded linearly from an initial neighbourhood of the standing configuration to their final extents, so that the policy learns to stabilise and reach nearby targets before being required to locomote towards distant ones. Second, terrain difficulty is advanced as the policy learns to reach the commanded poses safely, promoting environments to a higher level once the mean tracking error falls below $0.15\,$m.
+
+We apply domain randomization to strengthen the learned policy. In addition to the randomization of base mass and surface friction described in \cref{sec:lunar-design}, the low-level position controller applies a random processing delay of up to $40\,$ms to the joint targets issued by the policy, emulating the actuation latency of the physical platform. Zero-mean Gaussian noise is added to the observations supplied to the policy to account for state-estimation error; the critic receives the corresponding noise-free quantities, following the asymmetric actor-critic formulation, so that value estimation is not degraded by observation noise that the policy alone must be robust to.
+
+For the constrained learning setup, we define the maximum termination probabilities of all soft constraints to 25\%. We also follow the termination probability curriculum strategy described in \citep{dadiotis2025dynamicobjectgoalpushing}. To prevent early convergence to overly conservative behaviours, we linearly annealed the maximum termination probability from 5\% to 25\%, reaching its maximum value when 60\% of the training iterations are completed.
+
+We use Isaac Sim \citep{makoviychuk2021isaacgymhighperformance} as the physics simulator for our environment and Isaac Lab \citep{mittal2023orbit} as the framework in which the learning task is defined. The terrains are procedurally generated as height fields according to the user-defined terrain configuration. 
+
+We implemented a customized version of PPO \citep{schulman2017proximalpolicyoptimizationalgorithms} integrated with the CaT mechanism to obtain a Constrained PPO algorithm. Our implementation is an extension of the PPO algorithm in RSL-RL library \citep{rudin2022learning}. The policy $\pi_{\theta}$ is parametrized by a Multi-Layer Perceptron (MLP) with three hidden layers of 512, 256, and 128 neurons each, all of them using ELU activation functions \citep{clevert2016fastaccuratedeepnetwork}. Each episode spans $10\,$s of simulated time, with the policy running at $50\,$Hz and the low-level PD controllers at $200\,$Hz. We train for $10\,000$ learning iterations with $4096$ environments running in parallel, which takes approximately $12\,$h on a desktop machine with a single NVIDIA GeForce RTX~3090 GPU. Additional details are provided in \cref{tab:training}.
+
+\subsection{Results}
+
+\subsubsection{Experimental Setup}
+
+We evaluate our policy by running a single episode across 5000 parallel environments and report the mean pose tracking error. To test robustness against model mismatch, evaluation is carried out with compliant contact dynamics that were not present during training: whereas training randomises surface friction and base mass over the ranges of \cref{sec:lunar-design} on rigid contacts, evaluation additionally introduces finite terrain stiffness and damping, so that the policy encounters foot sinkage and contact compliance for the first time at test time. 
+
+We set the terrain soil properties to emulate the JSC-1a lunar regolith simulant, widely used in planetary science testbeds to mimic the properties of lunar soil \citep{zeng2010jsc-1a}. Specifically, we set the static and dynamic friction coefficients to $\mu_s=1.1$ and $\mu_d=0.9$ to consider the interaction of the JSC-1a simulant with Unitree Go2 rubber feet. To simulate the effect of feet sinking into loose regolith, we implement compliant contact properties for the generated terrains. We set the terrain stiffness to $5 \times10^4 N/m$, which is lower than the default value in the PhysX engine, thus making the ground more \textit{spongy}, and the damping to $4\times10^3 Ns/m$, which represents the effect of energy lost to crushing soil particles.
+
+Regarding terrain morphology, we define a standardized difficulty curriculum across terrain variations that will be used in our upcoming experiments. For each of the three considered terrains, we implement five different difficulty levels, with 1 being the easiest and 5 the hardest. \cref{fig:terrain-levels} illustrates the changes in difficulty across terrains showing the easiest, average, and hardest difficulty levels, with the remaining two levels being interpolations of them.
+
+\begin{figure}
+  \includegraphics[width=\columnwidth, height=0.7\columnwidth]{figures/AIS_TerrainLevels.pdf}
+  \caption{Overview of the terrain levels used for experimentation.}
+  \label{fig:terrain-levels}
+\end{figure}
+
+\subsubsection{End-effector Pose Tracking Accuracy} \label{exp:tracking}
+
+In this experiment, we evaluate the tracking performance of our policy in a standard generic scenario within our lunar surface operations landscape. To do so, we deploy the policy for the 5000 simulated robots in the easy terrain difficulty level across all terrain types, and sample random target poses within the maximum command ranges defined above. We evaluate tracking in this benign setting first in order to characterise performance in non-critical conditions, isolating the intrinsic precision of the policy from the effects of challenging terrain.
+
+We report a mean position error of \textbf{3.22 cm} and a mean orientation error of \textbf{6.83 degrees}. These values are of the same order as those reported by state-of-the-art terrestrial whole-body tracking methods \citep{portela2025wholebodyendeffectorposetracking, ha2024umilegs}, and are obtained by a policy that controls locomotion and manipulation jointly, without assuming a static stance as in \citep{portela2025wholebodyendeffectorposetracking} or employing a dedicated manipulation policy as in \citep{ha2024umilegs}, and on a platform whose actuators are less precise than those used in those works. This comparison should be read as an order-of-magnitude reference rather than a controlled benchmark. The platforms, command distributions, terrain and gravitational conditions differ across these works; the numbers establish that the proposed formulation reaches a precision regime consistent with the terrestrial state of the art, not that it outperforms it.
+
+The error distributions for both position and orientation metrics are shown in \cref{fig:error_kde}. The bulk of the probability mass lies between 2 and 6 cm in position and between 4 and 10 degrees in orientation. In addition, these results confirm the adaptability of the policy to the new soil properties included in this experimental stage. The tracking errors obtained show that the policy accommodates the compliant contact dynamics not encountered during training.
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}{0.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/pos_error_kde.pdf}
+        \label{fig:pos_kde}
+    \end{subfigure}
+    \begin{subfigure}{0.45\textwidth}
+        \includegraphics[width=\textwidth]{figures/rot_error_kde.pdf}
+        \label{fig:rot_kde}
+    \end{subfigure}
+    \caption{Distribution of the position and orientation errors for the 5000 evaluated samples}
+    \label{fig:error_kde}
+\end{figure}
+
+
+
+\subsubsection{Robustness to Terrain Morphology}
+
+Having characterised the pose tracking error of our policy, we now aim to assess its adaptability to different terrain topography variations. Specifically, we want to evaluate policy performance against different levels of difficulty across the considered terrains, to see how this performance is affected when facing more challenging situations.
+
+To do so, we define five different difficulty levels for each of the three terrain morphologies, as shown in \cref{fig:terrain-levels}. The increase in difficulty depends on the terrain type. For the \textit{Rough} terrain, a higher difficulty consists of a more irregular and sharp terrain surface. For the \textit{Hills} and \textit{Craters} terrains, higher difficulties imply a steeper slope that the robot must be able to safely traverse. The maximum slope values considered for this project are around 30 degrees, with average slopes ranging between 10 and 20 degrees. The parameters governing terrain generation at each difficulty level are reported in \cref{tab:env_config}. 
+
+Each column of \cref{fig:terrain-levels} corresponds to one difficulty level for each terrain type. Within a given difficulty level, individual environment instances are procedurally generated with different random seeds, so that the policy is exposed to varied topography at each level rather than to a single fixed surface. For each of the terrain-difficulty pairs, we deploy 5000 simulated robots and sample target poses randomly within the maximum command ranges, as in \cref{exp:tracking}, and compute the mean pose tracking error from all samples.
+
+\cref{fig:terrain-experiments} shows two grouped bar plots representing the mean errors and standard deviations for position and orientation obtained across terrain-difficulty pairs. The tracking error remains essentially constant for the \textit{Rough} terrain, suggesting that a more irregular terrain within the parameters we considered does not affect the policy capabilities.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{figures/terrain_difficulty_barplots.pdf}
+    \caption{Mean position and orientation errors across terrain-difficulty pairs.}
+    \label{fig:terrain-experiments}
+\end{figure*}
+
+For the \textit{Hills} terrain type, we see a slight increase in tracking error, especially at the maximum difficulty level. This is expected as the terrain becomes significantly more challenging, and the robot could struggle with these steeper slopes. The mean error nonetheless remains near 7 cm, which is compatible with coarse inspection and sample-retrieval tasks, though not with operations requiring centimeter-level placement. 
+
+The biggest increase in tracking error is shown for the \textit{Craters} terrain, where mean errors of $13\,$cm appear in the maximum difficulty scenarios. However, these scenarios are extreme conditions with slopes of 30 degrees, which are close to the limits of what a robot of the characteristics employed in this work should manage. At difficulty levels 2 to 4, with slopes between 10 and 20 degrees, tracking errors remain close to those obtained on flat terrain, indicating that the degradation is confined to the extreme end of the difficulty range rather than developing progressively across it.
+
+\subsubsection{Robustness to Soil Variability} \label{exp:soil}
+
+In addition to the sensitivity analysis of our policy against challenging terrain morphologies, in lunar surface operations we might encounter areas with variable regolith density. This variability can have a critical impact on the robot's locomotion, since a looser regolith could cause the feet to slip or sink deeper, while a more compact regolith results in higher impact forces that the policy must manage to avoid high torques exerted on the leg joints. 
+
+We therefore evaluate the sensitivity of the policy to regolith density, in order to establish the range of soil properties over which tracking performance is preserved. For this experiment, we define two new sets of soil material properties in addition to the standard JSC-1a configuration introduced at the beginning of this section. We add a \textit{loose} regolith soil type and a \textit{dense} type. The specific properties for the three soil types are shown in \cref{tab:soil_properties}. The \textit{loose} soil aims to simulate loose regolith regions, where the friction is lower and the feet can sink deeper inside the terrain. The \textit{dense} soil mimics regions of highly compacted regolith, with increased friction and substantially reduced compliance; sinkage is suppressed and foot impacts are transmitted to the legs with little attenuation, producing higher peak contact forces and joint torques.
+
+\begin{table*}[width=\textwidth,cols=5]
+    \caption{Soil type properties considered in our experimentation}
+    \label{tab:soil_properties}
+    \renewcommand{\arraystretch}{1.5} % Adjust row spacing for readability
+    \begin{tabular}{c c c c p{6cm}}
+        \toprule
+        \textbf{Soil type} & \textbf{$\mu_s$ / $\mu_d$} & \textbf{Stiffness ($N/m$)} & \textbf{Damping ($Ns/m$)} & \textbf{Challenge for Controller} \\
+        \midrule
+        \textbf{Loose} & 0.8 / 0.6 & 10,000 & 2,000 & \textbf{Slip \& Sinkage.} Leg may get trapped or slip away due to loose regolith. \\
+        [1ex] % Extra spacing between rows
+        \textbf{Nominal (JSC-1a)} & 1.1 / 0.9 & 50,000 & 4,000 & \textbf{Standard.} The baseline soil properties \\
+        [1ex]
+        \textbf{Dense} & 1.35 / 1.0 & 1,000,000 & 10,000 & \textbf{Impact Shock.} Hard contacts and impact forces. High friction might make the legs stumble. \\
+        \bottomrule
+    \end{tabular}
+\end{table*}
+
+However, evaluating policy performance by modifying soil types only might not suffice to validate the robustness of our method, since different soils can have a higher effect depending on the type of terrain and its difficulty. For example, a loose regolith scenario might not be problematic if we are in flat, irregular terrain, but it could affect locomotion critically when traversing steep slopes, since the reduced friction can cause slippage and result in a collision.
+
+To properly assess the effect of different soil properties, we also modify terrain types and difficulties for this experiment. We use only difficulty levels 2 to 4, which represent the most common scenarios we might encounter, avoiding the extremely easy or hard scenarios that are not as representative of our intended lunar operation environments. For each terrain-difficulty-soil triplet, we deploy the policy for 5000 simulated robots and compute the mean pose tracking error, similarly to what has been shown in previous experiments.
+
+\cref{fig:soil_experiment} illustrates the results of this experiment. Each plot corresponds to a different terrain difficulty, and each plot is separated into three columns, each representing a different terrain type. For each terrain-difficulty pair, the value of the mean position tracking error is presented as a point of different colors depending on the soil type (loose, nominal, or dense). The tracking error remains largely constant across soil types, with slightly higher errors in loose regolith. The only outlier in our experiments is the tracking error obtained when deploying the policy in hard \textit{hills} terrain with loose regolith, where the error increases about $2\,$cm compared to the other soil types. This behaviour might be caused by the importance of slippage in a much steeper slope, but remains within the error margins relevant to the operations targeted in this work.
+
+\begin{figure*}
+  \includegraphics[width=\textwidth]{figures/soil_experiments.pdf}
+  \caption{Mean tracking error for different soil types across terrains and difficulties.}
+  \label{fig:soil_experiment}
+\end{figure*}
+
+\subsubsection{Constraint Satisfaction Analysis} \label{exp:constraints}
+
+Finally, we validate the contribution of the CRL framework by analyzing constraint violations. We evaluate constraint satisfaction across episode rollouts. We deploy our policy on 5000 simulated robots for a single $10\,$s episode rollout in easy rough terrain. We chose this simple terrain because this experiment does not aim to evaluate policy robustness to terrain properties, but only constraint satisfaction. For each of the constraints defined in \cref{sec:constraints}, we report the percentage of time during an episode that the constraint has been violated, as in previous works \citep{chane2024cat, chanesane2024solo, belmonte2025isparo}.
+
+To assess the impact of the CRL formulation in satisfaction of the imposed constraints, we also trained three additional policies in order to compare their behaviour with our baseline policy trained with the full constraint set described in \cref{sec:constraints}. We trained two ablated policies by removing two different constraints (base velocity and leg joint deviation), and a third policy removing all soft constraints, leaving only hard constraints active to ensure failure avoidance. 
+
+The results of our experiments are shown in \cref{tab:constraint-ablation}. For the
+baseline policy, no violation of any hard constraint was recorded over the 5000
+evaluated episodes. Because the constraint mechanism terminates reward accrual rather
+than the rollout, this figure is a direct measurement: every episode is simulated for
+its full duration, and violation time is accumulated over the whole rollout regardless
+of whether the policy has already forfeited its future reward. A zero rate therefore
+states that the policy did not enter a non-foot contact, fall, or excessive impact
+force state at any point in any of the evaluated episodes, and is not an artefact of
+episodes being cut short at the moment of violation.
+
+Regarding soft constraints, violation time is close to zero for all joint torque and
+velocity limits, and below 6\% for most of the remaining constraints. The highest value
+corresponds to the base velocity constraint at 11.58\%, which is nonetheless satisfied
+over the large majority of each episode.
+
+\begin{table}[width=\columnwidth,cols=5]
+    \centering
+    \caption{Episode violation time percentage of soft constraints for easy rough terrain for different policies.}
+    \renewcommand{\arraystretch}{1.3} % Increases row spacing slightly for readability
+    % If you want vertical lines like the screenshot, change {l c c c c} to {|l|c|c|c|c|}
+    \begin{tabular}{c c c c c} 
+        \toprule
+        \textbf{Constraint} & \textbf{Baseline} & \textbf{No Constraints} & \textbf{No $c_v$} & \textbf{No $c_{dev}$} \\
+        \midrule
+        $c_{\tau,hip}$     & 0.003   & 0.003   & 0.001 & 0.010   \\
+        $c_{\tau,knee}$   & 0.006  & 13.92   & 0.001 & 0.001 \\
+        $c_{\dot{q}}$  & 0.0      & 4.89   & 0.0     & 0.0    \\
+        $c_v$       & 11.58  & 22.66  & 21.79   & 12.78  \\
+        $c_{dev}$ & 6.45   & 38.60   & 7.94  & 52.91  \\
+        $c_{f_{stumble}}$         & 0.0      & 3.42     & 0.0     & 0.0      \\
+        $c_{f_{slippage}}$       & 2.52  & 4.27  & 2.53   & 2.75 \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:constraint-ablation}
+\end{table}
+
+If we now compare the behaviour of our baseline policy with the policies trained removing specific constraints, we can clearly see the effect of applying a constraint in the resulting behaviour. For the policy without $c_v$, the constraint time violation is almost duplicated, while the policy without $c_{dev}$ increases the corresponding violation time by roughly a factor of eight, from 6.45\% to 52.91\%. These two experiments show the importance of introducing all desired constraints in our setup if we want to control a certain magnitude of interest for our task.
+
+The policy trained without soft constraints violates most of them for a substantial fraction of the episode, most notably the knee torque constraint (13.92\% against 0.006\% for the baseline) and the joint deviation constraint (38.60\% against 6.45\%). The comparison establishes that the constraint set is responsible for the observed behaviour, rather than it arising incidentally from the task reward.
+
+Two caveats bound this conclusion. First, violation time measures how often a limit is exceeded but not by how much, and a brief marginal exceedance carries different operational risk from a sustained large one; the present analysis does not distinguish them. Second, the residual violation rates of the baseline policy, in particular the 11.58\% for $c_v$, are not anomalies to be explained away but the expected consequence of enforcing constraints in probability with a bounded termination probability, compounded in the case of $c_v$ by the tension between the velocity limit and the command distribution developed in \cref{sec:discussion}. A policy that never violated $c_v$ would be unable to reach the most distant commanded poses within the episode.
+
+A further question concerns the durability of these results: does constraint
+satisfaction hold as the terrain becomes more demanding? To answer it, we deploy the
+baseline policy on the \textit{Hills} terrain at three difficulty levels, corresponding
+to those depicted in \cref{fig:terrain-levels}, and report violation time as the mean
+across 5000 simulated episodes for each level.
+
+The results of this experiment are summarized in \cref{tab:constraint-terrains}. Constraint satisfaction degrades only mildly as terrain difficulty increases: $c_v$ violation time rises from 11.66\% to 15.14\% and $c_{dev}$ from 5.22\% to 8.16\% between the easiest and hardest levels, while the torque and foot-contact constraints remain nearly unaffected. The constraint set therefore continues to shape behaviour as the terrain becomes more demanding, rather than being progressively abandoned in favour of task reward.
+
+\begin{table}[width=\columnwidth,cols=4]
+    \centering
+    \caption{Episode violation time percentage of soft constraints for baseline policy across different difficulty \textit{Hills} terrains. }
+    \renewcommand{\arraystretch}{1.3} % Increases row spacing slightly for readability
+    % If you want vertical lines like the screenshot, change {l c c c c} to {|l|c|c|c|c|}
+    \begin{tabular}{c c c c} 
+        \toprule
+        \textbf{Constraint} & \textbf{Easy} & \textbf{Average} & \textbf{Hard} \\
+        \midrule
+        $c_{\tau,hip}$    & 0.001   & 0.003 & 0.005   \\
+        $c_{\tau,knee}$   & 0.003   & 0.007 & 0.022 \\
+        $c_{\dot{q}}$     & 0.0   & 0.0     & 0.0    \\
+        $c_v$             & 11.66  & 13.79   & 15.14  \\
+        $c_{dev}$         & 5.22   & 5.95 & 8.16  \\
+        $c_{f_{stumble}}$ & 0.0      & 0.0     & 0.0   \\
+        $c_{f_{slippage}}$ & 2.55  & 2.89  & 3.50  \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:constraint-terrains}
+\end{table}

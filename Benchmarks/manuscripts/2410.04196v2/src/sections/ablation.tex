@@ -1,0 +1,49 @@
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.33\textwidth]{figs/grad_sim.pdf}
+    \caption{Gradients angular similarities with $m=4$. Lower values indicate greater angular diversity.}
+    \label{fig:train}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    % First row: Figure A and Table B
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figs/plots_sharpness_particle_1.pdf} % Replace with your image file
+        \caption{Particle 1}
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figs/plots_sharpness_particle_2.pdf} % Replace with your image file
+        \caption{Particle 2}
+    \end{subfigure}
+
+
+    % Second row: Figures C, D, and E
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figs/plots_sharpness_particle_3.pdf} % Replace with your image file
+        
+        \caption{Particle 3}
+        
+    \end{subfigure}
+    % \hfill
+    \begin{subfigure}[b]{0.49\linewidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figs/plots_sharpness_particle_4.pdf} % Replace with your image file
+        \caption{Particle 4}
+    \end{subfigure}
+    % \hfill
+    \caption{Evolution of sharpness of four particles over 100 epochs with SVGD \textcolor{blue}{(blue)} and FHBI \textcolor{red}{(red)}}
+\label{fig: ablation sharpness}
+\end{figure}
+
+As discussed in Section \ref{section: connections to SAM} and Section \ref{section: experiments}, FHBI shares implicit connections with SAM by minimizing particle-wise sharpness and diversifying travel directions, thereby improving the final performance. To empirically verify this hypothesis on the behavior of our algorithm, we contrast FHBI with SVGD  on the \texttt{KITTI} dataset. Four particles are initialized at the same location. We measured: \textbf{1)} the evolution of sharpness of each particle, defined as $\max_{\|\varepsilon\| \leq \rho} \gL_\gS(\vtheta + \varepsilon) - \gL_\gS(\vtheta)$ according to \citet{sam}, and \textbf{2)} the evolution of gradients angular diversity, quantified as the Frobenius norm of the covariance matrix formed by the particle gradients. Figure \ref{fig: ablation sharpness} shows that FHBI results in significantly lower and more stable sharpness evolution, encouraging less congruent gradient directions and promoting particles to explore diverse trajectories. Hence, FHBI reduces particle sharpness while promoting angular diversity, thereby improving generalization ability and avoiding overfitting by collapsing into a single mode.
+
+
+
+

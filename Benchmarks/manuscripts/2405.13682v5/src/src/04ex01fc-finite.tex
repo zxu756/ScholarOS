@@ -1,0 +1,65 @@
+\section{Example: Depth-$n$ Fully-Connected Network}\label{sec:ex-depth-n}
+We explain the case of depth-$n$ (precisely, depth-$n+1$) fully-connected network. 
+
+Set $X=Y=\RR^m$ (input and output domains),
+and for each $i \in \{1, \ldots, n\}$, set $X_i := \RR^{d_i}$ (with $X_1 = X$ and $X_{n+1} = Y$),
+$\Xi_i := \RR^{p_i \times d_i}\times\RR^{p_i}\times\SS_{d_{i+1}}^{q_i}$ (parameter domain), where $\SS_d$ denotes the $d-1$-dim. unit sphere, $\sigma_i:\RR^{p_i} \to \RR^{q_i}$ (activation functions), and define the feature map (vector-valued fully-connected neurons) as
+\begin{align*}
+    \phi_i(\xx_i,\xxi_i) := C_i \sigma_i( A_i \xx_i - \bb_i ), %
+\end{align*}
+for every $\xx_i \in \RR^{d_i}, \xxi_i=(A_i,\bb_i,C_i) \in \Xi_i$.
+Specifically, $d_1 = d_{n+1}=m$. If there is no risk of confusion, we omit writing $i$ for simplicity.
+
+Let $O(m)$ denote the orthogonal group in dimension $m$.
+Let $G := O(m) \times \aff(m)$ be the product group of $O(m)$ and $\aff(m) = GL(m) \ltimes \RR^m$.
+We suppose $G$ acts on the input and output domains as below: For any $g = (Q,L,\tt) \in G=O(m) \times \left( GL(m) \ltimes \RR^m \right)$,
+\begin{align*}
+    g \cdot \xx := L\xx+\tt, \ \xx \in X, \quad  %
+    g \cdot \yy := \urep_g[\yy] := Q \yy, \ \yy \in Y.
+\end{align*}
+Namely, the group actions of both $O(m)$ on $X$ and $\aff(m)$ on $Y$ are trivial.
+
+Let $\pi$ be the unitary representation of $G$ on the vector-valued square-integrable functions $\ff \in L^2(X;Y)$, defined by
+\begin{align*}
+\pi_g[\ff](\xx) := |\det L|^{-1/2} Q \ff(L^{-1}(\xx - \tt)), \quad 
+\xx \in X%
+\end{align*}
+for each $g = (Q,L,\tt) \in O(m) \times ( GL(m) \ltimes \RR^m )$.
+\begin{lemma} \label{lem:oaff.irrep}
+The above $\pi : G \to \calU(L^2(\RR^m;\RR^m))$ is irreducible.
+\end{lemma}
+
+See \cref{sec:proof.oaff.irrep} for the proof.
+Additionally, we put the dual action of $G$ on parameter domain $\Xi_i$ as below:
+\begin{align*}
+    g \cdot (A_i,\bb_i,C_i) :=
+   \begin{cases}
+    (A_i L^{-1}, \bb_i + A_i L^{-1} \tt, C_i), & i=1\\
+    (A_i, \bb_i, C_i), & i \neq 1, n\\
+    (A_i, \bb_i, QC_i), & i = n
+   \end{cases}
+\end{align*}
+for all $g = (Q,L,\tt) \in O(m) \times (GL(m) \ltimes \RR^m), \ (A_i,\bb_i,C_i) \in \Xi_i$.
+
+Then, the composition of feature maps $\phi_{1:n}(\xx,\xxi_{1:n}) := \phi_n(\bullet, \xxi_n) \circ \cdots \circ \phi_1(\xx,\xxi_1)$ is joint-$G$-equivariant. In fact,
+	\begin{align*}
+		\phi_1( g \cdot \xx, g \cdot \xxi_1 )
+		&= C_1\sigma\left( A_1L^{-1} (L\xx+\tt) - (\bb_1 + A_1L^{-1}\tt)\right)\\
+        &= C_1\sigma(A_1\xx-\bb_1)
+		= \phi_1( \xx, \xxi_1 ),\\
+		\phi_i( \xx, g \cdot \xxi_i )
+        &= C_i\sigma(A_i\xx-\bb_i)
+		= \phi_i( \xx, \xxi_i ), \quad i \neq 1,n\\
+		\phi_n( \xx, g \cdot \xxi_n )
+        &= Q C_n\sigma(A_n\xx-\bb_n)
+		= g \cdot \phi_n( \xx, \xxi_n ),
+	\end{align*}
+Therefore $\phi_{1:n}( g \cdot \xx, g \cdot \xxi_{1:n} )=g \cdot \phi_{1:n}( \xx, \xxi_{1:n} )$.
+
+So by putting depth-$n$ neural network and the corresponding ridgelet transform as below
+	\begin{align*}
+		\dnn[\gamma;\phi_{1:n}](\xx) &= \int_{\Xi_{1:n}} \gamma(\xxi_{1:n}) \phi_{1:n}(\xx,\xxi_{1:n}) \dd \xxi_{1:n}, \\%\label{eq:dnn04ex01}\\
+		\ridge[\ff;\psi_{1:n}](\xxi_{1:n}) &= \int_{\RR^m} \ff(\xx) \cdot \overline{\psi_{1:n}(\xx,\xxi_{1:n})}\dd\xx, %
+	\end{align*}
+\cref{thm:main} yields the reconstruction formula $\dnn_{\phi_{1:n}} \circ \ridge_{\psi_{1:n}} = \iiprod{\phi_{1:n},\psi_{1:n}} \id_{L^2(\RR^m;\RR^m)}$.
+

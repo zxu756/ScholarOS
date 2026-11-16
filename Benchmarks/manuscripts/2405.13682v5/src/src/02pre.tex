@@ -1,0 +1,40 @@
+\section{Preliminaries}
+We quickly overview the original integral representation and the ridgelet transform, a mathematical model of depth-2 fully-connected network and its right inverse. Then, we list a few facts in the group representation theory.
+In particular, \emph{Schur's lemma} play key roles in the proof of the main results.
+
+\paragraph{Notation.}
+For any topological space $X$, $C_c(X)$ denotes the Banach space of all compactly supported continuous functions on $X$.
+For any measure space $X$, $L^p(X)$ denotes the Banach space of all $p$-integrable functions on $X$.
+$\calS(\RR^d)$ and $\calS'(\RR^d)$ denote the classes of rapidly decreasing functions (or Schwartz test functions) and tempered distributions on $\RR^d$, respectively. 
+
+\input{src/supp-ridgelet-quick}
+
+\subsection{Irreducible Representation and Schur's Lemma}
+In the main theorem, we use \emph{Schur's lemma}, a fundamental theorem from group representation theory. 
+We refer to \citet{Folland2015} for more details on group representation and harmonic analysis on groups.
+
+In this study, we assume group $G$ to be \emph{locally compact}. This is a sufficient condition for having invariant measures. It is not a strong assumption. For example, any finite group, discrete group, compact group, and finite-dimensional Lie group are locally compact, while an \emph{infinite}-dimensional Lie group is \emph{not} locally compact.
+
+Let $\calH$ be a nonzero Hilbert space, and
+$\calU(\calH)$ be the group of unitary operators on $\calH$. A \emph{unitary representation} $\pi$ of $G$ on $\calH$ is a group homomorphism that is continuous with respect to the strong operator topology---that is, 
+a map $\pi : G \to \calU(\calH)$ satisfying $\pi_{gh} = \pi_g\pi_h$ and $\pi_{g^{-1}}=\pi_g^{-1}$, and for any $\psi \in \calH$, the map $G \ni g \mapsto \pi_g[\psi] \in \calH$ is continuous.
+
+Suppose $\calM$ is a closed subspace of $\calH$. $\calM$ is called an \emph{invariant} subspace when $\pi_g[\calM] \subset \calM$ for all $g \in G$. Particularly, $\pi$ is called \emph{irreducible} when it has only trivial invariant subspaces, namely $\{0\}$ and the whole space $\calH$.
+The following theorem is a basic and useful characterization of irreducible representations.
+\begin{theorem}[Schur's lemma] \label{thm:schur}
+A unitary representation $\pi : G \to \calU(\calH)$ is irreducible iff 
+any bounded operator $T$ on $\calH$ that commutes with $\pi$ is always a constant multiple of the identity. In other words, if $\pi_g \circ T=T \circ \pi_g$ for all $g \in G$, then $T=c \id_{\calH}$ for some $c \in \CC$.
+\end{theorem}
+See %
+\citet[Theorem~3.5(a)]{Folland2015} for the proof. %
+As we will see in the proof of the main theorem, an irreducible representation (or more generally, a \emph{simple object}) is a standard unit for expressive power. Namely, suppose $X$ is a simple object (such as a simple abelian group, and an irreducible representation), 
+and $N$ is a non-trivial sub-object (such as a normal group, and a sub-representation), then we can conclude $N=X$, which means the universality of $N$ in $X$. Schur's lemma restates this in terms of morphism. That is, the commutative property $\pi \circ T = T \circ \pi$ implies $T$ is a homomorphism, and thus it has to be either zero or identity.
+
+As a concrete example of an irreducible representation, we use the following regular representation of the affine group $\aff(m)$ on $L^2(\RR^m)$.
+\begin{theorem} \label{thm:aff.irrep}
+Let $G := \aff(m) := GL(m) \ltimes \RR^m$ be the affine group acting on $X=\RR^m$ by $(L,\tt) \cdot \xx = L\xx+\tt$, and let $\calH := L^2(\RR^m)$ be the Hilbert space of square-integrable functions.
+Let $\pi : \aff(m) \to \calU(L^2(\RR^m))$ be the regular representation of the affine group $\aff(m)$ on $L^2(\RR^m)$, namely $\pi_g[f](\xx) := |\det L|^{-1/2} f( L^{-1}(\xx-\tt) )$ for any $g=(L,\tt) \in G$. Then $\pi$ is irreducible.
+\end{theorem}
+See \cref{sec:irrep.affine} for the proof.
+
+

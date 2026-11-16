@@ -1,0 +1,288 @@
+\begin{thebibliography}{53}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Abbas et~al.(2022)Abbas, Xiao, Chen, Chen, and Chen]{abbas2022sharp}
+Abbas, M., Xiao, Q., Chen, L., Chen, P.-Y., and Chen, T.
+\newblock Sharp-maml: Sharpness-aware model-agnostic meta learning.
+\newblock \emph{arXiv preprint arXiv:2206.03996}, 2022.
+
+\bibitem[Aronszajn(1950)]{rkhsinfinitedim}
+Aronszajn, N.
+\newblock Theory of reproducing kernels.
+\newblock \emph{Transactions of the American Mathematical Society}, 68\penalty0 (3):\penalty0 337--404, 1950.
+
+\bibitem[Bahri et~al.(2022)Bahri, Mobahi, and Tay]{bahri-etal-2022-sharpness}
+Bahri, D., Mobahi, H., and Tay, Y.
+\newblock Sharpness-aware minimization improves language model generalization.
+\newblock In \emph{Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pp.\  7360--7371, Dublin, Ireland, May 2022. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2022.acl-long.508}.
+\newblock URL \url{https://aclanthology.org/2022.acl-long.508}.
+
+\bibitem[Blundell et~al.(2015)Blundell, Cornebise, Kavukcuoglu, and Wierstra]{blundell2015weight}
+Blundell, C., Cornebise, J., Kavukcuoglu, K., and Wierstra, D.
+\newblock Weight uncertainty in neural network.
+\newblock In \emph{International conference on machine learning}, pp.\  1613--1622. PMLR, 2015.
+
+\bibitem[Caldarola et~al.(2022)Caldarola, Caputo, and Ciccone]{caldarola2022improving}
+Caldarola, D., Caputo, B., and Ciccone, M.
+\newblock Improving generalization in federated learning by seeking flat minima.
+\newblock In \emph{European Conference on Computer Vision}, pp.\  654--672. Springer, 2022.
+
+\bibitem[Cha et~al.(2021)Cha, Chun, Lee, Cho, Park, Lee, and Park]{cha2021swad}
+Cha, J., Chun, S., Lee, K., Cho, H.-C., Park, S., Lee, Y., and Park, S.
+\newblock Swad: Domain generalization by seeking flat minima.
+\newblock \emph{Advances in Neural Information Processing Systems}, 34:\penalty0 22405--22418, 2021.
+
+\bibitem[Chaudhari et~al.(2017)Chaudhari, Choromańska, Soatto, LeCun, Baldassi, Borgs, Chayes, Sagun, and Zecchina]{Chaudhari2017EntropySGDBG}
+Chaudhari, P., Choromańska, A., Soatto, S., LeCun, Y., Baldassi, C., Borgs, C., Chayes, J.~T., Sagun, L., and Zecchina, R.
+\newblock Entropy-sgd: biasing gradient descent into wide valleys.
+\newblock \emph{Journal of Statistical Mechanics: Theory and Experiment}, 2019, 2017.
+
+\bibitem[Chen et~al.(2014)Chen, Fox, and Guestrin]{chen2014stochastic}
+Chen, T., Fox, E., and Guestrin, C.
+\newblock Stochastic gradient {H}amiltonian {M}onte {C}arlo.
+\newblock In \emph{International conference on machine learning}, pp.\  1683--1691. PMLR, 2014.
+
+\bibitem[Chen et~al.(2021)Chen, Hsieh, and Gong]{chen2021vision}
+Chen, X., Hsieh, C.-J., and Gong, B.
+\newblock When vision transformers outperform resnets without pre-training or strong data augmentations.
+\newblock In \emph{International Conference on Learning Representations (ICLR)}, 2021.
+
+\bibitem[Deng et~al.(2009)Deng, Dong, Socher, Li, Li, and Fei-Fei]{imagenet}
+Deng, J., Dong, W., Socher, R., Li, L.-J., Li, K., and Fei-Fei, L.
+\newblock Imagenet: A large-scale hierarchical image database.
+\newblock In \emph{2009 IEEE Conference on Computer Vision and Pattern Recognition}, pp.\  248--255, 2009.
+\newblock \doi{10.1109/CVPR.2009.5206848}.
+
+\bibitem[Dinh et~al.(2017)Dinh, Pascanu, Bengio, and Bengio]{dinh2017sharp}
+Dinh, L., Pascanu, R., Bengio, S., and Bengio, Y.
+\newblock Sharp minima can generalize for deep nets.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  1019--1028. PMLR, 2017.
+
+\bibitem[Dosovitskiy(2021)]{vit}
+Dosovitskiy, A.
+\newblock An image is worth 16x16 words: Transformers for image recognition at scale.
+\newblock In \emph{International Conference on Learning Representations (ICLR)}, 2021.
+
+\bibitem[Dusenberry et~al.(2020)Dusenberry, Jerfel, Wen, Ma, Snoek, Heller, Lakshminarayanan, and Tran]{dusenberry2020efficient}
+Dusenberry, M., Jerfel, G., Wen, Y., Ma, Y., Snoek, J., Heller, K., Lakshminarayanan, B., and Tran, D.
+\newblock Efficient and scalable {B}ayesian neural nets with rank-1 factors.
+\newblock In \emph{International conference on machine learning}, pp.\  2782--2792. PMLR, 2020.
+
+\bibitem[Dziugaite \& Roy(2017)Dziugaite and Roy]{DBLP:conf/uai/DziugaiteR17}
+Dziugaite, G.~K. and Roy, D.~M.
+\newblock Computing nonvacuous generalization bounds for deep (stochastic) neural networks with many more parameters than training data.
+\newblock In \emph{{UAI}}. {AUAI} Press, 2017.
+
+\bibitem[Foret et~al.(2021)Foret, Kleiner, Mobahi, and Neyshabur]{sam}
+Foret, P., Kleiner, A., Mobahi, H., and Neyshabur, B.
+\newblock Sharpness-aware minimization for efficiently improving generalization.
+\newblock In \emph{9th International Conference on Learning Representations, {ICLR} 2021, Virtual Event, Austria, May 3-7, 2021}. OpenReview.net, 2021.
+\newblock URL \url{https://openreview.net/forum?id=6Tm1mposlrM}.
+
+\bibitem[Fort \& Ganguli(2019)Fort and Ganguli]{fort2019emergent}
+Fort, S. and Ganguli, S.
+\newblock Emergent properties of the local geometry of neural loss landscapes.
+\newblock \emph{arXiv preprint arXiv:1910.05929}, 2019.
+
+\bibitem[Ghosh et~al.(2018)Ghosh, Yao, and Doshi-Velez]{ghosh2018structured}
+Ghosh, S., Yao, J., and Doshi-Velez, F.
+\newblock Structured variational learning of {B}ayesian neural networks with horseshoe priors.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  1744--1753. PMLR, 2018.
+
+\bibitem[Graves(2011)]{graves2011practical}
+Graves, A.
+\newblock Practical variational inference for neural networks.
+\newblock \emph{Advances in Neural Information Processing Systems}, 24, 2011.
+
+\bibitem[Gupta \& Nagar(2018)Gupta and Nagar]{gupta2018matrix}
+Gupta, A.~K. and Nagar, D.~K.
+\newblock \emph{Matrix variate distributions}.
+\newblock Chapman and Hall/CRC, 2018.
+
+\bibitem[Hochreiter \& Schmidhuber(1994)Hochreiter and Schmidhuber]{DBLP:conf/nips/HochreiterS94}
+Hochreiter, S. and Schmidhuber, J.
+\newblock Simplifying neural nets by discovering flat minima.
+\newblock In \emph{{NIPS}}, pp.\  529--536. {MIT} Press, 1994.
+
+\bibitem[Houlsby et~al.(2019)Houlsby, Giurgiu, Jastrzebski, Morrone, De~Laroussilhe, Gesmundo, Attariyan, and Gelly]{adapter}
+Houlsby, N., Giurgiu, A., Jastrzebski, S., Morrone, B., De~Laroussilhe, Q., Gesmundo, A., Attariyan, M., and Gelly, S.
+\newblock Parameter-efficient transfer learning for {NLP}.
+\newblock In Chaudhuri, K. and Salakhutdinov, R. (eds.), \emph{Proceedings of the 36th International Conference on Machine Learning}, volume~97 of \emph{Proceedings of Machine Learning Research}, pp.\  2790--2799. PMLR, 09--15 Jun 2019.
+\newblock URL \url{https://proceedings.mlr.press/v97/houlsby19a.html}.
+
+\bibitem[Hu et~al.(2022)Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang, and Chen]{lora}
+Hu, E.~J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., and Chen, W.
+\newblock Lora: Low-rank adaptation of large language models.
+\newblock In \emph{ICLR}. OpenReview.net, 2022.
+\newblock URL \url{http://dblp.uni-trier.de/db/conf/iclr/iclr2022.html#HuSWALWWC22}.
+
+\bibitem[Izmailov et~al.(2018)Izmailov, Podoprikhin, Garipov, Vetrov, and Wilson]{DBLP:conf/uai/IzmailovPGVW18}
+Izmailov, P., Podoprikhin, D., Garipov, T., Vetrov, D.~P., and Wilson, A.~G.
+\newblock Averaging weights leads to wider optima and better generalization.
+\newblock In \emph{{UAI}}, pp.\  876--885. {AUAI} Press, 2018.
+
+\bibitem[Jiang et~al.(2020)Jiang, Neyshabur, Mobahi, Krishnan, and Bengio]{DBLP:conf/iclr/JiangNMKB20}
+Jiang, Y., Neyshabur, B., Mobahi, H., Krishnan, D., and Bengio, S.
+\newblock Fantastic generalization measures and where to find them.
+\newblock In \emph{{ICLR}}. OpenReview.net, 2020.
+
+\bibitem[Kaddour et~al.(2022)Kaddour, Liu, Silva, and Kusner]{kaddour}
+Kaddour, J., Liu, L., Silva, R., and Kusner, M.~J.
+\newblock Questions for flat-minima optimization of modern neural networks.
+\newblock \emph{CoRR}, abs/2202.00661, 2022.
+\newblock URL \url{https://arxiv.org/abs/2202.00661}.
+
+\bibitem[Keskar et~al.(2017)Keskar, Nocedal, Tang, Mudigere, and Smelyanskiy]{keskar2017large}
+Keskar, N.~S., Nocedal, J., Tang, P. T.~P., Mudigere, D., and Smelyanskiy, M.
+\newblock On large-batch training for deep learning: Generalization gap and sharp minima.
+\newblock In \emph{5th International Conference on Learning Representations, ICLR 2017}, 2017.
+
+\bibitem[Kim \& Hospedales(2023)Kim and Hospedales]{bayestune}
+Kim, M. and Hospedales, T.
+\newblock Bayestune: Bayesian sparse deep model fine-tuning.
+\newblock In \emph{Advances in Neural Information Processing Systems 36 (NeurIPS 2023)}, volume~36, pp.\  65317--65365. Curran Associates Inc, December 2023.
+\newblock URL \url{https://neurips.cc/Conferences/2023}.
+\newblock Thirty-Seventh Conference on Neural Information Processing Systems, NeurIPS 2023 ; Conference date: 10-12-2023 Through 16-12-2023.
+
+\bibitem[Kim et~al.(2022)Kim, Li, Hu, and Hospedales]{fishersam}
+Kim, M., Li, D., Hu, S., and Hospedales, T.
+\newblock Fisher sam: Information geometry and sharpness aware minimisation.
+\newblock In Chaudhuri, K., Jegelka, S., Song, L., Szepesvari, C., Niu, G., and Sabato, S. (eds.), \emph{Proceedings of the 39th International Conference on Machine Learning}, Proceedings of Machine Learning Research, pp.\  11148--11161. PMLR, July 2022.
+\newblock URL \url{https://icml.cc/Conferences/2022}.
+\newblock 39th International Conference on Machine Learning, ICML 2022 ; Conference date: 17-07-2022 Through 23-07-2022.
+
+\bibitem[Kingma \& Welling(2014)Kingma and Welling]{kingma2013auto}
+Kingma, D.~P. and Welling, M.
+\newblock {Auto-Encoding Variational Bayes}.
+\newblock In \emph{2nd International Conference on Learning Representations, {ICLR} 2014, Banff, AB, Canada, April 14-16, 2014, Conference Track Proceedings}, 2014.
+
+\bibitem[Kingma et~al.(2015)Kingma, Salimans, and Welling]{kingma2015variational}
+Kingma, D.~P., Salimans, T., and Welling, M.
+\newblock Variational dropout and the local reparameterization trick.
+\newblock \emph{Advances in Neural Information Processing Systems}, 28, 2015.
+
+\bibitem[Kreyszig(1978)]{functional_analysis}
+Kreyszig, E.
+\newblock \emph{Introductory Functional Analysis with Applications}.
+\newblock John Wiley \& Sons, 1978.
+
+\bibitem[Lakshminarayanan et~al.(2017)Lakshminarayanan, Pritzel, and Blundell]{deepens}
+Lakshminarayanan, B., Pritzel, A., and Blundell, C.
+\newblock Simple and scalable predictive uncertainty estimation using deep ensembles, 2017.
+\newblock URL \url{https://arxiv.org/abs/1612.01474}.
+
+\bibitem[Li et~al.(2022)Li, Wang, and Li]{li2022}
+Li, Z., Wang, Z., and Li, J.
+\newblock Analyzing sharpness along gd trajectory: Progressive sharpening and edge of stability, 2022.
+
+\bibitem[Liu \& Wang(2016)Liu and Wang]{svgd}
+Liu, Q. and Wang, D.
+\newblock Stein variational gradient descent: A general purpose {B}ayesian inference algorithm.
+\newblock \emph{Advances in Neural Information Processing Systems}, 29, 2016.
+
+\bibitem[Louizos \& Welling(2017)Louizos and Welling]{louizos2017multiplicative}
+Louizos, C. and Welling, M.
+\newblock Multiplicative normalizing flows for variational {B}ayesian neural networks.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  2218--2227. PMLR, 2017.
+
+\bibitem[M{\"o}llenhoff \& Khan(2023)M{\"o}llenhoff and Khan]{llenhoff2023sam}
+M{\"o}llenhoff, T. and Khan, M.~E.
+\newblock {SAM} as an optimal relaxation of bayes.
+\newblock In \emph{The Eleventh International Conference on Learning Representations}, 2023.
+\newblock URL \url{https://openreview.net/forum?id=k4fevFqSQcX}.
+
+\bibitem[Neal(1996)]{Neal_Bayesian}
+Neal, R.~M.
+\newblock \emph{Bayesian Learning for Neural Networks}.
+\newblock Springer-Verlag, Berlin, Heidelberg, 1996.
+\newblock ISBN 0387947248.
+
+\bibitem[Neyshabur et~al.(2017)Neyshabur, Bhojanapalli, McAllester, and Srebro]{neyshabur2017exploring}
+Neyshabur, B., Bhojanapalli, S., McAllester, D., and Srebro, N.
+\newblock Exploring generalization in deep learning.
+\newblock \emph{Advances in Neural Information Processing Systems}, 30, 2017.
+
+\bibitem[Nguyen et~al.(2023)Nguyen, Vuong, Phan, Do, Phung, and Le]{va2023_flat_Bayes}
+Nguyen, V.-A., Vuong, T.-L., Phan, H., Do, T.-T., Phung, D., and Le, T.
+\newblock Flat seeking {B}ayesian neural networks.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2023.
+
+\bibitem[Pereyra et~al.(2017)Pereyra, Tucker, Chorowski, Kaiser, and Hinton]{DBLP:conf/iclr/PereyraTCKH17}
+Pereyra, G., Tucker, G., Chorowski, J., Kaiser, L., and Hinton, G.~E.
+\newblock Regularizing neural networks by penalizing confident output distributions.
+\newblock In \emph{{ICLR} (Workshop)}. OpenReview.net, 2017.
+
+\bibitem[Petzka et~al.(2021)Petzka, Kamp, Adilova, Sminchisescu, and Boley]{DBLP:conf/nips/PetzkaKASB21}
+Petzka, H., Kamp, M., Adilova, L., Sminchisescu, C., and Boley, M.
+\newblock Relative flatness and generalization.
+\newblock In \emph{NeurIPS}, pp.\  18420--18432, 2021.
+
+\bibitem[Pham et~al.(2025)Pham, Truong, Tran, Nguyen, Phung, and Le]{quan2025promoting}
+Pham, N.-Q., Truong, T., Tran, Q., Nguyen, T.~M., Phung, D., and Le, T.
+\newblock Promoting ensemble diversity with interactive bayesian distributional robustness for fine-tuning foundation models.
+\newblock In \emph{Proceedings of the 42st International Conference on Machine Learning (ICML)}, Proceedings of Machine Learning Research, Vancouver, Canada, 2025. PMLR.
+
+\bibitem[Qu et~al.(2022)Qu, Li, Duan, Liu, Tang, and Lu]{qu2022generalized}
+Qu, Z., Li, X., Duan, R., Liu, Y., Tang, B., and Lu, Z.
+\newblock Generalized federated learning via sharpness aware minimization.
+\newblock In Chaudhuri, K., Jegelka, S., Song, L., Szepesvari, C., Niu, G., and Sabato, S. (eds.), \emph{Proceedings of the 39th International Conference on Machine Learning}, volume 162 of \emph{Proceedings of Machine Learning Research}, pp.\  18250--18280. PMLR, 17--23 Jul 2022.
+\newblock URL \url{https://proceedings.mlr.press/v162/qu22a.html}.
+
+\bibitem[Ritter et~al.(2018)Ritter, Botev, and Barber]{ritter2018scalable}
+Ritter, H., Botev, A., and Barber, D.
+\newblock A scalable laplace approximation for neural networks.
+\newblock In \emph{6th International Conference on Learning Representations, ICLR 2018-Conference Track Proceedings}, volume~6. International Conference on Representation Learning, 2018.
+
+\bibitem[Rossi et~al.(2020)Rossi, Marmin, and Filippone]{rossi2020walsh}
+Rossi, S., Marmin, S., and Filippone, M.
+\newblock Walsh-{H}adamard variational inference for {B}ayesian deep learning.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33:\penalty0 9674--9686, 2020.
+
+\bibitem[Shalev-Shwartz \& Ben-David(2014)Shalev-Shwartz and Ben-David]{uml}
+Shalev-Shwartz, S. and Ben-David, S.
+\newblock \emph{Understanding Machine Learning: From Theory to Algorithms}.
+\newblock Cambridge University Press, 2014.
+\newblock ISBN 978-1-107-05713-5.
+
+\bibitem[Wang et~al.(2023)Wang, Zhang, Lei, and Zhang]{wang2023sharpness}
+Wang, P., Zhang, Z., Lei, Z., and Zhang, L.
+\newblock Sharpness-aware gradient matching for domain generalization.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pp.\  3769--3778, 2023.
+
+\bibitem[Welling \& Teh(2011)Welling and Teh]{sgld}
+Welling, M. and Teh, Y.~W.
+\newblock Bayesian learning via stochastic gradient {L}angevin dynamics.
+\newblock In \emph{Proceedings of the 28th International Conference on International Conference on Machine Learning}, ICML'11, pp.\  681–688, Madison, WI, USA, 2011. Omnipress.
+\newblock ISBN 9781450306195.
+
+\bibitem[Yang et~al.(2023)Yang, Su, and Ji]{sada_jem}
+Yang, X., Su, Q., and Ji, S.
+\newblock Towards bridging the performance gaps of joint energy-based models.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pp.\  15732--15741, June 2023.
+
+\bibitem[Zhai et~al.(2020)Zhai, Puigcerver, Kolesnikov, Ruyssen, Riquelme, Lucic, Djolonga, Pinto, Neumann, Dosovitskiy, Beyer, Bachem, Tschannen, Michalski, Bousquet, Gelly, and Houlsby]{vtab}
+Zhai, X., Puigcerver, J., Kolesnikov, A., Ruyssen, P., Riquelme, C., Lucic, M., Djolonga, J., Pinto, A.~S., Neumann, M., Dosovitskiy, A., Beyer, L., Bachem, O., Tschannen, M., Michalski, M., Bousquet, O., Gelly, S., and Houlsby, N.
+\newblock A large-scale study of representation learning with the visual task adaptation benchmark, 2020.
+\newblock URL \url{https://arxiv.org/abs/1910.04867}.
+
+\bibitem[Zhang et~al.(2018)Zhang, Sun, Duvenaud, and Grosse]{zhang2018noisy}
+Zhang, G., Sun, S., Duvenaud, D., and Grosse, R.
+\newblock Noisy natural gradient as variational inference.
+\newblock In \emph{International Conference on Machine Learning}, pp.\  5852--5861. PMLR, 2018.
+
+\bibitem[Zhang et~al.(2023)Zhang, Xu, Yu, Dong, Tian, and Cui]{zhang2023flatness}
+Zhang, X., Xu, R., Yu, H., Dong, Y., Tian, P., and Cui, P.
+\newblock Flatness-aware minimization for domain generalization.
+\newblock In \emph{Proceedings of the IEEE/CVF International Conference on Computer Vision}, pp.\  5189--5202, 2023.
+
+\bibitem[Zhou et~al.(2024)Zhou, Suh, Cheng, and Huo]{rkhsapprox}
+Zhou, T.-Y., Suh, N., Cheng, G., and Huo, X.
+\newblock Approximation of {RKHS} functionals by neural networks, 2024.
+\newblock URL \url{https://arxiv.org/abs/2403.12187}.
+
+\end{thebibliography}

@@ -1,0 +1,35 @@
+{
+ "paper": "fixture-bib-fields",
+ "generated_utc": "2026-11-16T21:25:21Z",
+ "generator": "Tectonic 0.17.0, bundle https://relay.fullyjustified.net/default_bundle_v33.tar, --untrusted --keep-intermediates --keep-logs",
+ "aux_files": [
+  "main.aux"
+ ],
+ "cite_keys": [
+  "conf2020",
+  "paper1",
+  "paper2",
+  "web1",
+  "web2"
+ ],
+ "nocite_star": false,
+ "bibcite_keys": [
+  "conf2020",
+  "paper1",
+  "paper2",
+  "web1",
+  "web2"
+ ],
+ "labels": [],
+ "excluded_internal_labels": [],
+ "latex_log": {
+  "undefined_citations": [],
+  "undefined_references": [],
+  "multiply_defined_labels": []
+ },
+ "bibtex_log": {
+  "missing_entries": [],
+  "error_messages": 0,
+  "ran": true
+ }
+}

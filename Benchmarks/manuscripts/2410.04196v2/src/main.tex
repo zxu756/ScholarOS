@@ -1,0 +1,194 @@
+%%%%%%%% ICML 2025 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+\input{math_commands.tex}
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{multirow}
+\usepackage{colortbl}
+\newcommand*\rot{\rotatebox{90}}
+\usepackage{subcaption}     % For creating subfigures
+\usepackage{listings}
+\lstset{
+  basicstyle=\fontsize{9}{11}\selectfont\ttfamily
+}
+
+\usepackage{wrapfig,lipsum,booktabs}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs} % for professional tables
+\definecolor{mygreen}{RGB}{0, 128, 0}
+\definecolor{myorange}{RGB}{255, 140, 0}
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2025} with \usepackage[nohyperref]{icml2025} above.
+\usepackage{hyperref}
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2025}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2025}
+
+% For theorems and such
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Improving Generalization with Flat Hilbert Bayesian Inference.}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Improving Generalization with Flat Hilbert Bayesian Inference}
+
+% It is OKAY to include author information, even for blind
+% submissions: the style file will automatically remove it for you
+% unless you've provided the [accepted] option to the icml2025
+% package.
+
+% List of affiliations: The first argument should be a (short)
+% identifier you will use later to specify author affiliations
+% Academic affiliations should list Department, University, City, Region, Country
+% Industry affiliations should list Company, City, Region, Country
+
+% You can specify symbols, otherwise they are numbered in order.
+% Ideally, you should not use this facility. Affiliations will be numbered
+% in order of appearance and this is the preferred way.
+\icmlsetsymbol{equal}{*}
+
+\begin{icmlauthorlist}
+\icmlauthor{Tuan Truong}{equal,qualcomm}
+\icmlauthor{Quyen Tran}{equal,qualcomm}
+\icmlauthor{Ngoc-Quan Pham}{qualcomm}
+\icmlauthor{Nhat Ho}{ut}
+\icmlauthor{Dinh Phung}{qualcomm,monash}
+\icmlauthor{Trung Le}{monash}
+%\icmlauthor{Firstname7 Lastname7}{comp}
+%\icmlauthor{}{sch}
+%\icmlauthor{Firstname8 Lastname8}{sch}
+%\icmlauthor{Firstname8 Lastname8}{yyy,comp}
+%\icmlauthor{}{sch}
+%\icmlauthor{}{sch}
+\end{icmlauthorlist}
+
+\icmlaffiliation{qualcomm}{Qualcomm AI Research, Qualcomm Vietnam Company Limited}
+\icmlaffiliation{monash}{Monash University, Australia}
+\icmlaffiliation{ut}{The University of Texas at Austin, USA}
+
+\icmlcorrespondingauthor{Tuan Truong}{tuantruo@qti.qualcomm.com}
+%\icmlcorrespondingauthor{Trung Le}{trunglm@monash.edu}
+
+% You may provide any keywords that you
+% find helpful for describing your paper; these are used to populate
+% the "keywords" metadata in the PDF, but will not be shown in the document
+\icmlkeywords{Machine Learning, ICML, SAM, Sharpness, Bayesian Inference, LoRA}
+
+\vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column
+% listing the affiliations and the copyright notice.
+% The command takes one argument, which is text to display at the start of the footnote.
+% The \icmlEqualContribution command is standard text for equal contribution.
+% Remove it (just {}) if you do not need this facility.
+
+%\printAffiliationsAndNotice{}  % leave blank if no need to mention equal contribution
+\printAffiliationsAndNotice{\icmlEqualContribution} % otherwise use the standard text.
+
+\begin{abstract}
+We introduce Flat Hilbert Bayesian Inference (FHBI), an algorithm designed to enhance generalization in Bayesian inference. Our approach involves an iterative two-step procedure with an adversarial functional perturbation step and a functional descent step within a reproducing kernel Hilbert space. This methodology is supported by a theoretical analysis that extends previous findings on generalization ability from finite-dimensional Euclidean spaces to infinite-dimensional functional spaces. To evaluate the effectiveness of FHBI, we conduct comprehensive comparisons against nine baseline methods on the \texttt{VTAB-1K} benchmark, which encompasses 19 diverse datasets across various domains with diverse semantics. Empirical results demonstrate that FHBI consistently outperforms the baselines by notable margins, highlighting its practical efficacy. 
+
+% Our code is available at \href{https://github.com/tuantruongubc/Flat-Hilbert-Variational-Inference.git}{this repo}.
+\end{abstract}
+
+\section{Introduction}
+\label{section: introduction}
+\input{sections/introduction}
+
+\section{Related Works}
+\label{section: related works}
+\input{sections/related_works}
+
+\section{Backgrounds and Notations}
+\label{section: preliminaries}
+\input{sections/preliminaries}
+
+\section{Flat Hilbert Bayesian Inference (FHBI)}
+\label{section: methodology}
+\input{sections/methodology}
+
+\section{Experiments}
+\label{section: experiments}
+\input{sections/experiments}
+
+\section{Ablation Studies: Particles Sharpness and Gradient Diversity}
+\label{section: ablation}
+\input{sections/ablation}
+
+\section{Conclusion}
+\input{sections/conclusion}
+
+\paragraph{Limitations and Future Directions.}
+
+Similar to other particle-based methods, FHBI needs to store multiple models. Although it remains well-suited for fine-tuning since the additional modules are typically lightweight, this requirement is a memory bottleneck for larger models. Given that the variational inference approaches can alleviate this issue, an avenue for future research is to extend the concept of \textit{sharpness over functional spaces} introduced by our theory to the VI techniques to improve the generalization of these methods without storing multiple models.
+
+\section*{Acknowledgments}
+Trung Le was partly supported by ARC DP23 grant DP230101176 and by the Air Force Office of Scientific Research under award number FA9550-23-S-0001.
+
+
+\section*{Impact Statement}
+This paper presents work to advance the field of Machine Learning. There are potential societal consequences of our work, none of which we feel must be highlighted.
+
+\bibliography{fhbi}
+\bibliographystyle{icml2025}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\onecolumn
+\input{sections/appendix}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}
+

@@ -1,0 +1,382 @@
+\begin{thebibliography}{10}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\texttt{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\expandafter\ifx\csname href\endcsname\relax
+  \def\href#1#2{#2} \def\path#1{#1}\fi
+
+\bibitem{Mot14}
+A.~Motter, D.~Campbell, Chaos at fifty., Phys. Today 66 (2013) 27--33.
+
+\bibitem{Rue14}
+D.~Ruelle, Early chaos theory., Phys. Today 67 (2014) 9--10.
+
+\bibitem{Poincare_celestial_dynamics}
+H.~Poincar'e, New methods of celestial mechanics, Vol.~13, 1992.
+
+\bibitem{ButterFly}
+E.~Lorenz, Deterministic nonperiodic flow, J. Atmos. Sci. 20 (1963) 130.
+
+\bibitem{Gil98}
+R.~Gilmore, Topological analysis of chaotic dynamical systems, Rev. Mod. Phys.
+  70 (1998) 1455--1529.
+
+\bibitem{Gilmore_book}
+R.~Gilmore, M.~Lefranc, The Topology of Chaos: Alice in Stretch and Squeeze
+  land, Wiley, New York, 2002.
+
+\bibitem{RevModPhys.57.617}
+J.~Eckmann, D.~Ruelle, Ergodic theory of chaos and strange attractors., Rev.
+  Mod. Phys. 57 (1985) 617--656.
+
+\bibitem{Chaos_book_1}
+R.~Devaney, A First Course in Chaotic Dynamical Systems: Theory and Experiment,
+  Addison-Wesley, 1992.
+
+\bibitem{Chaos_book_2017}
+S.~Strogatz, Nonlinear Dynamics and Chaos: With Applications to Physics,
+  Biology, Chemistry, and Engineering (2nd ed.)., CRC Press., 2015.
+
+\bibitem{10.1063/5.0025924}
+S.~Mangiarotti, C.~Letellier, {Topological characterization of toroidal chaos:
+  A branched manifold for the Deng toroidal attractor}, Chaos: An
+  Interdisciplinary Journal of Nonlinear Science 31~(1) (2021) 013129.
+
+\bibitem{Yorke_1975}
+T.-Y. Li, J.~A. Yorke, Period three implies chaos, The American Mathematical
+  Monthly 82~(10) (1975) 985--992.
+
+\bibitem{TransientChaos2015}
+T.~Tél, The joy of transient chaos, Chaos: An Interdisciplinary Journal of
+  Nonlinear Science 25~(9) (2015) 097619.
+
+\bibitem{Intermittency_Review}
+S.~Elaskar, E.~del Río, Review of chaotic intermittency, Symmetry 15~(6)
+  (2023).
+
+\bibitem{Baxendale.10.1007/BFb0076851}
+P.~H. Baxendale, The lyapunov spectrum of a stochastic flow of diffeomorphisms,
+  in: L.~Arnold, V.~Wihstutz (Eds.), Lyapunov Exponents, Springer Berlin
+  Heidelberg, Berlin, Heidelberg, 1986, pp. 322--337.
+
+\bibitem{Arnold.10.1007/BFb0076835}
+L.~Arnold, W.~Kliemann, E.~Oeljeklaus, Lyapunov exponents of linear stochastic
+  systems, in: L.~Arnold, V.~Wihstutz (Eds.), Lyapunov Exponents, Springer
+  Berlin Heidelberg, Berlin, Heidelberg, 1986, pp. 85--125.
+
+\bibitem{ovchinnikov2020}
+I.~V. Ovchinnikov, W.~Li, Y.~Sun, A.~E. Hudson, K.~Meier, R.~N. Schwartz, K.~L.
+  Wang, Criticality or supersymmetry breaking?, Symmetry 12~(5) (2020) 805.
+\newblock \href {https://doi.org/https://doi.org/10.3390/sym12050805}
+  {\path{doi:https://doi.org/10.3390/sym12050805}}.
+
+\bibitem{Voss_1979}
+R.~Voss, 1/f (flicker) noise: A brief review, in: 33rd Annual Symposium on
+  Frequency Control, 1979, pp. 40--46.
+
+\bibitem{RevModPhys.53.497}
+P.~Dutta, P.~M. Horn, Low-frequency fluctuations in solids: 1/f noise, Rev.
+  Mod. Phys. 53 (1981) 497--516.
+
+\bibitem{Keshner_1_f_noise_1982}
+M.~Keshner, 1/f noise, Proceedings of the IEEE 70~(3) (1982) 212--218.
+
+\bibitem{Wang_1fnoise}
+G.~Xu, C.~M.~J. Torres, Y.~Zhang, F.~Liu, E.~B. Song, M.~Wang, Y.~Zhou,
+  C.~Zeng, K.~L. Wang, Effect of spatial charge inhomogeneity on 1/f noise
+  behavior in graphene (2010).
+
+\bibitem{pinkNoiseBiosystems2001}
+P.~Szendro, G.~Vincze, A.~Szasz, Pink-noise behaviour of biosystems, European
+  Biophysics Journal 30 (2001) 227--231.
+
+\bibitem{EEG}
+T.~Musha, M.~Yamamoto, 1/f fluctuations in biological systems, in: Engineering
+  in Medicine and Biology Society, 1997. Proceedings of the 19th Annual
+  International Conference of the IEEE, Vol.~6, 1997, pp. 2692--2697.
+
+\bibitem{Biology1fNoise}
+T.~Musha, Y.~Mitsuaki, $1/f$ fluctuations in biological systems, in:
+  Proceedings of the 19th Annual International Conference of the IEEE on
+  Engineering in Medicine and Biology Society, Chicago, IL, USA,
+  30~October--2~November~1997, 1997, pp. 2692--2697.
+
+\bibitem{BookHeartBrainNoise}
+S.~Dana, P.~Roy, J.~E. Kurths, Complex Dynamics in Physiological Systems: From
+  Heart to Brain, Springer, Berlin/Heidelberg, Germany, 2009.
+
+\bibitem{Pre11}
+T.~Preis, J.~Schneider, H.~Stanley, Switching processes in financial markets,
+  Proc. Natl. Acad. Sci. USA 108 (2011) 7674--7678.
+
+\bibitem{PhysRevLett.97.118102}
+C.~B\'edard, H.~Kr\"oger, A.~Destexhe, Does the $1/f$ frequency scaling of
+  brain signals reflect self-organized critical states?, Phys. Rev. Lett. 97
+  (2006) 118102.
+
+\bibitem{Oks10}
+B.~\"Oksendal, Stochastic Differential Equations: An Introduction with
+  Applications, Springer, Berlin/Heidelberg, Germany, 2010.
+
+\bibitem{Baxendale1}
+P.~Baxendale, S.~Lototsky, Stochastic Differential Equations: Theory and
+  Applications, World Scientific, Singapore, Singapore, 2007.
+
+\bibitem{Watanabe1}
+N.~Ikeda, S.~Watanabe, Stochastic Differential Equations and Diffusion
+  Processes, North-Holland, Amsterdam, The Netherlands, 1989.
+
+\bibitem{Crauel1}
+H.~Crauel, M.~Gundlach, Stochastic Dynamics, Springer, New York, NY, USA, 1999.
+
+\bibitem{ARNOLD19831}
+L.~Arnold, W.~Kliemann, Qualitative theory of stochastic systems, in:
+  A.~Bharucha-Reid (Ed.), Probabilistic Analysis and Related Topics, Academic
+  Press, 1983, pp. 1--79.
+
+\bibitem{LEJAN1984307}
+Y.~Le~Jan, S.~Watanabe, Stochastic flows of diffeomorphisms, in: K.~Itô (Ed.),
+  Stochastic Analysis, Vol.~32 of North-Holland Mathematical Library, Elsevier,
+  1984, pp. 307--332.
+
+\bibitem{Kunita2019}
+H.~Kunita, Stochastic Differential Equations and Stochastic Flows, Springer
+  Singapore, Singapore, 2019, pp. 77--124.
+
+\bibitem{Hairer_2001}
+J.-P. Eckmann, M.~Hairer, Invariant measures for stochastic partial
+  differential equations in unbounded domains, Nonlinearity 14~(1) (2001) 133.
+
+\bibitem{kupiainen2016renormalization}
+A.~Kupiainen, Renormalization group and stochastic pdes, Annales Henri
+  Poincar\'e 17 (2016) 497–535.
+
+\bibitem{Heirer_2018}
+M.~Hairer, Renormalisation of parabolic stochastic pdes, Jpn. J. Math. 13
+  (2018) 187–233.
+
+\bibitem{Bedrossian_RecentReview}
+J.~Bedrossian, A.~Blumenthal, S.~Punshon-Smith, A regularity method for lower
+  bounds on the lyapunov exponent for stochastic differential equations.
+  (2022).
+
+\bibitem{Arn03}
+L.~Arnold, Random Dynamical Systems, Springer, Berlin/Heidelberg, Germany,
+  2003.
+
+\bibitem{Teschl}
+G.~Teschl, Ordinary Differential Equations and Dynamical Systems, American
+  Mathematical Society, Providence, RI, USA, 2012.
+
+\bibitem{Izhikevich}
+E.~Izhikevich, Dynamical Systems in Neuroscience, MIT Press, Cambridge, 2007.
+
+\bibitem{Chaos_book_2}
+B.~Aulbach, B.~Kieninger, Nonlinear Dynamics and Systems Theory 1 (2001) 2337.
+
+\bibitem{OVCHINNIKOV2024114611}
+I.~V. Ovchinnikov, Ubiquitous order known as chaos, Chaos, Solitons \& Fractals
+  181 (2024) 114611.
+
+\bibitem{ParSour}
+G.~Parisi, N.~Sourlas, Random magnetic fields, supersymmetry, and negative
+  dimensions, Phys. Rev. Lett. 43 (1979) 744--745.
+
+\bibitem{ParSour1}
+G.~Parisi, N.~Sourlas, Supersymmetric field theories and stochastic
+  differential equations, Nucl. Phys. B 206 (1982) 321--332.
+
+\bibitem{ZinnJustin}
+J.~Zinn-Justin, Renormalization and stochastic quantization, Nucl. Phys. B 275
+  (1986) 135--159.
+
+\bibitem{Baulieu_1988}
+L.~Baulieu, B.~Grossman, A topological interpretation of stochastic
+  quantization, Physics Letters B 212~(3) (1988) 351.
+
+\bibitem{TFT_BOOK}
+D.~Birmingham, M.~Blau, M.~Rakowski, G.~Thompson, Topological field theory,
+  Phys. Rep. 209 (1991) 129.
+
+\bibitem{labastida1989}
+J.~Labastida, Morse theory interpretation of topological quantum field
+  theories, Commun. Math. Phys. 123 (1989) 641--658.
+
+\bibitem{Baulieu_1989}
+L.~Baulieu, M.~Singer, The topological sigma model, Comms. in Math. Phys.
+  125~(2) (1989) 227.
+
+\bibitem{Witten_1982}
+E.~Witten, Supersymmetry and morse theory, J. Differ. Geom. 17 (1982) 661--692.
+
+\bibitem{Witten98}
+E.~Witten, Topological quantum field theory, Commun. Math. Phys. 117 (1988)
+  353--386.
+
+\bibitem{Witten981}
+E.~Witten, Topological sigma models, Commun. Math. Phys. 118 (1988) 411--449.
+
+\bibitem{Rue02}
+D.~Ruelle, Dynamical zeta functions and transfer operators, Not. AMS 49 (2002)
+  887--895.
+
+\bibitem{RFT_SSB_book}
+T.~Brauner, Effective Field Theory for Spontaneously Broken Symmetry (Lecture
+  Notes in Physics, 1023), Springer, Stavanger, Norway, 2024.
+
+\bibitem{AdSCFT_Maldacena}
+J.~Maldacena, The large-n limit of superconformal field theories and
+  supergravity 38 (1999) 1113–1133.
+
+\bibitem{GUBSER1998105}
+S.~Gubser, I.~Klebanov, A.~Polyakov, Gauge theory correlators from non-critical
+  string theory, Physics Letters B 428 (1998) 105--114.
+
+\bibitem{Witten1998AntideSS}
+E.~Witten, Anti-de sitter space and holography, Advances in Theoretical and
+  Mathematical Physics 2 (1998) 253--291.
+
+\bibitem{natsuume2016adscftdualityuserguide}
+M.~Natsuume, Ads/cft duality user guide (2016).
+\newblock \href {http://arxiv.org/abs/1409.3575} {\path{arXiv:1409.3575}}.
+
+\bibitem{Penedones_2016}
+J.~Penedones, Tasi lectures on ads/cft, in: New Frontiers in Fields and
+  Strings, World Scientific, 2016.
+
+\bibitem{KaplanAdSCFT}
+J.~Kaplan,
+  \href{https://sites.krieger.jhu.edu/jared-kaplan/files/2016/05/AdSCFTCourseNotesCurrentPublic.pdf}{Lectures
+  on ads/cft from the bottom up}.
+\newline\urlprefix\url{https://sites.krieger.jhu.edu/jared-kaplan/files/2016/05/AdSCFTCourseNotesCurrentPublic.pdf}
+
+\bibitem{OvcEntropy}
+I.~V. Ovchinnikov, Introduction to supersymmetric theory of stochastics,
+  Entropy 18 (2016) 108.
+
+\bibitem{West}
+B.~West, A.~Bulsara, K.~Lindenberg, V.~Seshadri, K.~Shuler, Stochastic
+  processes with non-additive fluctuations: I. it\^o and stratonovich calculus
+  and the effects of correlations., Physica A 97 (1979) 211--233.
+
+\bibitem{Torsten}
+I.~Ovchinnikov, T.~En\ss{}lin, Kinematic dynamo, supersymmetry breaking, and
+  chaos, Phys. Rev. D 93 (2016) 085023.
+
+\bibitem{Mos021}
+A.~Mostafazadeh, Pseudo-hermiticity versus pt-symmetry ii: A complete
+  characterization of non-hermitian hamiltonians with a real spectrum., J.
+  Math. Phys. 43 (2002) 2814--2816.
+
+\bibitem{Mos023}
+A.~Mostafazadeh, Pseudo-hermiticity versus pt-symmetry iii: Equivalence of
+  pseudo-hermiticity and the presence of antilinear symmetries, J. Math. Phys.
+  43 (2002) 3944--3951.
+
+\bibitem{Bak87}
+P.~Bak, C.~Tang, K.~Wiesenfeld, Self-organized criticality: An explanation of
+  the $1/f$ noise, Phys. Rev. Lett. 59 (1987) 381--384.
+
+\bibitem{A_recent_review_on_SOC}
+N.~W. Watkins, G.~Pruessner, S.~C. Chapman, N.~B. Crosby, H.~J. Jensen, 25
+  years of self-organized criticality: Concepts and controversies, Space
+  Science Reviews 198~(1) (2016) 3--44.
+
+\bibitem{SOC_controvercy}
+N.~Watkins, G.~Pruessner, S.~Chapman, N.~Crosby, H.~Jensen, 25 years of
+  self-organized criticality: Concepts and controversies, Space Science Reviews
+  198 (2016) 3--44.
+
+\bibitem{Asc11}
+M.~Aschwanden, Self-Organized Criticallity in Astrophysics: Statistics of
+  Nonlinear Processes in the Universe, Springer, Berlin/Heidelberg, Germany,
+  2011.
+
+\bibitem{seizure}
+C.~Meisel, A.~Storch, S.~Hallmeyer-Elgner, E.~Bullmore, T.~Gross, Failure of
+  adaptive self-organized criticality during epileptic seizure attacks, PLoS
+  Comput. Biol. 8 (2012) e1002312.
+
+\bibitem{Gozzi_New}
+E.~Gozzi, M.~Reuter, Lyapunov exponents, path-integrals and forms, Chaos
+  Solitons Fractals 4 (1994) 1117--1139.
+
+\bibitem{Weiderpass_Sethi}
+G.~A. Weiderpass, S.~S. Sethi, To be published.
+
+\bibitem{QUILLEN198589}
+D.~Quillen, Superconnections and the chern character, Topology 24~(1) (1985)
+  89--95.
+
+\bibitem{Seinberg}
+N.~Seinberg, Naturalness versus supersymmetric non-renormalization theorems.,
+  Phys. Lett. B 318 (1993) 469--475.
+
+\bibitem{GL1_1WZ_2005}
+V.~Schomerus, H.~Saleur, The gl(1$|$1) wzw-model: From supergeometry to
+  logarithmic cft, Nuclear Physics B 734~(3) (2006) 221--245.
+
+\bibitem{SEIBERG1993469}
+N.~Seiberg, Naturalness versus supersymmetric non-renormalization theorems,
+  Physics Letters B 318~(3) (1993) 469--475.
+
+\bibitem{NonUnitaryCFTs}
+I.~Esterlis, A.~L. Fitzpatrick, D.~M. Ramirez, Closure of the operator product
+  expansion in the non-unitary bootstrap (2016) 30.
+
+\bibitem{ComplexCFTs}
+V.~Gorbenko, S.~Rychkov, B.~Zan, Walking, weak first-order transitions, and
+  complex cfts, Journal of High Energy Physics (2018) 108.
+
+\bibitem{PhysRevLett.133.076504}
+Y.~Tang, H.~Ma, Q.~Tang, Y.-C. He, W.~Zhu, Reclaiming the lost conformality in
+  a non-hermitian quantum 5-state potts model, Phys. Rev. Lett. 133 (2024)
+  076504.
+
+\bibitem{Arjun_Bagchi_2009}
+A.~Bagchi, R.~Gopakumar, Galilean conformal algebras and ads/cft, Journal of
+  High Energy Physics 2009~(07) (2009) 037.
+
+\bibitem{MARTINEC1988249}
+E.~J. Martinec, G.~M. Sotkov, Superghosts revisited: Supersymmetric
+  bosonization, Physics Letters B 208~(2) (1988) 249--254.
+
+\bibitem{ALVAREZGAUME1988455}
+L.~{Alvarez Gaumé}, C.~Gomez, G.~Moore, C.~Vafa, Strings in the operator
+  formalism, Nuclear Physics B 303~(3) (1988) 455--521.
+
+\bibitem{kausch1995curiositiesc2}
+H.~G. Kausch, Curiosities at c=-2 (1995).
+\newblock \href {http://arxiv.org/abs/hep-th/9510149}
+  {\path{arXiv:hep-th/9510149}}.
+
+\bibitem{ginsparg1988appliedconformalfieldtheory}
+P.~Ginsparg, Applied conformal field theory (1988).
+\newblock \href {http://arxiv.org/abs/hep-th/9108028}
+  {\path{arXiv:hep-th/9108028}}.
+
+\bibitem{RevModPhys.91.015002}
+D.~Poland, S.~Rychkov, A.~Vichi, The conformal bootstrap: Theory, numerical
+  techniques, and applications, Rev. Mod. Phys. 91 (2019) 015002.
+
+\bibitem{GaugeFieldsInAdSCFT}
+E.~Barnes, E.~Gorbatov, K.~Intriligator, J.~Wright, Current correlators and
+  ads/cft geometry, Nuclear Physics B 732~(1) (2006) 89--117.
+
+\bibitem{Eduardo}
+E.~Fradkin, Quantum Field Theory: An Integrated Approach, Princeton University
+  Press, Princeton, 2021.
+
+\bibitem{Sundrum_AdSCFT_2012}
+R.~Sundrum, From fixed points to the fifth dimension, Phys. Rev. D 86 (2012)
+  085025.
+
+\bibitem{WilsonLoopsMaldacena}
+J.~Maldacena, Wilson loops in large $\mathit{N}$ field theories, Phys. Rev.
+  Lett. 80 (1998).
+
+\bibitem{WilsonLoops1}
+K.-M. Lee, S.~Lee, 1/2-bps wilson loops and vortices in abjm model, Journal of
+  High Energy Physics (2010).
+
+\end{thebibliography}
