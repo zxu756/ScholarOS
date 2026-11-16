@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 59175,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Increased_levels_of_activated_T-cells_and_reduce_4d7527a8b0.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:09:59Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:09:59 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:09:59 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "8480ad661ec372702a23bfe2c6c71346a1e6e00297d973ec12c6ff6aca2291e8",
+  "slug" : "crossref_title_Increased_levels_of_activated_T-cells_and_reduce_4d7527a8b0",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Increased%20levels%20of%20activated%20T-cells%20and%20reduced%20levels%20of%20CD4%2FCD25%2B%20cells%20in%20peripheral%20blood%20of%20Guillain-Barr%C3%A9%20syndrome%20patients%20compared%20to%20controls%20Harness&rows=5"
+}

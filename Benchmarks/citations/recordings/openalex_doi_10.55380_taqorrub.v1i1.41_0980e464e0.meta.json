@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 16690,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.55380_taqorrub.v1i1.41_0980e464e0.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:08:20Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:08:21 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:08:21 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "960",
+    "x-ratelimit-reset" : "71499"
+  },
+  "service" : "openalex",
+  "sha256" : "2f218c567257c84e0f434893ee7e212ab6095ac6f3a69f84ee074f2582585549",
+  "slug" : "openalex_doi_10.55380_taqorrub.v1i1.41_0980e464e0",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.55380/taqorrub.v1i1.41"
+}

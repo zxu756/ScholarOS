@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 57205,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Introduction_to_Fourier_Analysis_on_Euclidean_Sp_6aad9c9af3.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:44Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:45 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:45 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "930",
+    "x-ratelimit-reset" : "71355"
+  },
+  "service" : "openalex",
+  "sha256" : "f8b7d6214773379e0a04a4b333cdd804595a8167f66fefcaadbfce1bcf16dacd",
+  "slug" : "openalex_title_Introduction_to_Fourier_Analysis_on_Euclidean_Sp_6aad9c9af3",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Introduction%20to%20Fourier%20Analysis%20on%20Euclidean%20Spaces"
+}

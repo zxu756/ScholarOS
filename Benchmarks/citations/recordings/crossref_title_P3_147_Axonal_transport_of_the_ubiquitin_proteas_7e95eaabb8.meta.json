@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 60437,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_P3_147_Axonal_transport_of_the_ubiquitin_proteas_7e95eaabb8.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:09:44Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:09:44 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:09:44 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "b8a9e6ce4be0e936b9f04d12d28ebe14ff092b44e5571d0a2bc66f6255e35bb4",
+  "slug" : "crossref_title_P3_147_Axonal_transport_of_the_ubiquitin_proteas_7e95eaabb8",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=P3%E2%80%90147%3A%20Axonal%20transport%20of%20the%20ubiquitin%E2%80%90proteasome%20system%20and%20it%20relevance%20for%20protein%20degradation%20Otero&rows=5"
+}

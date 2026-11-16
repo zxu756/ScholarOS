@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 60,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1145_m1missing.8n6s6svafb_4d35b35b56.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:09:37Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:09:37 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:09:37 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "679909a4e2a133cace0e9f9a32d99e971f67ab79e1e3b1f835c5406d65f97e57",
+  "slug" : "doi_handle_10.1145_m1missing.8n6s6svafb_4d35b35b56",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1145/m1missing.8n6s6svafb"
+}

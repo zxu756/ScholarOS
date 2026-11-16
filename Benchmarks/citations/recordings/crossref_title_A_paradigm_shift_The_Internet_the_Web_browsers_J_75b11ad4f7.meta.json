@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 27106,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_A_paradigm_shift_The_Internet_the_Web_browsers_J_75b11ad4f7.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:09:38Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:09:39 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:09:39 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "78c0c6528be97eedbc29a3d2e3dfda053d44f1dbdcb612ee52e8b2595dceb141",
+  "slug" : "crossref_title_A_paradigm_shift_The_Internet_the_Web_browsers_J_75b11ad4f7",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=A%20paradigm%20shift%21%20The%20Internet%2C%20the%20Web%2C%20browsers%2C%20Java%20and%20the%20future%20of%20computer%20science%20education%20Boroni&rows=5"
+}

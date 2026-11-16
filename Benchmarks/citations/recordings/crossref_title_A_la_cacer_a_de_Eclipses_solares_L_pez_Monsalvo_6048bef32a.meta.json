@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 30453,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_A_la_cacer_a_de_Eclipses_solares_L_pez_Monsalvo_6048bef32a.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:17Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:17 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:17 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "b3ee7cec8456210b41e6dc04ce5648f0acdeed2e68439ec8c0e392f947028562",
+  "slug" : "crossref_title_A_la_cacer_a_de_Eclipses_solares_L_pez_Monsalvo_6048bef32a",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=A%20la%20cacer%C3%ADa%20de%20Eclipses%20solares%20L%C3%B3pez%20Monsalvo&rows=5"
+}

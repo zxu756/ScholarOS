@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 5710,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.55380_taqorrub.v1i1.41_f2e1c9a5ea.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:08:20Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:08:20 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:08:20 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "0f76cc27f7c86629f5173cbd6c8a3b5a224f9b86ec5c48f92e6083e6816fc21b",
+  "slug" : "crossref_doi_10.55380_taqorrub.v1i1.41_f2e1c9a5ea",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.55380/taqorrub.v1i1.41"
+}

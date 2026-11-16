@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 7189,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1103_physreva.67.032302_e0fada4aee.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:07:05Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:07:05 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:07:05 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "6f5a2be4daaae4833f86268545d1bc3c4987c5012ae4c2152618d0bb546dabf3",
+  "slug" : "crossref_doi_10.1103_physreva.67.032302_e0fada4aee",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1103/physreva.67.032302"
+}

@@ -1,0 +1,20 @@
+{
+  "attempts" : 1,
+  "byte_length" : 62,
+  "content_type" : "application/json;charset=UTF-8",
+  "raw_file" : "doi_handle_10.1016_j.jmedhist.2020.06.004_f6bd590470.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:22Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:22 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json;charset=UTF-8",
+    "Date" : "Mon, 16 Nov 2026 04:11:22 GMT"
+  },
+  "service" : "doi",
+  "sha256" : "0320e91add856a9263fa8965b9ab65af9251b2440909894e3bef14bf31075eba",
+  "slug" : "doi_handle_10.1016_j.jmedhist.2020.06.004_f6bd590470",
+  "status" : 404,
+  "url" : "https://doi.org/api/handles/10.1016/j.jmedhist.2020.06.004"
+}

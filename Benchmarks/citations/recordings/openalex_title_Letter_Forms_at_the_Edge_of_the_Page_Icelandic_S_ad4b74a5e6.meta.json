@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 59132,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Letter_Forms_at_the_Edge_of_the_Page_Icelandic_S_ad4b74a5e6.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:19Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:20 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:11:20 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "890",
+    "x-ratelimit-reset" : "71320"
+  },
+  "service" : "openalex",
+  "sha256" : "612ea965762e77314a8c2c93d6f7de5eb0d5c0f529a8bb19ebfb069c9260328f",
+  "slug" : "openalex_title_Letter_Forms_at_the_Edge_of_the_Page_Icelandic_S_ad4b74a5e6",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Letter%20Forms%20at%20the%20Edge%20of%20the%20Page%20Icelandic%20Scribal%20Practice%20in%20the%20Fourteenth%20Century"
+}

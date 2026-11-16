@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 80213,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_The_complexity_of_wire-routing_and_finding_minim_fd57e99c37.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:39Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:40 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:40 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "940",
+    "x-ratelimit-reset" : "71360"
+  },
+  "service" : "openalex",
+  "sha256" : "b6cadcab6123b9bee0438c911a8c26a4e35e5df8f611dd747779d17c98113ec6",
+  "slug" : "openalex_title_The_complexity_of_wire-routing_and_finding_minim_fd57e99c37",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=The%20complexity%20of%20wire-routing%20and%20finding%20minimum%20area%20layouts%20for%20arbitrary%20VLSI%20circuits"
+}

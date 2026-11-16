@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 10431,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Letter_Forms_at_the_Edge_of_the_Page_Icelandic_S_cb65f62b17.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:18Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:18 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:11:18 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "d018527bf67c0d0810fa908c6d83f888da553fd508b2a3b27ee7d305459db909",
+  "slug" : "crossref_title_Letter_Forms_at_the_Edge_of_the_Page_Icelandic_S_cb65f62b17",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Letter%20Forms%20at%20the%20Edge%20of%20the%20Page%3A%20Icelandic%20Scribal%20Practice%20in%20the%20Fourteenth%20Century%20Eiriksdottir%202011&rows=5"
+}

@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 8673,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_A_survey_of_lichen_turnover_along_the_eastern_sl_e627c05527.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:15Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:16 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:11:16 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "4ab02b69b515a34c14ab2b2c115c1ebda8547bb236e7ff93de4a6336452dd4a6",
+  "slug" : "crossref_title_A_survey_of_lichen_turnover_along_the_eastern_sl_e627c05527",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=A%20survey%20of%20lichen%20turnover%20along%20the%20eastern%20slopes%20of%20Marion%20Island%20Ormstad%202007&rows=5"
+}

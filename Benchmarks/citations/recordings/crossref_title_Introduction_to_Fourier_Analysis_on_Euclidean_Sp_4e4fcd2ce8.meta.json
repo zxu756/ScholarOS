@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 10717,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_Introduction_to_Fourier_Analysis_on_Euclidean_Sp_4e4fcd2ce8.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:43Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:44 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:44 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "4a0bcb49053b763597e093144c7eb2f447b71cc04b36aa8e4edc5d3ffb8df246",
+  "slug" : "crossref_title_Introduction_to_Fourier_Analysis_on_Euclidean_Sp_4e4fcd2ce8",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=Introduction%20to%20Fourier%20Analysis%20on%20Euclidean%20Spaces%20Stein%201971&rows=5"
+}

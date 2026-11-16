@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 17069,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.30598_barekengvol18iss3pp1909-1918_c5f74ea34d.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:07:54Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:07:55 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:07:55 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "960",
+    "x-ratelimit-reset" : "71525"
+  },
+  "service" : "openalex",
+  "sha256" : "49a361db462e173d6ff9c8733b0f58b261059548470aa23a43b7e6dea09fffee",
+  "slug" : "openalex_doi_10.30598_barekengvol18iss3pp1909-1918_c5f74ea34d",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.30598/barekengvol18iss3pp1909-1918"
+}

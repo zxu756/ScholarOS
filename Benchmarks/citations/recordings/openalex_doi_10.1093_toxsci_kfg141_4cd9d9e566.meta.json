@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 31082,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.1093_toxsci_kfg141_4cd9d9e566.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:07:36Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:07:36 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:07:36 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "960",
+    "x-ratelimit-reset" : "71544"
+  },
+  "service" : "openalex",
+  "sha256" : "9b883a6323e5d39c59b4b8eddfc58345b3407dd1e7c413d5bf5937f166836589",
+  "slug" : "openalex_doi_10.1093_toxsci_kfg141_4cd9d9e566",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.1093/toxsci/kfg141"
+}

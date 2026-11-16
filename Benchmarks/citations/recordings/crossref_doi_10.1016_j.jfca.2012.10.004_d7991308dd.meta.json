@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 13818,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_doi_10.1016_j.jfca.2012.10.004_d7991308dd.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:07:45Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:07:45 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:07:45 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "460c12f5f6634b37a3407854b7cd7266d5617ddf0f80bd32f83889405b86e3f7",
+  "slug" : "crossref_doi_10.1016_j.jfca.2012.10.004_d7991308dd",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works/10.1016/j.jfca.2012.10.004"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 19941,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_doi_10.3390_math14010062_03711686d1.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:08:33Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:08:34 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:08:34 GMT",
+    "x-ratelimit-cost-usd" : "0",
+    "x-ratelimit-credits-used" : "0",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "960",
+    "x-ratelimit-reset" : "71486"
+  },
+  "service" : "openalex",
+  "sha256" : "9399986fd7724ca0d07ffd458f69f039f1d47ec5533576c5db6c0c323d7e42a9",
+  "slug" : "openalex_doi_10.3390_math14010062_03711686d1",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works/https://doi.org/10.3390/math14010062"
+}

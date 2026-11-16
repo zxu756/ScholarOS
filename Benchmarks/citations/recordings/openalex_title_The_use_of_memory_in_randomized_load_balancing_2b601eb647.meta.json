@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 74594,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_The_use_of_memory_in_randomized_load_balancing_2b601eb647.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:47Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:48 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:48 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "920",
+    "x-ratelimit-reset" : "71352"
+  },
+  "service" : "openalex",
+  "sha256" : "4c5065edd7742d2bfd52f3a031fd99ea43c5e29a48002c1bb0ff1483aab74c52",
+  "slug" : "openalex_title_The_use_of_memory_in_randomized_load_balancing_2b601eb647",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=The%20use%20of%20memory%20in%20randomized%20load%20balancing"
+}

@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 1256,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_Counting_winter_couplets_across_the_inlet_basins_2758e5ff4f.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:10Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:11 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:11:11 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "910",
+    "x-ratelimit-reset" : "71329"
+  },
+  "service" : "openalex",
+  "sha256" : "84c34370a2dad48d98229c80cd618ad9384793068553de281461084331c23e8d",
+  "slug" : "openalex_title_Counting_winter_couplets_across_the_inlet_basins_2758e5ff4f",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=Counting%20winter%20couplets%20across%20the%20inlet%20basins%20of%20Lake%20Vardalen"
+}

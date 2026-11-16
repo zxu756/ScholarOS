@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 19,
+  "content_type" : "text/plain",
+  "raw_file" : "crossref_doi_10.1021_acsami.2c03784_ec52aa0488.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:25Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:25 GMT",
+  "response_headers" : {
+    "Content-Type" : "text/plain",
+    "Date" : "Mon, 16 Nov 2026 04:11:25 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "5"
+  },
+  "service" : "crossref",
+  "sha256" : "ae8462e3af85ca7577aaa97ff22a194f9dfd7fada58cf4944b53d2fdfa7b1f92",
+  "slug" : "crossref_doi_10.1021_acsami.2c03784_ec52aa0488",
+  "status" : 404,
+  "url" : "https://api.crossref.org/works/10.1021/acsami.2c03784"
+}

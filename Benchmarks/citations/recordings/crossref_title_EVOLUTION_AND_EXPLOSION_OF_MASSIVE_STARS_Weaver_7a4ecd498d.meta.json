@@ -1,0 +1,23 @@
+{
+  "attempts" : 1,
+  "byte_length" : 97683,
+  "content_type" : "application/json",
+  "raw_file" : "crossref_title_EVOLUTION_AND_EXPLOSION_OF_MASSIVE_STARS_Weaver_7a4ecd498d.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:10:20Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:10:20 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:10:20 GMT",
+    "x-concurrency-limit" : "1",
+    "x-rate-limit-interval" : "1s",
+    "x-rate-limit-limit" : "1"
+  },
+  "service" : "crossref",
+  "sha256" : "4e8eee7090c556f6e5abe327b10999ef2a7a43cd567dcc2e46d313be08696594",
+  "slug" : "crossref_title_EVOLUTION_AND_EXPLOSION_OF_MASSIVE_STARS_Weaver_7a4ecd498d",
+  "status" : 200,
+  "url" : "https://api.crossref.org/works?query.bibliographic=EVOLUTION%20AND%20EXPLOSION%20OF%20MASSIVE%20STARS%2A%20Weaver&rows=5"
+}

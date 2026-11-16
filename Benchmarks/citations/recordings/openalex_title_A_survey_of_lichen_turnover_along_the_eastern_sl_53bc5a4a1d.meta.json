@@ -1,0 +1,25 @@
+{
+  "attempts" : 1,
+  "byte_length" : 115133,
+  "content_type" : "application/json",
+  "raw_file" : "openalex_title_A_survey_of_lichen_turnover_along_the_eastern_sl_53bc5a4a1d.raw",
+  "request_headers" : {
+    "User-Agent" : "ScholarOS/1.2.0"
+  },
+  "requested_at" : "2026-11-16T04:11:16Z",
+  "response_date_header" : "Mon, 16 Nov 2026 04:11:17 GMT",
+  "response_headers" : {
+    "Content-Type" : "application/json",
+    "Date" : "Mon, 16 Nov 2026 04:11:17 GMT",
+    "x-ratelimit-cost-usd" : "0.001",
+    "x-ratelimit-credits-used" : "10",
+    "x-ratelimit-limit" : "1000",
+    "x-ratelimit-remaining" : "900",
+    "x-ratelimit-reset" : "71323"
+  },
+  "service" : "openalex",
+  "sha256" : "8c030eb28790b400c47a252bd2ad91c6bda60c20ca5b312cefe2803ccea02d4e",
+  "slug" : "openalex_title_A_survey_of_lichen_turnover_along_the_eastern_sl_53bc5a4a1d",
+  "status" : 200,
+  "url" : "https://api.openalex.org/works?per-page=5&search=A%20survey%20of%20lichen%20turnover%20along%20the%20eastern%20slopes%20of%20Marion%20Island"
+}
