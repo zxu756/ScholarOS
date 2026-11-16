@@ -407,7 +407,7 @@ def _build_real_typo(
         gold_rows.append({
             "key": key,
             "group": "real_typo",
-            "truth": "mutated",
+            "truth": "real",
             "expected": ["VERIFIED"],
             "insertable": True,
             "provenance": {
@@ -433,7 +433,7 @@ def _build_real_typo(
         gold_rows.append({
             "key": key,
             "group": "real_typo",
-            "truth": "mutated",
+            "truth": "real",
             "expected": ["VERIFIED"],
             "insertable": True,
             "provenance": {
@@ -457,7 +457,7 @@ def _build_real_typo(
         gold_rows.append({
             "key": key,
             "group": "real_typo",
-            "truth": "mutated",
+            "truth": "real",
             "expected": ["VERIFIED"],
             "insertable": True,
             "provenance": {
@@ -480,7 +480,7 @@ def _build_real_typo(
         gold_rows.append({
             "key": key,
             "group": "real_typo",
-            "truth": "mutated",
+            "truth": "real",
             "expected": ["VERIFIED"],
             "insertable": True,
             "provenance": {

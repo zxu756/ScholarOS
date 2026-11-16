@@ -602,10 +602,11 @@ class BenchmarkToolsUnitTests(unittest.TestCase):
                 src_keys = [r["provenance"]["source_key"] for r in rows]
                 self.assertEqual(len(set(src_keys)), 20, "Duplicate source_key in %s" % grp)
                 for r in rows:
-                    self.assertEqual(r["truth"], "mutated")
+                    if grp != "real_typo":
+                        self.assertEqual(r["truth"], "mutated")
                     self.assertEqual(r["provenance"]["seed"], 20261116)
 
-            # Verify real_typo breakdown (5 typo DRIFT + 5 accent VERIFIED + 5 https + 5 uppercase)
+            # Verify real_typo breakdown (5 typo DRIFT with truth='mutated' + 15 format-only VERIFIED with truth='real')
             typo_rows = gold_by_group["real_typo"]
             by_mut = {}
             for r in typo_rows:
@@ -613,9 +614,11 @@ class BenchmarkToolsUnitTests(unittest.TestCase):
                 by_mut[m] = by_mut.get(m, 0) + 1
                 if m == "title_single_letter_typo":
                     self.assertEqual(r["expected"], ["DRIFT"])
+                    self.assertEqual(r["truth"], "mutated")
                     self.assertFalse(r["insertable"])
                 else:
                     self.assertEqual(r["expected"], ["VERIFIED"])
+                    self.assertEqual(r["truth"], "real")
                     self.assertTrue(r["insertable"])
             self.assertEqual(by_mut, {
                 "title_single_letter_typo": 5,
@@ -708,6 +711,19 @@ class BenchmarkToolsUnitTests(unittest.TestCase):
             # Exactly 3 entries must have leading and trailing spaces inside doi = {  10....  }
             padded_matches = re.findall(r"doi = \{  10\.[^}]+  \}", typo_bib_raw)
             self.assertEqual(len(padded_matches), 3)
+            td2_typo_gold = [
+                json.loads(line)
+                for line in pathlib.Path(td2, "gold.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip() and json.loads(line)["group"] == "real_typo"
+            ]
+            self.assertEqual(
+                sum(1 for r in td2_typo_gold if r["expected"] == ["VERIFIED"] and r["truth"] == "real"),
+                15,
+            )
+            self.assertEqual(
+                sum(1 for r in td2_typo_gold if r["expected"] == ["DRIFT"] and r["truth"] == "mutated"),
+                5,
+            )
 
     # ------------------------------------------------------------------
     # 6. Byte-for-byte determinism with identical saved responses + seed
