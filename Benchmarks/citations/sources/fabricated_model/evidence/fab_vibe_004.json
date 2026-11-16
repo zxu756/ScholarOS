@@ -1,0 +1,138 @@
+{
+ "key": "fab_vibe_004",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Kov{\\'a}{\\v{c}}ik, Radoslav and {\\v{S}}imkov{\\'a}, Alena and Barto{\\v{s}}, Emil",
+  "title": "Chaetotaxy of the labial complex in cave-dwelling Collembola and its bearing on family-level taxonomy",
+  "journal": "Pedobiologia",
+  "year": "2004",
+  "volume": "48",
+  "number": "5-6",
+  "pages": "511--524"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Chaetotaxy+of+the+labial+complex+in+cave-dwelling+Collembola+and+its+bearing+on+family-level+taxonomy+Kovacik+2004&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:56Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Chaetotaxy+of+the+labial+complex+in+cave-dwelling+Collembola+and+its+bearing+on+family-level+taxonomy&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:57Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Cave-dwelling Coecobrya from southern China with a survey of clypeal chaetae in Entomobryoidea (Collembola)",
+    "doi": "10.5852/ejt.2016.226",
+    "first_author": "Zhang",
+    "year": 2016,
+    "container": "European Journal of Taxonomy",
+    "similarity": 0.233
+   },
+   {
+    "source": "Crossref",
+    "title": "Colouration, chaetotaxy and molecular data provide species-level resolution in a species complex of Dicranocentrus (Collembola : Entomobryidae)",
+    "doi": "10.1071/is18019",
+    "first_author": "Zhang",
+    "year": 2018,
+    "container": "Invertebrate Systematics",
+    "similarity": 0.41
+   },
+   {
+    "source": "Crossref",
+    "title": "Chaetotaxy",
+    "doi": "10.1163/9789004273634_007",
+    "first_author": "Fjellberg",
+    "year": 1998,
+    "container": "The Collembola of Fennoscandia and Denmark, Part I: Poduromorpha",
+    "similarity": 0.18
+   },
+   {
+    "source": "Crossref",
+    "title": "Heteromurus (Verhoeffiella) dallaii sp. n. a new cave-dwelling springtail (Collembola: Entomobryidae)",
+    "doi": "10.5962/bhl.part.81615",
+    "first_author": "Nosek",
+    "year": 1985,
+    "container": "Revue suisse de zoologie.",
+    "similarity": 0.472
+   },
+   {
+    "source": "Crossref",
+    "title": "Seabird-Transported Contaminants Are Reflected in the Arctic Tundra, But Not in Its Soil-Dwelling Springtails (Collembola)",
+    "doi": "10.1021/acs.est.9b05316.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.355
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Deep Troglomorphy: New Arrhopalitidae (Collembola: Symphypleona) of Different Life Forms from the Snezhnaya Cave System in the Caucasus",
+    "doi": "https://doi.org/10.3390/d14080678",
+    "first_author": "Robert S. Vargovitsh",
+    "year": 2022,
+    "similarity": 0.198
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Lepidonella sirindhornae sp. nov. (Entomobryidae: Paronellinae), A New Collembola species from Southern Thailand",
+    "doi": "https://doi.org/10.58837/tnh.25.8.267503",
+    "first_author": "Areeruk Nilsai",
+    "year": 2025,
+    "similarity": 0.3
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The influence of vicariance and dispersal on the diversification and evolution of springtails (Collembola)",
+    "doi": "https://doi.org/10.13140/rg.2.2.26822.22084",
+    "first_author": "Aron D. Katz",
+    "year": 2018,
+    "similarity": 0.312
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Alloscopus ramanai sp. nov. (Orchesellidae, Heteromurinae), a new Collembola species from central Thailand, with complete mitochondrial genome and phylogenetic placement",
+    "doi": "https://doi.org/10.3897/bdj.14.e173157",
+    "first_author": "Areeruk Nilsai",
+    "year": 2026,
+    "similarity": 0.281
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Asian cave-adapted diplurans, with the description of two new genera and four new species (Arthropoda, Hexapoda, Entognatha)",
+    "doi": "https://doi.org/10.5852/ejt.2021.731.1199",
+    "first_author": "Alberto Sendra",
+    "year": 2021,
+    "similarity": 0.309
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Heteromurus (Verhoeffiella) dallaii sp. n. a new cave-dwelling springtail (Collembola: Entomobryidae)",
+   "doi": "10.5962/bhl.part.81615",
+   "first_author": "Nosek",
+   "year": 1985,
+   "container": "Revue suisse de zoologie.",
+   "similarity": 0.472
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

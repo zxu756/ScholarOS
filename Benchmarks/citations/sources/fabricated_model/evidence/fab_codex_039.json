@@ -1,0 +1,151 @@
+{
+ "key": "fab_codex_039",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Chiara Bellini and Omar Kassab and Helena Varga",
+  "title": "Chloride-bearing crusts on bronze fittings from a submerged harbor deposit",
+  "journal": "Journal of Cultural Heritage",
+  "volume": "42",
+  "pages": "154--164",
+  "year": "2020",
+  "doi": "10.1016/j.culher.2019.08.011"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.culher.2019.08.011",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.culher.2019.08.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:14Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.culher.2019.08.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:15Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.culher.2019.08.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:15Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Heritage significance and the identification of attributes to preserve in a sustainable refurbishment",
+   "container": "Journal of Cultural Heritage",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Chloride-bearing+crusts+on+bronze+fittings+from+a+submerged+harbor+deposit+Bellini+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:16Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Chloride-bearing+crusts+on+bronze+fittings+from+a+submerged+harbor+deposit&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:17Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "A Strategic Protection Scheme for the Submerged Bronze Age Town at Pavlopetri",
+    "doi": "10.33583/utm2020.10",
+    "first_author": "Euser",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.331
+   },
+   {
+    "source": "Crossref",
+    "title": "Bronze bracelets deposit from Niewierszyn by the Pilica River",
+    "doi": "10.23858/sa/73.2021.2.1717",
+    "first_author": "Janiak",
+    "year": 2020,
+    "container": "Sprawozdania Archeologiczne",
+    "similarity": 0.252
+   },
+   {
+    "source": "Crossref",
+    "title": "Fittings made from unplasticized poly(vinyl chloride) (PVC-U), chlorinated poly(vinyl chloride) (PVC-C) or acrylonitrile/butadiene/styrene (ABS) with plain sockets for pipes under pressure",
+    "doi": "10.3403/bsiso727",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.221
+   },
+   {
+    "source": "Crossref",
+    "title": "Thermoplastics pipes and fittings. Vicat softening temperature",
+    "doi": "10.3403/30353850u",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.37
+   },
+   {
+    "source": "Crossref",
+    "title": "Thermoplastics pipes and fittings. Vicat softening temperature",
+    "doi": "10.3403/30381521",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.37
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Milk-analysis : a practical treatise on the examination of milk and its derivatives, cream, butter, and cheese",
+    "doi": "https://doi.org/10.5962/bhl.title.56576",
+    "first_author": "James Alfred Wanklyn",
+    "year": 1874,
+    "similarity": 0.257
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Ecocriticism and Italy: Ecology, Resistance, and Liberation",
+    "doi": "https://doi.org/10.5040/9781474219488",
+    "first_author": "Serenella Iovino",
+    "year": 2015,
+    "similarity": 0.262
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Control of SRB – Mediated Microbially Influenced Corrosion in Flowing Systems",
+    "doi": "https://doi.org/10.11575/prism/25456",
+    "first_author": "Tijan Pinnock",
+    "year": 2016,
+    "similarity": 0.134
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Thermoplastics pipes and fittings. Vicat softening temperature",
+   "doi": "10.3403/30353850u",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.37
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

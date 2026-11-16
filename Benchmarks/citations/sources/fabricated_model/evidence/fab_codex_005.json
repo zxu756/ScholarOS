@@ -1,0 +1,136 @@
+{
+ "key": "fab_codex_005",
+ "source_file": "codex.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Katrin Eiriksdottir",
+  "title": "Letter Forms at the Edge of the Page: Icelandic Scribal Practice in the Fourteenth Century",
+  "publisher": "Brepols",
+  "address": "Turnhout",
+  "year": "2011"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Letter+Forms+at+the+Edge+of+the+Page%3A+Icelandic+Scribal+Practice+in+the+Fourteenth+Century+Eiriksdottir+2011&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:21Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Letter+Forms+at+the+Edge+of+the+Page%3A+Icelandic+Scribal+Practice+in+the+Fourteenth+Century&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:22Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Back at Western Icelandic Scribal Desks",
+    "doi": "10.1484/m.mssp-eb.5.127264",
+    "first_author": null,
+    "year": 2021,
+    "container": "Illuminated Manuscript Production in Medieval Iceland",
+    "similarity": 0.406
+   },
+   {
+    "source": "Crossref",
+    "title": "",
+    "doi": "10.3030/654825",
+    "first_author": null,
+    "year": 2016,
+    "container": null,
+    "similarity": 0.0
+   },
+   {
+    "source": "Crossref",
+    "title": "Fourteenth-Century Mixed-Gender Practice Halls",
+    "doi": "10.21313/hawaii/9780824859367.003.0004",
+    "first_author": "Griffiths",
+    "year": 2016,
+    "container": "Tracing the Itinerant Path",
+    "similarity": 0.267
+   },
+   {
+    "source": "Crossref",
+    "title": "5. Poetry, Language and Snorri’s Edda in the Mid-Fourteenth Century",
+    "doi": "10.1515/9783110643930-006",
+    "first_author": null,
+    "year": 2019,
+    "container": "The Poetic Genesis of Old Icelandic Literature",
+    "similarity": 0.571
+   },
+   {
+    "source": "Crossref",
+    "title": "D. John Ball's Letter to the Peasants of Essex",
+    "doi": "10.1093/oseo/instance.00255584",
+    "first_author": "Ball",
+    "year": 1921,
+    "container": "Fourteenth Century Verse &amp; Prose",
+    "similarity": 0.299
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Imagining Universal Government At The Edge Of The World: Institutional Forms In Norse Bishops’ Lives",
+    "doi": null,
+    "first_author": "Joel Edmund Anderson",
+    "year": 2015,
+    "similarity": 0.46
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Book of Hours in the Form of a Roll (Egerton 3044), Bruges Scribe Johannes de Ecclesia, and the Art of Writing",
+    "doi": "https://doi.org/10.34055/osf.io/eyu47",
+    "first_author": "Kathryn M. Rudy",
+    "year": 2021,
+    "similarity": 0.274
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Rise of Paper: An Overview of Paper Provenance and Use in 15th- and 16th-Century Iceland",
+    "doi": "https://doi.org/10.1515/9783111162768-002",
+    "first_author": "Silvia Hufnagel",
+    "year": 2023,
+    "similarity": 0.436
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Saints and their Legacies in Medieval Iceland",
+    "doi": "https://doi.org/10.1017/9781800101999",
+    "first_author": "Dario Bullitta",
+    "year": 2021,
+    "similarity": 0.313
+   },
+   {
+    "source": "OpenAlex",
+    "title": "An Old Icelandic Medical Manuscript.",
+    "doi": null,
+    "first_author": "Henning Larsen",
+    "year": 1927,
+    "similarity": 0.323
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "5. Poetry, Language and Snorri’s Edda in the Mid-Fourteenth Century",
+   "doi": "10.1515/9783110643930-006",
+   "first_author": null,
+   "year": 2019,
+   "container": "The Poetic Genesis of Old Icelandic Literature",
+   "similarity": 0.571
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

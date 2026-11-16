@@ -1,0 +1,129 @@
+{
+ "key": "fab_codex_040",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ariadne Papadaki and Luc Moreau and Selma Gruber",
+  "title": "Pore-water renewal and layered corrosion of bronze artefacts in marine silt",
+  "journal": "Corrosion Science",
+  "volume": "197",
+  "pages": "110066",
+  "year": "2022",
+  "doi": "10.1016/j.corsci.2022.110066"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.corsci.2022.110066",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.corsci.2022.110066",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:18Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.corsci.2022.110066",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:19Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.corsci.2022.110066",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:19Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Pore-water+renewal+and+layered+corrosion+of+bronze+artefacts+in+marine+silt+Papadaki+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:20Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Pore-water+renewal+and+layered+corrosion+of+bronze+artefacts+in+marine+silt&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:21Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Simulation of corrosion processes of buried archaeological bronze artefacts",
+    "doi": "10.1533/9781845693015.203",
+    "first_author": "ANGELINI",
+    "year": 2007,
+    "container": "Corrosion of Metallic Heritage Artefacts",
+    "similarity": 0.44
+   },
+   {
+    "source": "Crossref",
+    "title": "Corrosion of archaeological bronze artefacts in acidic soil",
+    "doi": "10.1007/bf01186246",
+    "first_author": "Tronner",
+    "year": 1995,
+    "container": "Water, Air, &amp; Soil Pollution",
+    "similarity": 0.582
+   },
+   {
+    "source": "Crossref",
+    "title": "Migration characteristics of fine clay particles under the influence of pore water during production in marine clayey silt hydrate reservoirs",
+    "doi": "10.5194/egusphere-egu26-2937",
+    "first_author": "Lei",
+    "year": 2026,
+    "container": null,
+    "similarity": 0.315
+   },
+   {
+    "source": "Crossref",
+    "title": "Photo-induced passivation: A new corrosion mitigation strategy for bronze artefacts",
+    "doi": "10.1016/j.corsci.2024.112401",
+    "first_author": "Wu",
+    "year": 2024,
+    "container": "Corrosion Science",
+    "similarity": 0.51
+   },
+   {
+    "source": "Crossref",
+    "title": "Water flow and nutrient transport in a layered silt loam soil",
+    "doi": "10.18174/199876",
+    "first_author": "de Vos",
+    "year": null,
+    "container": null,
+    "similarity": 0.353
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Soil redistribution studies whithin the Panama Canal Watershed using FRN and CSSI methodologies",
+    "doi": null,
+    "first_author": "A. Saavedra",
+    "year": 2025,
+    "similarity": 0.294
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Corrosion of archaeological bronze artefacts in acidic soil",
+   "doi": "10.1007/bf01186246",
+   "first_author": "Tronner",
+   "year": 1995,
+   "container": "Water, Air, &amp; Soil Pollution",
+   "similarity": 0.582
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

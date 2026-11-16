@@ -1,0 +1,159 @@
+{
+ "key": "fab_codex_026",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Rasim Tekin and Elif Manav and Claude Perrault",
+  "title": "Boundary marks and tenancy claims in late Ottoman cadastral revisions",
+  "journal": "Journal of Historical Geography",
+  "volume": "64",
+  "pages": "33--46",
+  "year": "2019",
+  "doi": "10.1016/j.jhg.2019.01.006"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jhg.2019.01.006",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jhg.2019.01.006",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:32Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jhg.2019.01.006",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:33Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jhg.2019.01.006",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:33Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Review",
+   "container": "Journal of Historical Geography",
+   "year": 2019
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Boundary+marks+and+tenancy+claims+in+late+Ottoman+cadastral+revisions+Tekin+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:34Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Boundary+marks+and+tenancy+claims+in+late+Ottoman+cadastral+revisions&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:35Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Cadastral Systems",
+    "doi": "10.1201/9781315369990-13",
+    "first_author": null,
+    "year": 2016,
+    "container": "Land Tenure, Boundary Surveys, and Cadastral Systems",
+    "similarity": 0.279
+   },
+   {
+    "source": "Crossref",
+    "title": "Benjamin C. Fortna, Imperial Classroom: Islam, the State, and Education in the Late Ottoman Empire,",
+    "doi": "10.18589/oa.1145960",
+    "first_author": "Tekin",
+    "year": 2022,
+    "container": "Osmanlı Araştırmaları",
+    "similarity": 0.432
+   },
+   {
+    "source": "Crossref",
+    "title": "Labour tenancy claims bring deep history into the present",
+    "doi": "10.1163/2210-7975_hrd-1182-2016010",
+    "first_author": null,
+    "year": null,
+    "container": "Human Rights Documents Online",
+    "similarity": 0.476
+   },
+   {
+    "source": "Crossref",
+    "title": "Plates",
+    "doi": "10.5040/9780755608935.0012",
+    "first_author": null,
+    "year": 2016,
+    "container": "From the Gulf to Ararat",
+    "similarity": 0.133
+   },
+   {
+    "source": "Crossref",
+    "title": "“The Sultan Says”",
+    "doi": "10.1093/oso/9780190092924.003.0003",
+    "first_author": "Ayoub",
+    "year": 2019,
+    "container": "Law, Empire, and the Sultan",
+    "similarity": 0.214
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Crafting Compendiums, Making Law: Ottoman Legal Compendiums And The Reconfiguration Of Legal Authority In The Seventeenth Century",
+    "doi": null,
+    "first_author": "Yalçınkaya, Furkan",
+    "year": 2025,
+    "similarity": 0.316
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Legal issues in the property, use, preservation, and management of agricultural lands in Bulgaria",
+    "doi": "https://doi.org/10.21029/jael.2024.37.135",
+    "first_author": "Minko Georgiev",
+    "year": 2024,
+    "similarity": 0.27
+   },
+   {
+    "source": "OpenAlex",
+    "title": "On the Evolution of Social Development in the British Sudan A Comparative Study of the Gezira and Zande Cotton-Growing Schemes",
+    "doi": "https://doi.org/10.33915/etd.4792",
+    "first_author": "Joseph M. Snyder",
+    "year": 2011,
+    "similarity": 0.256
+   },
+   {
+    "source": "OpenAlex",
+    "title": "3 The Bureaucratization of Land Tenure",
+    "doi": "https://doi.org/10.1163/9789004330900_005",
+    "first_author": "Паоло Сартори",
+    "year": 2016,
+    "similarity": 0.262
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Labour tenancy claims bring deep history into the present",
+   "doi": "10.1163/2210-7975_hrd-1182-2016010",
+   "first_author": null,
+   "year": null,
+   "container": "Human Rights Documents Online",
+   "similarity": 0.476
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

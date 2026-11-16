@@ -1,0 +1,137 @@
+{
+ "key": "fab_codex_016",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Lucia Navarre and Greer Tolman and Simon Klee",
+  "title": "False encounter rates from overlapping beaked-whale echolocation bouts",
+  "journal": "Marine Mammal Science",
+  "volume": "31",
+  "number": "4",
+  "pages": "1423--1441",
+  "year": "2015"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=False+encounter+rates+from+overlapping+beaked-whale+echolocation+bouts+Navarre+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:00Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=False+encounter+rates+from+overlapping+beaked-whale+echolocation+bouts&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:01Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Review for \"Geographic differences in Blainville's beaked whale ( &lt;i&gt;Mesoplodon densirostris&lt;/i&gt; ) echolocation clicks\"",
+    "doi": "10.1111/ddi.13673/v1/review2",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.438
+   },
+   {
+    "source": "Crossref",
+    "title": "Figure 5: True’s beaked whale appearance, as photographed during the encounter in July 2018.",
+    "doi": "10.7717/peerj.7809/fig-5",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.39
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Geographic differences in Blainville's beaked whale ( &lt;i&gt;Mesoplodon densirostris&lt;/i&gt; ) echolocation clicks\"",
+    "doi": "10.1111/ddi.13673/v2/review1",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.438
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Geographic differences in Blainville's beaked whale ( &lt;i&gt;Mesoplodon densirostris&lt;/i&gt; ) echolocation clicks\"",
+    "doi": "10.1111/ddi.13673/v1/review1",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.438
+   },
+   {
+    "source": "Crossref",
+    "title": "Decision letter for \"Geographic differences in Blainville's beaked whale ( &lt;i&gt;Mesoplodon densirostris&lt;/i&gt; ) echolocation clicks\"",
+    "doi": "10.1111/ddi.13673/v1/decision1",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.438
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Biosonar performance of foraging beaked whales ( Mesoplodon densirostris )",
+    "doi": "https://doi.org/10.1242/jeb.01327",
+    "first_author": "Peter T. Madsen",
+    "year": 2005,
+    "similarity": 0.5
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Passive acoustic monitoring of beaked whale densities in the Gulf of Mexico",
+    "doi": "https://doi.org/10.1038/srep16343",
+    "first_author": "John A. Hildebrand",
+    "year": 2015,
+    "similarity": 0.455
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Sowerby's beaked whale biosonar and movement strategy indicate deep-sea foraging niche differentiation in mesoplodont whales",
+    "doi": "https://doi.org/10.1242/jeb.243728",
+    "first_author": "Fleur Visser",
+    "year": 2022,
+    "similarity": 0.33
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Audiogram of a stranded Blainville's beaked whale (Mesoplodon densirostris) measured using auditory evoked potentials",
+    "doi": "https://doi.org/10.1242/jeb.054338",
+    "first_author": "Aude F. Pacini",
+    "year": 2011,
+    "similarity": 0.4
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Insights into Blainville's (Mesoplodon densirostris) beaked whale communication",
+    "doi": null,
+    "first_author": "Charlotte A. Dunn",
+    "year": 2015,
+    "similarity": 0.449
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Biosonar performance of foraging beaked whales ( Mesoplodon densirostris )",
+   "doi": "https://doi.org/10.1242/jeb.01327",
+   "first_author": "Peter T. Madsen",
+   "year": 2005,
+   "similarity": 0.5
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

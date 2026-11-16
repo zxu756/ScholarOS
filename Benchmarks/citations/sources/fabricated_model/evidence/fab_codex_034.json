@@ -1,0 +1,113 @@
+{
+ "key": "fab_codex_034",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Sofia Neri and Andrei Velichko and Pascale Veyron",
+  "title": "Rigidity windows in accelerated Rauzy paths with sparse winners",
+  "journal": "Journal of Modern Dynamics",
+  "volume": "19",
+  "pages": "371--399",
+  "year": "2023",
+  "eprint": "2107.04386",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "2107.04386",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=2107.04386",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:58Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Joint Matrix Decomposition for Deep Convolutional Neural Networks Compression",
+   "first_author": "Shaowu Chen",
+   "year": "2021"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Rigidity+windows+in+accelerated+Rauzy+paths+with+sparse+winners+Neri+2023&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:59Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Rigidity+windows+in+accelerated+Rauzy+paths+with+sparse+winners&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:00Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "On the rigidity of Arnoux-Rauzy words",
+    "doi": "10.1016/j.aam.2025.102932",
+    "first_author": "Berthé",
+    "year": 2025,
+    "container": "Advances in Applied Mathematics",
+    "similarity": 0.42
+   },
+   {
+    "source": "Crossref",
+    "title": "Accelerated Nano-Optical Imaging through Sparse Sampling",
+    "doi": "10.1021/acs.nanolett.3c03733.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.487
+   },
+   {
+    "source": "Crossref",
+    "title": "Video for Modified Compressed Sparse Row Format for Accelerated FPGA-Based Sparse Matrix Multiplication",
+    "doi": "10.1109/iscas45731.2020.9181266/video",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.422
+   },
+   {
+    "source": "Crossref",
+    "title": "All Pairs Shortest Paths in Sparse Graphs, 2004; Pettie",
+    "doi": "10.1007/springerreference_57530",
+    "first_author": null,
+    "year": null,
+    "container": "SpringerReference",
+    "similarity": 0.414
+   },
+   {
+    "source": "Crossref",
+    "title": "Surface-Accelerated String Method for Locating Minimum Free Energy Paths",
+    "doi": "10.1021/acs.jctc.3c01401.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.356
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Accelerated Nano-Optical Imaging through Sparse Sampling",
+   "doi": "10.1021/acs.nanolett.3c03733.s001",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.487
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

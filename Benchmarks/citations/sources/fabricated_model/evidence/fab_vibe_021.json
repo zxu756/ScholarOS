@@ -1,0 +1,167 @@
+{
+ "key": "fab_vibe_021",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Tashi, Sonam and Wangchuk, Karma and Dorji, Pema",
+  "title": "Ring-width chronologies of high-altitude juniper and their response to monsoon variability",
+  "journal": "Dendrochronologia",
+  "year": "2017",
+  "volume": "44",
+  "pages": "55--66",
+  "doi": "10.1016/j.dendro.2017.04.003"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.dendro.2017.04.003",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.dendro.2017.04.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:53Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.dendro.2017.04.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:54Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.dendro.2017.04.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:54Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "An empirical resampling method for determining optimal high-pass filters used in correlation-based tree-ring crossdating",
+   "container": "Dendrochronologia",
+   "year": 2017
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Ring-width+chronologies+of+high-altitude+juniper+and+their+response+to+monsoon+variability+Tashi+2017&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:55Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Ring-width+chronologies+of+high-altitude+juniper+and+their+response+to+monsoon+variability&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:56Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "A Direct Comparison of Sympatric High-Latitude Pinus contorta and Picea albertiana Ring-Width Chronologies",
+    "doi": "10.3959/trr2018-18",
+    "first_author": "Strong",
+    "year": 2020,
+    "container": "Tree-Ring Research",
+    "similarity": 0.235
+   },
+   {
+    "source": "Crossref",
+    "title": "Data S1: Raw measurements (ring width, wood density data, carbon chronologies and climatic data)",
+    "doi": "10.7717/peerj.7085/supp-1",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.343
+   },
+   {
+    "source": "Crossref",
+    "title": "Global surface temperature signals in pine ring‐width chronologies from southern monsoon Asia",
+    "doi": "10.1029/2005gl023745",
+    "first_author": "Buckley",
+    "year": 2005,
+    "container": "Geophysical Research Letters",
+    "similarity": 0.481
+   },
+   {
+    "source": "Crossref",
+    "title": "Development of Two Tree-ring Width Chronologies of the Samples Collected from the Baluntai Region",
+    "doi": "10.3724/sp.j.1148.2008.00288",
+    "first_author": "ZHANG",
+    "year": 2008,
+    "container": "Arid Zone Research",
+    "similarity": 0.46
+   },
+   {
+    "source": "Crossref",
+    "title": "Tree-Ring Width Chronologies and Their Response to Climate in the Qinling Mountains, China",
+    "doi": "10.3319/tao.1994.5.3.365(pages)",
+    "first_author": "Wu",
+    "year": 1994,
+    "container": "Terrestrial, Atmospheric and Oceanic Sciences",
+    "similarity": 0.581
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Forward modelling of tree-ring width and comparison with a global network of tree-ring chronologies",
+    "doi": "https://doi.org/10.5194/cp-10-437-2014",
+    "first_author": "Petra Breitenmoser",
+    "year": 2014,
+    "similarity": 0.243
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tree-Ring Chronologies from Western Himalaya and Their Dendroclimatic Potential",
+    "doi": "https://doi.org/10.1163/22941932-90000692",
+    "first_author": "Hemant P. Borgaonkar",
+    "year": 1999,
+    "similarity": 0.509
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The 600-mm precipitation isoline distinguishes tree-ring-width responses to climate in China",
+    "doi": "https://doi.org/10.1093/nsr/nwy101",
+    "first_author": "Yu Liu",
+    "year": 2018,
+    "similarity": 0.297
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tree-Ring Width and Carbon Isotope Chronologies Track Temperature, Humidity, and Baseflow in the Tianshan Mountains, Central Asia",
+    "doi": "https://doi.org/10.3390/f11121308",
+    "first_author": "Yuting Fan",
+    "year": 2020,
+    "similarity": 0.472
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tree ring variability and climate response of Abies spectabilis along an elevation gradient in Mustang, Nepal",
+    "doi": "https://doi.org/10.3126/banko.v24i1.13473",
+    "first_author": "Deepak Kumar Kharal",
+    "year": 2015,
+    "similarity": 0.162
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Tree-Ring Width Chronologies and Their Response to Climate in the Qinling Mountains, China",
+   "doi": "10.3319/tao.1994.5.3.365(pages)",
+   "first_author": "Wu",
+   "year": 1994,
+   "container": "Terrestrial, Atmospheric and Oceanic Sciences",
+   "similarity": 0.581
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

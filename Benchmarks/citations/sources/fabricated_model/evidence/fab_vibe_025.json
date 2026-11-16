@@ -1,0 +1,167 @@
+{
+ "key": "fab_vibe_025",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Mwakalinga, Joseph and Kimaro, Grace and Mushi, Emmanuel",
+  "title": "Compositional analysis of imported and local ceramics from a Swahili coastal settlement",
+  "journal": "Journal of Archaeological Science: Reports",
+  "year": "2018",
+  "volume": "20",
+  "pages": "311--324",
+  "doi": "10.1016/j.jasrep.2018.05.011"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jasrep.2018.05.011",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jasrep.2018.05.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:06Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jasrep.2018.05.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:07Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jasrep.2018.05.011",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:07Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Residue analysis, use-wear patterns, and replicative studies indicate that sandstone tools were used as reamers when producing shell fishhooks on San Nicolas Island, California",
+   "container": "Journal of Archaeological Science: Reports",
+   "year": 2018
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Compositional+analysis+of+imported+and+local+ceramics+from+a+Swahili+coastal+settlement+Mwakalinga+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:08Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Compositional+analysis+of+imported+and+local+ceramics+from+a+Swahili+coastal+settlement&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:09Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Ceramics from each site and their classification as local and nonlocal based on compositional results",
+    "doi": "10.3998/mpub.12208577.cmp.120",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.17
+   },
+   {
+    "source": "Crossref",
+    "title": "IMPORTED CERAMICS FROM THE SETTLEMENT KENT",
+    "doi": "10.17816/snv20154207",
+    "first_author": "Loman",
+    "year": 2015,
+    "container": "Samara Journal of Science",
+    "similarity": 0.543
+   },
+   {
+    "source": "Crossref",
+    "title": "Geochemical Analysis of Putative Local and Ubaid Ceramics from Dosariyah",
+    "doi": "10.2307/j.ctv1nzfw9d.15",
+    "first_author": "Magee",
+    "year": 2018,
+    "container": "Dosariyah: An Arabian Neolithic Coastal Community in the Central Gulf",
+    "similarity": 0.553
+   },
+   {
+    "source": "Crossref",
+    "title": "Appendix A.",
+    "doi": "10.2307/j.ctt13x0mmk.15",
+    "first_author": "Boileau",
+    "year": 2015,
+    "container": "Mochlos III: The Late Hellenistic Settlement",
+    "similarity": 0.082
+   },
+   {
+    "source": "Crossref",
+    "title": "Local and Imported Ceramics in the Roman Province of Scythia (4th – 6th centuries AD)",
+    "doi": "10.30861/9781841716275",
+    "first_author": "Opait",
+    "year": 2004,
+    "container": null,
+    "similarity": 0.44
+   },
+   {
+    "source": "OpenAlex",
+    "title": "When Did the Swahili Become Maritime?",
+    "doi": "https://doi.org/10.1111/aman.12171",
+    "first_author": "Jeffrey Fleisher",
+    "year": 2015,
+    "similarity": 0.293
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The impact of Ming and Qing dynasty maritime bans on trade ceramics recovered from coastal settlements in northern Sumatra, Indonesia",
+    "doi": "https://doi.org/10.1016/j.ara.2019.100174",
+    "first_author": "Yew Seng Tai",
+    "year": 2019,
+    "similarity": 0.438
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Entwined African and Asian genetic roots of medieval peoples of the Swahili coast",
+    "doi": "https://doi.org/10.1038/s41586-023-05754-w",
+    "first_author": "Esther S. Brielle",
+    "year": 2023,
+    "similarity": 0.452
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Coastal Subsistence, Maritime Trade, and the Colonization of Small Offshore Islands in Eastern African Prehistory",
+    "doi": "https://doi.org/10.1080/15564894.2016.1188334",
+    "first_author": "Alison Crowther",
+    "year": 2016,
+    "similarity": 0.152
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fishing and Fish Consumption in the Swahili Communities of East Africa, 700–1400 CE",
+    "doi": "https://doi.org/10.11141/ia.37.3",
+    "first_author": "Eréndira M. Quintana Morales",
+    "year": 2014,
+    "similarity": 0.331
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Geochemical Analysis of Putative Local and Ubaid Ceramics from Dosariyah",
+   "doi": "10.2307/j.ctv1nzfw9d.15",
+   "first_author": "Magee",
+   "year": 2018,
+   "container": "Dosariyah: An Arabian Neolithic Coastal Community in the Central Gulf",
+   "similarity": 0.553
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

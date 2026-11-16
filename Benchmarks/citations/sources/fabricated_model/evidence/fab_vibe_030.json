@@ -1,0 +1,135 @@
+{
+ "key": "fab_vibe_030",
+ "source_file": "vibe.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Zhou, Lianhua",
+  "title": "Evidential Systems in Tibeto-Burman: A Comparative Study",
+  "publisher": "De Gruyter Mouton",
+  "address": "Berlin",
+  "year": "2019"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Evidential+Systems+in+Tibeto-Burman%3A+A+Comparative+Study+Zhou+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:23Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Evidential+Systems+in+Tibeto-Burman%3A+A+Comparative+Study&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:23Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Evidentials and evidential-like categories in nDrapa",
+    "doi": "10.32655/ltba.30.2.05",
+    "first_author": "Shirai",
+    "year": 2007,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.411
+   },
+   {
+    "source": "Crossref",
+    "title": "Preliminary report on evidential categories in Lende Tibetan (Kyirong)",
+    "doi": "10.32655/ltba.23.2.06",
+    "first_author": "Huber",
+    "year": 2000,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.439
+   },
+   {
+    "source": "Crossref",
+    "title": "4. Tonal comparison of Lolo-Burmese with other tibeto-Burman languages",
+    "doi": "10.1075/cilt.54.08ton",
+    "first_author": null,
+    "year": 1987,
+    "container": "Current Issues in Linguistic Theory",
+    "similarity": 0.435
+   },
+   {
+    "source": "Crossref",
+    "title": "Non-singular pronouns in Tibeto-Burman (Trans-Himalayan)",
+    "doi": "10.1075/ltba.18006.del",
+    "first_author": "DeLancey",
+    "year": 2019,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.477
+   },
+   {
+    "source": "Crossref",
+    "title": "Review of Fortier &amp; Witzer (2019): A Comparative Dictionary of Raute and Rawat: Tibeto-Burman languages of the Central Himalayas",
+    "doi": "10.1075/ltba.00008.bra",
+    "first_author": "Bradley",
+    "year": 2020,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.387
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Historical-comparative Study of the Tani (Mirish) Branch in Tibeto-Burman",
+    "doi": null,
+    "first_author": "Tianshin Sun",
+    "year": 1993,
+    "similarity": 0.359
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Evidentiality in Shuhi (Tibeto-Burman)",
+    "doi": null,
+    "first_author": "Katia Chirkova",
+    "year": 2024,
+    "similarity": 0.615
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Towards a history of verb agreement in Tibeto-Burman",
+    "doi": "https://doi.org/10.5070/h99123042",
+    "first_author": "Scott DeLancey",
+    "year": 2010,
+    "similarity": 0.393
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Reported Evidentiality in Tibeto-Burman Languages",
+    "doi": "https://doi.org/10.5070/h920152301",
+    "first_author": "Lauren Gawne",
+    "year": 2021,
+    "similarity": 0.635
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Notes on verb agreement prefixes in Tibeto-Burman",
+    "doi": "https://doi.org/10.5070/h910123565",
+    "first_author": "Scott DeLancey",
+    "year": 2011,
+    "similarity": 0.481
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Reported Evidentiality in Tibeto-Burman Languages",
+   "doi": "https://doi.org/10.5070/h920152301",
+   "first_author": "Lauren Gawne",
+   "year": 2021,
+   "similarity": 0.635
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

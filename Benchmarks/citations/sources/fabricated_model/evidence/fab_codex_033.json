@@ -1,0 +1,153 @@
+{
+ "key": "fab_codex_033",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ilya Korovin and Celia Monnier",
+  "title": "Return-time skewness for bounded-type interval exchanges",
+  "journal": "Ergodic Theory and Dynamical Systems",
+  "volume": "40",
+  "number": "11",
+  "pages": "3042--3068",
+  "year": "2020",
+  "eprint": "1806.07243",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "1806.07243",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=1806.07243",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:55Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Learning Conditioned Graph Structures for Interpretable Visual Question Answering",
+   "first_author": "Will Norcliffe-Brown",
+   "year": "2018"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Return-time+skewness+for+bounded-type+interval+exchanges+Korovin+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:56Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Return-time+skewness+for+bounded-type+interval+exchanges&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:56Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Interval Point in Time Date and Time Data Type",
+    "doi": "10.32388/0ko01l",
+    "first_author": null,
+    "year": 2020,
+    "container": "Definitions",
+    "similarity": 0.255
+   },
+   {
+    "source": "Crossref",
+    "title": "Low Interval Point in Time Date and Time Data Type",
+    "doi": "10.32388/wj9zgi",
+    "first_author": null,
+    "year": 2020,
+    "container": "Definitions",
+    "similarity": 0.283
+   },
+   {
+    "source": "Crossref",
+    "title": "Interval Point in Time Date Data Type",
+    "doi": "10.32388/9de09b",
+    "first_author": null,
+    "year": 2020,
+    "container": "Definitions",
+    "similarity": 0.258
+   },
+   {
+    "source": "Crossref",
+    "title": "Interval Point in Time Integer Data Type",
+    "doi": "10.32388/5wcfgi",
+    "first_author": null,
+    "year": 2020,
+    "container": "Definitions",
+    "similarity": 0.271
+   },
+   {
+    "source": "Crossref",
+    "title": "Event-Related Periodic Interval of Time Data Type",
+    "doi": "10.32388/hwp0sg",
+    "first_author": null,
+    "year": 2020,
+    "container": "Definitions",
+    "similarity": 0.4
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Skew-product systems over infinite interval exchange transformations",
+    "doi": "https://doi.org/10.1088/1361-6544/add836",
+    "first_author": "Henk Bruin",
+    "year": 2025,
+    "similarity": 0.516
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The time-varying asymmetry of exchange rate returns: A stochastic volatility – stochastic skewness model",
+    "doi": "https://doi.org/10.1016/j.jempfin.2020.06.008",
+    "first_author": "Martin Iseringhausen",
+    "year": 2020,
+    "similarity": 0.293
+   },
+   {
+    "source": "OpenAlex",
+    "title": "On the Out-of-Sample Importance of Skewness and Asymmetric Dependence for Asset Allocation",
+    "doi": "https://doi.org/10.1093/jjfinec/nbh006",
+    "first_author": "Andrew J. Patton",
+    "year": 2004,
+    "similarity": 0.37
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Weak mixing for interval exchange transformations and translation flows",
+    "doi": "https://doi.org/10.4007/annals.2007.165.637",
+    "first_author": "Artur Avila",
+    "year": 2007,
+    "similarity": 0.394
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Upper Bound for Permanent Saturation of Metric Graphs using Interval Exchange Transformations",
+    "doi": "https://doi.org/10.1007/s00332-026-10342-z",
+    "first_author": "Ermolaev Egor",
+    "year": 2026,
+    "similarity": 0.403
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Skew-product systems over infinite interval exchange transformations",
+   "doi": "https://doi.org/10.1088/1361-6544/add836",
+   "first_author": "Henk Bruin",
+   "year": 2025,
+   "similarity": 0.516
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

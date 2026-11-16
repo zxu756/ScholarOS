@@ -1,0 +1,167 @@
+{
+ "key": "fab_codex_007",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Nila Banerji and Koenraad Vermeer and Inez Falco",
+  "title": "Humidity cycling of tin-halide absorbers in unsealed planar cells",
+  "booktitle": "2019 IEEE 46th Photovoltaic Specialists Conference (PVSC)",
+  "pages": "1842--1846",
+  "year": "2019",
+  "publisher": "IEEE",
+  "doi": "10.1109/PVSC40753.2019.8980652"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1109/PVSC40753.2019.8980652",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1109/PVSC40753.2019.8980652",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:27Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1109/PVSC40753.2019.8980652",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:28Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1109/PVSC40753.2019.8980652",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:28Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Contacting n<sup>+</sup> Poly-Si Junctions with Fired AZO Layers: A Promising Approach for High Temperature Passivated Contact Solar Cells",
+   "container": "2019 IEEE 46th Photovoltaic Specialists Conference (PVSC)",
+   "year": 2019
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Humidity+cycling+of+tin-halide+absorbers+in+unsealed+planar+cells+Banerji+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:29Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Humidity+cycling+of+tin-halide+absorbers+in+unsealed+planar+cells&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:30Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "How Halide Alloying Influences the Optoelectronic Quality in Tin-Halide Perovskite Solar Absorbers",
+    "doi": "10.1021/acsenergylett.3c01241.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.368
+   },
+   {
+    "source": "Crossref",
+    "title": "Multi-scale degradation study under humidity of lead halide perovskite absorbers",
+    "doi": "10.70675/a1771357zc0b9z4b21za29ezb39005f570e6",
+    "first_author": "Akhavan Kazemi",
+    "year": null,
+    "container": null,
+    "similarity": 0.4
+   },
+   {
+    "source": "Crossref",
+    "title": "Influence of defect states on the performances of planar tin halide perovskite solar cells",
+    "doi": "10.1088/1674-4926/40/3/032201",
+    "first_author": "Huang",
+    "year": 2019,
+    "container": "Journal of Semiconductors",
+    "similarity": 0.361
+   },
+   {
+    "source": "Crossref",
+    "title": "Influence of layer Thickness on the Power Conversion Efficiency of Tin Halide-Based Planar Heterojunction Solar Cells",
+    "doi": "10.21203/rs.3.rs-1811917/v1",
+    "first_author": "Gehlot",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.418
+   },
+   {
+    "source": "Crossref",
+    "title": "Improving Hybrid Tin Halide Films by Tin Trifluoromethanesulfonate for Lead-Free Perovskite Solar Cells",
+    "doi": "10.1021/acs.jpclett.4c01097.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.464
+   },
+   {
+    "source": "OpenAlex",
+    "title": "High efficiency planar-type perovskite solar cells with negligible hysteresis using EDTA-complexed SnO2",
+    "doi": "https://doi.org/10.1038/s41467-018-05760-x",
+    "first_author": "Dong Fang Yang",
+    "year": 2018,
+    "similarity": 0.214
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Passivation and process engineering approaches of halide perovskite films for high efficiency and stability perovskite solar cells",
+    "doi": "https://doi.org/10.1039/d1ee00062d",
+    "first_author": "Abd. Rashid bin Mohd Yusoff",
+    "year": 2021,
+    "similarity": 0.308
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Solution-processed halide perovskite solar cells: from coating to modules",
+    "doi": "https://doi.org/10.1007/s44308-025-00012-z",
+    "first_author": "Yihao Mo",
+    "year": 2026,
+    "similarity": 0.336
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Novel approaches and scalability prospects of copper based hole transporting materials for planar perovskite solar cells",
+    "doi": "https://doi.org/10.1039/c9tc04009a",
+    "first_author": "Maria Bidikoudi",
+    "year": 2019,
+    "similarity": 0.357
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Advanced carbon electrode and green solvents for fabrication of metal halide perovskite solar cells",
+    "doi": "https://doi.org/10.5204/thesis.eprints.236550",
+    "first_author": "Yongyue Yu",
+    "year": 2022,
+    "similarity": 0.378
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Improving Hybrid Tin Halide Films by Tin Trifluoromethanesulfonate for Lead-Free Perovskite Solar Cells",
+   "doi": "10.1021/acs.jpclett.4c01097.s001",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.464
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

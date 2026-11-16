@@ -1,0 +1,138 @@
+{
+ "key": "fab_codex_029",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Pao Vang and Lianmei He and Rina Chao",
+  "title": "Phrase-edge tone alternations in a western Hmong-Mien variety",
+  "journal": "Journal of the International Phonetic Association",
+  "volume": "49",
+  "number": "2",
+  "pages": "225--248",
+  "year": "2019"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Phrase-edge+tone+alternations+in+a+western+Hmong-Mien+variety+Vang+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:45Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Phrase-edge+tone+alternations+in+a+western+Hmong-Mien+variety&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:46Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Hmong Communities in the Western Hemisphere, 1975–2025",
+    "doi": "10.1093/9780197852699.003.0092",
+    "first_author": "Vang",
+    "year": 2026,
+    "container": "Oxford Research Encyclopedia of Migration Studies",
+    "similarity": 0.456
+   },
+   {
+    "source": "Crossref",
+    "title": "Introduction",
+    "doi": "10.5749/9781452950068-001",
+    "first_author": "Vang",
+    "year": 2010,
+    "container": "Claiming Place",
+    "similarity": 0.164
+   },
+   {
+    "source": "Crossref",
+    "title": "Hmong-Mien Languages",
+    "doi": "10.1093/obo/9780199772810-0173",
+    "first_author": "Mortensen",
+    "year": 2014,
+    "container": "Oxford Bibliographies in Linguistics",
+    "similarity": 0.321
+   },
+   {
+    "source": "Crossref",
+    "title": "Claiming Place",
+    "doi": "10.5749/9781452950068",
+    "first_author": "Vang",
+    "year": 2010,
+    "container": null,
+    "similarity": 0.187
+   },
+   {
+    "source": "Crossref",
+    "title": "Acknowledgments",
+    "doi": "10.5749/9781452950068-015",
+    "first_author": "Vang",
+    "year": 2010,
+    "container": "Claiming Place",
+    "similarity": 0.211
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Contributions to Anthropology, Number 9: Embroidered Hmong Story Cloths",
+    "doi": null,
+    "first_author": "Susanne L. Bessac",
+    "year": 1988,
+    "similarity": 0.369
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Grammatical tone: Typology and theory",
+    "doi": "https://doi.org/10.5070/bf211040767",
+    "first_author": "Nicholas Revett Rolle",
+    "year": 2018,
+    "similarity": 0.33
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Creole Prosodic Systems Are Areal, Not Simple",
+    "doi": "https://doi.org/10.3389/fpsyg.2021.690593",
+    "first_author": "Kofi Yakpo",
+    "year": 2021,
+    "similarity": 0.21
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Cross-Language Acoustic Space for Vocalic Phonation Distinctions",
+    "doi": "https://doi.org/10.1353/lan.2023.a900090",
+    "first_author": "Patricia Keating",
+    "year": 2023,
+    "similarity": 0.346
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Sino-Tibetan Languages",
+    "doi": "https://doi.org/10.1016/b0-08-044854-2/02335-x",
+    "first_author": "Randy J. LaPolla",
+    "year": 2006,
+    "similarity": 0.12
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Hmong Communities in the Western Hemisphere, 1975–2025",
+   "doi": "10.1093/9780197852699.003.0092",
+   "first_author": "Vang",
+   "year": 2026,
+   "container": "Oxford Research Encyclopedia of Migration Studies",
+   "similarity": 0.456
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

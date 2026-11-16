@@ -1,0 +1,137 @@
+{
+ "key": "fab_vibe_032",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Santos, Rafael and Lima, Camila",
+  "title": "Rodent reservoirs and environmental risk factors for leptospirosis in a flood-prone settlement",
+  "journal": "Epidemiology and Infection",
+  "year": "2012",
+  "volume": "140",
+  "number": "12",
+  "pages": "2216--2225"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Rodent+reservoirs+and+environmental+risk+factors+for+leptospirosis+in+a+flood-prone+settlement+Santos+2012&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:27Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Rodent+reservoirs+and+environmental+risk+factors+for+leptospirosis+in+a+flood-prone+settlement&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:28Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Risk Attitudes and Adaptation: Experimental Evidence from a Flood-Prone Urban Informal Settlement in South Africa",
+    "doi": "10.2139/ssrn.5338065",
+    "first_author": "Visser",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.476
+   },
+   {
+    "source": "Crossref",
+    "title": "Leptospirosis Risk Assessment in Rodent Populations and Environmental Reservoirs in Humanitarian Aid Settings in Thailand",
+    "doi": "10.3390/microorganisms13010029",
+    "first_author": "Krairojananan",
+    "year": 2024,
+    "container": "Microorganisms",
+    "similarity": 0.456
+   },
+   {
+    "source": "Crossref",
+    "title": "Determinant Factors of Leptospirosis in Indonesia:  Flood Prone Area Setting in Wajo District",
+    "doi": "10.4108/eai.26-10-2018.2288705",
+    "first_author": "Syamsuar",
+    "year": 2019,
+    "container": "Proceedings of the Proceedings of the 3rd International Conference on Environmental Risks and Public Health, ICER-PH 2018, 26-27, October 2018, Makassar, Indonesia",
+    "similarity": 0.562
+   },
+   {
+    "source": "Crossref",
+    "title": "Braid Burn Flood Storage Reservoirs",
+    "doi": "10.1680/dams2012.57999.0027",
+    "first_author": null,
+    "year": 2012,
+    "container": "Dams: Engineering in a Social and Environmental Context",
+    "similarity": 0.233
+   },
+   {
+    "source": "Crossref",
+    "title": "Risk Factors and Demographic Profile of Suspected Leptospirosis Cases in Kendary City: Health Challenges in Flood-Prone Areas",
+    "doi": "10.29080/jhsp.v9i1.1334",
+    "first_author": "Agung Mirasa",
+    "year": 2025,
+    "container": "Journal of Health Science and Prevention",
+    "similarity": 0.44
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Risk factors for human leptospirosis following flooding: A meta-analysis of observational studies",
+    "doi": "https://doi.org/10.1371/journal.pone.0217643",
+    "first_author": "Cho Min Naing",
+    "year": 2019,
+    "similarity": 0.484
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Environmental and Risk Factors of Leptospirosis: A Spatial Analysis in Semarang City",
+    "doi": "https://doi.org/10.1088/1755-1315/55/1/012013",
+    "first_author": "Silviana Nur Fajriyah",
+    "year": 2017,
+    "similarity": 0.554
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Literature Review: Relationship of Environmental Risk Factors and the Incidence of Leptospirosis in Settlements (2018–2023)",
+    "doi": "https://doi.org/10.20473/jkl.v15i3.2023.235-246",
+    "first_author": "Nafiah Farisan Nuha",
+    "year": 2023,
+    "similarity": 0.598
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Identification of rodent species confirmed as the cause of leptospirosis disease, along with ecosystem distribution and environmental factors",
+    "doi": "https://doi.org/10.61511/jocae.v2i1.2024.800",
+    "first_author": "Sri Komalaningsih",
+    "year": 2024,
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Infrastructure risk factors for leptospirosis transmission in urban informal settlements",
+    "doi": "https://doi.org/10.64898/2026.08.13.26360375",
+    "first_author": "Ana Maria Nascimento Silva",
+    "year": 2026,
+    "similarity": 0.593
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Literature Review: Relationship of Environmental Risk Factors and the Incidence of Leptospirosis in Settlements (2018–2023)",
+   "doi": "https://doi.org/10.20473/jkl.v15i3.2023.235-246",
+   "first_author": "Nafiah Farisan Nuha",
+   "year": 2023,
+   "similarity": 0.598
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

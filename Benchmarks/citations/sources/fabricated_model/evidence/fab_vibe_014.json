@@ -1,0 +1,154 @@
+{
+ "key": "fab_vibe_014",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Nakamura, Hiroshi and Tanaka, Yuki and Watanabe, Sho",
+  "title": "Robust multigrid preconditioning for saddle-point systems arising in Biot consolidation",
+  "journal": "Numerical Linear Algebra with Applications",
+  "year": "2021",
+  "volume": "28",
+  "number": "2",
+  "pages": "e2341",
+  "eprint": "2011.09344",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "2011.09344",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=2011.09344",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:29Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Probing the anomalous positron fraction origin with fully leptonic decaying gravitino dark matter candidates",
+   "first_author": "Johannes Buchner",
+   "year": "2020"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Robust+multigrid+preconditioning+for+saddle-point+systems+arising+in+Biot+consolidation+Nakamura+2021&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:30Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Robust+multigrid+preconditioning+for+saddle-point+systems+arising+in+Biot+consolidation&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:31Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "On preconditioning of double saddle point linear systems arising from liquid crystal director modeling",
+    "doi": "10.1016/j.aml.2022.108445",
+    "first_author": "Chen",
+    "year": 2023,
+    "container": "Applied Mathematics Letters",
+    "similarity": 0.55
+   },
+   {
+    "source": "Crossref",
+    "title": "Algebraic multigrid methods for saddle point systems arising from mortar contact formulations",
+    "doi": "10.1002/nme.6680",
+    "first_author": "Wiesner",
+    "year": 2021,
+    "container": "International Journal for Numerical Methods in Engineering",
+    "similarity": 0.7
+   },
+   {
+    "source": "Crossref",
+    "title": "New Preconditioning Techniques for Saddle Point Problems Arising from the Time-Harmonic Maxwell Equations",
+    "doi": "10.1155/2013/905723",
+    "first_author": "Liu",
+    "year": 2013,
+    "container": "ISRN Applied Mathematics",
+    "similarity": 0.583
+   },
+   {
+    "source": "Crossref",
+    "title": "Preconditioning discontinuous Galerkin saddle point systems",
+    "doi": "10.1016/b978-008044046-0.50494-2",
+    "first_author": "Kanschat",
+    "year": 2003,
+    "container": "Computational Fluid and Solid Mechanics 2003",
+    "similarity": 0.534
+   },
+   {
+    "source": "Crossref",
+    "title": "Preconditioning Saddle-Point Matrices",
+    "doi": "10.1007/978-0-387-71564-3_9",
+    "first_author": null,
+    "year": null,
+    "container": "Multilevel Block Factorization Preconditioners",
+    "similarity": 0.532
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Parameter-Robust Discretization and Preconditioning of Biot's Consolidation Model",
+    "doi": "https://doi.org/10.1137/15m1029473",
+    "first_author": "Jeonghun J. Lee",
+    "year": 2017,
+    "similarity": 0.571
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Robust Block Preconditioners for Biot’s Model",
+    "doi": "https://doi.org/10.1007/978-3-319-93873-8_1",
+    "first_author": "James H. Adler",
+    "year": 2018,
+    "similarity": 0.5
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Weakly Imposed Symmetry and Robust Preconditioners for Biot’s Consolidation Model",
+    "doi": "https://doi.org/10.1515/cmam-2017-0016",
+    "first_author": "Trygve Bærland",
+    "year": 2017,
+    "similarity": 0.5
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Robust Preconditioners for Perturbed Saddle-Point Problems and Conservative Discretizations of Biot's Equations Utilizing Total Pressure",
+    "doi": "https://doi.org/10.1137/20m1379708",
+    "first_author": "Wietse M. Boon",
+    "year": 2021,
+    "similarity": 0.538
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Parameter-robust Uzawa-type iterative methods for double saddle point problems arising in Biot’s consolidation and multiple-network poroelasticity models",
+    "doi": "https://doi.org/10.1142/s0218202520500499",
+    "first_author": "Qingguo Hong",
+    "year": 2020,
+    "similarity": 0.517
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Algebraic multigrid methods for saddle point systems arising from mortar contact formulations",
+   "doi": "10.1002/nme.6680",
+   "first_author": "Wiesner",
+   "year": 2021,
+   "container": "International Journal for Numerical Methods in Engineering",
+   "similarity": 0.7
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

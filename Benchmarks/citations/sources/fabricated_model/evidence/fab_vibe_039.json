@@ -1,0 +1,162 @@
+{
+ "key": "fab_vibe_039",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "B{\\\"o}hm, Annegret and Keller, Rudolf",
+  "title": "Corrosion of iron-gall ink and the stabilisation of manuscript paper",
+  "journal": "Studies in Conservation",
+  "year": "2003",
+  "volume": "48",
+  "number": "2",
+  "pages": "97--110",
+  "doi": "10.1179/sic.2003.48.2.97"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1179/sic.2003.48.2.97",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1179/sic.2003.48.2.97",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:51Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1179/sic.2003.48.2.97",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:52Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1179/sic.2003.48.2.97",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:52Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Corrosion+of+iron-gall+ink+and+the+stabilisation+of+manuscript+paper+Bohm+2003&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:53Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Corrosion+of+iron-gall+ink+and+the+stabilisation+of+manuscript+paper&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:54Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Gelatine in Historical Paper Production and as Inhibiting Agent for Iron-Gall Ink Corrosion on Paper",
+    "doi": "10.1515/rest.2004.26",
+    "first_author": "Kolbe",
+    "year": 2004,
+    "container": "Restaurator",
+    "similarity": 0.44
+   },
+   {
+    "source": "Crossref",
+    "title": "Stabilisation of Paper Containing Iron-Gall Ink with Current Aqueous Processes",
+    "doi": "10.1515/rest.2005.26.3.181",
+    "first_author": "KOLAR",
+    "year": 2005,
+    "container": "Restaurator",
+    "similarity": 0.301
+   },
+   {
+    "source": "Crossref",
+    "title": "Polyoxometalate-Ionic Liquids for Mitigating the Effects of Iron Gall Ink Corrosion on Cellulosic Supports",
+    "doi": "10.1021/acsomega.4c04925.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.402
+   },
+   {
+    "source": "Crossref",
+    "title": "Non Destructive Detection of Iron-Gall Inks by Means of Multispectral Imaging Part 2: Application on Original Objects Affected With Iron-Gall-Ink Corrosion",
+    "doi": "10.1515/rest.2003.88",
+    "first_author": "Havermans",
+    "year": 2003,
+    "container": "Restaurator",
+    "similarity": 0.36
+   },
+   {
+    "source": "Crossref",
+    "title": "Guar Gum Nanocomposites: Green Corrosion Inhibitors of Iron‐Gall Ink on Paper Artworks",
+    "doi": "10.1002/star.202100174",
+    "first_author": "Afsharpour",
+    "year": 2021,
+    "container": "Starch - Stärke",
+    "similarity": 0.458
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Beneficial effect of gelatin on iron gall ink corrosion",
+    "doi": "https://doi.org/10.1186/s40494-021-00593-2",
+    "first_author": "Alice Gimat",
+    "year": 2021,
+    "similarity": 0.407
+   },
+   {
+    "source": "OpenAlex",
+    "title": "XANES analysis of Fe valence in iron gall inks",
+    "doi": "https://doi.org/10.1002/xrs.962",
+    "first_author": "Iztok Arčon",
+    "year": 2007,
+    "similarity": 0.351
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Iron-gall inks: a review of their degradation mechanisms and conservation treatments",
+    "doi": "https://doi.org/10.1186/s40494-022-00779-2",
+    "first_author": "Maria João Melo",
+    "year": 2022,
+    "similarity": 0.45
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Impact of the antifungal and antioxidant potential of monoterpenoids on the paper manuscripts with iron gall ink",
+    "doi": "https://doi.org/10.1038/s40494-025-01868-8",
+    "first_author": "Salwa Moustafa Amer Mahmoud",
+    "year": 2025,
+    "similarity": 0.244
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Polyoxometalate-Ionic Liquids for Mitigating the Effects of Iron Gall Ink Corrosion on Cellulosic Supports",
+    "doi": "https://doi.org/10.1021/acsomega.4c04925",
+    "first_author": "Margarida Nunes",
+    "year": 2024,
+    "similarity": 0.402
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Guar Gum Nanocomposites: Green Corrosion Inhibitors of Iron‐Gall Ink on Paper Artworks",
+   "doi": "10.1002/star.202100174",
+   "first_author": "Afsharpour",
+   "year": 2021,
+   "container": "Starch - Stärke",
+   "similarity": 0.458
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:42Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

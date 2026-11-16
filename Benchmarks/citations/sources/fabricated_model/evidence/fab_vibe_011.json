@@ -1,0 +1,168 @@
+{
+ "key": "fab_vibe_011",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Wickramasinghe, Nadeesha and Perera, Sunil and Jayasuriya, Dilani",
+  "title": "Cost-effectiveness of a community antivenom and first-aid programme in a rural district",
+  "journal": "Transactions of the Royal Society of Tropical Medicine and Hygiene",
+  "year": "2014",
+  "volume": "108",
+  "number": "7",
+  "pages": "412--420",
+  "doi": "10.1093/trstmh/tru081"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1093/trstmh/tru081",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1093/trstmh/tru081",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:20Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1093/trstmh/tru081",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:20Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1093/trstmh/tru081",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:20Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Yellow fever, Asia and the East African slave trade",
+   "container": "Transactions of the Royal Society of Tropical Medicine and Hygiene",
+   "year": 2014
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Cost-effectiveness+of+a+community+antivenom+and+first-aid+programme+in+a+rural+district+Wickramasinghe+2014&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:22Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Cost-effectiveness+of+a+community+antivenom+and+first-aid+programme+in+a+rural+district&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:23Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Community-based psychological first aid with rural communities",
+    "doi": "10.1016/b978-0-12-804292-2.00017-x",
+    "first_author": "Quevillon",
+    "year": 2016,
+    "container": "Community-Based Psychological First Aid",
+    "similarity": 0.456
+   },
+   {
+    "source": "Crossref",
+    "title": "Community-based first aid: a program report on the intersection of community-based participatory research and first aid education in a remote Canadian Aboriginal community",
+    "doi": "10.22605/rrh2537",
+    "first_author": "VanderBurgh",
+    "year": 2014,
+    "container": "Rural and Remote Health",
+    "similarity": 0.451
+   },
+   {
+    "source": "Crossref",
+    "title": "Community-based Prevention of Diabetes (ComPoD): A randomised trial with a waiting list control group to evaluate the effectiveness and cost-effectiveness of a third sector led, community-based diabetes prevention programme",
+    "doi": "10.1186/isrctn70221670",
+    "first_author": "Smith",
+    "year": 2014,
+    "container": "http://isrctn.org/&gt;",
+    "similarity": 0.072
+   },
+   {
+    "source": "Crossref",
+    "title": "Effectiveness and cost-effectiveness of a care-programme by district nurses among elderly with dementia symptoms and their primary informal caregiver",
+    "doi": "10.1186/isrctn83135728",
+    "first_author": "Jansen",
+    "year": 2012,
+    "container": "http://isrctn.org/&gt;",
+    "similarity": 0.398
+   },
+   {
+    "source": "Crossref",
+    "title": "Evaluating a planner to aid a community weight management programme",
+    "doi": "10.1186/isrctn75407376",
+    "first_author": "Armitage",
+    "year": 2014,
+    "container": "http://isrctn.org/&gt;",
+    "similarity": 0.455
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Access to antivenoms in the developing world: A multidisciplinary analysis",
+    "doi": "https://doi.org/10.1016/j.toxcx.2021.100086",
+    "first_author": "Julien Potet",
+    "year": 2021,
+    "similarity": 0.388
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Snakebite envenoming at MSF: A decade of clinical challenges and antivenom access issues",
+    "doi": "https://doi.org/10.1016/j.toxcx.2022.100146",
+    "first_author": "Julien Potet",
+    "year": 2022,
+    "similarity": 0.379
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effectiveness of a village emergency care model: a pilot intervention in rural Tanzania",
+    "doi": "https://doi.org/10.1136/emermed-2025-215433",
+    "first_author": "Nathanael Shauri Sirili",
+    "year": 2026,
+    "similarity": 0.439
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Venomous snakebites: Rapid action saves lives—A multifaceted community education programme increases awareness about snakes and snakebites among the rural population of Tamil Nadu, India",
+    "doi": "https://doi.org/10.1371/journal.pntd.0008911",
+    "first_author": "Stephen Paul Samuel",
+    "year": 2020,
+    "similarity": 0.384
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mapping Evidence on the Regulations Affecting the Accessibility, Availability, and Management of Snake Antivenom Globally: A Scoping Review",
+    "doi": "https://doi.org/10.3390/tropicalmed10080228",
+    "first_author": "Ramsha Majeed",
+    "year": 2025,
+    "similarity": 0.305
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Community-based psychological first aid with rural communities",
+   "doi": "10.1016/b978-0-12-804292-2.00017-x",
+   "first_author": "Quevillon",
+   "year": 2016,
+   "container": "Community-Based Psychological First Aid",
+   "similarity": 0.456
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

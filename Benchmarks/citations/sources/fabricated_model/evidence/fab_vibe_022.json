@@ -1,0 +1,138 @@
+{
+ "key": "fab_vibe_022",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Bhatt, Jaya and Rawat, Deepak",
+  "title": "Temperature sensitivity of juniper growth at a timberline site in the western Himalaya",
+  "journal": "Tree-Ring Research",
+  "year": "2006",
+  "volume": "62",
+  "number": "2",
+  "pages": "91--103"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Temperature+sensitivity+of+juniper+growth+at+a+timberline+site+in+the+western+Himalaya+Bhatt+2006&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:58Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Temperature+sensitivity+of+juniper+growth+at+a+timberline+site+in+the+western+Himalaya&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:59Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Spatial Distribution and Climatic Sensitivity of Juniper Forests in the Cold-Arid Ladakh, North-western Himalaya, India",
+    "doi": "10.56093/aaz.v65i2.175663",
+    "first_author": "Misra",
+    "year": 2026,
+    "container": "Annals of Arid Zone",
+    "similarity": 0.542
+   },
+   {
+    "source": "Crossref",
+    "title": "Pastoralism in Timberline Forests of Western Himalaya",
+    "doi": "10.1007/978-981-19-4476-5_21",
+    "first_author": "Singh",
+    "year": 2023,
+    "container": "Ecology of Himalayan Treeline Ecotone",
+    "similarity": 0.532
+   },
+   {
+    "source": "Crossref",
+    "title": "An Old-Growth Definition for Western Juniper Woodlands: Texas Ashe Juniper Dominated or Codominated Communities",
+    "doi": "10.2737/srs-gtr-15",
+    "first_author": "Diamond",
+    "year": 1997,
+    "container": null,
+    "similarity": 0.265
+   },
+   {
+    "source": "Crossref",
+    "title": "Criteria and indicator for assessing threat on Himalayan birch (B. utilis) at timberline ecotone of Nanda Devi Biosphere Reserve: A world heritage site, Western Himalaya, India",
+    "doi": "10.1016/j.indic.2020.100086",
+    "first_author": "Maletha",
+    "year": 2020,
+    "container": "Environmental and Sustainability Indicators",
+    "similarity": 0.383
+   },
+   {
+    "source": "Crossref",
+    "title": "Site Quality and Growth of Pinyon-Juniper Stands in Nevada",
+    "doi": "10.1093/forestscience/27.3.593",
+    "first_author": "Meeuwig",
+    "year": 1981,
+    "container": "Forest Science",
+    "similarity": 0.403
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Temperature change along elevation and its effect on the alpine timberline tree growth in the southeast of the Tibetan Plateau",
+    "doi": "https://doi.org/10.1016/j.accre.2018.05.001",
+    "first_author": "Baoxiong Chen",
+    "year": 2018,
+    "similarity": 0.519
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Distribution Patterns of Timberline and Its Response to Climate Change in the Himalayas",
+    "doi": "https://doi.org/10.5814/j.issn.1674-764x.2020.04.002",
+    "first_author": "Shi Peili",
+    "year": 2020,
+    "similarity": 0.441
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Indian Himalayan Timberline Ecotone in Response to Climate Change – Initial Findings",
+    "doi": "https://doi.org/10.18520/cs/v120/i5/859-871",
+    "first_author": "S. P. Singh",
+    "year": 2021,
+    "similarity": 0.345
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tree-Ring Oxygen Isotope Variations in Subalpine Firs from the Western Himalaya Capture Spring Season Temperature Signals",
+    "doi": "https://doi.org/10.3390/f13030437",
+    "first_author": "Bency David Chinthala",
+    "year": 2022,
+    "similarity": 0.367
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Weakened relationship between tree growth and nitrogen availability due to global CO2 increase and warming in the Taibai Mountain timberline, central China",
+    "doi": "https://doi.org/10.1093/jpe/rtae001",
+    "first_author": "Lelong Yin",
+    "year": 2024,
+    "similarity": 0.308
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Spatial Distribution and Climatic Sensitivity of Juniper Forests in the Cold-Arid Ladakh, North-western Himalaya, India",
+   "doi": "10.56093/aaz.v65i2.175663",
+   "first_author": "Misra",
+   "year": 2026,
+   "container": "Annals of Arid Zone",
+   "similarity": 0.542
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,168 @@
+{
+ "key": "fab_vibe_017",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Rahmawati, Siti and Hidayat, Yusuf and Nugroho, Bambang",
+  "title": "Ectomycorrhizal networks and phosphorus transfer in a tropical peat-swamp forest",
+  "journal": "New Phytologist",
+  "year": "2019",
+  "volume": "223",
+  "number": "3",
+  "pages": "1402--1416",
+  "doi": "10.1111/nph.15874"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1111/nph.15874",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1111/nph.15874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:38Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1111/nph.15874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:39Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1111/nph.15874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:39Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "<i>Arabidopsis</i>\n                    histone H3K4 demethylase\n                    <scp>JMJ</scp>\n                    17 functions in dehydration stress response",
+   "container": "New Phytologist",
+   "year": 2019
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Ectomycorrhizal+networks+and+phosphorus+transfer+in+a+tropical+peat-swamp+forest+Rahmawati+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:40Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Ectomycorrhizal+networks+and+phosphorus+transfer+in+a+tropical+peat-swamp+forest&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:42Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Integrated forest fire management in tropical peat swamp forest:",
+    "doi": "10.37002/biodiversidadebrasileira.v9i1.1210",
+    "first_author": "Ainuddin Nuruddin",
+    "year": 2019,
+    "container": "Biodiversidade Brasileira",
+    "similarity": 0.545
+   },
+   {
+    "source": "Crossref",
+    "title": "Circularity and Singularity of Tropical Peat Swamp Forest Ecosystems",
+    "doi": "10.1007/978-981-33-4654-3_16",
+    "first_author": "Anshari",
+    "year": 2021,
+    "container": "Tropical Peatland Eco-management",
+    "similarity": 0.527
+   },
+   {
+    "source": "Crossref",
+    "title": "How are rural communities on the edge of the largest tropical peat swamp forest in the Congo Basin using peat resources?",
+    "doi": "10.18258/24536",
+    "first_author": "Shona Jenkins",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.422
+   },
+   {
+    "source": "Crossref",
+    "title": "Replication Data for: Degradation increases peat greenhouse gas emissions in undrained tropical peat swamp forests",
+    "doi": "10.17528/cifor/data.00291",
+    "first_author": "E.",
+    "year": 2023,
+    "container": "Replication Data for: Degradation increases peat greenhouse gas emissions in undrained tropical peat swamp forests",
+    "similarity": 0.56
+   },
+   {
+    "source": "Crossref",
+    "title": "Interdependence of peat and vegetation in a tropical peat swamp forest",
+    "doi": "10.1142/9781848160125_0014",
+    "first_author": "Page",
+    "year": 2000,
+    "container": "Changes and Disturbance in Tropical Rainforest in South-East Asia",
+    "similarity": 0.56
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tree species that ‘live slow, die older’ enhance tropical peat swamp restoration: Evidence from a systematic review",
+    "doi": "https://doi.org/10.1111/1365-2664.14232",
+    "first_author": "Stuart William Smith",
+    "year": 2022,
+    "similarity": 0.408
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Rarity of monodominance in hyperdiverse Amazonian forests",
+    "doi": "https://doi.org/10.1038/s41598-019-50323-9",
+    "first_author": "Hans ter Steege",
+    "year": 2019,
+    "similarity": 0.35
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tradeoffs and Synergies in Tropical Forest Root Traits and Dynamics for Nutrient and Water Acquisition: Field and Modeling Advances",
+    "doi": "https://doi.org/10.3389/ffgc.2021.704469",
+    "first_author": "Daniela Francis Cusack",
+    "year": 2021,
+    "similarity": 0.295
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Interkingdom plant-microbial ecological networks under selective and clear cutting of tropical rainforest",
+    "doi": "https://doi.org/10.1016/j.foreco.2021.119182",
+    "first_author": "Jie Chen",
+    "year": 2021,
+    "similarity": 0.465
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Ecosystem carbon dynamics in logged forest of Malaysian Borneo",
+    "doi": "https://doi.org/10.5167/uzh-25404",
+    "first_author": "Philippe Saner",
+    "year": 2009,
+    "similarity": 0.268
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Replication Data for: Degradation increases peat greenhouse gas emissions in undrained tropical peat swamp forests",
+   "doi": "10.17528/cifor/data.00291",
+   "first_author": "E.",
+   "year": 2023,
+   "container": "Replication Data for: Degradation increases peat greenhouse gas emissions in undrained tropical peat swamp forests",
+   "similarity": 0.56
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

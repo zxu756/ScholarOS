@@ -1,0 +1,136 @@
+{
+ "key": "fab_vibe_026",
+ "source_file": "vibe.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Nakalema, Wanjiru",
+  "title": "Kiln and Kilometre: Ceramic Production and Coastal Trade in the Medieval Swahili World",
+  "publisher": "Cambridge University Press",
+  "address": "Cambridge",
+  "year": "2010"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Kiln+and+Kilometre%3A+Ceramic+Production+and+Coastal+Trade+in+the+Medieval+Swahili+World+Nakalema+2010&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:17:40Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Kiln+and+Kilometre%3A+Ceramic+Production+and+Coastal+Trade+in+the+Medieval+Swahili+World&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:17:41Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Resources of the ocean fringe and the archaeology of the medieval Swahili",
+    "doi": "10.4324/9781315691459-3",
+    "first_author": "Pollard",
+    "year": 2017,
+    "container": "The Swahili World",
+    "similarity": 0.405
+   },
+   {
+    "source": "Crossref",
+    "title": "Pure Ammonia-Fueled Roller Kiln for the Production of Ceramic Tiles: A First Demonstration",
+    "doi": "10.1021/acs.energyfuels.4c03745.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.345
+   },
+   {
+    "source": "Crossref",
+    "title": "Pure Ammonia-Fueled Roller Kiln for the Production of Ceramic Tiles: A First Demonstration",
+    "doi": "10.1021/acs.energyfuels.4c03745.s002",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.345
+   },
+   {
+    "source": "Crossref",
+    "title": "Pure Ammonia-Fueled Roller Kiln for the Production of Ceramic Tiles: A First Demonstration",
+    "doi": "10.1021/acs.energyfuels.4c03745.s003",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.345
+   },
+   {
+    "source": "Crossref",
+    "title": "The Rise and Extent of Commercial Stockfish Production and Trade in Medieval North-Norwegian Coastal Society",
+    "doi": "10.1017/9789048540235.004",
+    "first_author": "Figenschow",
+    "year": 2022,
+    "container": "Food Culture in Medieval Scandinavia",
+    "similarity": 0.508
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Glass beads as indicators of contact and trade in Southern Africa ca. AD 900 - AD 1250",
+    "doi": null,
+    "first_author": "Sharma J. Saitowitz",
+    "year": 1996,
+    "similarity": 0.274
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Longquan celadon: a quantitative archaeological analysis of a pan-Indian Ocean industry of the 12 th to 15 th centuries",
+    "doi": "https://doi.org/10.1080/00438243.2023.2216183",
+    "first_author": "Ran Zhang",
+    "year": 2022,
+    "similarity": 0.325
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Maritime Traditions of the Fishermen of Socotra, Yemen",
+    "doi": null,
+    "first_author": "Julian Jansen van Rensburg",
+    "year": 2012,
+    "similarity": 0.296
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Long History of Home-bases, Huts, Houses, Villages, Towns, Cities and Megacities",
+    "doi": "https://doi.org/10.22339/jbh.v7i4.7401",
+    "first_author": "Phillip C. Edwards",
+    "year": 2024,
+    "similarity": 0.185
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Beginning of Agriculture in South and Eastern Africa",
+    "doi": "https://doi.org/10.53555/ajbr.v27i4s.7620",
+    "first_author": "Dr. Sideshwar Prasad Shukla",
+    "year": 2024,
+    "similarity": 0.248
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "The Rise and Extent of Commercial Stockfish Production and Trade in Medieval North-Norwegian Coastal Society",
+   "doi": "10.1017/9789048540235.004",
+   "first_author": "Figenschow",
+   "year": 2022,
+   "container": "Food Culture in Medieval Scandinavia",
+   "similarity": 0.508
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

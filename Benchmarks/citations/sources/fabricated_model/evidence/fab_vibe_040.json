@@ -1,0 +1,139 @@
+{
+ "key": "fab_vibe_040",
+ "source_file": "vibe.bib",
+ "entry_type": "incollection",
+ "fields": {
+  "author": "Vasquez, Marisol and Herrera, Diego",
+  "title": "Non-destructive analysis of iron-gall ink on historical manuscripts",
+  "booktitle": "Conservation of Cultural Heritage: Analytical Methods and Practice",
+  "editor": "Lindholm, Astrid and Moretti, Gianni",
+  "publisher": "Elsevier",
+  "address": "Amsterdam",
+  "year": "2015",
+  "pages": "311--330"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Non-destructive+analysis+of+iron-gall+ink+on+historical+manuscripts+Vasquez+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:55Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Non-destructive+analysis+of+iron-gall+ink+on+historical+manuscripts&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:56Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Chapter 17 A study of ancient manuscripts exposed to iron-gall ink corrosion",
+    "doi": "10.1016/s0166-526x(04)80021-7",
+    "first_author": null,
+    "year": 2004,
+    "container": "Comprehensive Analytical Chemistry",
+    "similarity": 0.42
+   },
+   {
+    "source": "Crossref",
+    "title": "Non Destructive Detection of Iron-Gall Inks by Means of Multispectral Imaging Part 2: Application on Original Objects Affected With Iron-Gall-Ink Corrosion",
+    "doi": "10.1515/rest.2003.88",
+    "first_author": "Havermans",
+    "year": 2003,
+    "container": "Restaurator",
+    "similarity": 0.425
+   },
+   {
+    "source": "Crossref",
+    "title": "Elucidation of the Fe(III) Gallate Structure in Historical Iron Gall Ink",
+    "doi": "10.1021/acs.analchem.6b00088.s002",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.42
+   },
+   {
+    "source": "Crossref",
+    "title": "Elucidation of the Fe(III) Gallate Structure in Historical Iron Gall Ink",
+    "doi": "10.1021/acs.analchem.6b00088.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.42
+   },
+   {
+    "source": "Crossref",
+    "title": "Synthetic antioxidants as iron gall ink corrosion inhibitors in historical manuscripts",
+    "doi": "10.1016/j.culher.2023.01.009",
+    "first_author": "Haddadi",
+    "year": 2023,
+    "container": "Journal of Cultural Heritage",
+    "similarity": 0.654
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Non-destructive analyses of iron-polyphenolic complexes for reconstructing iron-gall inks historical recipes",
+    "doi": "https://doi.org/10.1038/s40494-025-01946-x",
+    "first_author": "S Caterino",
+    "year": 2025,
+    "similarity": 0.64
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Study of Iron Gall Inks, Ingredients and Paper Composition Using Non-Destructive Techniques",
+    "doi": "https://doi.org/10.3390/heritage2040166",
+    "first_author": "V. Corregidor",
+    "year": 2019,
+    "similarity": 0.433
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Compositional characterization of iron gall inks in manuscripts",
+    "doi": "https://doi.org/10.1017/s1431927614014482",
+    "first_author": "Rita Viegas",
+    "year": 2015,
+    "similarity": 0.6
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Analysis of Iron Complexes of Tannic Acid and Other Related Polyphenols as Revealed by Spectroscopic Techniques: Implications in the Identification and Characterization of Iron Gall Inks in Historical Manuscripts",
+    "doi": "https://doi.org/10.1021/acsomega.2c01679",
+    "first_author": "Alba Espina",
+    "year": 2022,
+    "similarity": 0.302
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Non-destructive recovery of historical ink chemistry using machine learning",
+    "doi": "https://doi.org/10.1016/j.rechem.2026.103985",
+    "first_author": "Barbara Domżał",
+    "year": 2026,
+    "similarity": 0.521
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Synthetic antioxidants as iron gall ink corrosion inhibitors in historical manuscripts",
+   "doi": "10.1016/j.culher.2023.01.009",
+   "first_author": "Haddadi",
+   "year": 2023,
+   "container": "Journal of Cultural Heritage",
+   "similarity": 0.654
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:42Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

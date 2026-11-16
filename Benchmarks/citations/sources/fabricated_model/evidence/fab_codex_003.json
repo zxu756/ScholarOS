@@ -1,0 +1,130 @@
+{
+ "key": "fab_codex_003",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Anika Broekman and Talia Renwick and Lucien Marelle",
+  "title": "Windward escarpments as refugia for saxicolous lichens in the sub-Antarctic",
+  "journal": "Polar Biology",
+  "volume": "41",
+  "number": "8",
+  "pages": "1635--1649",
+  "year": "2018",
+  "doi": "10.1007/s00300-018-2306-9"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1007/s00300-018-2306-9",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1007/s00300-018-2306-9",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:15Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/s00300-018-2306-9",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:15Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1007/s00300-018-2306-9",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:16Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Windward+escarpments+as+refugia+for+saxicolous+lichens+in+the+sub-Antarctic+Broekman+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:17Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Windward+escarpments+as+refugia+for+saxicolous+lichens+in+the+sub-Antarctic&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:18Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Strigula aquatica (lichens, Strigulaceae) , a new saxicolous pyrenolichen from Japan",
+    "doi": "10.1127/nova.hedwigia/66/1998/419",
+    "first_author": "Harada",
+    "year": 1998,
+    "container": "Nova Hedwigia",
+    "similarity": 0.455
+   },
+   {
+    "source": "Crossref",
+    "title": "Saxicolous and terricolous lichens from the foothills of northern Oman",
+    "doi": "10.1127/0029-5035/2002/0075-0177",
+    "first_author": "Brown",
+    "year": 2002,
+    "container": "Nova Hedwigia",
+    "similarity": 0.455
+   },
+   {
+    "source": "Crossref",
+    "title": "Growth in the alpine saxicolous lichens Allantoparmelia alpicola and Melanelia stygia",
+    "doi": "10.1127/0029-5035/2004/0078-0301",
+    "first_author": "Hestmark",
+    "year": 2004,
+    "container": "Nova Hedwigia",
+    "similarity": 0.438
+   },
+   {
+    "source": "Crossref",
+    "title": "The saxicolous and terricolous, cyanobacterial lichens of Socotra (Yemen, Indian Ocean)",
+    "doi": "10.1127/0029-5035/2003/0077-0073",
+    "first_author": "Schultz",
+    "year": 2003,
+    "container": "Nova Hedwigia",
+    "similarity": 0.329
+   },
+   {
+    "source": "Crossref",
+    "title": "Non-saxicolous lecideoid lichens in southern South America",
+    "doi": "10.11646/phytotaxa.476.1.1",
+    "first_author": "RODRIGUEZ-FLAKUS",
+    "year": 2020,
+    "container": "Phytotaxa",
+    "similarity": 0.541
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Advancing biodiversity and species distribution modelling using geodiversity information",
+    "doi": null,
+    "first_author": "Joseph J. Bailey",
+    "year": 2018,
+    "similarity": 0.258
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Non-saxicolous lecideoid lichens in southern South America",
+   "doi": "10.11646/phytotaxa.476.1.1",
+   "first_author": "RODRIGUEZ-FLAKUS",
+   "year": 2020,
+   "container": "Phytotaxa",
+   "similarity": 0.541
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

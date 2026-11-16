@@ -1,0 +1,136 @@
+{
+ "key": "fab_vibe_006",
+ "source_file": "vibe.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Mukherjee, Ratnabali",
+  "title": "Weight Standards and Mint Practice in Kushan Copper Coinage",
+  "publisher": "Oxford University Press",
+  "address": "New Delhi",
+  "year": "2009"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Weight+Standards+and+Mint+Practice+in+Kushan+Copper+Coinage+Mukherjee+2009&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:02Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Weight+Standards+and+Mint+Practice+in+Kushan+Copper+Coinage&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:03Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Weight Standards",
+    "doi": "10.1017/cbo9780511584015.003",
+    "first_author": null,
+    "year": 2011,
+    "container": "Roman Republican Coinage",
+    "similarity": 0.427
+   },
+   {
+    "source": "Crossref",
+    "title": "Arab-Sasanian Copper Coinage",
+    "doi": "10.1553/0x00020f58",
+    "first_author": "GYSELEN",
+    "year": 2009,
+    "container": null,
+    "similarity": 0.506
+   },
+   {
+    "source": "Crossref",
+    "title": "Mint / minting (coinage)",
+    "doi": "10.1163/2352-0272_emho_dum_024340",
+    "first_author": null,
+    "year": null,
+    "container": "Encyclopedia of Early Modern History Online",
+    "similarity": 0.43
+   },
+   {
+    "source": "Crossref",
+    "title": "Abd al-Malik's Coinage Reforms : the Role of the Damascus Mint",
+    "doi": "10.3406/numi.2009.2879",
+    "first_author": "Treadwell",
+    "year": 2009,
+    "container": "Revue numismatique",
+    "similarity": 0.185
+   },
+   {
+    "source": "Crossref",
+    "title": "Coinage and Soho Mint",
+    "doi": "10.1017/cbo9780511708152.009",
+    "first_author": null,
+    "year": 2010,
+    "container": "Matthew Boulton",
+    "similarity": 0.175
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Kushans and the Emergence of the Early Silk Roads",
+    "doi": null,
+    "first_author": "Paul David Wilson",
+    "year": 2020,
+    "similarity": 0.232
+   },
+   {
+    "source": "OpenAlex",
+    "title": "9 Tools of Economic Activity from the Greek Kingdoms of Central Asia to the Kushan Empire",
+    "doi": "https://doi.org/10.1515/9783110607642-014",
+    "first_author": "Lauren Morris",
+    "year": 2021,
+    "similarity": 0.338
+   },
+   {
+    "source": "OpenAlex",
+    "title": "4 Economic Actors under the Greek Kingdoms of Central Asia to the Kushan Empire",
+    "doi": "https://doi.org/10.1515/9783110607642-007",
+    "first_author": "Lauren Morris",
+    "year": 2021,
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Gold coinage in the Roman world: function and production",
+    "doi": "https://doi.org/10.82444/warw.33823414",
+    "first_author": "George Alexander Green",
+    "year": 2026,
+    "similarity": 0.175
+   },
+   {
+    "source": "OpenAlex",
+    "title": "13 Economic Development under the Greek Kingdoms of Central Asia to the Kushan Empire: Empire, Migration, and Monasteries",
+    "doi": "https://doi.org/10.1515/9783110607642-021",
+    "first_author": "Lauren Morris",
+    "year": 2021,
+    "similarity": 0.271
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Arab-Sasanian Copper Coinage",
+   "doi": "10.1553/0x00020f58",
+   "first_author": "GYSELEN",
+   "year": 2009,
+   "container": null,
+   "similarity": 0.506
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

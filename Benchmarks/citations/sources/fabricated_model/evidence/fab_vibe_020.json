@@ -1,0 +1,166 @@
+{
+ "key": "fab_vibe_020",
+ "source_file": "vibe.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Kova{\\v{c}}evi{\\'c}, Nikola and Petrovi{\\'c}, Milica and Jovanovi{\\'c}, Stefan",
+  "title": "Field measurements of pedestrian-induced vibration in a slender steel footbridge",
+  "booktitle": "Proceedings of the 8th International Conference on Structural Dynamics",
+  "year": "2011",
+  "pages": "1876--1883",
+  "doi": "10.1201/b11332-224"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1201/b11332-224",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1201/b11332-224",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:49Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1201/b11332-224",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:50Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1201/b11332-224",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:50Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Stochastic field analyses of the site amplification factors based on observed and inversely analyzed real strong ground motion in Japan",
+   "container": "Applications of Statistics and Probability in Civil Engineering",
+   "year": 2011
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Field+measurements+of+pedestrian-induced+vibration+in+a+slender+steel+footbridge+Kovacevic+2011&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:51Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Field+measurements+of+pedestrian-induced+vibration+in+a+slender+steel+footbridge&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:52Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Field measurement-based pedestrian-induced vibration analysis and comfort evaluation of a steel truss footbridge",
+    "doi": "10.3724/sp.j.1249.2015.01089",
+    "first_author": "Li",
+    "year": 2015,
+    "container": "Journal of Shenzhen University Science and Engineering",
+    "similarity": 0.719
+   },
+   {
+    "source": "Crossref",
+    "title": "Framework for Calculating the Vertical Human-Induced Vibration of the Suspension Footbridge Under the Random Pedestrian Flow",
+    "doi": "10.1007/s13296-022-00640-z",
+    "first_author": "Li",
+    "year": 2022,
+    "container": "International Journal of Steel Structures",
+    "similarity": 0.441
+   },
+   {
+    "source": "Crossref",
+    "title": "A theory of pedestrian-induced footbridge vibration comfortability based on sensitivity model",
+    "doi": "10.1186/s43251-021-00045-8",
+    "first_author": "Chen",
+    "year": 2021,
+    "container": "Advances in Bridge Engineering",
+    "similarity": 0.509
+   },
+   {
+    "source": "Crossref",
+    "title": "Vertical Vibration of Complex and Slender Footbridges due to Stochastic Crowd-Induced Excitation",
+    "doi": "10.24904/footbridge2017.09904",
+    "first_author": "Zhong",
+    "year": 2017,
+    "container": "Footbridge 2017 Berlin - Tell A Story: Conference Proceedings 6-8.9.2017 TU-Berlin",
+    "similarity": 0.386
+   },
+   {
+    "source": "Crossref",
+    "title": "Image Processing for Capturing Motions of Crowd and Its Application to Pedestrian‐Induced Lateral Vibration of a Footbridge",
+    "doi": "10.1155/2007/763437",
+    "first_author": "Yoshida",
+    "year": 2007,
+    "container": "Shock and Vibration",
+    "similarity": 0.512
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Eeklo Footbridge: Benchmark Dataset on Pedestrian-Induced Vibrations",
+    "doi": "https://doi.org/10.1061/(asce)be.1943-5592.0001707",
+    "first_author": "Katrien Van Nimmen",
+    "year": 2021,
+    "similarity": 0.544
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Dynamic Behaviour of Footbridges Subjected to Pedestrian-Induced Vibrations Studies",
+    "doi": null,
+    "first_author": "Fjalar Hauksson",
+    "year": 2005,
+    "similarity": 0.515
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Vibration control of a slender footbridge using passive and semiactive tuned mass dampers",
+    "doi": "https://doi.org/10.1002/stc.2208",
+    "first_author": "Carlos Moutinho",
+    "year": 2018,
+    "similarity": 0.379
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Recent Advances in the Serviceability Assessment of Footbridges Under Pedestrian-Induced Vibrations",
+    "doi": "https://doi.org/10.5772/intechopen.71888",
+    "first_author": "Javier Fernando Jiménez‐Alonso",
+    "year": 2018,
+    "similarity": 0.492
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Human-induced vibrations on footbridges: A probability-based approach of the vibration serviceability of footbridges under vertical pedestrian loading",
+    "doi": null,
+    "first_author": "Z. Reimert",
+    "year": 2014,
+    "similarity": 0.297
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Field measurement-based pedestrian-induced vibration analysis and comfort evaluation of a steel truss footbridge",
+   "doi": "10.3724/sp.j.1249.2015.01089",
+   "first_author": "Li",
+   "year": 2015,
+   "container": "Journal of Shenzhen University Science and Engineering",
+   "similarity": 0.719
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

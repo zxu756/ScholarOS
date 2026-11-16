@@ -1,0 +1,162 @@
+{
+ "key": "fab_codex_014",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Nadia Kovalen and Pavel Ibragimov and Elise Durand",
+  "title": "Contour-filtered subspaces for resolvent peaks in directed sparse matrices",
+  "journal": "Numerische Mathematik",
+  "volume": "152",
+  "number": "1",
+  "pages": "87--116",
+  "year": "2022",
+  "doi": "10.1007/s00211-022-01284-7"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1007/s00211-022-01284-7",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1007/s00211-022-01284-7",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:52Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/s00211-022-01284-7",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:52Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1007/s00211-022-01284-7",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:52Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Contour-filtered+subspaces+for+resolvent+peaks+in+directed+sparse+matrices+Kovalen+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:54Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Contour-filtered+subspaces+for+resolvent+peaks+in+directed+sparse+matrices&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:54Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "9. Commuting Matrices and Hyperinvariant Subspaces",
+    "doi": "10.1137/1.9780898719093.ch9",
+    "first_author": null,
+    "year": 2006,
+    "container": "Invariant Subspaces of Matrices with Applications",
+    "similarity": 0.228
+   },
+   {
+    "source": "Crossref",
+    "title": "11. Algebras of Matrices and Invariant Subspaces",
+    "doi": "10.1137/1.9780898719093.ch11",
+    "first_author": null,
+    "year": 2006,
+    "container": "Invariant Subspaces of Matrices with Applications",
+    "similarity": 0.215
+   },
+   {
+    "source": "Crossref",
+    "title": "Robust Sparse Recovery with Sparse Bernoulli Matrices Via Expanders",
+    "doi": "10.2139/ssrn.4137156",
+    "first_author": "Abdalla Teixeira",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.255
+   },
+   {
+    "source": "Crossref",
+    "title": "Polynomial matrices, splitting subspaces and Krylov subspaces over finite fields",
+    "doi": "10.1016/j.ffa.2022.102081",
+    "first_author": "Aggarwal",
+    "year": 2022,
+    "container": "Finite Fields and Their Applications",
+    "similarity": 0.288
+   },
+   {
+    "source": "Crossref",
+    "title": "On operators and complemented subspaces in the Köthe spaces determined by sparse matrices",
+    "doi": "10.1007/bf02112535",
+    "first_author": "Kondakov",
+    "year": 1995,
+    "container": "Siberian Mathematical Journal",
+    "similarity": 0.503
+   },
+   {
+    "source": "OpenAlex",
+    "title": "An invitation to resolvent analysis",
+    "doi": "https://doi.org/10.1007/s00162-024-00717-x",
+    "first_author": "Laura Victoria Rolandi",
+    "year": 2024,
+    "similarity": 0.349
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Local-resolvent formulation and assessment of linear-scaling Kohn-Sham calculations",
+    "doi": "https://doi.org/10.48550/arxiv.2610.18137",
+    "first_author": "Albert Linda",
+    "year": 2026,
+    "similarity": 0.344
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Resolvent-based framework for jet noise reduction of a low-bypass ratio coannular nozzle",
+    "doi": "https://doi.org/10.2514/6.2024-2805",
+    "first_author": "Jaywon Woo",
+    "year": 2024,
+    "similarity": 0.296
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Reconstruction of irregular flow dynamics around two square cylinders from sparse measurements using a data-driven algorithm",
+    "doi": "https://doi.org/10.48550/arxiv.2209.03290",
+    "first_author": "Flavio Savarino",
+    "year": 2022,
+    "similarity": 0.313
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Frequency-Dependent Polarization Propagator Calculation for Quantum Dots Using Optimized Inverse Krylov Subspace and Folded-Spectrum Method",
+    "doi": "https://doi.org/10.48550/arxiv.2512.09811",
+    "first_author": "Martin, Chandler",
+    "year": 2025,
+    "similarity": 0.338
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "On operators and complemented subspaces in the Köthe spaces determined by sparse matrices",
+   "doi": "10.1007/bf02112535",
+   "first_author": "Kondakov",
+   "year": 1995,
+   "container": "Siberian Mathematical Journal",
+   "similarity": 0.503
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

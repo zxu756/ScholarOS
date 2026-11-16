@@ -1,0 +1,98 @@
+{
+ "key": "fab_codex_002",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Maija Rautio and Soren Haldvik",
+  "title": "Counting winter couplets across the inlet basins of Lake Vardalen",
+  "journal": "Journal of Paleolimnology",
+  "volume": "52",
+  "number": "3",
+  "pages": "241--258",
+  "year": "2014"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Counting+winter+couplets+across+the+inlet+basins+of+Lake+Vardalen+Rautio+2014&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:13Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Counting+winter+couplets+across+the+inlet+basins+of+Lake+Vardalen&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:14Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "The dominant role of sunlight in degrading winter dissolved organic matter from a thermokarst lake in a subarctic peatland",
+    "doi": "10.5194/bg-2022-26",
+    "first_author": "Mazoyer",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.353
+   },
+   {
+    "source": "Crossref",
+    "title": "The dominant role of sunlight in degrading winter dissolved organic matter from a thermokarst lake in a subarctic peatland",
+    "doi": "10.5194/bg-19-3959-2022",
+    "first_author": "Mazoyer",
+    "year": 2022,
+    "container": "Biogeosciences",
+    "similarity": 0.353
+   },
+   {
+    "source": "Crossref",
+    "title": "Supplementary material to \"The dominant role of sunlight in degrading winter dissolved organic matter from a thermokarst lake in a subarctic peatland\"",
+    "doi": "10.5194/bg-2022-26-supplement",
+    "first_author": "Mazoyer",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.31
+   },
+   {
+    "source": "Crossref",
+    "title": "Variability in lake bacterial growth and primary production under lake ice: Evidence from early winter to spring melt",
+    "doi": "10.1002/lno.12447",
+    "first_author": "Kivilä",
+    "year": 2023,
+    "container": "Limnology and Oceanography",
+    "similarity": 0.232
+   },
+   {
+    "source": "Crossref",
+    "title": "Voyage across Lake St. Clair",
+    "doi": "10.1017/cbo9781139060523.031",
+    "first_author": null,
+    "year": 2011,
+    "container": "Winter Studies and Summer Rambles in Canada",
+    "similarity": 0.391
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Voyage across Lake St. Clair",
+   "doi": "10.1017/cbo9781139060523.031",
+   "first_author": null,
+   "year": 2011,
+   "container": "Winter Studies and Summer Rambles in Canada",
+   "similarity": 0.391
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,167 @@
+{
+ "key": "fab_codex_032",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Laila Hossain and Matteo Ricci and Danh Pham",
+  "title": "Antibiotic-resistance profiles along the inlet-to-outlet gradient of aquaculture ponds",
+  "journal": "Aquaculture",
+  "volume": "550",
+  "pages": "737841",
+  "year": "2022",
+  "doi": "10.1016/j.aquaculture.2021.737841"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.aquaculture.2021.737841",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.aquaculture.2021.737841",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:51Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.aquaculture.2021.737841",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:52Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.aquaculture.2021.737841",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:52Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Strong and weak sustainability in Nordic aquaculture policies",
+   "container": "Aquaculture",
+   "year": 2022
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Antibiotic-resistance+profiles+along+the+inlet-to-outlet+gradient+of+aquaculture+ponds+Hossain+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:53Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Antibiotic-resistance+profiles+along+the+inlet-to-outlet+gradient+of+aquaculture+ponds&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:54Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Antibiotic resistance of bacteria from shrimp ponds",
+    "doi": "10.1016/s0044-8486(00)00570-6",
+    "first_author": "Tendencia",
+    "year": 2001,
+    "container": "Aquaculture",
+    "similarity": 0.511
+   },
+   {
+    "source": "Crossref",
+    "title": "Metagenomic analysis of potential pathogens and antibiotic resistance genes in sturgeon ponds",
+    "doi": "10.1016/j.aquaculture.2026.743771",
+    "first_author": "Cui",
+    "year": 2026,
+    "container": "Aquaculture",
+    "similarity": 0.425
+   },
+   {
+    "source": "Crossref",
+    "title": "Antibiotic resistance in Gram-negative bacteria from cultured catfish and aquaculture ponds",
+    "doi": "10.1016/0044-8486(91)90241-x",
+    "first_author": "McPhearson",
+    "year": 1991,
+    "container": "Aquaculture",
+    "similarity": 0.554
+   },
+   {
+    "source": "Crossref",
+    "title": "Determination of suitable stocking density for good aquaculture practice-based carp fattening in ponds under drought-prone areas of Bangladesh",
+    "doi": "10.1016/j.aquaculture.2021.737485",
+    "first_author": "Hossain",
+    "year": 2022,
+    "container": "Aquaculture",
+    "similarity": 0.316
+   },
+   {
+    "source": "Crossref",
+    "title": "Antibiotic and antibiotic resistance genes in freshwater aquaculture ponds in China: A meta-analysis and assessment",
+    "doi": "10.1016/j.jclepro.2021.129719",
+    "first_author": "Wang",
+    "year": 2021,
+    "container": "Journal of Cleaner Production",
+    "similarity": 0.49
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Occurrence and Distribution of Antibiotics and Antibiotic Resistance Genes in the Water and Sediments of Reservoir-Based Drinking Water Sources in Henan, China",
+    "doi": "https://doi.org/10.3390/microorganisms13122828",
+    "first_author": "Wei Yuan",
+    "year": 2025,
+    "similarity": 0.41
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Bacterial microbiome dynamics in commercial integrated aquaculture systems growing Ulva in abalone effluent water",
+    "doi": "https://doi.org/10.1007/s10811-024-03298-8",
+    "first_author": "Kristin de Jager",
+    "year": 2024,
+    "similarity": 0.332
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Differences of Occurrence, Distribution, and Factors Influencing Antibiotic Resistance Genes Between Freshwater and Seawater in China",
+    "doi": "https://doi.org/10.3390/w17091282",
+    "first_author": "Pei Jiang",
+    "year": 2025,
+    "similarity": 0.323
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Environmental Biofilms as Reservoirs for Antimicrobial Resistance",
+    "doi": "https://doi.org/10.3389/fmicb.2021.766242",
+    "first_author": "Gabriela Flores-Vargas",
+    "year": 2021,
+    "similarity": 0.225
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Antibiotic residues in the cirata reservoir, Indonesia and their effect on ecology and the selection for antibiotic-resistant bacteria",
+    "doi": "https://doi.org/10.1016/j.envres.2024.119992",
+    "first_author": "Miranti Ariyani",
+    "year": 2024,
+    "similarity": 0.228
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Antibiotic resistance in Gram-negative bacteria from cultured catfish and aquaculture ponds",
+   "doi": "10.1016/0044-8486(91)90241-x",
+   "first_author": "McPhearson",
+   "year": 1991,
+   "container": "Aquaculture",
+   "similarity": 0.554
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

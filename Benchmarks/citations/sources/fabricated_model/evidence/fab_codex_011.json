@@ -1,0 +1,130 @@
+{
+ "key": "fab_codex_011",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Leena Varkey and Tobias Mercer and Helen Adusei and Nisha Rao",
+  "title": "Cost per referable lesion detected by itinerant tele-ophthalmology in remote clinics",
+  "journal": "Ophthalmology",
+  "volume": "126",
+  "number": "9",
+  "pages": "1278--1286",
+  "year": "2019",
+  "pmid": "31847265"
+ },
+ "identifier": {
+  "kind": "pmid",
+  "value": "31847265",
+  "requests": [
+   {
+    "source": "PubMed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=31847265&retmode=json",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:42Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "PubMed",
+   "title": "Applicability of Anti-Human Estrogen Receptor β Antibody PPZ0506 for the Immunodetection of Rodent Estrogen Receptor β Proteins.",
+   "first_author": "Ishii H",
+   "year": "2019",
+   "container": "Int J Mol Sci"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Cost+per+referable+lesion+detected+by+itinerant+tele-ophthalmology+in+remote+clinics+Varkey+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:43Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Cost+per+referable+lesion+detected+by+itinerant+tele-ophthalmology+in+remote+clinics&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:43Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Evaluation of a Remote Diagnosis Imaging Model vs Dilated Eye Examination in Referable Macular Degeneration",
+    "doi": "10.1001/jamaophthalmol.2019.1203",
+    "first_author": "Hadziahmetovic",
+    "year": 2019,
+    "container": "JAMA Ophthalmology",
+    "similarity": 0.272
+   },
+   {
+    "source": "Crossref",
+    "title": "THE HISTOLOGY OF THE CRYOSURGICAL LESION",
+    "doi": "10.1097/00004397-196700000-00013",
+    "first_author": "Lincoff",
+    "year": 1967,
+    "container": "International Ophthalmology Clinics",
+    "similarity": 0.21
+   },
+   {
+    "source": "Crossref",
+    "title": "THE HISTOLOGY OF THE CRYOSURGICAL LESION",
+    "doi": "10.1097/00004397-196700720-00013",
+    "first_author": "Lincoff",
+    "year": 1967,
+    "container": "International Ophthalmology Clinics",
+    "similarity": 0.21
+   },
+   {
+    "source": "Crossref",
+    "title": "Tele-ICU Technologies",
+    "doi": "10.1016/j.ccc.2019.02.009",
+    "first_author": "Herasevich",
+    "year": 2019,
+    "container": "Critical Care Clinics",
+    "similarity": 0.248
+   },
+   {
+    "source": "Crossref",
+    "title": "P025 Community lesion imaging clinics for tele-triage of suspected skin cancer: implementation of a low-cost model in an NHS trust",
+    "doi": "10.1093/bjd/ljae090.052",
+    "first_author": "Morgan",
+    "year": 2024,
+    "container": "British Journal of Dermatology",
+    "similarity": 0.216
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Role of Telemedicine, In-Home Testing and Artificial Intelligence to Alleviate an Increasingly Burdened Healthcare System: Diabetic Retinopathy",
+    "doi": "https://doi.org/10.1007/s40123-021-00353-2",
+    "first_author": "Janusz Pieczyński",
+    "year": 2021,
+    "similarity": 0.245
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nurse-Led Model in Diabetic Retinopathy Screening: An Exploratory Scoping Review of Nurses’ Roles and Contributions",
+    "doi": "https://doi.org/10.2147/opth.s548241",
+    "first_author": "Chen Chen",
+    "year": 2025,
+    "similarity": 0.234
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Evaluation of a Remote Diagnosis Imaging Model vs Dilated Eye Examination in Referable Macular Degeneration",
+   "doi": "10.1001/jamaophthalmol.2019.1203",
+   "first_author": "Hadziahmetovic",
+   "year": 2019,
+   "container": "JAMA Ophthalmology",
+   "similarity": 0.272
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

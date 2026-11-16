@@ -1,0 +1,161 @@
+{
+ "key": "fab_codex_008",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Jiawen Luo and Anselm Riedel and Priya Nanduri",
+  "title": "Water-assisted vacancy migration in lead-free bismuth iodide solar absorbers",
+  "journal": "ACS Applied Materials \\& Interfaces",
+  "volume": "14",
+  "number": "19",
+  "pages": "22168--22177",
+  "year": "2022",
+  "doi": "10.1021/acsami.2c03784"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1021/acsami.2c03784",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1021/acsami.2c03784",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:31Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1021/acsami.2c03784",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:32Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1021/acsami.2c03784",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:32Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Water-assisted+vacancy+migration+in+lead-free+bismuth+iodide+solar+absorbers+Luo+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:33Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Water-assisted+vacancy+migration+in+lead-free+bismuth+iodide+solar+absorbers&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:34Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Formation of Corrugated n = 1 2D Tin Iodide Perovskites and Their Use as Lead-Free Solar Absorbers",
+    "doi": "10.1021/acsnano.0c08204.s008",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.419
+   },
+   {
+    "source": "Crossref",
+    "title": "Formation of Corrugated n = 1 2D Tin Iodide Perovskites and Their Use as Lead-Free Solar Absorbers",
+    "doi": "10.1021/acsnano.0c08204.s005",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.419
+   },
+   {
+    "source": "Crossref",
+    "title": "Formation of Corrugated n = 1 2D Tin Iodide Perovskites and Their Use as Lead-Free Solar Absorbers",
+    "doi": "10.1021/acsnano.0c08204.s003",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.419
+   },
+   {
+    "source": "Crossref",
+    "title": "Formation of Corrugated n = 1 2D Tin Iodide Perovskites and Their Use as Lead-Free Solar Absorbers",
+    "doi": "10.1021/acsnano.0c08204.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.419
+   },
+   {
+    "source": "Crossref",
+    "title": "Formation of Corrugated n = 1 2D Tin Iodide Perovskites and Their Use as Lead-Free Solar Absorbers",
+    "doi": "10.1021/acsnano.0c08204.s004",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.419
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Lead-Free Perovskite Materials for Solar Cells",
+    "doi": "https://doi.org/10.1007/s40820-020-00578-z",
+    "first_author": "Minghao Wang",
+    "year": 2021,
+    "similarity": 0.361
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Potassium Iodide-Modified Lead-Free Cs3Bi2I9 Perovskites for Enhanced High-Efficiency Solar Cells",
+    "doi": "https://doi.org/10.3390/nano12213751",
+    "first_author": "Shindume Lomboleni Hamukwaya",
+    "year": 2022,
+    "similarity": 0.405
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effect of bismuth iodide ( BiI3 ) interfacial layer with different HTL’s in FAPI based perovskite solar cell – SCAPS – 1D study",
+    "doi": "https://doi.org/10.1016/j.solener.2021.02.041",
+    "first_author": "Karthick Sekar",
+    "year": 2021,
+    "similarity": 0.297
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Threshold Resistive Switching in Inorganic Lead-Free Cesium–Bismuth Iodide Perovskite for Neuron Emulation",
+    "doi": "https://doi.org/10.1021/acsaelm.5c00516",
+    "first_author": "Michalis Loizos",
+    "year": 2025,
+    "similarity": 0.527
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Rudorffite Silver‐Bismuth Iodides: Emerging Eco‐Friendly Wide‐Bandgap Absorbers for Indoor Photovoltaics",
+    "doi": "https://doi.org/10.1002/smll.202510252",
+    "first_author": "Taeho Moon",
+    "year": 2025,
+    "similarity": 0.402
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Threshold Resistive Switching in Inorganic Lead-Free Cesium–Bismuth Iodide Perovskite for Neuron Emulation",
+   "doi": "https://doi.org/10.1021/acsaelm.5c00516",
+   "first_author": "Michalis Loizos",
+   "year": 2025,
+   "similarity": 0.527
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

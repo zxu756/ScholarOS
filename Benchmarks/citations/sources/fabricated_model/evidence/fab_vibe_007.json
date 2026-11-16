@@ -1,0 +1,160 @@
+{
+ "key": "fab_vibe_007",
+ "source_file": "vibe.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Lindqvist, H{\\aa}kan and Bergstr{\\\"o}m, Elin and Nystr{\\\"o}m, Oskar",
+  "title": "Interfacial resistance and dendrite growth in argyrodite-type halide solid electrolytes",
+  "booktitle": "Proceedings of the 232nd Meeting of the Electrochemical Society",
+  "year": "2017",
+  "pages": "1180--1189",
+  "doi": "10.1149/232.01180ecst"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1149/232.01180ecst",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1149/232.01180ecst",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:04Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1149/232.01180ecst",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:05Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1149/232.01180ecst",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:05Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Interfacial+resistance+and+dendrite+growth+in+argyrodite-type+halide+solid+electrolytes+Lindqvist+2017&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:07Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Interfacial+resistance+and+dendrite+growth+in+argyrodite-type+halide+solid+electrolytes&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:08Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Interfacial Electronic Properties Dictate Li Dendrite Growth in Solid Electrolytes",
+    "doi": "10.1021/acs.chemmater.9b01967.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.686
+   },
+   {
+    "source": "Crossref",
+    "title": "Garnet Electrolytes with Ultralow Interfacial Resistance by SnS2 Coating for Dendrite-Free all-Solid-State Batteries",
+    "doi": "10.1021/acsaem.1c00193.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.493
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Iodide substituted halide-rich lithium argyrodite solid electrolytes with improved performance for all solid-state batteries\"",
+    "doi": "10.1039/d5tc00529a/v1/review1",
+    "first_author": null,
+    "year": 2025,
+    "container": null,
+    "similarity": 0.396
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Iodide substituted halide-rich lithium argyrodite solid electrolytes with improved performance for all solid-state batteries\"",
+    "doi": "10.1039/d5tc00529a/v2/review1",
+    "first_author": null,
+    "year": 2025,
+    "container": null,
+    "similarity": 0.396
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Iodide substituted halide-rich lithium argyrodite solid electrolytes with improved performance for all solid-state batteries\"",
+    "doi": "10.1039/d5tc00529a/v1/review2",
+    "first_author": null,
+    "year": 2025,
+    "container": null,
+    "similarity": 0.396
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Recent Progress on Lithium Argyrodite Solid-State Electrolytes",
+    "doi": "https://doi.org/10.3866/pku.whxb202211034",
+    "first_author": "Linfeng Peng",
+    "year": 2022,
+    "similarity": 0.577
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Differences in the Interfacial Mechanical Properties of Thiophosphate and Argyrodite Solid Electrolytes and Their Composites",
+    "doi": "https://doi.org/10.1021/acsami.2c10589",
+    "first_author": "Marm B. Dixit",
+    "year": 2022,
+    "similarity": 0.502
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Rethinking dendrite growth in solid electrolytes",
+    "doi": "https://doi.org/10.20517/energyz.2026.22",
+    "first_author": "Tongen Lin",
+    "year": 2026,
+    "similarity": 0.622
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Regulation of the Interfaces Between Argyrodite Solid Electrolytes and Lithium Metal Anode",
+    "doi": "https://doi.org/10.3389/fchem.2022.837978",
+    "first_author": "Bo Pang",
+    "year": 2022,
+    "similarity": 0.497
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tuned Reactivity at the Lithium Metal–Argyrodite Solid State Electrolyte Interphase",
+    "doi": "https://doi.org/10.1002/aenm.202301338",
+    "first_author": "Hongchang Hao",
+    "year": 2023,
+    "similarity": 0.447
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Interfacial Electronic Properties Dictate Li Dendrite Growth in Solid Electrolytes",
+   "doi": "10.1021/acs.chemmater.9b01967.s001",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.686
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

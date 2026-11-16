@@ -1,0 +1,138 @@
+{
+ "key": "fab_vibe_012",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Mensah, Kwabena and Adjei, Abena",
+  "title": "Household costs of snakebite and the economics of village-level antivenom stocks",
+  "journal": "Toxicon",
+  "year": "2008",
+  "volume": "52",
+  "number": "3",
+  "pages": "441--449"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Household+costs+of+snakebite+and+the+economics+of+village-level+antivenom+stocks+Mensah+2008&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:24Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Household+costs+of+snakebite+and+the+economics+of+village-level+antivenom+stocks&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:25Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "IMPACT OF MICROFINANCE ON HOUSEHOLD INCOME: EVIDENCE FROM VILLAGE LEVEL STUDY IN ORISSA",
+    "doi": "10.18535/ijmei/v1i10.03",
+    "first_author": null,
+    "year": 2015,
+    "container": "International Journal of management and economics Invention",
+    "similarity": 0.446
+   },
+   {
+    "source": "Crossref",
+    "title": "",
+    "doi": "10.35802/221702",
+    "first_author": null,
+    "year": 2021,
+    "container": null,
+    "similarity": 0.0
+   },
+   {
+    "source": "Crossref",
+    "title": "Biosynthetic Oligoclonal Antivenom (BOA) for Snakebite and Next-Generation Treatments for Snakebite Victims",
+    "doi": "10.3390/toxins10120534",
+    "first_author": "Kini",
+    "year": 2018,
+    "container": "Toxins",
+    "similarity": 0.432
+   },
+   {
+    "source": "Crossref",
+    "title": "Breakthroughs and setbacks on the hunt for a universal snakebite antivenom – podcast",
+    "doi": "10.64628/ab.uhp4wshkm",
+    "first_author": "Ware",
+    "year": 2024,
+    "container": null,
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "Economic burden of snakebite and cost-effectiveness of improving access to snake antivenom in Asean countries",
+    "doi": "10.58837/chula.the.2022.326",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.54
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Snakebite envenomation and predation of domestic animals in Goa, India",
+    "doi": "https://doi.org/10.3389/famrs.2025.1746300",
+    "first_author": "Shaleen Attre",
+    "year": 2026,
+    "similarity": 0.268
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Snakebite in domestic animals: First global scoping review",
+    "doi": "https://doi.org/10.1016/j.prevetmed.2019.104729",
+    "first_author": "Isabelle Bolon",
+    "year": 2019,
+    "similarity": 0.35
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nexus Between Energy Poverty and Technological Innovations: A Pathway for Addressing Energy Sustainability",
+    "doi": "https://doi.org/10.3389/fenvs.2022.888080",
+    "first_author": "Kiran Batool",
+    "year": 2022,
+    "similarity": 0.216
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Universal health coverage: yes, but coverage of what?: the need for people-centered care",
+    "doi": "https://doi.org/10.1111/tmi.12161",
+    "first_author": "Peter Decat",
+    "year": 2013,
+    "similarity": 0.378
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Invited Speakers' Abstracts",
+    "doi": "https://doi.org/10.1111/tmi.12161",
+    "first_author": null,
+    "year": 2013,
+    "similarity": 0.245
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Economic burden of snakebite and cost-effectiveness of improving access to snake antivenom in Asean countries",
+   "doi": "10.58837/chula.the.2022.326",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.54
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

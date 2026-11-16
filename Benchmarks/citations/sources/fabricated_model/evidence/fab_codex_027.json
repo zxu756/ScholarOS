@@ -1,0 +1,166 @@
+{
+ "key": "fab_codex_027",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Livia Baroni and Niko Havel and Emilia Dragan",
+  "title": "Strut junction orientation and fatigue life in laser-fused titanium lattices",
+  "journal": "International Journal of Fatigue",
+  "volume": "151",
+  "pages": "106348",
+  "year": "2021",
+  "doi": "10.1016/j.ijfatigue.2021.106348"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.ijfatigue.2021.106348",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.ijfatigue.2021.106348",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:36Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.ijfatigue.2021.106348",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:37Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.ijfatigue.2021.106348",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:37Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Fatigue crack propagation behaviors in Ti-5Al-3Mo-3V-2Zr-2Cr-1Nb-1Fe alloy with STA and BASCA heat treatments",
+   "container": "International Journal of Fatigue",
+   "year": 2021
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Strut+junction+orientation+and+fatigue+life+in+laser-fused+titanium+lattices+Baroni+2021&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:39Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Strut+junction+orientation+and+fatigue+life+in+laser-fused+titanium+lattices&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:39Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "The Low Cycle Fatigue Behaviour of Laser Powder Bed Fused Stainless Steel 316LN: Build Orientation and Surface Finish Effects",
+    "doi": "10.23889/suthesis.63640",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.29
+   },
+   {
+    "source": "Crossref",
+    "title": "The role of node fillet, unit-cell size and strut orientation on the fatigue strength of Ti-6Al-4V lattice materials additively manufactured via laser powder bed fusion",
+    "doi": "10.1016/j.ijfatigue.2020.105946",
+    "first_author": "Dallago",
+    "year": 2021,
+    "container": "International Journal of Fatigue",
+    "similarity": 0.346
+   },
+   {
+    "source": "Crossref",
+    "title": "Life prediction and failure analysis in laser powder bed fused TiC/Ti6Al4V titanium matrix composite under high cycle and very high cycle fatigue conditions",
+    "doi": "10.1016/j.ijfatigue.2023.108101",
+    "first_author": "Li",
+    "year": 2024,
+    "container": "International Journal of Fatigue",
+    "similarity": 0.431
+   },
+   {
+    "source": "Crossref",
+    "title": "Effect of strut orientation on the microstructure heterogeneities in AlSi10Mg lattices processed by selective laser melting",
+    "doi": "10.1016/j.scriptamat.2017.07.020",
+    "first_author": "Delroisse",
+    "year": 2017,
+    "container": "Scripta Materialia",
+    "similarity": 0.402
+   },
+   {
+    "source": "Crossref",
+    "title": "Improving Fatigue Properties of Laser-Powder-Bed-Fused Ta15 Titanium Alloy Using Hot Isostatic Pressing: Anisotropy, Defect Effects and Life Prediction",
+    "doi": "10.2139/ssrn.5313692",
+    "first_author": "Gao",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.373
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Efficient optimization framework for L-PBF fatigue enhanced Ti6Al4V lattice component",
+    "doi": "https://doi.org/10.1016/j.matdes.2023.111975",
+    "first_author": "Raffaele De Biasi",
+    "year": 2023,
+    "similarity": 0.472
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Architectural bone parameters and the relationship to titanium lattice design for powder bed fusion additive manufacturing",
+    "doi": "https://doi.org/10.1016/j.addma.2021.102273",
+    "first_author": "Martine E. McGregor",
+    "year": 2021,
+    "similarity": 0.354
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mechanical performance, fatigue behaviour, and biointegration of additively manufactured architected lattices",
+    "doi": "https://doi.org/10.1080/17452759.2025.2530733",
+    "first_author": "Ragul Gandhi",
+    "year": 2025,
+    "similarity": 0.383
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Titanium Alloy Implants with Lattice Structures for Mandibular Reconstruction",
+    "doi": "https://doi.org/10.3390/ma17010140",
+    "first_author": "Khaled M. Hijazi",
+    "year": 2023,
+    "similarity": 0.222
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Selective Laser Melting of Ti6Al4V Lattice Structures for Bone Implants",
+    "doi": "https://doi.org/10.26180/11296433",
+    "first_author": "Ezgi Onal",
+    "year": 2019,
+    "similarity": 0.354
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Efficient optimization framework for L-PBF fatigue enhanced Ti6Al4V lattice component",
+   "doi": "https://doi.org/10.1016/j.matdes.2023.111975",
+   "first_author": "Raffaele De Biasi",
+   "year": 2023,
+   "similarity": 0.472
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

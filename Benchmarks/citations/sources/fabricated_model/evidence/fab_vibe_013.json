@@ -1,0 +1,154 @@
+{
+ "key": "fab_vibe_013",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Kowalczyk, Marta and Lindgren, Anders and Petrov, Dmitri",
+  "title": "Block preconditioners for coupled flow and deformation in heterogeneous poroelastic media",
+  "journal": "SIAM Journal on Scientific Computing",
+  "year": "2019",
+  "volume": "41",
+  "number": "4",
+  "pages": "B842--B869",
+  "eprint": "1902.04871",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "1902.04871",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=1902.04871",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:25Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "The Role of a Tiny Brightening in a Huge Geo-effective Solar Eruption Leading to the St Patrick's Day Storm",
+   "first_author": "Yumi Bamba",
+   "year": "2019"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Block+preconditioners+for+coupled+flow+and+deformation+in+heterogeneous+poroelastic+media+Kowalczyk+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:26Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Block+preconditioners+for+coupled+flow+and+deformation+in+heterogeneous+poroelastic+media&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:27Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Convergence analysis of two-grid fixed stress split iterative scheme for coupled flow and deformation in heterogeneous poroelastic media",
+    "doi": "10.1016/j.cma.2018.07.018",
+    "first_author": "Dana",
+    "year": 2018,
+    "container": "Computer Methods in Applied Mechanics and Engineering",
+    "similarity": 0.693
+   },
+   {
+    "source": "Crossref",
+    "title": "Robust block diagonal preconditioners for poroelastic problems with strongly heterogeneous material",
+    "doi": "10.1002/nla.2546",
+    "first_author": "Luber",
+    "year": 2023,
+    "container": "Numerical Linear Algebra with Applications",
+    "similarity": 0.574
+   },
+   {
+    "source": "Crossref",
+    "title": "Fluid Flow and Deformation in Poroelastic Randomly Heterogeneous Materials",
+    "doi": "10.2139/ssrn.7120895",
+    "first_author": "Tripuraneni",
+    "year": 2026,
+    "container": null,
+    "similarity": 0.552
+   },
+   {
+    "source": "Crossref",
+    "title": "Mixed Method for Isogeometric Analysis of Coupled Flow and Deformation in Poroelastic Media",
+    "doi": "10.3390/app12062915",
+    "first_author": "Bekele",
+    "year": 2022,
+    "container": "Applied Sciences",
+    "similarity": 0.622
+   },
+   {
+    "source": "Crossref",
+    "title": "Fully coupled poroelastic governing equations for groundwater flow and solid skeleton deformation in variably saturated true anisotropic porous geologic media",
+    "doi": "10.1007/bf02910248",
+    "first_author": "Kim",
+    "year": 2004,
+    "container": "Geosciences Journal",
+    "similarity": 0.429
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A parallel block preconditioner for large-scale poroelasticity with highly heterogeneous material parameters",
+    "doi": "https://doi.org/10.1007/s10596-012-9284-4",
+    "first_author": "Joachim Berdal Haga",
+    "year": 2012,
+    "similarity": 0.569
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Robust block preconditioners for poroelasticity",
+    "doi": "https://doi.org/10.1016/j.cma.2020.113229",
+    "first_author": "Shuangshuang Chen",
+    "year": 2020,
+    "similarity": 0.559
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Robust block diagonal preconditioners for poroelastic problems with strongly heterogeneous material",
+    "doi": "https://doi.org/10.1002/nla.2546",
+    "first_author": "Tomáš Luber",
+    "year": 2023,
+    "similarity": 0.574
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Dimensional model reduction for flow through fractures in poroelastic media",
+    "doi": "https://doi.org/10.1051/m2an/2016069",
+    "first_author": "Martina Bukač",
+    "year": 2016,
+    "similarity": 0.524
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Algebraic preconditioning for Biot-Barenblatt poroelastic systems",
+    "doi": "https://doi.org/10.21136/am.2017.0179-17",
+    "first_author": "Radim Blaheta",
+    "year": 2017,
+    "similarity": 0.506
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Convergence analysis of two-grid fixed stress split iterative scheme for coupled flow and deformation in heterogeneous poroelastic media",
+   "doi": "10.1016/j.cma.2018.07.018",
+   "first_author": "Dana",
+   "year": 2018,
+   "container": "Computer Methods in Applied Mechanics and Engineering",
+   "similarity": 0.693
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

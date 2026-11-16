@@ -1,0 +1,168 @@
+{
+ "key": "fab_vibe_019",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Marchetti, Elena and Rossi, Gianluca and Bianchi, Paolo",
+  "title": "Tuned mass damping of lateral and torsional vibrations in a slender cable-stayed footbridge",
+  "journal": "Journal of Bridge Engineering",
+  "year": "2015",
+  "volume": "20",
+  "number": "8",
+  "pages": "04014098",
+  "doi": "10.1061/(ASCE)BE.1943-5592.0000703"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1061/(ASCE)BE.1943-5592.0000703",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1061/%28ASCE%29BE.1943-5592.0000703",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:45Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1061/%28ASCE%29BE.1943-5592.0000703",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:46Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1061/%28ASCE%29BE.1943-5592.0000703",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:46Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Discussion of “Development Length Tests of Full-Scale Prestressed Self-Consolidating Concrete Box and I-Girders” by Bassem Andrawes, Andrew Pozolo, and Zhe Chen",
+   "container": "Journal of Bridge Engineering",
+   "year": 2015
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Tuned+mass+damping+of+lateral+and+torsional+vibrations+in+a+slender+cable-stayed+footbridge+Marchetti+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:47Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Tuned+mass+damping+of+lateral+and+torsional+vibrations+in+a+slender+cable-stayed+footbridge&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:48Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "A simplified model for the study of lateral-torsional vibrations of cable stayed bridges",
+    "doi": "10.1201/9781003762447-43",
+    "first_author": "Konstantakopoulos",
+    "year": 2026,
+    "container": "Structural Dynamics - Eurodyn",
+    "similarity": 0.659
+   },
+   {
+    "source": "Crossref",
+    "title": "Atwater Village Cable-Stayed Equestrian Bridge",
+    "doi": "10.24904/footbridge2022.009",
+    "first_author": "Fitzwilliam",
+    "year": 2022,
+    "container": "Footbridge 2022, Madrid: Creating Experience",
+    "similarity": 0.453
+   },
+   {
+    "source": "Crossref",
+    "title": "Active tuned mass damper for damping of offshore wind turbine vibrations",
+    "doi": "10.1002/we.2063",
+    "first_author": "Brodersen",
+    "year": 2016,
+    "container": "Wind Energy",
+    "similarity": 0.515
+   },
+   {
+    "source": "Crossref",
+    "title": "Human-induced vibrations of a curved cable-stayed footbridge",
+    "doi": "10.1016/j.jcsr.2018.02.001",
+    "first_author": "Bassoli",
+    "year": 2018,
+    "container": "Journal of Constructional Steel Research",
+    "similarity": 0.596
+   },
+   {
+    "source": "Crossref",
+    "title": "Torsional Behavior of a Under-Deck Cable-Stayed Footbridge",
+    "doi": "10.2749/222137816819258339",
+    "first_author": "Yuan",
+    "year": 2016,
+    "container": "IABSE Reports",
+    "similarity": 0.604
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Investigation of the Dynamic Performance of a Cable-Stayed Footbridge",
+    "doi": "https://doi.org/10.15168/11572_369155",
+    "first_author": "Anil Kumar",
+    "year": 2011,
+    "similarity": 0.463
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Design of cable-stayed footbridges under serviceability loads",
+    "doi": "https://doi.org/10.25560/58244",
+    "first_author": "Caterina Ramos Moreno",
+    "year": 2015,
+    "similarity": 0.368
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Assessment of the lateral vibration serviceability limit state of slender footbridges including the postlock-in behaviour",
+    "doi": "https://doi.org/10.20868/upm.thesis.69592",
+    "first_author": "Rocío G. Cuevas",
+    "year": 2021,
+    "similarity": 0.472
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Review of Human Induced Vibrations on Footbridges",
+    "doi": "https://doi.org/10.3844/ajeassp.2015.422.433",
+    "first_author": "Chrysanthos Maraveas",
+    "year": 2015,
+    "similarity": 0.465
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Attenuation of pedestrian-induced vibrations in girder footbridges using tuned-mass dampers",
+    "doi": "https://doi.org/10.1186/s43251-020-00013-8",
+    "first_author": "Natividad García-Troncoso",
+    "year": 2020,
+    "similarity": 0.198
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "A simplified model for the study of lateral-torsional vibrations of cable stayed bridges",
+   "doi": "10.1201/9781003762447-43",
+   "first_author": "Konstantakopoulos",
+   "year": 2026,
+   "container": "Structural Dynamics - Eurodyn",
+   "similarity": 0.659
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

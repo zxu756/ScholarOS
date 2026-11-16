@@ -1,0 +1,168 @@
+{
+ "key": "fab_codex_023",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Edda Saari and Tomasz Bielak and Moira Caven",
+  "title": "Rehydration timing and chloroplast repair in desiccation-tolerant bryophyte mats",
+  "journal": "Plant, Cell \\& Environment",
+  "volume": "43",
+  "number": "7",
+  "pages": "1746--1759",
+  "year": "2020",
+  "doi": "10.1111/pce.13782"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1111/pce.13782",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1111/pce.13782",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:22Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1111/pce.13782",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:22Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1111/pce.13782",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:22Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Butterfly–plant interaction ‐ A dicey ménage à trois?",
+   "container": "Plant, Cell &amp; Environment",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Rehydration+timing+and+chloroplast+repair+in+desiccation-tolerant+bryophyte+mats+Saari+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:24Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Rehydration+timing+and+chloroplast+repair+in+desiccation-tolerant+bryophyte+mats&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:25Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Desiccation tolerance in bryophytes: The dehydration and rehydration transcriptomes in the desiccation-tolerant bryophyte Bryum argenteum",
+    "doi": "10.1038/s41598-017-07297-3",
+    "first_author": "Gao",
+    "year": 2017,
+    "container": "Scientific Reports",
+    "similarity": 0.519
+   },
+   {
+    "source": "Crossref",
+    "title": "The rehydration transcriptome of the desiccation-tolerant bryophyte Tortula ruralis: transcript classification and analysis",
+    "doi": "10.1186/1471-2164-5-89",
+    "first_author": "Oliver",
+    "year": 2004,
+    "container": "BMC Genomics",
+    "similarity": 0.525
+   },
+   {
+    "source": "Crossref",
+    "title": "Rehydration Quickly Assembles Photosynthetic Complexes in Desiccation Tolerant Riccia gangetica",
+    "doi": "10.26717/bjstr.2020.30.004891",
+    "first_author": "Soni",
+    "year": 2020,
+    "container": "Biomedical Journal of Scientific &amp; Technical Research",
+    "similarity": 0.549
+   },
+   {
+    "source": "Crossref",
+    "title": "Small-spatial scale ecophysiological and stress- induced (salicylic acid) biochemical investigations on desiccation-tolerant bryophyte SYNTRICHIA RURALIS",
+    "doi": "10.54598/001200",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.391
+   },
+   {
+    "source": "Crossref",
+    "title": "Differences in Rehydration of Three Desiccation-tolerant Angiosperm Species",
+    "doi": "10.1006/anbo.1996.0180",
+    "first_author": "SHERWIN",
+    "year": 1996,
+    "container": "Annals of Botany",
+    "similarity": 0.542
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Activation of seed-specific genes in leaves and roots of the desiccation tolerant plant, Xerophyta humilis",
+    "doi": null,
+    "first_author": "Sally‐Ann Walford",
+    "year": 2008,
+    "similarity": 0.541
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Bryophyte Ecology Table of Contents",
+    "doi": null,
+    "first_author": "Janice M. Glime",
+    "year": 2012,
+    "similarity": 0.226
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effects of altered precipitation regimes on bryophyte carbon dynamics in a Peruvian tropical montane cloud forest",
+    "doi": null,
+    "first_author": "Jenny Ahlstrand",
+    "year": 2016,
+    "similarity": 0.321
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Desiccation tolerance mechanisms in the green lineage and beyond",
+    "doi": "https://doi.org/10.1111/nph.71466",
+    "first_author": "Jenny M. Schuster",
+    "year": 2026,
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Life on the dry side: a roadmap to understanding desiccation tolerance and accelerating translational applications",
+    "doi": "https://doi.org/10.1038/s41467-025-58656-y",
+    "first_author": "Rose A. Marks",
+    "year": 2025,
+    "similarity": 0.363
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Rehydration Quickly Assembles Photosynthetic Complexes in Desiccation Tolerant Riccia gangetica",
+   "doi": "10.26717/bjstr.2020.30.004891",
+   "first_author": "Soni",
+   "year": 2020,
+   "container": "Biomedical Journal of Scientific &amp; Technical Research",
+   "similarity": 0.549
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

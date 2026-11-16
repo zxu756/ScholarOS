@@ -1,0 +1,136 @@
+{
+ "key": "fab_codex_030",
+ "source_file": "codex.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Mei-Lan Qiu",
+  "title": "Tone Domains and Syllable Chains in Hmong-Mien Speech",
+  "publisher": "De Gruyter Mouton",
+  "address": "Berlin",
+  "year": "2006"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Tone+Domains+and+Syllable+Chains+in+Hmong-Mien+Speech+Qiu+2006&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:47Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Tone+Domains+and+Syllable+Chains+in+Hmong-Mien+Speech&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:47Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Recognition tone and syllable in combination for Lao continuous speech",
+    "doi": "10.58837/chula.the.2004.1597",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.553
+   },
+   {
+    "source": "Crossref",
+    "title": "Tone classification of syllable -segmented Thai speech based on multilayer perceptron",
+    "doi": "10.33915/etd.1611",
+    "first_author": "Satravaha",
+    "year": null,
+    "container": null,
+    "similarity": 0.409
+   },
+   {
+    "source": "Crossref",
+    "title": "Hmong-Mien Languages",
+    "doi": "10.1093/obo/9780199772810-0173",
+    "first_author": "Mortensen",
+    "year": 2014,
+    "container": "Oxford Bibliographies in Linguistics",
+    "similarity": 0.329
+   },
+   {
+    "source": "Crossref",
+    "title": "A perceptually-based approach to Chinese syllable-tone patterning",
+    "doi": "10.21437/speechprosody.2016-21",
+    "first_author": "Luo",
+    "year": 2016,
+    "container": "Speech Prosody 2016",
+    "similarity": 0.322
+   },
+   {
+    "source": "Crossref",
+    "title": "Tone-syllable synchrony in Mandarin: New evidence and implications",
+    "doi": "10.1016/j.specom.2024.103121",
+    "first_author": "Kang",
+    "year": 2024,
+    "container": "Speech Communication",
+    "similarity": 0.424
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Minor syllable tones and the reconstruction of proto-Kammu voiced stops",
+    "doi": null,
+    "first_author": "Jan‐Olof Svantesson",
+    "year": 2025,
+    "similarity": 0.419
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Southeast Asian Tone in Areal Perspective",
+    "doi": "https://doi.org/10.1017/9781107279872.027",
+    "first_author": "James Kirby",
+    "year": 2017,
+    "similarity": 0.298
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Lombard effect on production and perception of Northern Vietnamese tones",
+    "doi": null,
+    "first_author": "Giang Le",
+    "year": 2024,
+    "similarity": 0.295
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Representational Implications of the Phonologization of Contour Tones",
+    "doi": null,
+    "first_author": "Benjamin Macaulay",
+    "year": 2014,
+    "similarity": 0.082
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Phonological Reconstruction of Proto-Hlai",
+    "doi": "https://doi.org/10.1163/9789004300521",
+    "first_author": "Peter K. Norquest",
+    "year": 2015,
+    "similarity": 0.104
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Recognition tone and syllable in combination for Lao continuous speech",
+   "doi": "10.58837/chula.the.2004.1597",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.553
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,162 @@
+{
+ "key": "fab_codex_035",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Freya Lindholm and Mateusz Cichy and James Orell",
+  "title": "Borehole temperature fronts resolved by fibre-optic sensing during pulsed injection",
+  "journal": "Water Resources Research",
+  "volume": "56",
+  "number": "4",
+  "pages": "e2019WR026842",
+  "year": "2020",
+  "doi": "10.1029/2019WR026842"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1029/2019WR026842",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1029/2019WR026842",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:01Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1029/2019WR026842",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:02Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1029/2019WR026842",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:11:02Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Borehole+temperature+fronts+resolved+by+fibre-optic+sensing+during+pulsed+injection+Lindholm+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:03Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Borehole+temperature+fronts+resolved+by+fibre-optic+sensing+during+pulsed+injection&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:04Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Fibre optic sensors",
+    "doi": "10.3403/30295712u",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.353
+   },
+   {
+    "source": "Crossref",
+    "title": "Fibre optic sensors",
+    "doi": "10.3403/30295712",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.353
+   },
+   {
+    "source": "Crossref",
+    "title": "Distributed fibre-optic temperature sensing in a 1 km borehole drilled on a fast-flowing glacier in Greenland",
+    "doi": "10.5194/egusphere-egu2020-2433",
+    "first_author": "Law",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.396
+   },
+   {
+    "source": "Crossref",
+    "title": "Best Practice for Fiber Optic Leak Detection, Injection and Production Profiling",
+    "doi": "10.3997/2214-4609.202030020",
+    "first_author": "F.",
+    "year": 2020,
+    "container": "First EAGE Workshop on Fibre Optic Sensing",
+    "similarity": 0.469
+   },
+   {
+    "source": "Crossref",
+    "title": "Tracking Reservoir Temperature and Pressure Changes During CO2 Injection Using Distributed Fibre-Optic Sensing",
+    "doi": "10.3997/2214-4609.2026101896",
+    "first_author": "Collet",
+    "year": 2026,
+    "container": "87th EAGE Annual Conference &amp; Exhibition (Workshop Programme)",
+    "similarity": 0.456
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fibre Optic Methods of Prospecting: A Comprehensive and Modern Branch of Geophysics",
+    "doi": "https://doi.org/10.1007/s10712-021-09634-8",
+    "first_author": "Mulugeta Chanie Fenta",
+    "year": 2021,
+    "similarity": 0.267
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Monitoring cold water injections for reservoir characterization using a permanent fiber optic installation in a geothermal production well in the Southern German Molasse Basin",
+    "doi": "https://doi.org/10.1186/s40517-021-00204-0",
+    "first_author": "Felix Schölderle",
+    "year": 2021,
+    "similarity": 0.171
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fiber Optic Shape Sensors: A comprehensive review",
+    "doi": "https://doi.org/10.1016/j.optlaseng.2020.106508",
+    "first_author": "Ignazio Floris",
+    "year": 2020,
+    "similarity": 0.305
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Residential and District-Scale Ground-Coupled Heat Pump Performance with Fiber Optic Distributed Temperature Sensing",
+    "doi": null,
+    "first_author": "Matthew D. Walker",
+    "year": 2015,
+    "similarity": 0.261
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fibre optic monitoring and finite element analysis of well integrity in methane hydrate reservoirs",
+    "doi": "https://doi.org/10.17863/cam.41244",
+    "first_author": "T. SASAKI",
+    "year": 2019,
+    "similarity": 0.32
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Best Practice for Fiber Optic Leak Detection, Injection and Production Profiling",
+   "doi": "10.3997/2214-4609.202030020",
+   "first_author": "F.",
+   "year": 2020,
+   "container": "First EAGE Workshop on Fibre Optic Sensing",
+   "similarity": 0.469
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

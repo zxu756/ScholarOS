@@ -1,0 +1,166 @@
+{
+ "key": "fab_vibe_037",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Prasetyo, Adi and Wulandari, Retno and Santoso, Bayu",
+  "title": "Sediment accretion rates and organic carbon burial in tropical seagrass meadows",
+  "journal": "Estuarine, Coastal and Shelf Science",
+  "year": "2020",
+  "volume": "238",
+  "pages": "106--119",
+  "doi": "10.1016/j.ecss.2020.106719"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.ecss.2020.106719",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.ecss.2020.106719",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:43Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.ecss.2020.106719",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:44Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.ecss.2020.106719",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:44Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Saltmarsh grass supports fishery food webs in subtropical Australian estuaries",
+   "container": "Estuarine, Coastal and Shelf Science",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Sediment+accretion+rates+and+organic+carbon+burial+in+tropical+seagrass+meadows+Prasetyo+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:45Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Sediment+accretion+rates+and+organic+carbon+burial+in+tropical+seagrass+meadows&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:46Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Nutrient Enrichment Decreases Dissolved Organic Carbon Sequestration Potential of Tropical Seagrass Meadows by Mediating Bacterial Activity",
+    "doi": "10.2139/ssrn.4118447",
+    "first_author": "Huang",
+    "year": 2022,
+    "container": "SSRN Electronic Journal",
+    "similarity": 0.578
+   },
+   {
+    "source": "Crossref",
+    "title": "Vertical accretion and carbon burial rates in subtropical seagrass meadows increased following anthropogenic pressure from European colonisation",
+    "doi": "10.1016/j.ecss.2017.12.006",
+    "first_author": "Samper-Villarreal",
+    "year": 2018,
+    "container": "Estuarine, Coastal and Shelf Science",
+    "similarity": 0.529
+   },
+   {
+    "source": "Crossref",
+    "title": "Mapping sediment carbon in a large tropical reservoir: burial of terrestrial and aquatic organic carbon, and occurrence of potential methane ebullition hot spots",
+    "doi": "10.5194/egusphere-egu2020-20241",
+    "first_author": "Sobek",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.437
+   },
+   {
+    "source": "Crossref",
+    "title": "Tidal level seasonally modulates sediment organic carbon in seagrass meadows of tropical lagoon bays",
+    "doi": "10.1016/j.catena.2026.110116",
+    "first_author": "Zhang",
+    "year": 2026,
+    "container": "CATENA",
+    "similarity": 0.48
+   },
+   {
+    "source": "Crossref",
+    "title": "Increasing salinization and organic carbon burial rates in seagrass meadows from an anthropogenically-modified coastal lagoon in southern Gulf of Mexico",
+    "doi": "10.1016/j.ecss.2020.106843",
+    "first_author": "Ruiz-Fernández",
+    "year": 2020,
+    "container": "Estuarine, Coastal and Shelf Science",
+    "similarity": 0.476
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Seagrass sediment organic carbon burial rates are globally significant",
+    "doi": "https://doi.org/10.1038/s41467-026-79168-3",
+    "first_author": "Ariane Arias‐Ortiz",
+    "year": 2026,
+    "similarity": 0.483
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Non‐seagrass carbon contributions to seagrass sediment blue carbon",
+    "doi": "https://doi.org/10.1002/lno.10718",
+    "first_author": "Matthew P. J. Oreska",
+    "year": 2017,
+    "similarity": 0.234
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Using eDNA to determine the source of organic carbon in seagrass meadows",
+    "doi": "https://doi.org/10.1002/lno.10499",
+    "first_author": "Ruth Reef",
+    "year": 2017,
+    "similarity": 0.609
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Evaluation of the baseline carbon sequestration rates of Indo‐Pacific temperate and tropical seagrass meadow sediments",
+    "doi": "https://doi.org/10.1111/1440-1703.12263",
+    "first_author": "Toshihiro Miyajima",
+    "year": 2021,
+    "similarity": 0.477
+   },
+   {
+    "source": "OpenAlex",
+    "title": "How can blue carbon burial in seagrass meadows increase long-term, net sequestration of carbon? A critical review",
+    "doi": "https://doi.org/10.1088/1748-9326/ac8ab4",
+    "first_author": "Sophia C. Johannessen",
+    "year": 2022,
+    "similarity": 0.411
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Using eDNA to determine the source of organic carbon in seagrass meadows",
+   "doi": "https://doi.org/10.1002/lno.10499",
+   "first_author": "Ruth Reef",
+   "year": 2017,
+   "similarity": 0.609
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

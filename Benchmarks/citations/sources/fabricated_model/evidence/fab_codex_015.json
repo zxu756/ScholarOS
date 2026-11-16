@@ -1,0 +1,122 @@
+{
+ "key": "fab_codex_015",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Mara Ellwood and Teo Saldana and Amelie Corbin",
+  "title": "Click-train persistence of beaked whales beneath seasonal shipping lanes",
+  "journal": "The Journal of the Acoustical Society of America",
+  "volume": "146",
+  "number": "5",
+  "pages": "3614--3627",
+  "year": "2019",
+  "doi": "10.1121/1.5134578"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1121/1.5134578",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1121/1.5134578",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:56Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1121/1.5134578",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:56Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1121/1.5134578",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:57Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Click-train+persistence+of+beaked+whales+beneath+seasonal+shipping+lanes+Ellwood+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:58Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Click-train+persistence+of+beaked+whales+beneath+seasonal+shipping+lanes&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:58Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Figure 14: Schematic drawing showing differences between Gervais’ (A) and True’s (B) beaked whales. Note the more pronounced melon of True’s beaked whales and the lines in the dorsum of Gervais’ beaked whales.",
+    "doi": "10.7717/peerj.3059/fig-14",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.132
+   },
+   {
+    "source": "Crossref",
+    "title": "Click characteristics of northern bottlenose whales (<i>Hyperoodon ampullatus</i>) and Sowerby's beaked whales (<i>Mesoplodon bidens</i>) off eastern Canada",
+    "doi": "10.1121/1.5111336",
+    "first_author": "Clarke",
+    "year": 2019,
+    "container": "The Journal of the Acoustical Society of America",
+    "similarity": 0.404
+   },
+   {
+    "source": "Crossref",
+    "title": "Ginkgo-Toothed Beaked Whales (Mesoplodon ginkgodens) and Hubbs’ Beaked Whales (Mesoplodon carlhubbsi)",
+    "doi": "10.1515/9780824865931-014",
+    "first_author": null,
+    "year": 2016,
+    "container": "The Lives of Hawai‘i’s Dolphins and Whales",
+    "similarity": 0.393
+   },
+   {
+    "source": "Crossref",
+    "title": "Beaked Whales",
+    "doi": "10.1353/book.52552",
+    "first_author": "Ellis",
+    "year": 2017,
+    "container": null,
+    "similarity": 0.306
+   },
+   {
+    "source": "Crossref",
+    "title": "Beaked Whales and Pilot Whales in the Alboran Sea SW Mediterranean",
+    "doi": "10.21236/ada598384",
+    "first_author": "Canadas",
+    "year": 2011,
+    "container": null,
+    "similarity": 0.406
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Beaked Whales and Pilot Whales in the Alboran Sea SW Mediterranean",
+   "doi": "10.21236/ada598384",
+   "first_author": "Canadas",
+   "year": 2011,
+   "container": null,
+   "similarity": 0.406
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

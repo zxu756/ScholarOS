@@ -1,0 +1,154 @@
+{
+ "key": "fab_codex_031",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Farida Rahman and Nico Villena and Koji Tanabe and Amara Eze",
+  "title": "Seasonal exchange of resistant Aeromonas strains between shrimp ponds and drainage canals",
+  "journal": "Applied and Environmental Microbiology",
+  "volume": "85",
+  "number": "18",
+  "pages": "e00871-19",
+  "year": "2019",
+  "pmid": "31341278"
+ },
+ "identifier": {
+  "kind": "pmid",
+  "value": "31341278",
+  "requests": [
+   {
+    "source": "PubMed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=31341278&retmode=json",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:48Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "PubMed",
+   "title": "Meningeal lymphatic vessels at the skull base drain cerebrospinal fluid.",
+   "first_author": "Ahn JH",
+   "year": "2019",
+   "container": "Nature"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Seasonal+exchange+of+resistant+Aeromonas+strains+between+shrimp+ponds+and+drainage+canals+Rahman+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:49Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Seasonal+exchange+of+resistant+Aeromonas+strains+between+shrimp+ponds+and+drainage+canals&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:50Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "SEASONAL DISTRIBUTION AND ABUNDANCE OF DIATOMS IN SHRIMP PONDS OF KHULNA, BANGLADESH",
+    "doi": "10.53808/kus.2008.9.2.0836-l",
+    "first_author": "Islam",
+    "year": 2022,
+    "container": "Khulna University Studies",
+    "similarity": 0.5
+   },
+   {
+    "source": "Crossref",
+    "title": "Management induced changes of antibiotic resistant strains of heterotrophic bacteria in shrimp farming ponds",
+    "doi": "10.56093/ijans.v84i3.38721",
+    "first_author": "JANA",
+    "year": 2014,
+    "container": "The Indian Journal of Animal Sciences",
+    "similarity": 0.518
+   },
+   {
+    "source": "Crossref",
+    "title": "Seasonal nutrient cycling in integrated rice-shrimp ponds",
+    "doi": "10.1016/j.marpolbul.2019.110647",
+    "first_author": "Dien",
+    "year": 2019,
+    "container": "Marine Pollution Bulletin",
+    "similarity": 0.425
+   },
+   {
+    "source": "Crossref",
+    "title": "Transcriptome differences between enrofloxacin-resistant and enrofloxacin-susceptible strains of Aeromonas hydrophila",
+    "doi": "10.1371/journal.pone.0179549",
+    "first_author": "Zhu",
+    "year": 2017,
+    "container": "PLOS ONE",
+    "similarity": 0.33
+   },
+   {
+    "source": "Crossref",
+    "title": "Promotion and contribution of biota in low water exchange ponds farming blue shrimp <i>Litopenaeus stylirostris</i>\n (Stimpson)",
+    "doi": "10.1046/j.1355-557x.2001.00639.x",
+    "first_author": "Martinez-Cordova",
+    "year": 2002,
+    "container": "Aquaculture Research",
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Aeromonas Species Diversity, Virulence Characteristics, and Antimicrobial Susceptibility Patterns in Village Freshwater Aquaculture Ponds in North India",
+    "doi": "https://doi.org/10.3390/antibiotics14030294",
+    "first_author": "Alka Nokhwal",
+    "year": 2025,
+    "similarity": 0.276
+   },
+   {
+    "source": "OpenAlex",
+    "title": "COUPLING DNA LABELING AND NEXT-GENERATION SEQUENCING TECHNIQUES TO CHARACTERIZE METABOLICALLY-ACTIVE BACTERIA IN NONTRADITIONAL IRRIGATION WATER",
+    "doi": "https://doi.org/10.13016/bf5e-p2ua",
+    "first_author": "Leena Malayil",
+    "year": 2019,
+    "similarity": 0.12
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Prevalence, genetic diversity, and antimicrobial susceptibility of Vibrio spp. infected gilthead sea breams from coastal farms at Damietta, Egypt",
+    "doi": "https://doi.org/10.1186/s12917-024-03978-0",
+    "first_author": "Esraa Tawfeek Ismail",
+    "year": 2024,
+    "similarity": 0.243
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Towards sustainable aquaculture in Southeast Asia and Japan : proceedings of the Seminar-Workshop on Aquaculture Development in Southeast Asia, Iloilo City, Philippines, 26-28 July 1994",
+    "doi": null,
+    "first_author": "Teodora Uy Bagarinao",
+    "year": 1995,
+    "similarity": 0.164
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Investigation into jaundice in farmed catfish (Pangasianodon hypophthalmus, Sauvage) in the Mekong Delta, Vietnam",
+    "doi": null,
+    "first_author": "Truc T. T. Luu",
+    "year": 2013,
+    "similarity": 0.313
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Management induced changes of antibiotic resistant strains of heterotrophic bacteria in shrimp farming ponds",
+   "doi": "10.56093/ijans.v84i3.38721",
+   "first_author": "JANA",
+   "year": 2014,
+   "container": "The Indian Journal of Animal Sciences",
+   "similarity": 0.518
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

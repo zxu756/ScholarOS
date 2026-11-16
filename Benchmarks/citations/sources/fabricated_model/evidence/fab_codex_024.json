@@ -1,0 +1,168 @@
+{
+ "key": "fab_codex_024",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Brigid Norrie and Joonas Rinne",
+  "title": "Protein stabilization during repeated drying of a montane moss",
+  "journal": "Journal of Experimental Botany",
+  "volume": "68",
+  "number": "16",
+  "pages": "4471--4484",
+  "year": "2017",
+  "doi": "10.1093/jxb/erx241"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1093/jxb/erx241",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1093/jxb/erx241",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:26Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1093/jxb/erx241",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:27Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1093/jxb/erx241",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:27Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Senescence and nitrogen use efficiency in perennial grasses for forage and biofuel production",
+   "container": "Journal of Experimental Botany",
+   "year": 2017
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Protein+stabilization+during+repeated+drying+of+a+montane+moss+Norrie+2017&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:28Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Protein+stabilization+during+repeated+drying+of+a+montane+moss&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:29Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Mechanisms of Protein Stabilization During Freeze-Drying Storage: The Relative Importance of Thermodynamic Stabilization and Glassy State Relaxation Dynamics",
+    "doi": "10.3109/9781439825761-11",
+    "first_author": null,
+    "year": 2016,
+    "container": "Freeze-Drying/Lyophilization of Pharmaceutical and Biological Products",
+    "similarity": 0.495
+   },
+   {
+    "source": "Crossref",
+    "title": "Efficacy of sugar alcohols and sugars in protein stabilization during freezing, freeze-drying, and air-drying",
+    "doi": "10.1515/fzm-2025-0007",
+    "first_author": "Sun",
+    "year": 2025,
+    "container": "Frigid Zone Medicine",
+    "similarity": 0.533
+   },
+   {
+    "source": "Crossref",
+    "title": "Mechanisms of Protein Stabilization during Freeze-Drying and Storage",
+    "doi": "10.1201/9780203021323.ch3",
+    "first_author": "Pikal",
+    "year": 2004,
+    "container": "Drugs and the Pharmaceutical Sciences",
+    "similarity": 0.677
+   },
+   {
+    "source": "Crossref",
+    "title": "Membrane stabilization and desiccation tolerance during seed corn (Zea mays L.) drying",
+    "doi": "10.31274/rtd-180813-13024",
+    "first_author": "Chen",
+    "year": null,
+    "container": null,
+    "similarity": 0.469
+   },
+   {
+    "source": "Crossref",
+    "title": "Drying for Stabilization of Protein Formulations",
+    "doi": "10.1002/9783527802104.ch4",
+    "first_author": "Horn",
+    "year": 2020,
+    "container": "Drying Technologies for Biotechnology and Pharmaceutical Applications",
+    "similarity": 0.455
+   },
+   {
+    "source": "OpenAlex",
+    "title": "How mowing restores montane Mediterranean grasslands following cessation of traditional livestock grazing",
+    "doi": "https://doi.org/10.1016/j.agee.2020.106880",
+    "first_author": "Federico Maria Tardella",
+    "year": 2020,
+    "similarity": 0.263
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Range plant community types and carrying capacity for the montane subregion : third approximation /",
+    "doi": "https://doi.org/10.5962/bhl.title.104493",
+    "first_author": "Michael Willoughby",
+    "year": 1998,
+    "similarity": 0.369
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Isoprene Emission in Polytrichaceae Mosses",
+    "doi": "https://doi.org/10.15760/etd.6860",
+    "first_author": "Timea Deakova",
+    "year": 2000,
+    "similarity": 0.365
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Testing the Ecological and Physiological Factors Influencing Reproductive Success in Mosses",
+    "doi": "https://doi.org/10.15760/etd.1950",
+    "first_author": "Erin E. Shortlidge",
+    "year": 2000,
+    "similarity": 0.353
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Current trends in pharmaceutical treatment of dry eye disease: A review",
+    "doi": "https://doi.org/10.1016/j.ejps.2022.106206",
+    "first_author": "Hebatallah B. Mohamed",
+    "year": 2022,
+    "similarity": 0.379
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Mechanisms of Protein Stabilization during Freeze-Drying and Storage",
+   "doi": "10.1201/9780203021323.ch3",
+   "first_author": "Pikal",
+   "year": 2004,
+   "container": "Drugs and the Pharmaceutical Sciences",
+   "similarity": 0.677
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,135 @@
+{
+ "key": "fab_vibe_009",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Meyer, Kathrin and Roussel, Baptiste",
+  "title": "Tonal contours and phrase-final lengthening in a whistled register of a Pyrenean language",
+  "journal": "Journal of Phonetics",
+  "year": "2016",
+  "volume": "58",
+  "pages": "77--95",
+  "doi": "10.1016/j.wocn.2016.06.002"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.wocn.2016.06.002",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.wocn.2016.06.002",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:11Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.wocn.2016.06.002",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:12Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.wocn.2016.06.002",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:13Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Variation in the strength of lexical encoding across dialects",
+   "container": "Journal of Phonetics",
+   "year": 2016
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Tonal+contours+and+phrase-final+lengthening+in+a+whistled+register+of+a+Pyrenean+language+Meyer+2016&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:14Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Tonal+contours+and+phrase-final+lengthening+in+a+whistled+register+of+a+Pyrenean+language&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:14Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "PHRASE-LEVEL PROSODY IN ASL: FINAL LENGTHENING AND PHRASAL CONTOURS",
+    "doi": "10.1016/b978-0-12-193270-1.50017-0",
+    "first_author": "COULTER",
+    "year": 1993,
+    "container": "Current Issues in ASL Phonology",
+    "similarity": 0.413
+   },
+   {
+    "source": "Crossref",
+    "title": "Exploring the effects of phrase-final lengthening in Italian Sign Language (LIS) noun phrases",
+    "doi": "10.31513/linguistica.2020.v16n3a37495",
+    "first_author": "Mantovan",
+    "year": 2020,
+    "container": "Revista Linguíʃtica",
+    "similarity": 0.544
+   },
+   {
+    "source": "Crossref",
+    "title": "Whistled Speech and Language Ecology",
+    "doi": "10.1007/978-3-662-45837-2_4",
+    "first_author": "Meyer",
+    "year": 2015,
+    "container": "Whistled Languages",
+    "similarity": 0.368
+   },
+   {
+    "source": "Crossref",
+    "title": "The domain of phrase-final lengthening in Estonian",
+    "doi": "10.3726/978-3-653-03047-1/32",
+    "first_author": null,
+    "year": null,
+    "container": "Nordic Prosody",
+    "similarity": 0.561
+   },
+   {
+    "source": "Crossref",
+    "title": "Whistled Speech and Whistled Languages",
+    "doi": "10.1016/b0-08-044854-2/00034-1",
+    "first_author": "Meyer",
+    "year": 2006,
+    "container": "Encyclopedia of Language &amp; Linguistics",
+    "similarity": 0.409
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Auxiliary speech by vocal tract modulation and musical surrogacy",
+    "doi": "https://doi.org/10.1093/oxfordhb/9780192894700.013.0021",
+    "first_author": "Julien Meyer",
+    "year": 2025,
+    "similarity": 0.261
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "The domain of phrase-final lengthening in Estonian",
+   "doi": "10.3726/978-3-653-03047-1/32",
+   "first_author": null,
+   "year": null,
+   "container": "Nordic Prosody",
+   "similarity": 0.561
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

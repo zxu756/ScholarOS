@@ -1,0 +1,168 @@
+{
+ "key": "fab_vibe_001",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Bhattacharya, Anindita and Sarkar, Prithwish and Haldar, Meghna",
+  "title": "Reductive dissolution of iron oxyhydroxides and the depth zonation of arsenic in a tidal delta aquifer",
+  "journal": "Applied Geochemistry",
+  "year": "2011",
+  "volume": "26",
+  "number": "9",
+  "pages": "1587--1601",
+  "doi": "10.1016/j.apgeochem.2011.06.014"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.apgeochem.2011.06.014",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.apgeochem.2011.06.014",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:42Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.apgeochem.2011.06.014",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:43Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.apgeochem.2011.06.014",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:44Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Hg concentrations and accumulations in fungal fruiting bodies, as influenced by forest soil substrates and moss carpets",
+   "container": "Applied Geochemistry",
+   "year": 2011
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Reductive+dissolution+of+iron+oxyhydroxides+and+the+depth+zonation+of+arsenic+in+a+tidal+delta+aquifer+Bhattacharya+2011&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:45Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Reductive+dissolution+of+iron+oxyhydroxides+and+the+depth+zonation+of+arsenic+in+a+tidal+delta+aquifer&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:46Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Reductive dissolution of iron-oxyhydroxides directs groundwater arsenic mobilization in the upstream of Ganges River basin, Nepal",
+    "doi": "10.1016/j.gexplo.2014.09.002",
+    "first_author": "Yadav",
+    "year": 2015,
+    "container": "Journal of Geochemical Exploration",
+    "similarity": 0.565
+   },
+   {
+    "source": "Crossref",
+    "title": "Geogenic Arsenic Release by Iron-Oxides Reductive Dissolution in Aquifer Systems",
+    "doi": "10.1007/978-3-030-64514-4_89",
+    "first_author": "Ceriotti",
+    "year": 2021,
+    "container": "Lecture Notes in Civil Engineering",
+    "similarity": 0.352
+   },
+   {
+    "source": "Crossref",
+    "title": "Reductive Dissolution of Fe-oxyhydroxides a Potential Mechanism for Arsenic Release into Groundwater in the Alluvial Plain of River Brahmaputra",
+    "doi": "10.1007/978-3-030-21258-2_3",
+    "first_author": "Baviskar",
+    "year": 2019,
+    "container": "Advances in Water Security",
+    "similarity": 0.555
+   },
+   {
+    "source": "Crossref",
+    "title": "Arsenic in groundwater of the Bengal Delta Plain: geochemical evidences for small scale redox zonation in the aquifer",
+    "doi": "10.1201/9780203970829-7",
+    "first_author": null,
+    "year": 2005,
+    "container": "Natural Arsenic in Groundwater",
+    "similarity": 0.275
+   },
+   {
+    "source": "Crossref",
+    "title": "Identifying the arsenic-safe aquifers of the Ganges Delta: some insights into sustainable aquifer management",
+    "doi": "10.1201/9781351046633-246",
+    "first_author": "Chakraborty",
+    "year": 2019,
+    "container": "Environmental Arsenic in a Changing World",
+    "similarity": 0.258
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Arsenic, vanadium, iron, and manganese biogeochemistry in a deltaic wetland, southern Louisiana, USA",
+    "doi": "https://doi.org/10.1016/j.marchem.2017.03.010",
+    "first_author": "Katherine Telfeyan",
+    "year": 2017,
+    "similarity": 0.223
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Arsenic and Selenium",
+    "doi": "https://doi.org/10.1016/b978-0-08-095975-7.00902-5",
+    "first_author": "J. Plant",
+    "year": 2013,
+    "similarity": 0.213
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Groundwater arsenic content related to the sedimentology and stratigraphy of the Red River delta, Vietnam",
+    "doi": "https://doi.org/10.1016/j.scitotenv.2021.152641",
+    "first_author": "Jolanta Kaźmierczak",
+    "year": 2021,
+    "similarity": 0.291
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Natural and Anthropic Sources of Arsenic in the Groundwater and Soils of the Mekong Delta",
+    "doi": "https://doi.org/10.4236/ojss.2022.1211023",
+    "first_author": "Kenneth R. Olson",
+    "year": 2022,
+    "similarity": 0.356
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Redox-Controlled Biogeochemical Processes Affecting Arsenic Solubility in Sediments from a Basin-Fill Aquifer in Northern Utah",
+    "doi": "https://doi.org/10.26076/c839-272c",
+    "first_author": "Xianyu Meng",
+    "year": 2015,
+    "similarity": 0.377
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Reductive dissolution of iron-oxyhydroxides directs groundwater arsenic mobilization in the upstream of Ganges River basin, Nepal",
+   "doi": "10.1016/j.gexplo.2014.09.002",
+   "first_author": "Yadav",
+   "year": 2015,
+   "container": "Journal of Geochemical Exploration",
+   "similarity": 0.565
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

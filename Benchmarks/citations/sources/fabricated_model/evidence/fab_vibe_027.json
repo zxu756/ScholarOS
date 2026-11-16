@@ -1,0 +1,165 @@
+{
+ "key": "fab_vibe_027",
+ "source_file": "vibe.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Sokolov, Andrei and Kuznetsova, Irina and Volkov, Pavel",
+  "title": "Creep resistance of refractory high-entropy alloys at elevated temperature",
+  "booktitle": "Proceedings of the 12th International Symposium on Superalloys",
+  "year": "2020",
+  "pages": "455--464",
+  "doi": "10.1007/978-3-030-51834-9_45"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1007/978-3-030-51834-9_45",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1007/978-3-030-51834-9_45",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:12Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/978-3-030-51834-9_45",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:13Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1007/978-3-030-51834-9_45",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:13Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Aspects of High Strain Rate Industrial Forging of Inconel 718",
+   "container": "The Minerals, Metals &amp; Materials Series",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Creep+resistance+of+refractory+high-entropy+alloys+at+elevated+temperature+Sokolov+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:14Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Creep+resistance+of+refractory+high-entropy+alloys+at+elevated+temperature&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:15Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Elevated Temperature Creep of a Eutectic FeNiMnAlCr High Entropy Alloy",
+    "doi": "10.1007/s44210-025-00077-z",
+    "first_author": "Jiang",
+    "year": 2026,
+    "container": "High Entropy Alloys &amp; Materials",
+    "similarity": 0.278
+   },
+   {
+    "source": "Crossref",
+    "title": "Effect of aluminum addition on the elevated-temperature wear resistance of Ti40Zr40Nb10Ta10 refractory high-entropy alloys",
+    "doi": "10.1016/j.triboint.2025.111393",
+    "first_author": "Chen",
+    "year": 2026,
+    "container": "Tribology International",
+    "similarity": 0.5
+   },
+   {
+    "source": "Crossref",
+    "title": "High-Temperature Creep Behavior of AlxCrMnFeCoNi High-Entropy Alloys",
+    "doi": "10.5220/0007434700710076",
+    "first_author": "Cao",
+    "year": 2018,
+    "container": "Proceedings of the International Workshop on Materials, Chemistry and Engineering",
+    "similarity": 0.493
+   },
+   {
+    "source": "Crossref",
+    "title": "High-Temperature Nano-Indentation Creep of Reduced Activity High Entropy Alloys Based on 4-5-6 Elemental Palette",
+    "doi": "10.3390/e22020230",
+    "first_author": "Sadeghilaridjani",
+    "year": 2020,
+    "container": "Entropy",
+    "similarity": 0.473
+   },
+   {
+    "source": "Crossref",
+    "title": "A Perspective of the Design and Development of Metallic Ultra-High Temperature Materials: Refractory Metal Intermetallic Composites, Refractory Complex Concentrated Alloys and Refractory High Entropy Alloys",
+    "doi": "10.3390/alloys2030014",
+    "first_author": "Tsakiropoulos",
+    "year": 2023,
+    "container": "Alloys",
+    "similarity": 0.036
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Creep in a nanocrystalline VNbMoTaW refractory high-entropy alloy",
+    "doi": "https://doi.org/10.1016/j.jmst.2023.11.019",
+    "first_author": "Xun Shen",
+    "year": 2024,
+    "similarity": 0.633
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Alloy design for intrinsically ductile refractory high-entropy alloys",
+    "doi": "https://doi.org/10.1063/1.4966659",
+    "first_author": "Saad Sheikh",
+    "year": 2016,
+    "similarity": 0.531
+   },
+   {
+    "source": "OpenAlex",
+    "title": "High-temperature creep-oxidation interaction of (VNb)80(TaTi)20 refractory high-entropy alloy",
+    "doi": "https://doi.org/10.1016/j.intermet.2026.109218",
+    "first_author": "Lin Zhang",
+    "year": 2026,
+    "similarity": 0.506
+   },
+   {
+    "source": "OpenAlex",
+    "title": "High-Temperature Nano-Indentation Creep of Reduced Activity High Entropy Alloys Based on 4-5-6 Elemental Palette",
+    "doi": "https://doi.org/10.3390/e22020230",
+    "first_author": "Maryam Sadeghilaridjani",
+    "year": 2020,
+    "similarity": 0.473
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Creep behavior of high-entropy alloys: A critical review",
+    "doi": "https://doi.org/10.1016/j.intermet.2026.109242",
+    "first_author": "Mingwei Zhang",
+    "year": 2026,
+    "similarity": 0.574
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Creep in a nanocrystalline VNbMoTaW refractory high-entropy alloy",
+   "doi": "https://doi.org/10.1016/j.jmst.2023.11.019",
+   "first_author": "Xun Shen",
+   "year": 2024,
+   "similarity": 0.633
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

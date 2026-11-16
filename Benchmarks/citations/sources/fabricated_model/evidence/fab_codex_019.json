@@ -1,0 +1,167 @@
+{
+ "key": "fab_codex_019",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Kemal Erdemir and Ayse Demircan and Marcello Vettori",
+  "title": "Rocking-base restraint for the seismic retrofit of slender masonry minarets",
+  "journal": "Engineering Structures",
+  "volume": "205",
+  "pages": "110094",
+  "year": "2020",
+  "doi": "10.1016/j.engstruct.2019.110094"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.engstruct.2019.110094",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.engstruct.2019.110094",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:09Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.engstruct.2019.110094",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:10Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.engstruct.2019.110094",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:10Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Bond characteristics between high/ultra-high strength steel and ultra-high modulus CFRP laminates",
+   "container": "Engineering Structures",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Rocking-base+restraint+for+the+seismic+retrofit+of+slender+masonry+minarets+Erdemir+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:11Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Rocking-base+restraint+for+the+seismic+retrofit+of+slender+masonry+minarets&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:12Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Resilience-oriented seismic retrofit of heritage masonry minarets using hybrid base isolation and supplemental damping",
+    "doi": "10.1016/j.istruc.2025.110893",
+    "first_author": "Ergun",
+    "year": 2026,
+    "container": "Structures",
+    "similarity": 0.497
+   },
+   {
+    "source": "Crossref",
+    "title": "SEISMIC RETROFIT OF STRATEGIC MASONRY STRUCTURES WITH BASE ISOLATION TECHNIQUE: THE CASE STUDY OF “GIACOMO MATTEOTTI” SCHOOL BUILDING IN GUBBIO, ITALY",
+    "doi": "10.5592/co/2crocee.2023.31",
+    "first_author": "Barone",
+    "year": 2023,
+    "container": "2nd Croatian Conference on Earthquake Engineering ‒ 2CroCEE",
+    "similarity": 0.317
+   },
+   {
+    "source": "Crossref",
+    "title": "- Dynamic Seismic and Wind Response of Masonry Minarets",
+    "doi": "10.3311/ppci.15035",
+    "first_author": "Türkeli",
+    "year": 2020,
+    "container": "Periodica Polytechnica Civil Engineering",
+    "similarity": 0.516
+   },
+   {
+    "source": "Crossref",
+    "title": "",
+    "doi": "10.54499/2022.11827.bd",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.0
+   },
+   {
+    "source": "Crossref",
+    "title": "Large and Slender Rocking Blocks Under Sequences of Instant Pulses as Seismic Actions",
+    "doi": "10.2139/ssrn.4602616",
+    "first_author": "Jossa",
+    "year": 2023,
+    "container": null,
+    "similarity": 0.412
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Seismic Vulnerability of Masonry Minarets: State of the Art and Fast Assessment via Limit Analysis",
+    "doi": "https://doi.org/10.3390/buildings16081515",
+    "first_author": "Sare Nur Avcı",
+    "year": 2026,
+    "similarity": 0.36
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Seismic behavior and failure assessment of historical masonry minarets in the Bitlis urban conservation area with numerical analysis",
+    "doi": "https://doi.org/10.1038/s41598-026-68747-5",
+    "first_author": "Ercan Işık",
+    "year": 2026,
+    "similarity": 0.329
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Structural health monitoring (SHM) and Nondestructive testing (NDT) of slender masonry structures: A practical review",
+    "doi": "https://doi.org/10.1016/j.conbuildmat.2021.123768",
+    "first_author": "Francisco J. Pallarés",
+    "year": 2021,
+    "similarity": 0.417
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Investigation of the Behavior of Epoxy- and Lead-Bonded Mechanical Steel Stitching for Seismic Strengthening of Historical Stone Masonry Arches",
+    "doi": "https://doi.org/10.21203/rs.3.rs-9800809/v1",
+    "first_author": "Mohammad Manzoor Nasery",
+    "year": 2026,
+    "similarity": 0.396
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Finite Element Modeling and Construction Aspects of Masonry Walls: An Overview",
+    "doi": "https://doi.org/10.23967/j.rimni.2025.10.67720",
+    "first_author": "Abdo Mohammed Al‐Fakih",
+    "year": 2025,
+    "similarity": 0.355
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "- Dynamic Seismic and Wind Response of Masonry Minarets",
+   "doi": "10.3311/ppci.15035",
+   "first_author": "Türkeli",
+   "year": 2020,
+   "container": "Periodica Polytechnica Civil Engineering",
+   "similarity": 0.516
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

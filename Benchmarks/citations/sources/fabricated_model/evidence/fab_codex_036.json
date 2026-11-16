@@ -1,0 +1,136 @@
+{
+ "key": "fab_codex_036",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Nora Veldman and Hiro Sato and Elena Rojas",
+  "title": "Cable coupling effects in distributed temperature measurements from deep boreholes",
+  "booktitle": "Proceedings of SPIE",
+  "volume": "10323",
+  "pages": "103231D",
+  "year": "2017"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Cable+coupling+effects+in+distributed+temperature+measurements+from+deep+boreholes+Veldman+2017&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:06Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Cable+coupling+effects+in+distributed+temperature+measurements+from+deep+boreholes&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:07Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Temperature measurements in boreholes at Chalk River, Ontario",
+    "doi": "10.4095/315072",
+    "first_author": "Judge",
+    "year": 1979,
+    "container": null,
+    "similarity": 0.493
+   },
+   {
+    "source": "Crossref",
+    "title": "Determination of Formation Temperatures from Temperature Logs in Deep Boreholes: Comparison of Three Methods",
+    "doi": "10.1201/b19295-22",
+    "first_author": null,
+    "year": 2015,
+    "container": "Pressure and Temperature Well Testing",
+    "similarity": 0.423
+   },
+   {
+    "source": "Crossref",
+    "title": "Temperature gradient measurements in boreholes using low noise high resolution techniques",
+    "doi": "10.4095/119566",
+    "first_author": "Bristow",
+    "year": 1984,
+    "container": null,
+    "similarity": 0.409
+   },
+   {
+    "source": "Crossref",
+    "title": "Examination of Ambient Temperature Variations Effects on Predicted Fluid Temperatures in Vertical Boreholes",
+    "doi": "10.22488/okstate.17.000506",
+    "first_author": "Cimmino",
+    "year": 2017,
+    "container": "Proceedings of the IGSHPA Technical/Research Conference and Expo 2017",
+    "similarity": 0.497
+   },
+   {
+    "source": "Crossref",
+    "title": "Geophysical logs and core measurements from forty boreholes at Yucca Mountain, Nevada",
+    "doi": "10.3133/gp1001",
+    "first_author": null,
+    "year": 1991,
+    "container": null,
+    "similarity": 0.446
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fracture characterization from seismic measurements in a borehole",
+    "doi": null,
+    "first_author": "Sudhish K. Bakku",
+    "year": 2015,
+    "similarity": 0.422
+   },
+   {
+    "source": "OpenAlex",
+    "title": "3D deep geothermal reservoir imaging with wireline distributed acoustic sensing in two boreholes",
+    "doi": "https://doi.org/10.5194/se-13-1291-2022",
+    "first_author": "Evgeniia Martuganova",
+    "year": 2022,
+    "similarity": 0.461
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Laboratory study of temperature variation effects on Distributed Acoustic Sensing measurements.",
+    "doi": "https://doi.org/10.5281/zenodo.7694077",
+    "first_author": "Evgenii Sidenko",
+    "year": 2021,
+    "similarity": 0.5
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Deep Borehole Surveys and Problems",
+    "doi": "https://doi.org/10.5962/bhl.title.35891",
+    "first_author": "M. H. Haddock",
+    "year": 2015,
+    "similarity": 0.241
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Deep Borehole Field Test Laboratory and Borehole Testing Strategy",
+    "doi": "https://doi.org/10.2172/1333701",
+    "first_author": "Lawrence Berkeley National Lab. (LBNL), Berkeley, CA (United States)",
+    "year": 2016,
+    "similarity": 0.19
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Laboratory study of temperature variation effects on Distributed Acoustic Sensing measurements.",
+   "doi": "https://doi.org/10.5281/zenodo.7694077",
+   "first_author": "Evgenii Sidenko",
+   "year": 2021,
+   "similarity": 0.5
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,168 @@
+{
+ "key": "fab_codex_037",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Alina Voss and Mireille Fournier and Karel Dvorak",
+  "title": "Snowmelt asynchrony reshapes pollinator links across alpine meadow patches",
+  "journal": "Ecology Letters",
+  "volume": "23",
+  "number": "6",
+  "pages": "981--992",
+  "year": "2020",
+  "doi": "10.1111/ele.13488"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1111/ele.13488",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1111/ele.13488",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:08Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1111/ele.13488",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:08Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1111/ele.13488",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:09Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Accounting for stochasticity in demographic compensation along the elevational range of an alpine plant",
+   "container": "Ecology Letters",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Snowmelt+asynchrony+reshapes+pollinator+links+across+alpine+meadow+patches+Voss+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:10Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Snowmelt+asynchrony+reshapes+pollinator+links+across+alpine+meadow+patches&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:11Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Rest-grazing duration during regreening period enhances community stability of alpine meadow via community asynchrony and dominant species stability",
+    "doi": "10.2139/ssrn.5900863",
+    "first_author": "Wang",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.378
+   },
+   {
+    "source": "Crossref",
+    "title": "Asynchrony of winter soil freeze-thaw phenology induced by warming reduces ecosystem respiration of alpine meadow during the freeze-thaw period",
+    "doi": "10.5194/egusphere-egu2020-12031",
+    "first_author": "wang",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.359
+   },
+   {
+    "source": "Crossref",
+    "title": "Phosphorus enrichment increased community stability by increasing asynchrony and dominant species stability in alpine meadow of Qinghai-Tibet Plateau&amp;#160;",
+    "doi": "10.5194/egusphere-egu25-9977",
+    "first_author": "jiang",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "Field experimental study on the effect of thawed depth of frozen alpine meadow soil on rill erosion by snowmelt waterflow",
+    "doi": "10.22541/au.160029785.51297905",
+    "first_author": "SHI",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.287
+   },
+   {
+    "source": "Crossref",
+    "title": "Potentilla anserina reshapes soil-microbe networks in alpine meadow restoration",
+    "doi": "10.3389/fmicb.2026.1890269",
+    "first_author": "Zhang",
+    "year": 2026,
+    "container": "Frontiers in Microbiology",
+    "similarity": 0.562
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Pollinator-mediated reproductive consequences of altered co-flowering under climate change conditions depend on abiotic context",
+    "doi": "https://doi.org/10.1016/j.ecochg.2021.100043",
+    "first_author": "Marie Faust",
+    "year": 2021,
+    "similarity": 0.269
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Plant-pollinator communities responsive to local and landscape level factors in grassland restorations.",
+    "doi": "https://doi.org/10.18297/etd/3866",
+    "first_author": "Aaron N. Sexton",
+    "year": 2022,
+    "similarity": 0.307
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Long‐term changes in flowering synchrony reflect climatic changes across an elevational gradient",
+    "doi": "https://doi.org/10.1111/ecog.06050",
+    "first_author": "Alessandro Fisogni",
+    "year": 2022,
+    "similarity": 0.447
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Linking LiDAR-derived forest structure to functional plant diversity along secondary succession",
+    "doi": null,
+    "first_author": "Lorenzo Orzan",
+    "year": 2026,
+    "similarity": 0.213
+   },
+   {
+    "source": "OpenAlex",
+    "title": "UV-B stress responses and functional differentiation inAntarctic vegetation communities",
+    "doi": null,
+    "first_author": "Alberto-José Parada-Siles",
+    "year": 2026,
+    "similarity": 0.323
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Potentilla anserina reshapes soil-microbe networks in alpine meadow restoration",
+   "doi": "10.3389/fmicb.2026.1890269",
+   "first_author": "Zhang",
+   "year": 2026,
+   "container": "Frontiers in Microbiology",
+   "similarity": 0.562
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

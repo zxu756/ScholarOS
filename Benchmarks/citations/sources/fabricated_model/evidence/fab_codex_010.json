@@ -1,0 +1,166 @@
+{
+ "key": "fab_codex_010",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Sanna Kivioja and Ilmar Sild and Eero Malkamaki",
+  "title": "Morphological segmentation with shared stem priors for two under-resourced Uralic languages",
+  "booktitle": "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics",
+  "pages": "4132--4142",
+  "year": "2021",
+  "publisher": "Association for Computational Linguistics",
+  "doi": "10.18653/v1/2021.acl-long.319"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.18653/v1/2021.acl-long.319",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.18653/v1/2021.acl-long.319",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:38Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.18653/v1/2021.acl-long.319",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:39Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.18653/v1/2021.acl-long.319",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:39Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Breaking Down Walls of Text: How Can NLP Benefit Consumer Privacy?",
+   "container": "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
+   "year": 2021
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Morphological+segmentation+with+shared+stem+priors+for+two+under-resourced+Uralic+languages+Kivioja+2021&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:40Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Morphological+segmentation+with+shared+stem+priors+for+two+under-resourced+Uralic+languages&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:41Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Data-Driven Morphological Analysis for Uralic Languages",
+    "doi": "10.18653/v1/w19-0301",
+    "first_author": "Silfverberg",
+    "year": 2019,
+    "container": "Proceedings of the Fifth International Workshop on Computational Linguistics for Uralic Languages",
+    "similarity": 0.521
+   },
+   {
+    "source": "Crossref",
+    "title": "Languages under the influence: Building a database of Uralic languages",
+    "doi": "10.18653/v1/w17-0603",
+    "first_author": "Simon",
+    "year": 2017,
+    "container": "Proceedings of the Third Workshop on Computational Linguistics for\n          Uralic Languages",
+    "similarity": 0.412
+   },
+   {
+    "source": "Crossref",
+    "title": "New Challenges, Old Problems: AI and Under-resourced Languages",
+    "doi": "10.21437/sigul.2023-21",
+    "first_author": "Prys",
+    "year": 2023,
+    "container": "2nd Annual Meeting of the ELRA/ISCA SIG on Under-resourced Languages (SIGUL 2023)",
+    "similarity": 0.49
+   },
+   {
+    "source": "Crossref",
+    "title": "Cross-Family Stem-Suffix Boundary Segmentation in Turkic and Uralic Languages: A ByT5 Study of Azerbaijani, Turkish, Hungarian, and Finnish",
+    "doi": "10.3390/info17080745",
+    "first_author": "Ibiyev",
+    "year": 2026,
+    "container": "Information",
+    "similarity": 0.363
+   },
+   {
+    "source": "Crossref",
+    "title": "North Sámi morphological segmentation with low-resource semi-supervised sequence labeling",
+    "doi": "10.18653/v1/w19-0302",
+    "first_author": "Grönroos",
+    "year": 2019,
+    "container": "Proceedings of the Fifth International Workshop on Computational Linguistics for Uralic Languages",
+    "similarity": 0.578
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Model of Computational Morphology and its Application to Uralic Languages",
+    "doi": null,
+    "first_author": "Attila Novák",
+    "year": 2015,
+    "similarity": 0.434
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tokenization and Morphological Fidelity in Uralic NLP: A Cross-Lingual Evaluation",
+    "doi": "https://doi.org/10.18653/v1/2026.loreslm-1.43",
+    "first_author": "Nuo Xu",
+    "year": 2026,
+    "similarity": 0.409
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Wanca in Korp: Text corpora for underresourced Uralic languages",
+    "doi": null,
+    "first_author": "Heidi Jauhiainen",
+    "year": 2019,
+    "similarity": 0.588
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Proceedings of the Fifth International Workshop on Computational Linguistics for Uralic Languages",
+    "doi": "https://doi.org/10.18653/v1/w19-03",
+    "first_author": null,
+    "year": 2019,
+    "similarity": 0.436
+   },
+   {
+    "source": "OpenAlex",
+    "title": "North Sámi morphological segmentation with low-resource semi-supervised sequence labeling",
+    "doi": "https://doi.org/10.18653/v1/w19-0302",
+    "first_author": "Stig-Arne Grönroos",
+    "year": 2019,
+    "similarity": 0.578
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Wanca in Korp: Text corpora for underresourced Uralic languages",
+   "doi": null,
+   "first_author": "Heidi Jauhiainen",
+   "year": 2019,
+   "similarity": 0.588
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

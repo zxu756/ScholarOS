@@ -1,0 +1,138 @@
+{
+ "key": "fab_codex_038",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Nadia Birk and Petra Almquist and Luca Ferretti",
+  "title": "Late-season fly visitation and network redundancy in an alpine grassland",
+  "journal": "Oecologia",
+  "volume": "179",
+  "number": "2",
+  "pages": "531--542",
+  "year": "2015"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Late-season+fly+visitation+and+network+redundancy+in+an+alpine+grassland+Birk+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:12Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Late-season+fly+visitation+and+network+redundancy+in+an+alpine+grassland&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:13Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Influence of Climate, Time of Day and Season, and Flower Density on Insect Flower Visitation in Alpine Norway",
+    "doi": "10.2307/1551879",
+    "first_author": "Totland",
+    "year": 1994,
+    "container": "Arctic and Alpine Research",
+    "similarity": 0.436
+   },
+   {
+    "source": "Crossref",
+    "title": "Influence of Climate, Time of Day and Season, and Flower Density on Insect Flower Visitation in Alpine Norway",
+    "doi": "10.1080/00040851.1994.12003041",
+    "first_author": "Totland",
+    "year": 1994,
+    "container": "Arctic and Alpine Research",
+    "similarity": 0.436
+   },
+   {
+    "source": "Crossref",
+    "title": "Alpine grassland hydrologic response to climate change from plot to catchment scale",
+    "doi": "10.5194/egusphere-egu22-9950",
+    "first_author": "Vremec",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.206
+   },
+   {
+    "source": "Crossref",
+    "title": "THE LATE ALPINE SEASON.",
+    "doi": "10.1016/s0140-6736(01)86137-7",
+    "first_author": null,
+    "year": 1890,
+    "container": "The Lancet",
+    "similarity": 0.234
+   },
+   {
+    "source": "Crossref",
+    "title": "Lysimeter experiments reveal effects of elevated atmospheric carbon dioxide on soil-water fluxes and biomass production of alpine grassland under drought",
+    "doi": "10.5194/egusphere-egu22-8138",
+    "first_author": "Birk",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.347
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nectar chemistry reflects pollination strategies in alpine plant communities",
+    "doi": "https://doi.org/10.64898/2026.07.24.740324",
+    "first_author": "Roberto Rebollo",
+    "year": 2026,
+    "similarity": 0.405
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Comparison of grassland plant-pollinator networks on dairy farms in three contrasting French landscapes",
+    "doi": "https://doi.org/10.1016/j.actao.2021.103763",
+    "first_author": "Alice Michelot‐Antalik",
+    "year": 2021,
+    "similarity": 0.183
+   },
+   {
+    "source": "OpenAlex",
+    "title": "One fly to rule them all—muscid flies are the key pollinators in the Arctic",
+    "doi": "https://doi.org/10.1098/rspb.2016.1271",
+    "first_author": "Mikko Tiusanen",
+    "year": 2016,
+    "similarity": 0.286
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Foraging specialization of flower visitors in a grassland community: insights from metabarcoding versus traditional methods.",
+    "doi": null,
+    "first_author": "Melanie Streicher",
+    "year": 2024,
+    "similarity": 0.32
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Wild bee communities in grassland habitats of the Central Valley of California: Drivers of diversity and community structure",
+    "doi": null,
+    "first_author": "Jennifer L. Hernandez",
+    "year": 2013,
+    "similarity": 0.226
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Influence of Climate, Time of Day and Season, and Flower Density on Insect Flower Visitation in Alpine Norway",
+   "doi": "10.2307/1551879",
+   "first_author": "Totland",
+   "year": 1994,
+   "container": "Arctic and Alpine Research",
+   "similarity": 0.436
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

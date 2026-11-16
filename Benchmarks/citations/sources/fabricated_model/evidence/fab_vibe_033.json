@@ -1,0 +1,167 @@
+{
+ "key": "fab_vibe_033",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Achterberg, Joris and van Dijk, Marieke",
+  "title": "Tropical compactifications of tree space and the geometry of phylogenetic inference",
+  "journal": "Journal of Mathematical Biology",
+  "year": "2018",
+  "volume": "77",
+  "number": "3",
+  "pages": "701--729",
+  "doi": "10.1007/s00285-018-1229-7"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1007/s00285-018-1229-7",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1007/s00285-018-1229-7",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:30Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/s00285-018-1229-7",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:30Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1007/s00285-018-1229-7",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:30Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Mathematical modeling of climate change and malaria transmission dynamics: a historical review",
+   "container": "Journal of Mathematical Biology",
+   "year": 2018
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Tropical+compactifications+of+tree+space+and+the+geometry+of+phylogenetic+inference+Achterberg+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:32Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Tropical+compactifications+of+tree+space+and+the+geometry+of+phylogenetic+inference&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:33Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Tropical Geometry of Phylogenetic Tree Space: A statistical Perspective",
+    "doi": "10.1007/s10013-026-00795-w",
+    "first_author": "Monod",
+    "year": 2026,
+    "container": "Vietnam Journal of Mathematics",
+    "similarity": 0.523
+   },
+   {
+    "source": "Crossref",
+    "title": "Phylogenetic tree inference with tropical axial attention",
+    "doi": "10.3389/fsysb.2026.1886918",
+    "first_author": "Teska",
+    "year": 2026,
+    "container": "Frontiers in Systems Biology",
+    "similarity": 0.314
+   },
+   {
+    "source": "Crossref",
+    "title": "Figure 3: Phylogenetic consensus tree constructed using bayesian inference algorithm.",
+    "doi": "10.7717/peerj.2638/fig-3",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.337
+   },
+   {
+    "source": "Crossref",
+    "title": "Appendix S2: Example of phylogenetic tree inference from SECAPR output",
+    "doi": "10.7717/peerj.5175/supp-2",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.421
+   },
+   {
+    "source": "Crossref",
+    "title": "Supplemental Information 3: Bayesian inference (BI) phylogenetic tree based on haplotypes.",
+    "doi": "10.7717/peerj.7393/supp-3",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.438
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Foundations of the wald space for phylogenetic trees",
+    "doi": "https://doi.org/10.1112/jlms.12893",
+    "first_author": "Jonas Lueg",
+    "year": 2024,
+    "similarity": 0.578
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Combinatorics and Computations in Tropical Mathematics",
+    "doi": null,
+    "first_author": "Bo Lin",
+    "year": 2017,
+    "similarity": 0.234
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The neighbor-net algorithm",
+    "doi": "https://doi.org/10.1016/j.aam.2010.09.002",
+    "first_author": "Dan Levy",
+    "year": 2010,
+    "similarity": 0.22
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nonlinear algebra and applications",
+    "doi": "https://doi.org/10.3934/naco.2021045",
+    "first_author": "Paul Breiding",
+    "year": 2021,
+    "similarity": 0.222
+   },
+   {
+    "source": "OpenAlex",
+    "title": "",
+    "doi": "https://doi.org/10.2140/jsag.2024.14-1",
+    "first_author": null,
+    "year": 2024,
+    "similarity": 0.0
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Foundations of the wald space for phylogenetic trees",
+   "doi": "https://doi.org/10.1112/jlms.12893",
+   "first_author": "Jonas Lueg",
+   "year": 2024,
+   "similarity": 0.578
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

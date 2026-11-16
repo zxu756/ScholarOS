@@ -1,0 +1,144 @@
+{
+ "key": "fab_vibe_003",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Vandeputte, Lien and De Coninck, Marijke",
+  "title": "A revised generic classification of troglobitic springtails from the western Mediterranean karst",
+  "journal": "Zootaxa",
+  "year": "2015",
+  "volume": "3948",
+  "number": "2",
+  "pages": "201--238",
+  "doi": "10.11646/zootaxa.3948.2.4"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.11646/zootaxa.3948.2.4",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.11646/zootaxa.3948.2.4",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:51Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.11646/zootaxa.3948.2.4",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:52Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.11646/zootaxa.3948.2.4",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:52Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "A new species of Hemigrammus Gill, 1858 (Characiformes: Characidae) from the central and western Amazon and rio Paraná-Paraguai basins",
+   "container": "Zootaxa",
+   "year": 2015
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=A+revised+generic+classification+of+troglobitic+springtails+from+the+western+Mediterranean+karst+Vandeputte+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:54Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=A+revised+generic+classification+of+troglobitic+springtails+from+the+western+Mediterranean+karst&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:54Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Reduced fitness associated with introgression within the Western Mediterranean admixed population of European seabass",
+    "doi": "10.22541/au.171723209.90897859/v1",
+    "first_author": "Leitwein",
+    "year": 2024,
+    "container": null,
+    "similarity": 0.488
+   },
+   {
+    "source": "Crossref",
+    "title": "A new troglobitic schizomid (Hubbardiidae: Paradraculoides) from the Pilbara region, Western Australia",
+    "doi": "10.18195/issn.0312-3162.30(2).2015.132-136",
+    "first_author": "Abrams",
+    "year": 2015,
+    "container": "Records of the Western Australian Museum",
+    "similarity": 0.454
+   },
+   {
+    "source": "Crossref",
+    "title": "A troglobitic cryptopid centipede (Chilopoda: Scolopendromorpha) from western Queensland",
+    "doi": "10.18195/issn.0312-3162.23(2).2006.193-198",
+    "first_author": "Edgecombe",
+    "year": 2006,
+    "container": "Records of the Western Australian Museum",
+    "similarity": 0.431
+   },
+   {
+    "source": "Crossref",
+    "title": "Classification of Karst Springs For Flash Flood-Prone Areas in Western Turkey",
+    "doi": "10.5194/nhess-2016-6",
+    "first_author": "Demiroglu",
+    "year": 2016,
+    "container": null,
+    "similarity": 0.497
+   },
+   {
+    "source": "Crossref",
+    "title": "Karst and karst groundwater resources in the Mediterranean",
+    "doi": "10.1007/s12665-015-4239-4",
+    "first_author": "Bakalowicz",
+    "year": 2015,
+    "container": "Environmental Earth Sciences",
+    "similarity": 0.351
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Biodiversity from caves and other sub-terranean habitats of Georgia, USA",
+    "doi": "https://doi.org/10.4311/2019lsc0125",
+    "first_author": "Kirk S. Zigler",
+    "year": 2020,
+    "similarity": 0.371
+   },
+   {
+    "source": "OpenAlex",
+    "title": "First database of invertebrate species for scientific research: the contribution of UZI to partial replacement of vertebrate models and implementation of the 3Rs principles",
+    "doi": null,
+    "first_author": "Paola Zarattini",
+    "year": 2026,
+    "similarity": 0.225
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Classification of Karst Springs For Flash Flood-Prone Areas in Western Turkey",
+   "doi": "10.5194/nhess-2016-6",
+   "first_author": "Demiroglu",
+   "year": 2016,
+   "container": null,
+   "similarity": 0.497
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

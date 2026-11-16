@@ -1,0 +1,138 @@
+{
+ "key": "fab_codex_004",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Lena Ormstad and Patrice Bellanger",
+  "title": "A survey of lichen turnover along the eastern slopes of Marion Island",
+  "journal": "The Lichenologist",
+  "volume": "39",
+  "number": "5",
+  "pages": "459--471",
+  "year": "2007"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=A+survey+of+lichen+turnover+along+the+eastern+slopes+of+Marion+Island+Ormstad+2007&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:19Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=A+survey+of+lichen+turnover+along+the+eastern+slopes+of+Marion+Island&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:20Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Vegetation Distributions along Lichen-Dominated Slopes of Opposing Aspect in the Eastern Canadian Subarctic",
+    "doi": "10.14430/arctic1771",
+    "first_author": "Petzold",
+    "year": 1987,
+    "container": "ARCTIC",
+    "similarity": 0.386
+   },
+   {
+    "source": "Crossref",
+    "title": ": A Brother is a Stranger . Toru Matsumoto, Marion O. Lerrigo.",
+    "doi": "10.1525/as.1946.15.25.01p0132a",
+    "first_author": "Maki",
+    "year": 1946,
+    "container": "Far Eastern Survey",
+    "similarity": 0.339
+   },
+   {
+    "source": "Crossref",
+    "title": "<i>EDW Ardiella Mirabilis</i>, A Holocarpous Lichen from Marion Island",
+    "doi": "10.1017/s0024282986000063",
+    "first_author": "Henssen",
+    "year": 1986,
+    "container": "The Lichenologist",
+    "similarity": 0.415
+   },
+   {
+    "source": "Crossref",
+    "title": "Tin Mining in Banka Island",
+    "doi": "10.1525/as.1949.18.21.01p0535x",
+    "first_author": null,
+    "year": 1949,
+    "container": "Far Eastern Survey",
+    "similarity": 0.379
+   },
+   {
+    "source": "Crossref",
+    "title": "Formosa: Island Frontier",
+    "doi": "10.1525/as.1945.14.7.01p1566e",
+    "first_author": "Kerr",
+    "year": 1945,
+    "container": "Far Eastern Survey",
+    "similarity": 0.174
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Islands of Biodiversity: Characterization of Lichen Flora in Antarctic Nunataks",
+    "doi": "https://doi.org/10.3390/jof12050314",
+    "first_author": "Ana Aramburu",
+    "year": 2026,
+    "similarity": 0.367
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Terrestrial habitats on sub-Antarctic Marion Island: their vegetation, edaphic attributes, distribution and response to climate change",
+    "doi": "https://doi.org/10.1016/s0254-6299(15)31195-9",
+    "first_author": "Valdon R. Smith",
+    "year": 2001,
+    "similarity": 0.21
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The conservation status of Heard Island and the McDonald Islands",
+    "doi": "https://doi.org/10.25959/23233346",
+    "first_author": "PL Keage",
+    "year": 1981,
+    "similarity": 0.361
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Plant distribution and colonization in extreme polar deserts, Ellesmere Island, Canada",
+    "doi": null,
+    "first_author": "Esther Lévesque",
+    "year": 1997,
+    "similarity": 0.301
+   },
+   {
+    "source": "OpenAlex",
+    "title": "An insect invasion of Antarctica: the past, present and future distribution of Eretmoptera murphyi (Diptera, Chironomidae) on Signy Island",
+    "doi": "https://doi.org/10.1111/icad.12389",
+    "first_author": "Jesamine Bartlett",
+    "year": 2019,
+    "similarity": 0.386
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "<i>EDW Ardiella Mirabilis</i>, A Holocarpous Lichen from Marion Island",
+   "doi": "10.1017/s0024282986000063",
+   "first_author": "Henssen",
+   "year": 1986,
+   "container": "The Lichenologist",
+   "similarity": 0.415
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

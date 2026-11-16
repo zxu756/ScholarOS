@@ -1,0 +1,96 @@
+{
+ "key": "fab_codex_022",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Inna Serova and Pavel Kostin",
+  "title": "Shard-size sorting in peat sections downwind of Avachinsky volcano",
+  "booktitle": "Proceedings of the International Union for Quaternary Research Congress",
+  "pages": "214--219",
+  "year": "2015"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Shard-size+sorting+in+peat+sections+downwind+of+Avachinsky+volcano+Serova+2015&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:20Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Shard-size+sorting+in+peat+sections+downwind+of+Avachinsky+volcano&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:20Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Features of heat and mass transfer processes under the Avachinsky volcano (Kamchatka)",
+    "doi": "10.5194/egusphere-egu2020-362",
+    "first_author": "Kuznetsov",
+    "year": 2020,
+    "container": null,
+    "similarity": 0.389
+   },
+   {
+    "source": "Crossref",
+    "title": "Tidal effects in the seismicity of Avachinsky volcano",
+    "doi": "10.35540/2686-7907.2023.1.06",
+    "first_author": "Shevchenko",
+    "year": 2023,
+    "container": "Russian Journal of Seismology",
+    "similarity": 0.571
+   },
+   {
+    "source": "Crossref",
+    "title": "PHASE AND CHEMICAL COMPOSITION OF HIGH-TEMPERATURE SUBLIMATES OF AVACHINSKY VOLCANO (KAMCHATKA)",
+    "doi": "10.7868/s3034513825040028",
+    "first_author": "Plutakhina",
+    "year": 2025,
+    "container": "Вулканология и сейсмология / Journal of Volcanology and Seismology",
+    "similarity": 0.428
+   },
+   {
+    "source": "Crossref",
+    "title": "Microfungi of volcanic thermal environments of Avachinsky volcano (Kamchatka Peninsula, Russian Far East)",
+    "doi": "10.1038/s41598-026-69297-6",
+    "first_author": "Yu",
+    "year": 2026,
+    "container": "Scientific Reports",
+    "similarity": 0.393
+   },
+   {
+    "source": "Crossref",
+    "title": "Empirical recurrence rate time series for volcanism: Application to Avachinsky volcano, Russia",
+    "doi": "10.1016/j.jvolgeores.2007.12.003",
+    "first_author": "Ho",
+    "year": 2008,
+    "container": "Journal of Volcanology and Geothermal Research",
+    "similarity": 0.481
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Tidal effects in the seismicity of Avachinsky volcano",
+   "doi": "10.35540/2686-7907.2023.1.06",
+   "first_author": "Shevchenko",
+   "year": 2023,
+   "container": "Russian Journal of Seismology",
+   "similarity": 0.571
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

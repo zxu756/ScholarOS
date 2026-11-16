@@ -1,0 +1,1 @@
+Registry recordings for Benchmarks/citations/entries/*.bib will be captured here by the dispatcher after all 12 benchmark groups are generated (manifest.json + <slug>.raw + <slug>.meta.json).

@@ -1,0 +1,160 @@
+{
+ "key": "fab_vibe_010",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ozturk, Selin and Demirci, Hakan and Yildirim, Ayse",
+  "title": "Prosodic cues in whistled Turkish: an acoustic study of vowel height and stress",
+  "booktitle": "Proceedings of the 19th International Congress of Phonetic Sciences",
+  "year": "2019",
+  "pages": "2241--2245",
+  "doi": "10.21437/ICPhS.2019-2241"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.21437/ICPhS.2019-2241",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.21437/ICPhS.2019-2241",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:16Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.21437/ICPhS.2019-2241",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:16Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.21437/ICPhS.2019-2241",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:12:16Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Prosodic+cues+in+whistled+Turkish%3A+an+acoustic+study+of+vowel+height+and+stress+Ozturk+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:18Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Prosodic+cues+in+whistled+Turkish%3A+an+acoustic+study+of+vowel+height+and+stress&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:19Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Acoustic features of Japanese vowel-vowel hiatus at prosodic boundaries",
+    "doi": "10.21437/speechprosody.2006-61",
+    "first_author": "Kitazawa",
+    "year": 2006,
+    "container": "Speech Prosody 2006",
+    "similarity": 0.161
+   },
+   {
+    "source": "Crossref",
+    "title": "Prosodic cues to emotion : perceptual and acoustic analyses",
+    "doi": "10.22215/etd/2011-08980",
+    "first_author": "De Bodt",
+    "year": null,
+    "container": null,
+    "similarity": 0.563
+   },
+   {
+    "source": "Crossref",
+    "title": "Acoustic and prosodic analysis of Japanese vowel-vowel hiatus with laryngeal effect",
+    "doi": "10.21437/interspeech.2004-75",
+    "first_author": "Shigeyoshi",
+    "year": 2004,
+    "container": "Interspeech 2004",
+    "similarity": 0.311
+   },
+   {
+    "source": "Crossref",
+    "title": "Domain-Initial Strengthening in Turkish: Acoustic Cues to Prosodic Hierarchy in Stop Consonants",
+    "doi": "10.21437/interspeech.2021-2230",
+    "first_author": "Bodur",
+    "year": 2021,
+    "container": "Interspeech 2021",
+    "similarity": 0.453
+   },
+   {
+    "source": "Crossref",
+    "title": "Typology and acoustic strategies of whistled languages: Phonetic comparison and perceptual cues of whistled vowels",
+    "doi": "10.1017/s0025100308003277",
+    "first_author": "Meyer",
+    "year": 2008,
+    "container": "Journal of the International Phonetic Association",
+    "similarity": 0.293
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Natural and unnatural constraints in Hungarian vowel harmony",
+    "doi": "https://doi.org/10.1353/lan.0.0169",
+    "first_author": "Bruce Hayes",
+    "year": 2009,
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Perceiving whistled speech : a study of musicians' capacity for language processing",
+    "doi": "https://doi.org/10.70675/405062e3z6f59z458fz817fz36f5b48c0619",
+    "first_author": "Anaïs Tran Ngoc",
+    "year": 2023,
+    "similarity": 0.481
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Interaction of Domain-initial Effects with Lexical Stress: Acoustic Data from English, Spanish, and Portuguese",
+    "doi": null,
+    "first_author": "Napoleão de Souza",
+    "year": 2019,
+    "similarity": 0.349
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Comparative, diachronic and experimental perspectives on the interaction between tone and vowel in standard Cantonese",
+    "doi": null,
+    "first_author": "Gina Maureen Lee",
+    "year": 1993,
+    "similarity": 0.381
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The acoustics and perception of the word-initial singleton/geminate contrast in Kelantan Malay",
+    "doi": null,
+    "first_author": "Mohd Hilmi Hamzah",
+    "year": 2013,
+    "similarity": 0.221
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Prosodic cues to emotion : perceptual and acoustic analyses",
+   "doi": "10.22215/etd/2011-08980",
+   "first_author": "De Bodt",
+   "year": null,
+   "container": null,
+   "similarity": 0.563
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

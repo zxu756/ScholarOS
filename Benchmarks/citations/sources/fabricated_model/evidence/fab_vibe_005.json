@@ -1,0 +1,128 @@
+{
+ "key": "fab_vibe_005",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Kaushik, Devendra and Srivastava, Anjali",
+  "title": "Copper fractions and the attribution of Kushan fractional issues from a Gangetic hoard",
+  "journal": "Journal of Archaeological Science",
+  "year": "2013",
+  "volume": "40",
+  "number": "11",
+  "pages": "3901--3912",
+  "doi": "10.1016/j.jas.2013.05.019"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jas.2013.05.019",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jas.2013.05.019",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:58Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jas.2013.05.019",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:58Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jas.2013.05.019",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:59Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Quantifying visual prominence in social landscapes",
+   "container": "Journal of Archaeological Science",
+   "year": 2013
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Copper+fractions+and+the+attribution+of+Kushan+fractional+issues+from+a+Gangetic+hoard+Kaushik+2013&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:00Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Copper+fractions+and+the+attribution+of+Kushan+fractional+issues+from+a+Gangetic+hoard&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:01Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Gangetic Hoard",
+    "doi": "10.1007/978-3-030-58292-0_70026",
+    "first_author": null,
+    "year": 2021,
+    "container": "Encyclopedic Dictionary of Archaeology",
+    "similarity": 0.28
+   },
+   {
+    "source": "Crossref",
+    "title": "Three. A Hoard of Kushan Coins",
+    "doi": "10.1525/9780520957664-007",
+    "first_author": null,
+    "year": 2019,
+    "container": "Silk, Slaves, and Stupas",
+    "similarity": 0.365
+   },
+   {
+    "source": "Crossref",
+    "title": "A Hoard of Kushan Gold Coins from Swabi",
+    "doi": "10.2307/jj.10574826.19",
+    "first_author": "Tandon",
+    "year": 2023,
+    "container": "Look at the Coins! Papers in Honour of Joe Cribb on his 75th Birthday",
+    "similarity": 0.416
+   },
+   {
+    "source": "Crossref",
+    "title": "Roman objects in the Begram hoard and the memory of Greek rule in Kushan Central Asia",
+    "doi": "10.4324/9781315108513-34",
+    "first_author": "Morris",
+    "year": 2020,
+    "container": "The Graeco-Bactrian and Indo-Greek World",
+    "similarity": 0.386
+   },
+   {
+    "source": "Crossref",
+    "title": "SPACH : ten years preserving Afghanistanandrsquo;s cultural heritage : 8th international seminar of Kushan studies / International Centre for Kushan Studies, Academy of Sciences of Afghanistan.",
+    "doi": "10.2458/azu_acku_pamphlet_ds353_s63_2004",
+    "first_author": null,
+    "year": 2013,
+    "container": null,
+    "similarity": 0.354
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "A Hoard of Kushan Gold Coins from Swabi",
+   "doi": "10.2307/jj.10574826.19",
+   "first_author": "Tandon",
+   "year": 2023,
+   "container": "Look at the Coins! Papers in Honour of Joe Cribb on his 75th Birthday",
+   "similarity": 0.416
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

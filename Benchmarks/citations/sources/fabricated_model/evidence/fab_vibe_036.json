@@ -1,0 +1,153 @@
+{
+ "key": "fab_vibe_036",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Hagstr{\\\"o}m, Erik and Virtanen, Aino",
+  "title": "Transition-edge sensor arrays for sub-millimetre astronomy: noise and multiplexing",
+  "journal": "Journal of Low Temperature Physics",
+  "year": "2019",
+  "volume": "196",
+  "number": "3-4",
+  "pages": "233--248",
+  "eprint": "1903.07712",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "1903.07712",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=1903.07712",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:39Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Benchmarking Web API Quality -- Revisited",
+   "first_author": "David Bermbach",
+   "year": "2019"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Transition-edge+sensor+arrays+for+sub-millimetre+astronomy%3A+noise+and+multiplexing+Hagstrom+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:40Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Transition-edge+sensor+arrays+for+sub-millimetre+astronomy%3A+noise+and+multiplexing&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:42Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Modeling and Analysis of Maximum Multiplexing Number with Crosstalk Suppression under Electrical Crosstalk Constraint for Frequency Domain Multiplexing Readout of Transition Edge Sensor Arrays between 1-100 MHz",
+    "doi": "10.21203/rs.3.rs-7375684/v1",
+    "first_author": "Gao",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.124
+   },
+   {
+    "source": "Crossref",
+    "title": "Development of frequency division multiplexing readout for a large transition edge sensor array for space",
+    "doi": "10.33612/diss.193636081",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.376
+   },
+   {
+    "source": "Crossref",
+    "title": "Multiplexing technology based on SQUID for readout of superconducting transition-edge sensor arrays",
+    "doi": "10.1088/1674-1056/ac693c",
+    "first_author": "Wu",
+    "year": 2022,
+    "container": "Chinese Physics B",
+    "similarity": 0.322
+   },
+   {
+    "source": "Crossref",
+    "title": "Maximizing multiplexing in 1–100 MHz frequency domain readout of transition edge sensor arrays via crosstalk suppression",
+    "doi": "10.1038/s41598-026-49891-4",
+    "first_author": "Gao",
+    "year": 2026,
+    "container": "Scientific Reports",
+    "similarity": 0.388
+   },
+   {
+    "source": "Crossref",
+    "title": "Switchless Multiplexing of Graphene Active Sensor Arrays for Brain Mapping",
+    "doi": "10.1021/acs.nanolett.0c00467.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.439
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Pixel design for FIR/mm/submm astronomy constituted of a set of antenna-coupled superconducting detectors feeding a metamaterial-based lenslet",
+    "doi": "https://doi.org/10.1117/12.2627848",
+    "first_author": "Thomas Gascard",
+    "year": 2022,
+    "similarity": 0.35
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Transition Edge Sensors: Physics and Applications",
+    "doi": "https://doi.org/10.3390/instruments8040047",
+    "first_author": "Mario de Lucia",
+    "year": 2024,
+    "similarity": 0.543
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Realization of a large-area microbolometer sensor array for submillimeter astronomy applications: SCUBA-2",
+    "doi": "https://doi.org/10.1117/12.550401",
+    "first_author": "William J. Parkes",
+    "year": 2004,
+    "similarity": 0.605
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The UK Submillimetre and Millimetre Astronomy Roadmap 2024",
+    "doi": "https://doi.org/10.48550/arxiv.2408.12975",
+    "first_author": "Kate M Pattle",
+    "year": 2024,
+    "similarity": 0.446
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The SPICA-SAFARI Detector System: TES Detector Arrays With Frequency-Division Multiplexed SQUID Readout",
+    "doi": "https://doi.org/10.1109/tthz.2011.2177705",
+    "first_author": "Brian D. Jackson",
+    "year": 2011,
+    "similarity": 0.372
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Realization of a large-area microbolometer sensor array for submillimeter astronomy applications: SCUBA-2",
+   "doi": "https://doi.org/10.1117/12.550401",
+   "first_author": "William J. Parkes",
+   "year": 2004,
+   "similarity": 0.605
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

@@ -1,0 +1,129 @@
+{
+ "key": "fab_codex_021",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Yelena Markova and Akira Volkov and Sofia Krutova",
+  "title": "Peat-bound cryptotephra horizons across the central Kamchatka lowlands",
+  "journal": "Quaternary Science Reviews",
+  "volume": "184",
+  "pages": "68--83",
+  "year": "2018",
+  "doi": "10.1016/j.quascirev.2018.01.026"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.quascirev.2018.01.026",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.quascirev.2018.01.026",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:15Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.quascirev.2018.01.026",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:16Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.quascirev.2018.01.026",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:16Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Peat-bound+cryptotephra+horizons+across+the+central+Kamchatka+lowlands+Markova+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:18Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Peat-bound+cryptotephra+horizons+across+the+central+Kamchatka+lowlands&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:18Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "First discovery of cryptotephra in Holocene peat deposits of Estonia, eastern Baltic",
+    "doi": "10.1111/j.1502-3885.2006.tb01170.x",
+    "first_author": "HANG",
+    "year": 2006,
+    "container": "Boreas",
+    "similarity": 0.366
+   },
+   {
+    "source": "Crossref",
+    "title": "CA9 mimic bound to SH7",
+    "doi": "10.2210/pdb8ttr/pdb",
+    "first_author": "Peat",
+    "year": 2024,
+    "container": null,
+    "similarity": 0.239
+   },
+   {
+    "source": "Crossref",
+    "title": "First identification of cryptotephra from the Kamchatka Peninsula in a Greenland ice core: Implications of a widespread marker deposit that links Greenland to the Pacific northwest",
+    "doi": "10.1016/j.quascirev.2017.11.036",
+    "first_author": "Cook",
+    "year": 2018,
+    "container": "Quaternary Science Reviews",
+    "similarity": 0.337
+   },
+   {
+    "source": "Crossref",
+    "title": "Co-Movements of Lithuanian and Central European Stock Markets Across Different Time Horizons: a Wavelet Approach",
+    "doi": "10.15388/ekon.2018.1.11786",
+    "first_author": "Kregždė",
+    "year": 2018,
+    "container": "Ekonomika",
+    "similarity": 0.331
+   },
+   {
+    "source": "Crossref",
+    "title": "HCV NS5B 1b N316 bound to Compound 18",
+    "doi": "10.2210/pdb6mvk/pdb",
+    "first_author": "Williams",
+    "year": 2018,
+    "container": "Worldwide Protein Data Bank",
+    "similarity": 0.28
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tephrochronology and its application: A review",
+    "doi": "https://doi.org/10.1016/j.quageo.2010.08.003",
+    "first_author": "David J. Lowe",
+    "year": 2010,
+    "similarity": 0.313
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "First discovery of cryptotephra in Holocene peat deposits of Estonia, eastern Baltic",
+   "doi": "10.1111/j.1502-3885.2006.tb01170.x",
+   "first_author": "HANG",
+   "year": 2006,
+   "container": "Boreas",
+   "similarity": 0.366
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

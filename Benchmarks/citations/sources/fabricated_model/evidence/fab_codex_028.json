@@ -1,0 +1,160 @@
+{
+ "key": "fab_codex_028",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Giulio Fabbri and Mirek Brant and Hana Novakova",
+  "title": "Cyclic compression of graded titanium lattice coupons after surface polishing",
+  "booktitle": "MATEC Web of Conferences",
+  "volume": "300",
+  "pages": "05012",
+  "year": "2019",
+  "doi": "10.1051/matecconf/201930005012"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1051/matecconf/201930005012",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1051/matecconf/201930005012",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:41Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1051/matecconf/201930005012",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:41Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1051/matecconf/201930005012",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:10:41Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Cyclic+compression+of+graded+titanium+lattice+coupons+after+surface+polishing+Fabbri+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:43Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Cyclic+compression+of+graded+titanium+lattice+coupons+after+surface+polishing&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:43Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Effect of chemical mechanical polishing on surface nature of titanium implants FT-IR and wettability data of titanium implants surface after chemical mechanical polishing implementation",
+    "doi": "10.1016/j.dib.2016.11.065",
+    "first_author": "Ozdemir",
+    "year": 2017,
+    "container": "Data in Brief",
+    "similarity": 0.366
+   },
+   {
+    "source": "Crossref",
+    "title": "Material removal and surface finishing of additively manufactured Ti-6Al-4V coupons by cyclic process of plasma electrolytic polishing",
+    "doi": "10.1016/j.surfcoat.2025.131872",
+    "first_author": "Ng",
+    "year": 2025,
+    "container": "Surface and Coatings Technology",
+    "similarity": 0.408
+   },
+   {
+    "source": "Crossref",
+    "title": "Surface topographies of two-year coupons of titanium grade 16 from long-term testing",
+    "doi": "10.2172/15005559",
+    "first_author": "Bedrossian",
+    "year": 1999,
+    "container": null,
+    "similarity": 0.422
+   },
+   {
+    "source": "Crossref",
+    "title": "Cyclic OxidationReduction Cleaning for Microstructural and Chemical Restoration of Copper after Chemical Mechanical Polishing",
+    "doi": "10.1021/acsaelm.5c02225.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.416
+   },
+   {
+    "source": "Crossref",
+    "title": "Surface Roughness and Morphological Alterations of Titanium After Various Roughening and Polishing Treatments",
+    "doi": "10.1563/aaid-joi-d-25-00189",
+    "first_author": "Nezir",
+    "year": 2025,
+    "container": "Journal of Oral Implantology",
+    "similarity": 0.441
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Metal Coupon Testing in an Axial Rotating Detonation Engine for Wear Characterization",
+    "doi": null,
+    "first_author": "Gary S. North",
+    "year": 2020,
+    "similarity": 0.272
+   },
+   {
+    "source": "OpenAlex",
+    "title": "On the characterisation of subsurface deformation microstructures in aerostructural titanium alloys",
+    "doi": null,
+    "first_author": "Meurig Thomas",
+    "year": 2012,
+    "similarity": 0.307
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Lattice Structures for Bone Replacement: The Intersection of Bone Biomechanics, Lattice Design, and Additive Manufacturing",
+    "doi": "https://doi.org/10.1002/admt.202501885",
+    "first_author": "Stylianos Kechagias",
+    "year": 2026,
+    "similarity": 0.449
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effect of Cryogenic Treatment on the Mechanical Properties of Nickel-Titanium Shape Memory Alloys",
+    "doi": null,
+    "first_author": "Stuart Brahm Kozlick",
+    "year": 2013,
+    "similarity": 0.299
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Identification of Mechanical Properties for Titanium Alloy Ti-6Al-4V Produced Using LENS Technology",
+    "doi": "https://doi.org/10.3390/ma12060886",
+    "first_author": "Aleksandra Szafrańska",
+    "year": 2019,
+    "similarity": 0.42
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Lattice Structures for Bone Replacement: The Intersection of Bone Biomechanics, Lattice Design, and Additive Manufacturing",
+   "doi": "https://doi.org/10.1002/admt.202501885",
+   "first_author": "Stylianos Kechagias",
+   "year": 2026,
+   "similarity": 0.449
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

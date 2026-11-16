@@ -1,0 +1,136 @@
+{
+ "key": "fab_vibe_028",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Huang, Zhihao and Lin, Pei-Yu",
+  "title": "Dislocation climb and creep in single-phase high-entropy alloys",
+  "journal": "Acta Materialia",
+  "year": "2021",
+  "volume": "208",
+  "pages": "116--129"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Dislocation+climb+and+creep+in+single-phase+high-entropy+alloys+Huang+2021&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:16Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Dislocation+climb+and+creep+in+single-phase+high-entropy+alloys&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:17Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "​Al content Driven Phase Transition and Dislocation Dynamics in Single-Crystal FeCrNiCo-based High-Entropy Alloys under Extreme Conditions​",
+    "doi": "10.2139/ssrn.6691661",
+    "first_author": "Dong",
+    "year": 2026,
+    "container": null,
+    "similarity": 0.47
+   },
+   {
+    "source": "Crossref",
+    "title": "Analysis of creep in class A alloys with dislocation climb based models",
+    "doi": "10.1080/09603409.2025.2571840",
+    "first_author": "Sandström",
+    "year": 2025,
+    "container": "Materials at High Temperatures",
+    "similarity": 0.373
+   },
+   {
+    "source": "Crossref",
+    "title": "High Strain Rate Deformation Behavior of Single-Phase and Multi-Phase High Entropy Alloys",
+    "doi": "10.12794/metadc1808354",
+    "first_author": "Muskeri",
+    "year": null,
+    "container": null,
+    "similarity": 0.566
+   },
+   {
+    "source": "Crossref",
+    "title": "Formation and Superconductivity of Single-Phase High-Entropy Alloys with a Tetragonal Structure",
+    "doi": "10.1021/acsaelm.0c00108.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.582
+   },
+   {
+    "source": "Crossref",
+    "title": "Dislocation Multijunction-Driven Plasticity in HfNbTiZr High-Entropy Alloys",
+    "doi": "10.1021/acs.nanolett.5c01984.s002",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.594
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Review on Creep Behaviour of High-Entropy Alloys",
+    "doi": "https://doi.org/10.1007/978-981-95-8076-7_10",
+    "first_author": "Shubhashis Dixit",
+    "year": 2026,
+    "similarity": 0.584
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Creep Performance of Single Phase FCC High Entropy Alloys",
+    "doi": null,
+    "first_author": "Kyle A. Rozman",
+    "year": 2020,
+    "similarity": 0.667
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tensile creep properties of a CrMnFeCoNi high-entropy alloy",
+    "doi": "https://doi.org/10.1016/j.scriptamat.2020.113633",
+    "first_author": "Mingwei Zhang",
+    "year": 2020,
+    "similarity": 0.508
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Creep behavior and microstructure stability of precipitation-strengthened A2+B2 refractory high entropy alloys",
+    "doi": "https://doi.org/10.5445/ir/1000197642",
+    "first_author": "Liu Yang",
+    "year": 2026,
+    "similarity": 0.439
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The High Temperature Tensile and Creep Behaviors of High Entropy Superalloy",
+    "doi": "https://doi.org/10.1038/s41598-017-13026-7",
+    "first_author": "Te‐Kang Tsao",
+    "year": 2017,
+    "similarity": 0.565
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Creep Performance of Single Phase FCC High Entropy Alloys",
+   "doi": null,
+   "first_author": "Kyle A. Rozman",
+   "year": 2020,
+   "similarity": 0.667
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

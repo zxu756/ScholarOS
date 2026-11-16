@@ -1,0 +1,137 @@
+{
+ "key": "fab_codex_018",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Otto Feldmann and Rebekah Dale",
+  "title": "Seasonal shifts in nematode feeding guilds under long-term no-till wheat",
+  "journal": "Applied Soil Ecology",
+  "volume": "68",
+  "pages": "39--47",
+  "year": "2013"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Seasonal+shifts+in+nematode+feeding+guilds+under+long-term+no-till+wheat+Feldmann+2013&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:06Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Seasonal+shifts+in+nematode+feeding+guilds+under+long-term+no-till+wheat&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:07Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Impact of long-term zero till wheat on soil physical properties and wheat productivity under rice–wheat cropping system",
+    "doi": "10.1016/j.still.2014.03.002",
+    "first_author": "Singh",
+    "year": 2014,
+    "container": "Soil and Tillage Research",
+    "similarity": 0.272
+   },
+   {
+    "source": "Crossref",
+    "title": "Determinants for seasonal change of nematode community composition under long-term application of organic manure in an acid soil in subtropical China",
+    "doi": "10.1016/j.ejsobi.2012.11.003",
+    "first_author": "Jiang",
+    "year": 2013,
+    "container": "European Journal of Soil Biology",
+    "similarity": 0.416
+   },
+   {
+    "source": "Crossref",
+    "title": "Enhancing Long-Term No-Till Wheat Systems with Cover Crops and Flash Grazing",
+    "doi": "10.2139/ssrn.4035286",
+    "first_author": "Mubvumba",
+    "year": 2022,
+    "container": null,
+    "similarity": 0.405
+   },
+   {
+    "source": "Crossref",
+    "title": "Sulfur speciation in a tropical soil under long-term no-till amended with lime and phosphogypsum",
+    "doi": "10.11606/d.11.2020.tde-04052020-123116",
+    "first_author": "Costa",
+    "year": null,
+    "container": null,
+    "similarity": 0.488
+   },
+   {
+    "source": "Crossref",
+    "title": "Supplemental Information 2: Abundance of different nematode feeding groups (individuals per g dry soil) in the long-term fertilization experiment in Lanna, Sweden; mean (SE)",
+    "doi": "10.7717/peerj.11204/supp-2",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.445
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The role of nematodes in ecosystems.",
+    "doi": "https://doi.org/10.1079/9781845933852.0001",
+    "first_author": "Gregor W. Yeates",
+    "year": 2009,
+    "similarity": 0.411
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Reduced tillage, but not organic matter input, increased nematode diversity and food web stability in European long‐term field experiments",
+    "doi": "https://doi.org/10.1111/mec.15270",
+    "first_author": "Giulia Bongiorno",
+    "year": 2019,
+    "similarity": 0.337
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Cover cropping and no-till increase diversity and symbiotroph:saprotroph ratios of soil fungal communities",
+    "doi": "https://doi.org/10.1016/j.soilbio.2018.11.010",
+    "first_author": "Radomir Schmidt",
+    "year": 2018,
+    "similarity": 0.225
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nematode Interactions in Nature: Models for Sustainable Control of Nematode Pests of Crop Plants?",
+    "doi": "https://doi.org/10.1016/s0065-2113(05)89005-4",
+    "first_author": "Wim H. van der Putten",
+    "year": 2006,
+    "similarity": 0.275
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effects of synthetic fertilizer and farm compost on soil nematode community in long-term crop rotation plots: A morphological and metabarcoding approach",
+    "doi": "https://doi.org/10.1371/journal.pone.0230153",
+    "first_author": "Gisèle L. Herren",
+    "year": 2020,
+    "similarity": 0.341
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Sulfur speciation in a tropical soil under long-term no-till amended with lime and phosphogypsum",
+   "doi": "10.11606/d.11.2020.tde-04052020-123116",
+   "first_author": "Costa",
+   "year": null,
+   "container": null,
+   "similarity": 0.488
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

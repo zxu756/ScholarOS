@@ -1,0 +1,135 @@
+{
+ "key": "fab_codex_025",
+ "source_file": "codex.bib",
+ "entry_type": "book",
+ "fields": {
+  "author": "Melek Aksoy",
+  "title": "Plots and Possession: Reading Provincial Ottoman Cadastral Maps",
+  "publisher": "Cambridge University Press",
+  "address": "Cambridge",
+  "year": "2009"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Plots+and+Possession%3A+Reading+Provincial+Ottoman+Cadastral+Maps+Aksoy+2009&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:30Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Plots+and+Possession%3A+Reading+Provincial+Ottoman+Cadastral+Maps&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:31Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Maps",
+    "doi": "10.1515/9781474431019-004",
+    "first_author": null,
+    "year": 2018,
+    "container": "Nineteenth Century Local Governance in Ottoman Bulgaria",
+    "similarity": 0.121
+   },
+   {
+    "source": "Crossref",
+    "title": "List of Maps, Figures and Tables",
+    "doi": "10.1515/9781474431019-001",
+    "first_author": null,
+    "year": 2018,
+    "container": "Nineteenth Century Local Governance in Ottoman Bulgaria",
+    "similarity": 0.194
+   },
+   {
+    "source": "Crossref",
+    "title": "List Of Maps",
+    "doi": "10.1093/oso/9780199281633.002.0004",
+    "first_author": "Hanssen",
+    "year": 2005,
+    "container": "Fin de Siècle Beirut",
+    "similarity": 0.243
+   },
+   {
+    "source": "Crossref",
+    "title": "Analysis of the experience of improving cadastral maps by the formation of cadastral plots on the basis of the soil contours of large-scale soil maps",
+    "doi": "10.1088/1755-1315/862/1/012016",
+    "first_author": "Suleiman",
+    "year": 2021,
+    "container": "IOP Conference Series: Earth and Environmental Science",
+    "similarity": 0.265
+   },
+   {
+    "source": "Crossref",
+    "title": "Cadastral Maps",
+    "doi": "10.4135/9781412953924.n132",
+    "first_author": null,
+    "year": 2007,
+    "container": "Encyclopedia of Environment and Society",
+    "similarity": 0.368
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Life on the Ottoman Border: Essays in Honour of Nenad Moačanin",
+    "doi": "https://doi.org/10.17234/9789531759847",
+    "first_author": "Vjeran Kursar",
+    "year": 2022,
+    "similarity": 0.325
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Fragrant Gardens and Converging Waters: Ottoman Governance in Seventeenth-Century Damascus",
+    "doi": null,
+    "first_author": "Malissa Taylor",
+    "year": 2011,
+    "similarity": 0.397
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Mode of Space Production in the Nineteenth Century: Parceling (İfraz) as a Method of Land Commodification and Urbanization in Late Ottoman Empire",
+    "doi": "https://doi.org/10.5505/gpts.2023.83997",
+    "first_author": "Burcu Arıkan",
+    "year": 2023,
+    "similarity": 0.261
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Jerusalem in the First World War: Transition from Ottoman to British rule (1914-1920).",
+    "doi": "https://doi.org/10.25501/soas.00028827",
+    "first_author": "Roberto Mazza",
+    "year": 2008,
+    "similarity": 0.347
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The End of the timar System in Bosnia, 18th - 20th Century",
+    "doi": "https://doi.org/10.18589/oa.1223553",
+    "first_author": "Philippe Gelez",
+    "year": 2022,
+    "similarity": 0.291
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Fragrant Gardens and Converging Waters: Ottoman Governance in Seventeenth-Century Damascus",
+   "doi": null,
+   "first_author": "Malissa Taylor",
+   "year": 2011,
+   "similarity": 0.397
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

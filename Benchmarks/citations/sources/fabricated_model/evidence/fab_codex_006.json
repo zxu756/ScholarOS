@@ -1,0 +1,162 @@
+{
+ "key": "fab_codex_006",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Arna Vilhjalmsdottir and Jens Kolbeinn",
+  "title": "Split ascenders and abbreviated kinship terms in late medieval Icelandic hands",
+  "journal": "Journal of Medieval History",
+  "volume": "46",
+  "number": "4",
+  "pages": "451--469",
+  "year": "2020",
+  "doi": "10.1016/j.jmedhist.2020.06.004"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jmedhist.2020.06.004",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jmedhist.2020.06.004",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:23Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jmedhist.2020.06.004",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:23Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jmedhist.2020.06.004",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:09:24Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Split+ascenders+and+abbreviated+kinship+terms+in+late+medieval+Icelandic+hands+Vilhjalmsdottir+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:25Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Split+ascenders+and+abbreviated+kinship+terms+in+late+medieval+Icelandic+hands&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:26Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "‘Uninhabited’: Eco-Colonial Anxieties in Late Medieval Icelandic Saga",
+    "doi": "10.1017/9781787444799.005",
+    "first_author": "Remein",
+    "year": 2019,
+    "container": "New Medieval Literatures 19",
+    "similarity": 0.611
+   },
+   {
+    "source": "Crossref",
+    "title": "5 ‘Uninhabited’: Eco-Colonial Anxieties in Late Medieval Icelandic Saga",
+    "doi": "10.1515/9781787444799-005",
+    "first_author": "Remein",
+    "year": 2019,
+    "container": "New Medieval Literatures 19",
+    "similarity": 0.603
+   },
+   {
+    "source": "Crossref",
+    "title": "‘Uninhabited’:",
+    "doi": "10.2307/j.ctvb4bw1g.7",
+    "first_author": "REMEIN",
+    "year": 2019,
+    "container": "New Medieval Literatures 19",
+    "similarity": 0.18
+   },
+   {
+    "source": "Crossref",
+    "title": "1979 Sisters in spirit: Kinship terms and community of practice among late medieval Italian nuns",
+    "doi": "10.1515/9783112233214-010",
+    "first_author": "Ghezzi",
+    "year": 2025,
+    "container": "Multilingualism and Writing Practices in Defining Communities",
+    "similarity": 0.59
+   },
+   {
+    "source": "Crossref",
+    "title": "Abbreviated terms",
+    "doi": "10.1515/9783110555318-204",
+    "first_author": null,
+    "year": 2020,
+    "container": "Mesoporous Silica",
+    "similarity": 0.358
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Waging word wars: a discourse analysis of the patterns of Norse masculinity presented through mannjafnaor in the Icelandic sagas",
+    "doi": "https://doi.org/10.31390/gradschool_theses.3142",
+    "first_author": "Broussard, Jonathan Mark",
+    "year": 2010,
+    "similarity": 0.361
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mediations from Under the Cloak: Christianity, Trauma, and Reconciliation in Brennu-Njáls Saga",
+    "doi": null,
+    "first_author": "Jeremiah Young",
+    "year": 2020,
+    "similarity": 0.308
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Dual Noun in Ancient Hebrew",
+    "doi": null,
+    "first_author": "Ari Adler",
+    "year": 2026,
+    "similarity": 0.257
+   },
+   {
+    "source": "OpenAlex",
+    "title": "From Clerks to Corpora: Essays on the English language yesterday and today",
+    "doi": "https://doi.org/10.16993/sup.bab",
+    "first_author": "Philip Shaw",
+    "year": 2015,
+    "similarity": 0.172
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The 'Romantic Faëry': Keats, Tolkien, and the Perilous Realm",
+    "doi": "https://doi.org/10.13140/rg.2.2.29349.45280",
+    "first_author": "Sherwood, Will",
+    "year": 2020,
+    "similarity": 0.211
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "‘Uninhabited’: Eco-Colonial Anxieties in Late Medieval Icelandic Saga",
+   "doi": "10.1017/9781787444799.005",
+   "first_author": "Remein",
+   "year": 2019,
+   "container": "New Medieval Literatures 19",
+   "similarity": 0.611
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

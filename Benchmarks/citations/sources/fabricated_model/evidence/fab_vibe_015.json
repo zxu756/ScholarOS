@@ -1,0 +1,168 @@
+{
+ "key": "fab_vibe_015",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Halvorsen, Ingrid and Bakken, Torbj{\\o}rn",
+  "title": "Vertical distribution and flight timing of nocturnal passerine migration observed with a tracking radar",
+  "journal": "Journal of Avian Biology",
+  "year": "2012",
+  "volume": "43",
+  "number": "6",
+  "pages": "521--534",
+  "doi": "10.1111/j.1600-048X.2012.05612.x"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1111/j.1600-048X.2012.05612.x",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1111/j.1600-048X.2012.05612.x",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:32Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1111/j.1600-048X.2012.05612.x",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:33Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1111/j.1600-048X.2012.05612.x",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:33Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Female‐biased offspring sex ratios in birds at a mercury‐contaminated river",
+   "container": "Journal of Avian Biology",
+   "year": 2012
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Vertical+distribution+and+flight+timing+of+nocturnal+passerine+migration+observed+with+a+tracking+radar+Halvorsen+2012&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:34Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Vertical+distribution+and+flight+timing+of+nocturnal+passerine+migration+observed+with+a+tracking+radar&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:35Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "The flight behaviour of individual passerine nocturnal migrants: A tracking radar study",
+    "doi": "10.1016/0003-3472(77)90042-2",
+    "first_author": "Able",
+    "year": 1977,
+    "container": "Animal Behaviour",
+    "similarity": 0.561
+   },
+   {
+    "source": "Crossref",
+    "title": "Passerine Migration",
+    "doi": "10.1007/978-3-642-29020-6",
+    "first_author": "Chernetsov",
+    "year": 2012,
+    "container": null,
+    "similarity": 0.311
+   },
+   {
+    "source": "Crossref",
+    "title": "Optimal Migration Theory",
+    "doi": "10.1007/978-3-642-29020-6_4",
+    "first_author": "Chernetsov",
+    "year": 2012,
+    "container": "Passerine Migration",
+    "similarity": 0.315
+   },
+   {
+    "source": "Crossref",
+    "title": "A Radar Study of the Altitude of Nocturnal Passerine Migration",
+    "doi": "10.2307/4511688",
+    "first_author": "Able",
+    "year": 1970,
+    "container": "Bird-Banding",
+    "similarity": 0.448
+   },
+   {
+    "source": "Crossref",
+    "title": "Habitat Selection and Use by Passerine Migrants",
+    "doi": "10.1007/978-3-642-29020-6_5",
+    "first_author": "Chernetsov",
+    "year": 2012,
+    "container": "Passerine Migration",
+    "similarity": 0.4
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Radar and Direct Visual Study of Passerine Spring Migration in Southern Louisiana",
+    "doi": "https://doi.org/10.2307/4083884",
+    "first_author": "Sidney A. Gauthreaux",
+    "year": 1971,
+    "similarity": 0.473
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Strategies of passerine migration across the Mediterranean Sea and the Sahara Desert: a radar study",
+    "doi": "https://doi.org/10.1111/j.1474-919x.2000.tb04462.x",
+    "first_author": "Herbert Biebach",
+    "year": 2000,
+    "similarity": 0.408
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Bird migration flight altitudes studied by a network of operational weather radars",
+    "doi": "https://doi.org/10.1098/rsif.2010.0116",
+    "first_author": "Adriaan M. Dokter",
+    "year": 2010,
+    "similarity": 0.335
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Revealing patterns of nocturnal migration using the European weather radar network",
+    "doi": "https://doi.org/10.1111/ecog.04003",
+    "first_author": "Cecilia Nilsson",
+    "year": 2018,
+    "similarity": 0.443
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Grouping of Nocturnal Passerine Migrants",
+    "doi": null,
+    "first_author": "Richard Balcomb",
+    "year": 2024,
+    "similarity": 0.503
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "The flight behaviour of individual passerine nocturnal migrants: A tracking radar study",
+   "doi": "10.1016/0003-3472(77)90042-2",
+   "first_author": "Able",
+   "year": 1977,
+   "container": "Animal Behaviour",
+   "similarity": 0.561
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

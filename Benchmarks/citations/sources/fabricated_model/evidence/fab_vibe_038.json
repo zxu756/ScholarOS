@@ -1,0 +1,159 @@
+{
+ "key": "fab_vibe_038",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Fern{\\'a}ndez, Luc{\\'i}a and Ortega, Manuel and Ruiz, Carmen",
+  "title": "Blue carbon stocks and sediment accumulation in a Mediterranean seagrass meadow",
+  "booktitle": "Proceedings of the 54th European Marine Biology Symposium",
+  "year": "2019",
+  "pages": "212--221",
+  "doi": "10.1007/978-3-030-20389-4_21"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1007/978-3-030-20389-4_21",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1007/978-3-030-20389-4_21",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:47Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/978-3-030-20389-4_21",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:47Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1007/978-3-030-20389-4_21",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:48Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Blue+carbon+stocks+and+sediment+accumulation+in+a+Mediterranean+seagrass+meadow+Fernandez+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:49Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Blue+carbon+stocks+and+sediment+accumulation+in+a+Mediterranean+seagrass+meadow&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:50Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "How to quantify blue carbon sequestration rates in seagrass meadow sediment: geochemical method and troubleshooting",
+    "doi": "10.20517/cf.2023.37",
+    "first_author": "Johannessen",
+    "year": 2023,
+    "container": "Carbon Footprints",
+    "similarity": 0.415
+   },
+   {
+    "source": "Crossref",
+    "title": "Drivers+of+Seagrass+Meadow+Sediment+Organic+Carbon+Storage+from+Bioregional+to+Global+Scales",
+    "doi": "10.33009/fsu_bcf00243-c8a1-482f-a404-cd7fd7fabf62_p",
+    "first_author": null,
+    "year": null,
+    "container": "DigiNole",
+    "similarity": 0.246
+   },
+   {
+    "source": "Crossref",
+    "title": "Sediment properties influence seagrass sedimentary carbon stocks, challenging uniform blue carbon accounting",
+    "doi": "10.3389/fmars.2026.1809172",
+    "first_author": "McIlvenny",
+    "year": 2026,
+    "container": "Frontiers in Marine Science",
+    "similarity": 0.323
+   },
+   {
+    "source": "Crossref",
+    "title": "Coastal Sediment Nutrient Enrichment Alters Seagrass Blue Carbon Sink Capacity",
+    "doi": "10.1021/acs.est.1c03782.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.242
+   },
+   {
+    "source": "Crossref",
+    "title": "Sediment organic carbon stocks were similar among four species compositions in a tropical seagrass meadow",
+    "doi": "10.1002/lno.12258",
+    "first_author": "Samper‐Villarreal",
+    "year": 2022,
+    "container": "Limnology and Oceanography",
+    "similarity": 0.576
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Variability in the Carbon Storage of Seagrass Habitats and Its Implications for Global Estimates of Blue Carbon Ecosystem Service",
+    "doi": "https://doi.org/10.1371/journal.pone.0073748",
+    "first_author": "Paul S. Lavery",
+    "year": 2013,
+    "similarity": 0.183
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Non‐seagrass carbon contributions to seagrass sediment blue carbon",
+    "doi": "https://doi.org/10.1002/lno.10718",
+    "first_author": "Matthew P. J. Oreska",
+    "year": 2017,
+    "similarity": 0.152
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Carbon stocks and accumulation rates in Red Sea seagrass meadows",
+    "doi": "https://doi.org/10.1038/s41598-018-33182-8",
+    "first_author": "Óscar Serrano",
+    "year": 2018,
+    "similarity": 0.755
+   },
+   {
+    "source": "OpenAlex",
+    "title": "High variability of Blue Carbon storage in seagrass meadows at the estuary scale",
+    "doi": "https://doi.org/10.1038/s41598-020-62639-y",
+    "first_author": "Aurora M. Ricart",
+    "year": 2020,
+    "similarity": 0.453
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Sources of sediment carbon sequestered in restored seagrass meadows",
+    "doi": "https://doi.org/10.3354/meps11722",
+    "first_author": "Jill Thompson Greiner",
+    "year": 2016,
+    "similarity": 0.534
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Carbon stocks and accumulation rates in Red Sea seagrass meadows",
+   "doi": "https://doi.org/10.1038/s41598-018-33182-8",
+   "first_author": "Óscar Serrano",
+   "year": 2018,
+   "similarity": 0.755
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:42Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

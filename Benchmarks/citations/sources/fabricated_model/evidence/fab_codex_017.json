@@ -1,0 +1,167 @@
+{
+ "key": "fab_codex_017",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Mirela Popescu and Anders Hjort and Sabine Leclercq",
+  "title": "No-till residue depth predicts bacterivorous nematode recovery after harvest",
+  "journal": "Soil Biology and Biochemistry",
+  "volume": "153",
+  "pages": "108103",
+  "year": "2021",
+  "doi": "10.1016/j.soilbio.2020.108103"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.soilbio.2020.108103",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.soilbio.2020.108103",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:02Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.soilbio.2020.108103",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:03Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.soilbio.2020.108103",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:03Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Temperature and soil management effects on carbon fluxes and priming effect intensity",
+   "container": "Soil Biology and Biochemistry",
+   "year": 2021
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=No-till+residue+depth+predicts+bacterivorous+nematode+recovery+after+harvest+Popescu+2021&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:04Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=No-till+residue+depth+predicts+bacterivorous+nematode+recovery+after+harvest&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:05Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Residue distribution and biomass recovery following biomass harvest of plantation pine",
+    "doi": "10.13031/aim.20162458172",
+    "first_author": null,
+    "year": 2016,
+    "container": "2016 ASABE International Meeting",
+    "similarity": 0.457
+   },
+   {
+    "source": "Crossref",
+    "title": "Predatory copepods can control nematode populations: A functional-response experiment with Eucyclops subterraneus and bacterivorous nematodes",
+    "doi": "10.1127/1863-9135/2008/0172-0317",
+    "first_author": "Muschiol",
+    "year": 2008,
+    "container": "Fundamental and Applied Limnology",
+    "similarity": 0.417
+   },
+   {
+    "source": "Crossref",
+    "title": "Ascaroside Signaling in the Bacterivorous Nematode Caenorhabditis remanei Encodes the Growth Phase of Its Bacterial Food Source",
+    "doi": "10.1021/acs.orglett.9b01914.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.473
+   },
+   {
+    "source": "Crossref",
+    "title": "Bacterial communities associated with Zeldia punctata, a bacterivorous soil-borne nematode",
+    "doi": "10.1007/s10123-021-00207-8",
+    "first_author": "Shokoohi",
+    "year": 2021,
+    "container": "International Microbiology",
+    "similarity": 0.473
+   },
+   {
+    "source": "Crossref",
+    "title": "Residue Harvest Effects on Irrigated, No‐Till Corn Yield and Nitrogen Response",
+    "doi": "10.2134/agronj2015.0361",
+    "first_author": "Wortmann",
+    "year": 2016,
+    "container": "Agronomy Journal",
+    "similarity": 0.157
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The integration of nematode communities into the soil biological health framework by factor analysis",
+    "doi": "https://doi.org/10.1016/j.ecolind.2022.108676",
+    "first_author": "Tvisha K. Martin",
+    "year": 2022,
+    "similarity": 0.307
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effect of Soil Treatments and Amendments on the Nematode Community under Miscanthus Growing in a Lead Contaminated Military Site",
+    "doi": "https://doi.org/10.3390/agronomy10111727",
+    "first_author": "Zafer Alasmary",
+    "year": 2020,
+    "similarity": 0.294
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nematode response to nitrogen and phosphorus in grasslands, assessed by microscopy and molecular methods",
+    "doi": "https://doi.org/10.13025/16235",
+    "first_author": "Xiaoyun Chen",
+    "year": 2012,
+    "similarity": 0.235
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Effect of soil factors on parasitic nematodes of sugarcane in KwaZulu- Natal, South Africa.",
+    "doi": null,
+    "first_author": "Pelisa. Dana",
+    "year": 2004,
+    "similarity": 0.366
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Excessive Nitrate Limits the Sustainability of Deep Compost Mulch in Organic Market Gardening",
+    "doi": "https://doi.org/10.3390/agriculture13051080",
+    "first_author": "Benjamin Ruch",
+    "year": 2023,
+    "similarity": 0.26
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Ascaroside Signaling in the Bacterivorous Nematode Caenorhabditis remanei Encodes the Growth Phase of Its Bacterial Food Source",
+   "doi": "10.1021/acs.orglett.9b01914.s001",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.473
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

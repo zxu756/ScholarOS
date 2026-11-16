@@ -1,0 +1,167 @@
+{
+ "key": "fab_codex_012",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Martha Aluko and Peter Wrenford and Devika Saha",
+  "title": "Travel costs and attendance gains from rural retinal image triage",
+  "journal": "Journal of Health Economics",
+  "volume": "82",
+  "pages": "102581",
+  "year": "2022",
+  "doi": "10.1016/j.jhealeco.2022.102581"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jhealeco.2022.102581",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jhealeco.2022.102581",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:45Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jhealeco.2022.102581",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:46Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jhealeco.2022.102581",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:46Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "The impact of the COVID-19 pandemic and policy response on health care utilization: Evidence from county-level medical claims and cellphone data",
+   "container": "Journal of Health Economics",
+   "year": 2022
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Travel+costs+and+attendance+gains+from+rural+retinal+image+triage+Aluko+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:47Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Travel+costs+and+attendance+gains+from+rural+retinal+image+triage&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:48Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Travel burden in a rural primary care behavioral weight loss randomized trial: Impact on visit attendance and weight loss",
+    "doi": "10.1111/jrh.12652",
+    "first_author": "Kurz",
+    "year": 2022,
+    "container": "The Journal of Rural Health",
+    "similarity": 0.314
+   },
+   {
+    "source": "Crossref",
+    "title": "Achievement Gains from Attendance at Selective \nHigh Schools",
+    "doi": "10.2139/ssrn.3203990",
+    "first_author": "Houng",
+    "year": 2018,
+    "container": null,
+    "similarity": 0.452
+   },
+   {
+    "source": "Crossref",
+    "title": "The International Gains from Declining Transport Costs",
+    "doi": "10.2139/ssrn.2665316",
+    "first_author": "Lashkaripour",
+    "year": 2015,
+    "container": null,
+    "similarity": 0.471
+   },
+   {
+    "source": "Crossref",
+    "title": "Figure 1.17. Gains from different trade facilitation measures (% reduction in trade costs)",
+    "doi": "10.1787/888933967017",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.427
+   },
+   {
+    "source": "Crossref",
+    "title": "Rural poverty and labour migration",
+    "doi": "10.4324/9780429423888-7",
+    "first_author": "Mohanty",
+    "year": 2018,
+    "container": "Agrarian Transformation in Western India",
+    "similarity": 0.202
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Barriers to and enablers of diabetic retinopathy screening attendance: a systematic review of published and grey literature",
+    "doi": "https://doi.org/10.1111/dme.13686",
+    "first_author": "Ella Graham-Rowe",
+    "year": 2018,
+    "similarity": 0.278
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Feasibility and performance of eye movement perimetry for glaucoma triage in Tanzania: A prospective cross-sectional study in a real-world setting",
+    "doi": "https://doi.org/10.1371/journal.pgph.0007237",
+    "first_author": "Arun James Thirunavukarasu",
+    "year": 2026,
+    "similarity": 0.248
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Smartphone-based fundus imaging in global eye care: Closing the gap",
+    "doi": "https://doi.org/10.1016/j.preteyeres.2026.101515",
+    "first_author": "Raphael Lechtenboehmer",
+    "year": 2026,
+    "similarity": 0.244
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The new normal -chronic disease management and digital healthcare practice in rural and low internet environments",
+    "doi": "https://doi.org/10.30574/gscbps.2020.13.1.0315",
+    "first_author": "Olu James Mbanugo",
+    "year": 2020,
+    "similarity": 0.418
+   },
+   {
+    "source": "OpenAlex",
+    "title": "TELEHEALTH AND REHABILITATION: EXTENDING OCCUPATIONAL THERAPY SERVICES TO RURAL MISSISSIPPI",
+    "doi": null,
+    "first_author": "Melody M Burrage",
+    "year": 2019,
+    "similarity": 0.413
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "The International Gains from Declining Transport Costs",
+   "doi": "10.2139/ssrn.2665316",
+   "first_author": "Lashkaripour",
+   "year": 2015,
+   "container": null,
+   "similarity": 0.471
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

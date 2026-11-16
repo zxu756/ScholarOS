@@ -1,0 +1,136 @@
+{
+ "key": "fab_codex_020",
+ "source_file": "codex.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Selin Karatas and Omer Uysal and Petra Bianchini",
+  "title": "Reversible timber ties for earthquake strengthening of an unreinforced minaret",
+  "booktitle": "Proceedings of the 16th European Conference on Earthquake Engineering",
+  "pages": "1867--1876",
+  "year": "2018"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Reversible+timber+ties+for+earthquake+strengthening+of+an+unreinforced+minaret+Karatas+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:13Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Reversible+timber+ties+for+earthquake+strengthening+of+an+unreinforced+minaret&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:10:15Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "10. Seismic Strengthening of Unreinforced Masonry Piers with Steel Elements",
+    "doi": "10.1193/1.1585913",
+    "first_author": "Rai",
+    "year": 1996,
+    "container": "Earthquake Spectra",
+    "similarity": 0.5
+   },
+   {
+    "source": "Crossref",
+    "title": "Seismic behaviour of traditional timber frame walls: experimental results on unreinforced walls",
+    "doi": "10.1007/s10518-014-9650-9",
+    "first_author": "Poletti",
+    "year": 2014,
+    "container": "Bulletin of Earthquake Engineering",
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "TIES IN UNREINFORCED MASONRY STRUCTURES: CASE STUDY IN KRK",
+    "doi": "10.5592/co/3crocee.2025.114",
+    "first_author": "Šćulac",
+    "year": 2025,
+    "container": "Conference proceedings (Croatian Conference on Earthquake Engineering)",
+    "similarity": 0.37
+   },
+   {
+    "source": "Crossref",
+    "title": "State-of-the-Art Report on high reversible timber to timber strengthening interventions on wooden floors",
+    "doi": "10.1016/j.conbuildmat.2015.06.035",
+    "first_author": "Gubana",
+    "year": 2015,
+    "container": "Construction and Building Materials",
+    "similarity": 0.495
+   },
+   {
+    "source": "Crossref",
+    "title": "A COMPARATIVE STUDY OF STRENGTHENING AND RETROFITTING MEASURES FOR UNREINFORCED BRICK MASONRY MODEL UNDER CYCLIC TESTING",
+    "doi": "10.1080/13632460409350511",
+    "first_author": "AGARWAL",
+    "year": 2004,
+    "container": "Journal of Earthquake Engineering",
+    "similarity": 0.424
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Investigating the problems of historical buildings in relation to earthquakes and researching some of their retrofitting methods",
+    "doi": "https://doi.org/10.35784/bud-arch.6519",
+    "first_author": "Najmeh Hassas",
+    "year": 2025,
+    "similarity": 0.369
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Post-earthquake damage classification and assessment: case study of the residential buildings after the Mw = 5 earthquake in Mila city, Northeast Algeria on August 7, 2020",
+    "doi": "https://doi.org/10.1007/s10518-022-01568-9",
+    "first_author": "Mouloud Hamidatou",
+    "year": 2022,
+    "similarity": 0.287
+   },
+   {
+    "source": "OpenAlex",
+    "title": "SEISMIC PERFORMANCE AND FAILURE MECHANISMS OF MASONRY BUILDINGS DURING THE OCTOBER 30, 2020 İZMIR EARTHQUAKE",
+    "doi": "https://doi.org/10.47933/ijeir.1638553",
+    "first_author": "Pınar Usta",
+    "year": 2025,
+    "similarity": 0.29
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Nonlinear seismic assessment of masonry buildings strengthened with textile-reinforced mortar : Two Case Studies",
+    "doi": "https://doi.org/10.24012/dumf.1827986",
+    "first_author": "Gokhan Yucel",
+    "year": 2026,
+    "similarity": 0.383
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Seismic Assessment and Strengthening of a Load-Bearing Masonry Structure Considering SSI Effects",
+    "doi": "https://doi.org/10.3390/app15158135",
+    "first_author": "Kyriaki G. Amarantidou",
+    "year": 2025,
+    "similarity": 0.425
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "10. Seismic Strengthening of Unreinforced Masonry Piers with Steel Elements",
+   "doi": "10.1193/1.1585913",
+   "first_author": "Rai",
+   "year": 1996,
+   "container": "Earthquake Spectra",
+   "similarity": 0.5
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

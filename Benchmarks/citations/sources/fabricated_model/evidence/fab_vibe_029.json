@@ -1,0 +1,162 @@
+{
+ "key": "fab_vibe_029",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Gurung, Bimala and Thapa, Nirmal",
+  "title": "Evidentiality and mirativity in a Tibeto-Burman language of eastern Nepal",
+  "journal": "Linguistics of the Tibeto-Burman Area",
+  "year": "2014",
+  "volume": "37",
+  "number": "2",
+  "pages": "201--228",
+  "doi": "10.1075/ltba.37.2.03gur"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1075/ltba.37.2.03gur",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1075/ltba.37.2.03gur",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:19Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1075/ltba.37.2.03gur",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:19Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1075/ltba.37.2.03gur",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:19Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Evidentiality+and+mirativity+in+a+Tibeto-Burman+language+of+eastern+Nepal+Gurung+2014&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:21Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Evidentiality+and+mirativity+in+a+Tibeto-Burman+language+of+eastern+Nepal&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:21Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Evidentiality and mirativity in Magar",
+    "doi": "10.32655/ltba.30.2.06",
+    "first_author": "Grunow-Hårsta",
+    "year": 2007,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.655
+   },
+   {
+    "source": "Crossref",
+    "title": "Evidentiality in Darma (Tibeto-Burman)",
+    "doi": "10.32655/ltba.30.2.04",
+    "first_author": "Willis",
+    "year": 2007,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.587
+   },
+   {
+    "source": "Crossref",
+    "title": "Evidentiality across Borders: How Information Source and Access are Expressed in Tibeto-Burman",
+    "doi": "10.14711/thesis-hdl174727",
+    "first_author": "Tong",
+    "year": null,
+    "container": null,
+    "similarity": 0.434
+   },
+   {
+    "source": "Crossref",
+    "title": "Evidentials, inferentials and mirativity in Nepali",
+    "doi": "10.32655/ltba.23.2.02",
+    "first_author": "Peterson",
+    "year": 2000,
+    "container": "Linguistics of the Tibeto-Burman Area",
+    "similarity": 0.59
+   },
+   {
+    "source": "Crossref",
+    "title": "Reported Evidentiality in Tibeto-Burman Languages",
+    "doi": "10.5070/h920152301",
+    "first_author": "Gawne",
+    "year": 2021,
+    "container": "Himalayan Linguistics",
+    "similarity": 0.656
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Reported Evidentiality in Tibeto-Burman Languages",
+    "doi": "https://doi.org/10.5070/h920152301",
+    "first_author": "Lauren Gawne",
+    "year": 2021,
+    "similarity": 0.656
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Towards a history of verb agreement in Tibeto-Burman",
+    "doi": "https://doi.org/10.5070/h99123042",
+    "first_author": "Scott DeLancey",
+    "year": 2010,
+    "similarity": 0.336
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A semantic account of mirative evidentials",
+    "doi": "https://doi.org/10.3765/salt.v23i0.2687",
+    "first_author": "Jessica Rett",
+    "year": 2013,
+    "similarity": 0.191
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A preliminary study of the evidential-epistemic system of Dolpo, a Tibetic language of Nepal",
+    "doi": "https://doi.org/10.1075/ltba.24013.tou",
+    "first_author": "Nicolas Tournadre",
+    "year": 2025,
+    "similarity": 0.512
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Traces of mirativity in Shina",
+    "doi": "https://doi.org/10.5070/h99223478",
+    "first_author": "Elena Bashir",
+    "year": 2010,
+    "similarity": 0.353
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Reported Evidentiality in Tibeto-Burman Languages",
+   "doi": "10.5070/h920152301",
+   "first_author": "Gawne",
+   "year": 2021,
+   "container": "Himalayan Linguistics",
+   "similarity": 0.656
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

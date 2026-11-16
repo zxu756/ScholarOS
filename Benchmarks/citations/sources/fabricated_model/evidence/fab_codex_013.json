@@ -1,0 +1,154 @@
+{
+ "key": "fab_codex_013",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ruben Stenfeld and Marieke Olsson",
+  "title": "Ritz value drift under oblique projection of sparse non-normal operators",
+  "journal": "SIAM Journal on Matrix Analysis and Applications",
+  "volume": "40",
+  "number": "3",
+  "pages": "1094--1118",
+  "year": "2019",
+  "eprint": "1809.06421",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "1809.06421",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=1809.06421",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:49Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "A Flexible Design for Funding Public Goods",
+   "first_author": "Vitalik Buterin",
+   "year": "2018"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Ritz+value+drift+under+oblique+projection+of+sparse+non-normal+operators+Stenfeld+2019&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:50Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Ritz+value+drift+under+oblique+projection+of+sparse+non-normal+operators&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:50Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "PROJECTION OPERATORS AND NORMAL FORMS",
+    "doi": "10.1016/b978-0-08-016762-6.50014-8",
+    "first_author": null,
+    "year": 1972,
+    "container": "Quantum Mechanics",
+    "similarity": 0.532
+   },
+   {
+    "source": "Crossref",
+    "title": "Solvability of some boundary value problems involving p-Laplacian and non-autonomous differential operators",
+    "doi": "10.1186/s13661-019-1291-0",
+    "first_author": "Petrini",
+    "year": 2019,
+    "container": "Boundary Value Problems",
+    "similarity": 0.458
+   },
+   {
+    "source": "Crossref",
+    "title": "On the Non-Hypercyclicity of Normal Operators, Their Exponentials, and Symmetric Operators",
+    "doi": "10.3390/math7100903",
+    "first_author": "Markin",
+    "year": 2019,
+    "container": "Mathematics",
+    "similarity": 0.312
+   },
+   {
+    "source": "Crossref",
+    "title": "SORT-COSMO: A Projection-Based Structural Framework for Cosmology Scale-Dependent Drift, Non-Local Correlations, and Projection-Induced Cosmic Structure",
+    "doi": "10.2139/ssrn.6095126",
+    "first_author": "Wegener",
+    "year": 2026,
+    "container": null,
+    "similarity": 0.326
+   },
+   {
+    "source": "Crossref",
+    "title": "On the non-Hermitian FEAST algorithms with oblique projection for eigenvalue problems",
+    "doi": "10.1016/j.cam.2019.01.016",
+    "first_author": "Yin",
+    "year": 2019,
+    "container": "Journal of Computational and Applied Mathematics",
+    "similarity": 0.433
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Model and controller reduction of large-scale structures based on projection methods",
+    "doi": null,
+    "first_author": "Eduardo Gildin",
+    "year": 2006,
+    "similarity": 0.308
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Block Lanczos algorithm for lattice QCD spectroscopy and matrix elements",
+    "doi": "https://doi.org/10.1103/fp74-q35q",
+    "first_author": "Daniel C. Hackett",
+    "year": 2025,
+    "similarity": 0.306
+   },
+   {
+    "source": "OpenAlex",
+    "title": "A Model Integrating Satellite‐Derived Shoreline Observations for Predicting Fine‐Scale Shoreline Response to Waves and Sea‐Level Rise Across Large Coastal Regions",
+    "doi": "https://doi.org/10.1029/2022jf006936",
+    "first_author": "Sean F. Vitousek",
+    "year": 2023,
+    "similarity": 0.325
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Lanczos algorithm for lattice QCD matrix elements",
+    "doi": "https://doi.org/10.1103/zjzt-rv86",
+    "first_author": "Daniel C. Hackett",
+    "year": 2025,
+    "similarity": 0.198
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Stability Analysis of Complex Aerodynamic Flows",
+    "doi": "https://doi.org/10.20868/upm.thesis.49141",
+    "first_author": "Silvia Sanvido",
+    "year": 2017,
+    "similarity": 0.286
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "PROJECTION OPERATORS AND NORMAL FORMS",
+   "doi": "10.1016/b978-0-08-016762-6.50014-8",
+   "first_author": null,
+   "year": 1972,
+   "container": "Quantum Mechanics",
+   "similarity": 0.532
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

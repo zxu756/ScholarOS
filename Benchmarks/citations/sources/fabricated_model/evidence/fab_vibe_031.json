@@ -1,0 +1,153 @@
+{
+ "key": "fab_vibe_031",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ochieng, Beatrice and Mwangi, Peter and Otieno, Grace",
+  "title": "Seroprevalence of leptospirosis among residents of an urban informal settlement",
+  "journal": "PLOS Neglected Tropical Diseases",
+  "year": "2016",
+  "volume": "10",
+  "number": "5",
+  "pages": "e0004712",
+  "pmid": "27182904"
+ },
+ "identifier": {
+  "kind": "pmid",
+  "value": "27182904",
+  "requests": [
+   {
+    "source": "PubMed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=27182904&retmode=json",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:24Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "PubMed",
+   "title": "-gnosis.",
+   "first_author": "Masson V",
+   "year": "2016",
+   "container": "Ann Intern Med"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Seroprevalence+of+leptospirosis+among+residents+of+an+urban+informal+settlement+Ochieng+2016&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:25Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Seroprevalence+of+leptospirosis+among+residents+of+an+urban+informal+settlement&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:26Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Informal and Unserviceable: the State, Informal Settlement Residents, and Sanitation Management in Western Tshwane City, South Africa",
+    "doi": "10.1007/s12132-020-09396-3",
+    "first_author": "Shoniwa",
+    "year": 2020,
+    "container": "Urban Forum",
+    "similarity": 0.288
+   },
+   {
+    "source": "Crossref",
+    "title": "Urban Informality, Smart-City Interventions, and Spatial Justice Perceptions among Informal Settlement Residents in Major Pakistani Cities",
+    "doi": "10.65761/jssp.2026.167",
+    "first_author": "Latif",
+    "year": 2026,
+    "container": "Journal of Social Science Perspectives",
+    "similarity": 0.381
+   },
+   {
+    "source": "Crossref",
+    "title": "Efficient lighting uptake among the urban poor: evidence from a Kenyan informal settlement",
+    "doi": "10.1177/0956247816647871",
+    "first_author": "Figueroa",
+    "year": 2016,
+    "container": "Environment and Urbanization",
+    "similarity": 0.56
+   },
+   {
+    "source": "Crossref",
+    "title": "Informal citizens? Residents’ perceptions of space and place in a South African informal settlement",
+    "doi": "10.4324/9781315157306-8",
+    "first_author": "Kelly",
+    "year": 2017,
+    "container": "The African Metropolis",
+    "similarity": 0.534
+   },
+   {
+    "source": "Crossref",
+    "title": "Informal Vs Slums And Settlement Squatting",
+    "doi": "10.5040/9781350295070.ch-001",
+    "first_author": null,
+    "year": 2023,
+    "container": "Atlas of Informal Settlement",
+    "similarity": 0.314
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Leptospirosis seroprevalence and exposure factors in three informal settlements of French Guiana: An opportunistic survey",
+    "doi": "https://doi.org/10.1371/journal.pntd.0013764",
+    "first_author": "Paul Le Turnier",
+    "year": 2025,
+    "similarity": 0.472
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Infrastructure risk factors for leptospirosis transmission in urban informal settlements",
+    "doi": "https://doi.org/10.64898/2026.08.13.26360375",
+    "first_author": "Ana Maria Nascimento Silva",
+    "year": 2026,
+    "similarity": 0.671
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Spatiotemporal Determinants of Urban Leptospirosis Transmission: Four-Year Prospective Cohort Study of Slum Residents in Brazil",
+    "doi": "https://doi.org/10.1371/journal.pntd.0004275",
+    "first_author": "José E. Hagan",
+    "year": 2016,
+    "similarity": 0.429
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Knowledge, attitudes and practices (KAP) regarding leptospirosis among residents of riverside settlements of Santa Fe, Argentina",
+    "doi": "https://doi.org/10.1371/journal.pntd.0006470",
+    "first_author": "Tamara Ricardo",
+    "year": 2018,
+    "similarity": 0.542
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Seroprevalence and risk factors for Toxoplasma gondii infection in wild, domestic and companion animals in urban informal settlements from Salvador, Brazil",
+    "doi": "https://doi.org/10.1371/journal.pntd.0013303",
+    "first_author": "Leonela Bazan",
+    "year": 2025,
+    "similarity": 0.517
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Infrastructure risk factors for leptospirosis transmission in urban informal settlements",
+   "doi": "https://doi.org/10.64898/2026.08.13.26360375",
+   "first_author": "Ana Maria Nascimento Silva",
+   "year": 2026,
+   "similarity": 0.671
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

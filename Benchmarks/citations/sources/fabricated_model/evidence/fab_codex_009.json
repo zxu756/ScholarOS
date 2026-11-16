@@ -1,0 +1,153 @@
+{
+ "key": "fab_codex_009",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Aino Halonen and Marko Keisala and Daria Vezhnikova",
+  "title": "Paradigm-aware boundary induction for scarce Uralic text collections",
+  "journal": "Computational Linguistics",
+  "volume": "48",
+  "number": "2",
+  "pages": "337--365",
+  "year": "2022",
+  "eprint": "2204.08731",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "2204.08731",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=2204.08731",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:35Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Protostellar and Protoplanetary Disk Masses in the Serpens Region",
+   "first_author": "Alexa R. Anderson",
+   "year": "2022"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Paradigm-aware+boundary+induction+for+scarce+Uralic+text+collections+Halonen+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:36Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Paradigm-aware+boundary+induction+for+scarce+Uralic+text+collections&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:36Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Abbreviations Used in Text",
+    "doi": "10.1525/9780520329898-002",
+    "first_author": null,
+    "year": 1965,
+    "container": "An Introduction to the Uralic Languages",
+    "similarity": 0.362
+   },
+   {
+    "source": "Crossref",
+    "title": "Abbreviations Used in Text",
+    "doi": "10.2307/jj.5232981.3",
+    "first_author": null,
+    "year": 2023,
+    "container": "An Introduction to the Uralic Languages",
+    "similarity": 0.362
+   },
+   {
+    "source": "Crossref",
+    "title": "Lightweight LLM Intent Understanding in Data-Scarce Scenarios: An Architecture-Aware Classification Paradigm",
+    "doi": "10.1109/ainit70033.2026.11557978",
+    "first_author": "Du",
+    "year": 2026,
+    "container": "2026 7th International Seminar on Artificial Intelligence, Networking and Information Technology (AINIT)",
+    "similarity": 0.091
+   },
+   {
+    "source": "Crossref",
+    "title": "Mapping the distribution of the Uralic languages",
+    "doi": "10.1093/oso/9780198767664.002.0011",
+    "first_author": null,
+    "year": 2022,
+    "container": "The Oxford Guide to the Uralic Languages",
+    "similarity": 0.414
+   },
+   {
+    "source": "Crossref",
+    "title": "Leveraging Text Signed Distance Function Map for Boundary-Aware Guidance in Scene Text Segmentation",
+    "doi": "10.1109/access.2025.3566045",
+    "first_author": "Kim",
+    "year": 2025,
+    "container": "IEEE Access",
+    "similarity": 0.407
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Proceedings of the Fourth International Workshop on Computatinal Linguistics of Uralic Languages",
+    "doi": "https://doi.org/10.18653/v1/w18-02",
+    "first_author": null,
+    "year": 2018,
+    "similarity": 0.415
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Stemming techniques for resource-poor languages: a review of methods, challenges, and applications",
+    "doi": "https://doi.org/10.3389/frai.2026.1875268",
+    "first_author": "Sanjiban Sekhar Roy",
+    "year": 2026,
+    "similarity": 0.307
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Injection of linguistic knowledge into neural text generation models",
+    "doi": "https://doi.org/10.5821/dissertation-2117-341598",
+    "first_author": "Noé Casas Manzanares",
+    "year": 2020,
+    "similarity": 0.412
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Morphological inference from bitext for resource-poor languages",
+    "doi": null,
+    "first_author": "Steven P. Abney",
+    "year": 2012,
+    "similarity": 0.321
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Weighted Finite-State Methods for Spell-Checking and Correction",
+    "doi": null,
+    "first_author": "Tommi A. Pirinen",
+    "year": 2014,
+    "similarity": 0.366
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Proceedings of the Fourth International Workshop on Computatinal Linguistics of Uralic Languages",
+   "doi": "https://doi.org/10.18653/v1/w18-02",
+   "first_author": null,
+   "year": 2018,
+   "similarity": 0.415
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

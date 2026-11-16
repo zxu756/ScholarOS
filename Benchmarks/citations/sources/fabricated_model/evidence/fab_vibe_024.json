@@ -1,0 +1,154 @@
+{
+ "key": "fab_vibe_024",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Yamamoto, Kenji and Ishikawa, Rina and Morita, Takuya",
+  "title": "Abundance of heat-soluble proteins in the cryptobiotic state of tardigrades",
+  "journal": "PLOS ONE",
+  "year": "2013",
+  "volume": "8",
+  "number": "9",
+  "pages": "e74120",
+  "pmid": "24058412"
+ },
+ "identifier": {
+  "kind": "pmid",
+  "value": "24058412",
+  "requests": [
+   {
+    "source": "PubMed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=24058412&retmode=json",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:03Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "PubMed",
+   "title": "Cardiac myocyte diversity and a fibroblast network in the junctional region of the zebrafish heart revealed by transmission and serial block-face scanning electron microscopy.",
+   "first_author": "Lafontant PJ",
+   "year": "2013",
+   "container": "PLoS One"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Abundance+of+heat-soluble+proteins+in+the+cryptobiotic+state+of+tardigrades+Yamamoto+2013&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:04Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Abundance+of+heat-soluble+proteins+in+the+cryptobiotic+state+of+tardigrades&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:05Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Tardigrades’ cytoplasmic abundant heat soluble proteins serve as membrane protectors during dehydration",
+    "doi": "10.21203/rs.3.rs-8273490/v1",
+    "first_author": "Zhang",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "Tardigrades’ cytoplasmic abundant heat soluble proteins serve as membrane protectors during dehydration",
+    "doi": "10.1101/2025.04.14.648834",
+    "first_author": "Zhang",
+    "year": 2025,
+    "container": null,
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "Genomic Analyses of Cryptobiotic Tardigrades",
+    "doi": "10.15771/0949-8214_2008_1_5",
+    "first_author": "Mali",
+    "year": 2008,
+    "container": "Wissenschaftliche Beiträge / Technische Hochschule Wildau",
+    "similarity": 0.538
+   },
+   {
+    "source": "Crossref",
+    "title": "Understanding how intrinsically disordered proteins make tardigrades tough",
+    "doi": "10.21203/rs.3.rs-107495/v1",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.47
+   },
+   {
+    "source": "Crossref",
+    "title": "The heat shock response of the cryptobiotic brine shrimp Artemia — II. Heat shock proteins",
+    "doi": "10.1016/0306-4565(88)90023-x",
+    "first_author": "Miller",
+    "year": 1988,
+    "container": "Journal of Thermal Biology",
+    "similarity": 0.457
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Distribution of tardigrade cryptobiotic abilities across a fine-scale habitat gradient",
+    "doi": "https://doi.org/10.1007/s13127-024-00660-z",
+    "first_author": "Daniel Stec",
+    "year": 2024,
+    "similarity": 0.435
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tardigrades Use Intrinsically Disordered Proteins to Survive Desiccation",
+    "doi": "https://doi.org/10.1016/j.molcel.2017.02.018",
+    "first_author": "Thomas C. Boothby",
+    "year": 2017,
+    "similarity": 0.15
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Differential expression profiling of heat stressed tardigrades reveals major shift in the transcriptome",
+    "doi": "https://doi.org/10.1016/j.cbpa.2022.111169",
+    "first_author": "Ricardo Cardoso Neves",
+    "year": 2022,
+    "similarity": 0.303
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Comparative transcriptomics suggest unique molecular adaptations within tardigrade lineages",
+    "doi": "https://doi.org/10.1186/s12864-019-5912-x",
+    "first_author": "Maria Kamilari",
+    "year": 2019,
+    "similarity": 0.301
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mechanisms of Desiccation Tolerance: Themes and Variations in Brine Shrimp, Roundworms, and Tardigrades",
+    "doi": "https://doi.org/10.3389/fphys.2020.592016",
+    "first_author": "Jonathan D. Hibshman",
+    "year": 2020,
+    "similarity": 0.446
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Genomic Analyses of Cryptobiotic Tardigrades",
+   "doi": "10.15771/0949-8214_2008_1_5",
+   "first_author": "Mali",
+   "year": 2008,
+   "container": "Wissenschaftliche Beiträge / Technische Hochschule Wildau",
+   "similarity": 0.538
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

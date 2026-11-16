@@ -1,0 +1,137 @@
+{
+ "key": "fab_vibe_008",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ferreira, Joana and Almeida, Rui",
+  "title": "Anion sublattice disorder and ionic transport in lithium halide argyrodites",
+  "journal": "Solid State Ionics",
+  "year": "2020",
+  "volume": "352",
+  "pages": "115--127"
+ },
+ "identifier": {
+  "kind": "none",
+  "value": "",
+  "outcome": "none",
+  "requests": []
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Anion+sublattice+disorder+and+ionic+transport+in+lithium+halide+argyrodites+Ferreira+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:09Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Anion+sublattice+disorder+and+ionic+transport+in+lithium+halide+argyrodites&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:12:10Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Exploring the Anion Site Disorder Kinetics in Lithium Argyrodites",
+    "doi": "10.1021/jacs.4c14466.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.657
+   },
+   {
+    "source": "Crossref",
+    "title": "Tunable Lithium-Ion Transport in Mixed-Halide Argyrodites Li6xPS5xClBrx: An Unusual Compositional Space",
+    "doi": "10.1021/acs.chemmater.0c04650.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.497
+   },
+   {
+    "source": "Crossref",
+    "title": "Exploring the Relationship Between Halide Substitution Structural Disorder, and Lithium Distribution in Lithium Argyrodites (Li6xPS5xBr1+x)",
+    "doi": "10.1021/acs.chemmater.3c01525.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.464
+   },
+   {
+    "source": "Crossref",
+    "title": "Lithium Distribution and Site Disorder in Halide-Substituted Lithium Argyrodites: A Structural and Transport Study",
+    "doi": "10.1149/ma2023-0283325mtgabs",
+    "first_author": "Gautam",
+    "year": 2023,
+    "container": "ECS Meeting Abstracts",
+    "similarity": 0.415
+   },
+   {
+    "source": "Crossref",
+    "title": "On the Lithium Distribution in Halide Superionic Argyrodites by Halide Incorporation in Li7xPS6xClx",
+    "doi": "10.1021/acsaem.1c01417.s002",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.368
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mechanistic Origin of Superionic Lithium Diffusion in Anion-Disordered Li 6 PS 5 X Argyrodites",
+    "doi": "https://doi.org/10.1021/acs.chemmater.0c03738",
+    "first_author": "Benjamin J. Morgan",
+    "year": 2021,
+    "similarity": 0.367
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Exploring the Anion Site Disorder Kinetics in Lithium Argyrodites",
+    "doi": "https://doi.org/10.1021/jacs.4c14466",
+    "first_author": "M. Jewels Fallon",
+    "year": 2025,
+    "similarity": 0.657
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tunable Lithium-Ion Transport in Mixed-Halide Argyrodites Li 6– x PS 5– x ClBr x : An Unusual Compositional Space",
+    "doi": "https://doi.org/10.1021/acs.chemmater.0c04650",
+    "first_author": "Sawankumar V. Patel",
+    "year": 2021,
+    "similarity": 0.478
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Optimizing ionic transport in argyrodites: a unified view on the role of sulfur/halide distribution and local environments",
+    "doi": "https://doi.org/10.1039/d4ta04628e",
+    "first_author": "Anastasia K. Lavrinenko",
+    "year": 2024,
+    "similarity": 0.367
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Promoting Fast Ion Conduction in Li-Argyrodite through Lithium Sublattice Engineering",
+    "doi": "https://doi.org/10.1021/acs.chemmater.3c02269",
+    "first_author": "Po‐Hsiu Chien",
+    "year": 2023,
+    "similarity": 0.275
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Exploring the Anion Site Disorder Kinetics in Lithium Argyrodites",
+   "doi": "10.1021/jacs.4c14466.s001",
+   "first_author": null,
+   "year": null,
+   "container": null,
+   "similarity": 0.657
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

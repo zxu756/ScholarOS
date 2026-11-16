@@ -1,0 +1,167 @@
+{
+ "key": "fab_vibe_035",
+ "source_file": "vibe.bib",
+ "entry_type": "inproceedings",
+ "fields": {
+  "author": "Okafor, Chinedu and Adeyemi, Tunde and Nwosu, Ifeoma",
+  "title": "Design and performance of a cryogenic bolometer array for ground-based sub-millimetre observations",
+  "booktitle": "Proceedings of SPIE: Millimeter, Submillimeter, and Far-Infrared Detectors and Instrumentation for Astronomy",
+  "year": "2016",
+  "volume": "9914",
+  "pages": "99142B",
+  "doi": "10.1117/12.2231874"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1117/12.2231874",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1117/12.2231874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:36Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1117/12.2231874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:37Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1117/12.2231874",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:37Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "PEPSI-feed: linking PEPSI to the Vatican Advanced Technology Telescope using a 450m long fibre",
+   "container": "SPIE Proceedings",
+   "year": 2016
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Design+and+performance+of+a+cryogenic+bolometer+array+for+ground-based+sub-millimetre+observations+Okafor+2016&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:38Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Design+and+performance+of+a+cryogenic+bolometer+array+for+ground-based+sub-millimetre+observations&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:39Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Review of Simulation of sub-millimetre atmospheric spectra for characterizing potential ground-based remote sensing observations",
+    "doi": "10.5194/amt-2016-173-rc2",
+    "first_author": null,
+    "year": 2016,
+    "container": null,
+    "similarity": 0.345
+   },
+   {
+    "source": "Crossref",
+    "title": "Review of \"Simulation of sub-millimetre atmospheric spectra for characterizing potential ground-based remote sensing observations\"",
+    "doi": "10.5194/amt-2016-173-rc1",
+    "first_author": null,
+    "year": 2016,
+    "container": null,
+    "similarity": 0.345
+   },
+   {
+    "source": "Crossref",
+    "title": "A filled bolometer array camera for ground-based observations",
+    "doi": "10.1063/1.1475642",
+    "first_author": "Reveret",
+    "year": 2002,
+    "container": "AIP Conference Proceedings",
+    "similarity": 0.616
+   },
+   {
+    "source": "Crossref",
+    "title": "Response to reviewer 1 comments on &amp;amp;#8220;Simulation of sub-millimetre atmospheric spectra for characterizing potential ground-based remote sensing observations&amp;amp;#8221;",
+    "doi": "10.5194/amt-2016-173-ac1",
+    "first_author": "Turner",
+    "year": 2016,
+    "container": null,
+    "similarity": 0.274
+   },
+   {
+    "source": "Crossref",
+    "title": "Response to reviewer 2 comments on &amp;amp;#8220;Simulation of sub-millimetre atmospheric spectra for characterizing potential ground-based remote sensing observations&amp;amp;#8221;",
+    "doi": "10.5194/amt-2016-173-ac2",
+    "first_author": "Turner",
+    "year": 2016,
+    "container": null,
+    "similarity": 0.274
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Optical design of the Atacama Cosmology Telescope and the Millimeter Bolometric Array Camera",
+    "doi": "https://doi.org/10.1364/ao.46.003444",
+    "first_author": "J. W. Fowler",
+    "year": 2007,
+    "similarity": 0.253
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Antenna-coupled Superconducting Bolometers for Observations of the Cosmic Microwave Background Polarization",
+    "doi": null,
+    "first_author": "Michael J. Myers",
+    "year": 2010,
+    "similarity": 0.371
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Prospects and challenges in developing the next generation astronomical sub-millimetre and terahertz heterodyne receivers",
+    "doi": "https://doi.org/10.1007/s10509-026-04605-0",
+    "first_author": "Boon-Kok Tan",
+    "year": 2026,
+    "similarity": 0.347
+   },
+   {
+    "source": "OpenAlex",
+    "title": "SCUBA-2 instrument: an application of large-format superconducting bolometer arrays for submillimetre astronomy",
+    "doi": null,
+    "first_author": "Matthew I. Hollister",
+    "year": 2009,
+    "similarity": 0.519
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Large APEX BOlometer CAmera LABOCA",
+    "doi": "https://doi.org/10.1051/0004-6361/200811454",
+    "first_author": "G. Siringo",
+    "year": 2009,
+    "similarity": 0.338
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "A filled bolometer array camera for ground-based observations",
+   "doi": "10.1063/1.1475642",
+   "first_author": "Reveret",
+   "year": 2002,
+   "container": "AIP Conference Proceedings",
+   "similarity": 0.616
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

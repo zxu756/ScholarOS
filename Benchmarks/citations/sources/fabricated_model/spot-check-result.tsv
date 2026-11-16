@@ -1,0 +1,11 @@
+key	result	checked_by	date_utc	note
+fab_codex_012	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_codex_040	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_codex_038	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_codex_002	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_codex_013	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_vibe_010	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_vibe_021	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_vibe_022	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_vibe_006	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication
+fab_vibe_031	passed	repository owner	2026-11-15	Owner read the 10 sampled entries (fixed seed 20261116, tools/make_spot_check.py) and confirmed none is a real publication

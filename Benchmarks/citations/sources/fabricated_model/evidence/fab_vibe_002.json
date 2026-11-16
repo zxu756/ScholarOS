@@ -1,0 +1,167 @@
+{
+ "key": "fab_vibe_002",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Rahman, Shafiqur and Chowdhury, Nusrat Jahan and Islam, Md. Tanvir and Akhter, Farhana",
+  "title": "Monsoon recharge pathways and arsenic release in shallow aquifers of a coastal delta plain",
+  "journal": "Journal of Contaminant Hydrology",
+  "year": "2018",
+  "volume": "214",
+  "pages": "42--57",
+  "doi": "10.1016/j.jconhyd.2018.05.003"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.jconhyd.2018.05.003",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.jconhyd.2018.05.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:47Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.jconhyd.2018.05.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:48Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.jconhyd.2018.05.003",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:48Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Improving estimates of groundwater velocity in a fractured rock borehole using hydraulic and tracer dilution methods",
+   "container": "Journal of Contaminant Hydrology",
+   "year": 2018
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Monsoon+recharge+pathways+and+arsenic+release+in+shallow+aquifers+of+a+coastal+delta+plain+Rahman+2018&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:49Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Monsoon+recharge+pathways+and+arsenic+release+in+shallow+aquifers+of+a+coastal+delta+plain&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:11:51Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "GROUNDWATER ARSENIC IN SHALLOW AQUIFERS OF BENGAL DELTA PLAIN (WEST BENGAL): A MICROBIOLOGICAL APPROACH",
+    "doi": "10.1130/abs/2016am-286096",
+    "first_author": null,
+    "year": 2016,
+    "container": "Geological Society of America Abstracts with Programs",
+    "similarity": 0.526
+   },
+   {
+    "source": "Crossref",
+    "title": "Hydrogeochemical Evolution in the Different Shallow Aquifers of Central Gangetic Plain and Kosi Alluvial Fan and Their Implications for the Distribution of Groundwater Arsenic",
+    "doi": "10.1007/978-3-319-16124-2_1",
+    "first_author": "Mukherjee",
+    "year": 2015,
+    "container": "Safe and Sustainable Use of Arsenic-Contaminated Aquifers in the Gangetic Plain",
+    "similarity": 0.317
+   },
+   {
+    "source": "Crossref",
+    "title": "Arsenic mobilization in shallow aquifer of Bengal Delta Plain: role of microbial community and pathogenic bacteria",
+    "doi": "10.1201/9781351046633-49",
+    "first_author": "Ghosh",
+    "year": 2019,
+    "container": "Environmental Arsenic in a Changing World",
+    "similarity": 0.463
+   },
+   {
+    "source": "Crossref",
+    "title": "Groundwater Arsenic Contamination in Bengal Delta and Its Health Effects",
+    "doi": "10.1007/978-3-319-16124-2_14",
+    "first_author": "Rahman",
+    "year": 2015,
+    "container": "Safe and Sustainable Use of Arsenic-Contaminated Aquifers in the Gangetic Plain",
+    "similarity": 0.358
+   },
+   {
+    "source": "Crossref",
+    "title": "Characterization of recharge processes in shallow and deeper aquifers using isotopic signatures and geochemical behavior of groundwater in an arsenic-enriched part of the Ganga Plain",
+    "doi": "10.1016/j.apgeochem.2011.01.003",
+    "first_author": "Saha",
+    "year": 2011,
+    "container": "Applied Geochemistry",
+    "similarity": 0.397
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Natural recharge transcends anthropogenic forcing that influences arsenic vulnerability of the quaternary alluviums of the Mid-Gangetic Plain",
+    "doi": "https://doi.org/10.1038/s41545-020-0075-5",
+    "first_author": "Ashwin Singh",
+    "year": 2020,
+    "similarity": 0.424
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Recharge of low‐arsenic aquifers tapped by community wells in Araihazar, Bangladesh, inferred from environmental isotopes",
+    "doi": "https://doi.org/10.1002/2015wr018224",
+    "first_author": "I. Mihajlov",
+    "year": 2016,
+    "similarity": 0.373
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Biogeochemical Controls on the Release and Accumulation of Mn and As in Shallow Aquifers, West Bengal, India",
+    "doi": "https://doi.org/10.3389/fenvs.2017.00029",
+    "first_author": "Michael A. P. Vega",
+    "year": 2017,
+    "similarity": 0.469
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Identification of Hydrobiogeochemical Processes Controlling Seasonal Variations in Arsenic Concentrations Within a Riverbank Aquifer at Jianghan Plain, China",
+    "doi": "https://doi.org/10.1029/2017wr022170",
+    "first_author": "Kun Huang",
+    "year": 2018,
+    "similarity": 0.333
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Agricultural managed aquifer recharge (Ag-MAR)—a method for sustainable groundwater management: A review",
+    "doi": "https://doi.org/10.1080/10643389.2022.2050160",
+    "first_author": "Elad Levintal",
+    "year": 2022,
+    "similarity": 0.23
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "GROUNDWATER ARSENIC IN SHALLOW AQUIFERS OF BENGAL DELTA PLAIN (WEST BENGAL): A MICROBIOLOGICAL APPROACH",
+   "doi": "10.1130/abs/2016am-286096",
+   "first_author": null,
+   "year": 2016,
+   "container": "Geological Society of America Abstracts with Programs",
+   "similarity": 0.526
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

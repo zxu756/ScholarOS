@@ -1,0 +1,161 @@
+{
+ "key": "fab_vibe_023",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Lindberg, Sara and Ekstr{\\\"o}m, Jonas and Holm, Karin",
+  "title": "Quantitative proteomics of desiccation and rehydration in a tardigrade",
+  "journal": "Journal of Proteome Research",
+  "year": "2020",
+  "volume": "19",
+  "number": "6",
+  "pages": "2411--2425",
+  "doi": "10.1021/acs.jproteome.0c00112"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1021/acs.jproteome.0c00112",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1021/acs.jproteome.0c00112",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:00Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1021/acs.jproteome.0c00112",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:00Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1021/acs.jproteome.0c00112",
+    "status": 404,
+    "fetched_at": "2026-11-15T19:13:00Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 100,
+  "outcome": "not_registered"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Quantitative+proteomics+of+desiccation+and+rehydration+in+a+tardigrade+Lindberg+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:02Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Quantitative+proteomics+of+desiccation+and+rehydration+in+a+tardigrade&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:03Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "Quantitative Comparison of Deparaffinization, Rehydration and Extraction Methods for FFPE Tissue Proteomics and Phosphoproteomics",
+    "doi": "10.1021/acs.analchem.3c04479.s002",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.505
+   },
+   {
+    "source": "Crossref",
+    "title": "Quantitative Comparison of Deparaffinization, Rehydration and Extraction Methods for FFPE Tissue Proteomics and Phosphoproteomics",
+    "doi": "10.1021/acs.analchem.3c04479.s003",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.505
+   },
+   {
+    "source": "Crossref",
+    "title": "Quantitative Comparison of Deparaffinization, Rehydration and Extraction Methods for FFPE Tissue Proteomics and Phosphoproteomics",
+    "doi": "10.1021/acs.analchem.3c04479.s001",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.505
+   },
+   {
+    "source": "Crossref",
+    "title": "Quantitative Comparison of Deparaffinization, Rehydration and Extraction Methods for FFPE Tissue Proteomics and Phosphoproteomics",
+    "doi": "10.1021/acs.analchem.3c04479.s004",
+    "first_author": null,
+    "year": null,
+    "container": null,
+    "similarity": 0.505
+   },
+   {
+    "source": "Crossref",
+    "title": "A comparative ultrastructure study of the tardigrade\n                  <i>Ramazzottius varieornatus</i>\n                  in the hydrated state, after desiccation and during the process of rehydration",
+    "doi": "10.1101/2023.05.03.539216",
+    "first_author": "Galas",
+    "year": 2023,
+    "container": null,
+    "similarity": 0.365
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Mechanisms of Desiccation Tolerance: Themes and Variations in Brine Shrimp, Roundworms, and Tardigrades",
+    "doi": "https://doi.org/10.3389/fphys.2020.592016",
+    "first_author": "Jonathan D. Hibshman",
+    "year": 2020,
+    "similarity": 0.553
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Thermotolerance experiments on active and desiccated states of Ramazzottius varieornatus emphasize that tardigrades are sensitive to high temperatures",
+    "doi": "https://doi.org/10.1038/s41598-019-56965-z",
+    "first_author": "Ricardo Cardoso Neves",
+    "year": 2020,
+    "similarity": 0.382
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Proteomic Analysis of Tardigrades: Towards a Better Understanding of Molecular Mechanisms by Anhydrobiotic Organisms",
+    "doi": "https://doi.org/10.1371/journal.pone.0009502",
+    "first_author": "Elham Schokraie",
+    "year": 2010,
+    "similarity": 0.259
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Tardigrade small heat shock proteins can limit desiccation-induced protein aggregation",
+    "doi": "https://doi.org/10.1038/s42003-023-04512-y",
+    "first_author": "Jonathan D. Hibshman",
+    "year": 2023,
+    "similarity": 0.436
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Identification and expression of Lactobacillus paracasei genes for adaptation to desiccation and rehydration",
+    "doi": "https://doi.org/10.1016/j.fm.2019.103301",
+    "first_author": "Aurore Palud",
+    "year": 2018,
+    "similarity": 0.416
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "OpenAlex",
+   "title": "Mechanisms of Desiccation Tolerance: Themes and Variations in Brine Shrimp, Roundworms, and Tardigrades",
+   "doi": "https://doi.org/10.3389/fphys.2020.592016",
+   "first_author": "Jonathan D. Hibshman",
+   "year": 2020,
+   "similarity": 0.553
+  }
+ },
+ "flag": "clean",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

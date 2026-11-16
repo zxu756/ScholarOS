@@ -1,0 +1,127 @@
+{
+ "key": "fab_codex_001",
+ "source_file": "codex.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Ivar Nystad and Elina Korpela and Mikkel Arnesson",
+  "title": "Storm-layer aliasing in a varve chronology from a retreating fjord glacier",
+  "journal": "Quaternary Science Reviews",
+  "volume": "246",
+  "pages": "106517",
+  "year": "2020",
+  "doi": "10.1016/j.quascirev.2020.106517"
+ },
+ "identifier": {
+  "kind": "doi",
+  "value": "10.1016/j.quascirev.2020.106517",
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works/10.1016/j.quascirev.2020.106517",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:08Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.quascirev.2020.106517",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:09Z",
+    "error": null
+   },
+   {
+    "source": "doi.org",
+    "url": "https://doi.org/api/handles/10.1016/j.quascirev.2020.106517",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:09Z",
+    "error": null
+   }
+  ],
+  "doi_org_response_code": 1,
+  "registered_work": {
+   "source": "Crossref",
+   "title": "Sub-millennial eruptive recurrence in the silicic Mangaone Subgroup tephra sequence, New Zealand, from Bayesian modelling of zircon double-dating and radiocarbon ages",
+   "container": "Quaternary Science Reviews",
+   "year": 2020
+  },
+  "outcome": "exists"
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Storm-layer+aliasing+in+a+varve+chronology+from+a+retreating+fjord+glacier+Nystad+2020&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:10Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Storm-layer+aliasing+in+a+varve+chronology+from+a+retreating+fjord+glacier&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:09:12Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "VARVE CHRONOLOGY",
+    "doi": "10.4135/9781446247501.n4059",
+    "first_author": null,
+    "year": 2014,
+    "container": "Encyclopedia of Environmental Change",
+    "similarity": 0.356
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Ice nucleating properties of airborne dust from an actively retreating glacier in Yukon, Canada\"",
+    "doi": "10.1039/d1ea00101a/v1/review2",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.458
+   },
+   {
+    "source": "Crossref",
+    "title": "Sediment discharge from the proglacial zone of a retreating Alpine glacier",
+    "doi": "10.1127/0372-8854/2012/s-00122",
+    "first_author": "Geilhausen",
+    "year": 2013,
+    "container": "Zeitschrift für Geomorphologie, Supplementary Issues",
+    "similarity": 0.473
+   },
+   {
+    "source": "Crossref",
+    "title": "Atmospherically produced beryllium-10 in annually laminated late-glacial sediments of the North American Varve Chronology",
+    "doi": "10.5194/gchron-2020-16-rc2",
+    "first_author": null,
+    "year": 2020,
+    "container": null,
+    "similarity": 0.277
+   },
+   {
+    "source": "Crossref",
+    "title": "Review for \"Ice nucleating properties of airborne dust from an actively retreating glacier in Yukon, Canada\"",
+    "doi": "10.1039/d1ea00101a/v2/review1",
+    "first_author": null,
+    "year": 2022,
+    "container": null,
+    "similarity": 0.458
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "Sediment discharge from the proglacial zone of a retreating Alpine glacier",
+   "doi": "10.1127/0372-8854/2012/s-00122",
+   "first_author": "Geilhausen",
+   "year": 2013,
+   "container": "Zeitschrift für Geomorphologie, Supplementary Issues",
+   "similarity": 0.473
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:39Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}

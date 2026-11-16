@@ -1,0 +1,153 @@
+{
+ "key": "fab_vibe_034",
+ "source_file": "vibe.bib",
+ "entry_type": "article",
+ "fields": {
+  "author": "Moreau, C{\\'e}line and Lef{\\`e}vre, Antoine",
+  "title": "Tropical geometry of phylogenetic networks and the space of trees with reticulation",
+  "journal": "Advances in Applied Mathematics",
+  "year": "2022",
+  "volume": "134",
+  "pages": "102--121",
+  "eprint": "2107.11238",
+  "archiveprefix": "arXiv"
+ },
+ "identifier": {
+  "kind": "arxiv",
+  "value": "2107.11238",
+  "requests": [
+   {
+    "source": "arXiv",
+    "url": "https://export.arxiv.org/api/query?id_list=2107.11238",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:33Z",
+    "error": null
+   }
+  ],
+  "outcome": "exists",
+  "registered_work": {
+   "source": "arXiv",
+   "title": "Exploring Deep Registration Latent Spaces",
+   "first_author": "Théo Estienne",
+   "year": "2021"
+  }
+ },
+ "title_search": {
+  "requests": [
+   {
+    "source": "Crossref",
+    "url": "https://api.crossref.org/works?query.bibliographic=Tropical+geometry+of+phylogenetic+networks+and+the+space+of+trees+with+reticulation+Moreau+2022&rows=5&select=DOI%2Ctitle%2Cauthor%2Cissued%2Ccontainer-title%2Ctype",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:34Z",
+    "error": null
+   },
+   {
+    "source": "OpenAlex",
+    "url": "https://api.openalex.org/works?search=Tropical+geometry+of+phylogenetic+networks+and+the+space+of+trees+with+reticulation&per-page=5&select=id%2Cdoi%2Ctitle%2Cpublication_year%2Cauthorships",
+    "status": 200,
+    "fetched_at": "2026-11-15T19:13:35Z",
+    "error": null
+   }
+  ],
+  "candidates": [
+   {
+    "source": "Crossref",
+    "title": "T-REX: reconstructing and visualizing phylogenetic trees and\n\n  reticulation networks",
+    "doi": "10.1093/bioinformatics/17.7.664",
+    "first_author": "Makarenkov",
+    "year": 2001,
+    "container": "Bioinformatics",
+    "similarity": 0.476
+   },
+   {
+    "source": "Crossref",
+    "title": "Imputing Phylogenetic Trees Using Tropical Polytopes over the Space of Phylogenetic Trees",
+    "doi": "10.3390/math11153419",
+    "first_author": "Yoshida",
+    "year": 2023,
+    "container": "Mathematics",
+    "similarity": 0.407
+   },
+   {
+    "source": "Crossref",
+    "title": "Rtropical: Data Analysis Tools over Space of Phylogenetic Trees Using Tropical Geometry",
+    "doi": "10.32614/cran.package.rtropical",
+    "first_author": "Wang",
+    "year": 2021,
+    "container": "CRAN: Contributed Packages",
+    "similarity": 0.201
+   },
+   {
+    "source": "Crossref",
+    "title": "Bounding the Number of Reticulation Events for Displaying Multiple Trees in a Phylogenetic Network",
+    "doi": "10.2139/ssrn.4991316",
+    "first_author": "Wu",
+    "year": 2024,
+    "container": null,
+    "similarity": 0.287
+   },
+   {
+    "source": "Crossref",
+    "title": "Counting Phylogenetic Networks with Few Reticulation Vertices: Galled and Reticulation-Visible Networks",
+    "doi": "10.1007/s11538-024-01309-w",
+    "first_author": "Chang",
+    "year": 2024,
+    "container": "Bulletin of Mathematical Biology",
+    "similarity": 0.465
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Structural and defensive roles of angiosperm leaf venation network reticulation across an Andes–Amazon elevation gradient",
+    "doi": "https://doi.org/10.1111/1365-2745.12945",
+    "first_author": "Benjamin Wong Blonder",
+    "year": 2018,
+    "similarity": 0.392
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Distinguishing Level-2 Phylogenetic Networks Using Phylogenetic Invariants",
+    "doi": "https://doi.org/10.48550/arxiv.2104.12479",
+    "first_author": "Muhammad Ardiyansyah",
+    "year": 2021,
+    "similarity": 0.471
+   },
+   {
+    "source": "OpenAlex",
+    "title": "The Pfaffian Structure of CFN Phylogenetic Networks",
+    "doi": "https://doi.org/10.1007/s00285-025-02330-w",
+    "first_author": "Joseph Cummings",
+    "year": 2025,
+    "similarity": 0.433
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Unsupervised Learning of Phylogenetic Trees via Split-Weight Embedding",
+    "doi": "https://doi.org/10.48550/arxiv.2312.16074",
+    "first_author": "Kong, Yibo",
+    "year": 2023,
+    "similarity": 0.444
+   },
+   {
+    "source": "OpenAlex",
+    "title": "Group-based phylogenetic models on 3-sunlet networks",
+    "doi": "https://doi.org/10.1007/s11538-025-01506-1",
+    "first_author": "Shelby Cox",
+    "year": 2025,
+    "similarity": 0.4
+   }
+  ],
+  "searched_ok": true,
+  "best": {
+   "source": "Crossref",
+   "title": "T-REX: reconstructing and visualizing phylogenetic trees and\n\n  reticulation networks",
+   "doi": "10.1093/bioinformatics/17.7.664",
+   "first_author": "Makarenkov",
+   "year": 2001,
+   "container": "Bioinformatics",
+   "similarity": 0.476
+  }
+ },
+ "flag": "identifier_collision",
+ "checked_at": "2026-11-15T19:17:41Z",
+ "method": "tools/search_check.py; title similarity = difflib ratio on lower-cased alphanumerics"
+}
