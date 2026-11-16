@@ -2,11 +2,14 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01 scope:
+# Stage 01–02 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
 #   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
-#   - Rows 4..20: marked `SKIP (没跑)` for subsequent M2 stages
+#   - Row 8: Multi-file include graph (`\include`, `\input`, unbraced `\input`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`, child `\bibliography`, commented/verbatim skip)
+#   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `.bbl` entry parsing deferred to Stage 06)
+#   - Row 12 (encoding part): Latin-1 / Windows-1252 root and child files (`ENC001`, content extracted, exit != 2; command/parser checks deferred to Stage 04)
+#   - Remaining rows: marked `SKIP (没跑)` for subsequent M2 stages
 #
 # All runs are strictly `--offline` under an isolated `HOME` / `CFFIXED_USER_HOME` (`lib-cli-guard.sh`).
 # Tectonic and `m2-regen-expected.sh` are never invoked here.
@@ -485,18 +488,329 @@ PY
     fi
 
     # ==================================================================
-    # Rows 4..20: Deferred to subsequent M2 stages (marked 没跑 / SKIPPED)
+    # Rows 4..7: Deferred to subsequent M2 stages
     # ==================================================================
-    declare -a DEFERRED_ROWS=(
+    declare -a DEFERRED_ROWS_4_7=(
         "4:2506.06594v1 (thebibliography, 32 \\bibitem) 解析与 gold 对照 — 留给第 6 段"
-        "5:2405.13682v5 (\\input{main.bbl}, 46 条) — 留给第 2、6 段"
+        "5:2405.13682v5 (\\input{main.bbl}, 46 条) — 留给第 6 段"
         "6:9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 与 CITE_KEY_CASE — 留给第 4、5 段"
         "7:难例 hard-inputs/hard.tex 与逐写法无损用例 — 留给第 3 段"
-        "8:多文件包含图 (\\include/\\input/\\subfile/\\import/子文件 \\bibliography) — 留给第 2 段"
-        "9:缺失文件、缺失 .bib 与同名 .bbl 回退 (BIB_FROM_BBL) — 留给第 2、6 段"
+    )
+    for entry in "${DEFERRED_ROWS_4_7[@]}"; do
+        r_num="${entry%%:*}"
+        r_desc="${entry#*:}"
+        if should_run_row "$r_num"; then
+            echo "== [Row $r_num] $r_desc =="
+            echo "没跑 — $r_desc"
+            record_skip "$r_num" "$r_desc"
+        fi
+    done
+
+    # ==================================================================
+    # Row 8: Multi-file include graph & child bibliography discovery
+    # ==================================================================
+    if should_run_row 8; then
+        echo "== [Row 8] 多文件包含图：\\include、\\input、不带花括号 \\input、\\InputIfFileExists、\\subfile、\\import、\\subimport、子文件 \\bibliography、注释与逐字环境跳过 =="
+        set +e
+        ROW8_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home = sys.argv[1:4]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+failures = []
+
+# 8A. Tectonic-verified include-multi fixture (`Tests/Fixtures/manuscripts/include-multi/main.tex`)
+inc_tex = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "include-multi", "main.tex")
+inc_exp = json.load(open(os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "expected", "include-multi.json"), encoding="utf-8"))
+
+p_inc = subprocess.run([cli_bin, "diagnostics", inc_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+if p_inc.returncode == 2:
+    failures.append(f"include-multi exited 2: {p_inc.stderr.decode('utf-8', 'replace')}")
+else:
+    obj_inc = json.loads(p_inc.stdout.decode("utf-8"))
+    files_inc = [f["path"] for f in obj_inc.get("files", [])]
+    exp_files_inc = ["main.tex", "chapters/one.tex", "chapters/two.tex", "chapters/shared.tex"]
+    cites_inc = sorted(c["key"] for c in obj_inc.get("citations", []))
+    labels_inc = sorted(l["key"] for l in obj_inc.get("labels", []))
+    inc002_inc = [d for d in obj_inc.get("diagnostics", []) if d.get("code") == "INC002"]
+    cite404_inc = [d for d in obj_inc.get("diagnostics", []) if d.get("code") == "CITE404"]
+    bib_inc = [b["path"] for b in obj_inc.get("bibliographySources", [])]
+    print(f"  [include-multi] files={files_inc} bib={bib_inc} cites={cites_inc} labels={labels_inc} INC002={len(inc002_inc)} CITE404={len(cite404_inc)}")
+    if files_inc != exp_files_inc:
+        failures.append(f"include-multi files mismatch: {files_inc} != {exp_files_inc}")
+    if bib_inc != ["refs.bib"]:
+        failures.append(f"include-multi bib mismatch: {bib_inc}")
+    if set(cites_inc) != set(inc_exp["cite_keys"]):
+        failures.append(f"include-multi cite_keys mismatch: {cites_inc} vs {inc_exp['cite_keys']}")
+    if set(labels_inc) != set(inc_exp["labels"]):
+        failures.append(f"include-multi labels mismatch: {labels_inc} vs {inc_exp['labels']}")
+    if inc002_inc or cite404_inc:
+        failures.append(f"include-multi unexpected INC002={inc002_inc} CITE404={cite404_inc}")
+
+# 8B. All 7 include syntaxes + child \bibliography/\addbibresource + commented existing file + verbatim skip (`loader-multi`)
+multi_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "loader-multi")
+multi_tex = os.path.join(multi_dir, "main.tex")
+commented_file = os.path.join(multi_dir, "sections", "commented_out.tex")
+if not os.path.isfile(commented_file):
+    failures.append(f"Expected commented target file to exist on disk: {commented_file}")
+
+p_multi = subprocess.run([cli_bin, "diagnostics", multi_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+p_outline = subprocess.run([cli_bin, "outline", multi_tex, "--json", "--lang", "en"], env=env, capture_output=True)
+
+if p_multi.returncode == 2 or p_outline.returncode != 0:
+    failures.append(f"loader-multi CLI error: diag_rc={p_multi.returncode}, outline_rc={p_outline.returncode}")
+else:
+    obj_m = json.loads(p_multi.stdout.decode("utf-8"))
+    outline_m = json.loads(p_outline.stdout.decode("utf-8"))
+    files_m = [f["path"] for f in obj_m.get("files", [])]
+    exp_files_m = [
+        "main.tex",
+        "chapters/ch_one.tex",
+        "chapters/ch_two.tex",
+        "sections/braced_input.tex",
+        "sections/unbraced_input.tex",
+        "sections/if_exists.tex",
+        "sections/sub_doc.tex",
+        "modules/mod_a/entry.tex",
+        "modules/mod_a/nested/leaf.tex",
+        "snippets/exact_name.inc",
+    ]
+    bib_m = [b["path"] for b in obj_m.get("bibliographySources", [])]
+    exp_bib_m = ["refs_main.bib", "refs_extra.bib", "refs_biblatex.bib"]
+    cites_m = sorted(c["key"] for c in obj_m.get("citations", []))
+    exp_cites_m = ["k_biblatex", "k_extra", "k_leaf", "k_one", "k_sub", "k_two"]
+    all_defined_m = all(c.get("defined") is True for c in obj_m.get("citations", []))
+    labels_m = sorted(l["key"] for l in obj_m.get("labels", []))
+    exp_labels_m = [
+        "ch:m_one", "ch:m_two", "sec:braced", "sec:exact",
+        "sec:ifexists", "sec:imported", "sec:subfile", "sec:subimported", "sec:unbraced"
+    ]
+    inc002_m = [d for d in obj_m.get("diagnostics", []) if d.get("code") == "INC002"]
+    cite404_m = [d for d in obj_m.get("diagnostics", []) if d.get("code") == "CITE404"]
+    outline_titles = [e.get("title") for e in outline_m]
+
+    print(f"  [loader-multi] files={len(files_m)}/10 (commented_out excluded={'sections/commented_out.tex' not in files_m}) bib={bib_m} cites={cites_m} labels={len(labels_m)}/9 INC002={len(inc002_m)} outline_entries={len(outline_titles)}")
+    if files_m != exp_files_m:
+        failures.append(f"loader-multi files mismatch: {files_m} != {exp_files_m}")
+    if bib_m != exp_bib_m:
+        failures.append(f"loader-multi bibliographySources mismatch: {bib_m} != {exp_bib_m}")
+    if cites_m != exp_cites_m or not all_defined_m:
+        failures.append(f"loader-multi citations mismatch: {cites_m} defined={all_defined_m}")
+    if labels_m != exp_labels_m:
+        failures.append(f"loader-multi labels mismatch: {labels_m} != {exp_labels_m}")
+    if inc002_m or cite404_m:
+        failures.append(f"loader-multi unexpected INC002={inc002_m} CITE404={cite404_m}")
+    for required_title in ["Unbraced Input", "IfExists Input", "Subfile Section", "Imported Entry", "Subimported Leaf", "Exact Extension Snippet"]:
+        if required_title not in outline_titles:
+            failures.append(f"loader-multi outline missing section '{required_title}': {outline_titles}")
+    if "Commented Out" in outline_titles:
+        failures.append("loader-multi outline unexpectedly included commented-out file")
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW8_RC=$?
+        set -e
+        echo "$ROW8_OUT"
+        if [[ "$ROW8_RC" -eq 0 ]]; then
+            record_pass 8 "Multi-file include syntaxes, child bibliography discovery, commented/verbatim skip, and Tectonic .aux comparison match with 0 INC002"
+        else
+            record_fail 8 "Multi-file include resolution or bibliography discovery diverged from expected sets"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 9: Missing file / missing .bib INC002 & main .bbl fallback (BIB_FROM_BBL)
+    # ==================================================================
+    if should_run_row 9; then
+        echo "== [Row 9] 缺失文件与缺失 .bib (INC002 带文件与行号) 及同名 .bbl 回退 (BIB_FROM_BBL；.bbl 条目解析留给第 6 段) =="
+        set +e
+        ROW9_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home = sys.argv[1:4]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+base = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "loader-missing")
+failures = []
+
+def run_diag(tex_path):
+    proc = subprocess.run([cli_bin, "diagnostics", tex_path, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if proc.returncode == 2:
+        raise RuntimeError(f"CLI exited 2 on {tex_path}: {proc.stderr.decode('utf-8', 'replace')}")
+    return json.loads(proc.stdout.decode("utf-8"))
+
+# 9A. Root `\input{nothere}` at main.tex:4
+obj_root_in = run_diag(os.path.join(base, "missing-input-root", "main.tex"))
+inc_root = [d for d in obj_root_in.get("diagnostics", []) if d.get("code") == "INC002"]
+print(f"  [missing-input-root] INC002={[(d['severity'], d['file'], d['line']) for d in inc_root]}")
+if len(inc_root) != 1 or inc_root[0].get("severity") != "ERROR" or inc_root[0].get("file") != "main.tex" or inc_root[0].get("line") != 4:
+    failures.append(f"missing-input-root expected 1 ERROR INC002 at main.tex:4, got {inc_root}")
+
+# 9B. Child `\input{nothere}` at sections/intro.tex:3
+obj_child_in = run_diag(os.path.join(base, "missing-input", "main.tex"))
+inc_child = [d for d in obj_child_in.get("diagnostics", []) if d.get("code") == "INC002"]
+print(f"  [missing-input-child] INC002={[(d['severity'], d['file'], d['line']) for d in inc_child]}")
+if len(inc_child) != 1 or inc_child[0].get("severity") != "ERROR" or inc_child[0].get("file") != "sections/intro.tex" or inc_child[0].get("line") != 3:
+    failures.append(f"missing-input-child expected 1 ERROR INC002 at sections/intro.tex:3, got {inc_child}")
+
+# 9C. Missing `\bibliography{nothere}` without `.bbl` at main.tex:5
+obj_miss_bib = run_diag(os.path.join(base, "missing-bib", "main.tex"))
+inc_bib = [d for d in obj_miss_bib.get("diagnostics", []) if d.get("code") == "INC002"]
+print(f"  [missing-bib-no-bbl] INC002={[(d['severity'], d['file'], d['line']) for d in inc_bib]}")
+if len(inc_bib) != 1 or inc_bib[0].get("severity") != "ERROR" or inc_bib[0].get("file") != "main.tex" or inc_bib[0].get("line") != 5:
+    failures.append(f"missing-bib expected 1 ERROR INC002 at main.tex:5, got {inc_bib}")
+
+# 9D. Missing `\bibliography{custom}` with matching `acl_latex.bbl` -> 0 INC002, 1 INFO BIB_FROM_BBL, bibliographySources has bbl
+obj_bbl = run_diag(os.path.join(base, "bbl-fallback", "acl_latex.tex"))
+inc_bbl = [d for d in obj_bbl.get("diagnostics", []) if d.get("code") == "INC002"]
+info_bbl = [d for d in obj_bbl.get("diagnostics", []) if d.get("code") == "BIB_FROM_BBL"]
+bib_srcs = obj_bbl.get("bibliographySources", [])
+print(
+    f"  [bbl-fallback] INC002={len(inc_bbl)} BIB_FROM_BBL={[(d['severity'], d['file'], d['line']) for d in info_bbl]} "
+    f"bibliographySources={[(s['kind'], s['path']) for s in bib_srcs]} "
+    "(note: .bbl \\bibitem entry definition check deferred to Stage 06)"
+)
+if inc_bbl:
+    failures.append(f"bbl-fallback emitted unexpected INC002: {inc_bbl}")
+if len(info_bbl) != 1 or info_bbl[0].get("severity") != "INFO" or info_bbl[0].get("file") != "acl_latex.tex" or info_bbl[0].get("line") != 6:
+    failures.append(f"bbl-fallback expected 1 INFO BIB_FROM_BBL at acl_latex.tex:6, got {info_bbl}")
+if len(bib_srcs) != 1 or bib_srcs[0].get("kind") != "bbl" or bib_srcs[0].get("path") != "acl_latex.bbl":
+    failures.append(f"bbl-fallback expected bibliographySources=[{{kind:'bbl', path:'acl_latex.bbl'}}], got {bib_srcs}")
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW9_RC=$?
+        set -e
+        echo "$ROW9_OUT"
+        if [[ "$ROW9_RC" -eq 0 ]]; then
+            record_pass 9 "Missing include/bib emit exact ERROR INC002 (file & line), and matching <main>.bbl emits INFO BIB_FROM_BBL with 0 INC002"
+        else
+            record_fail 9 "Missing-file INC002 or BIB_FROM_BBL fallback check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Rows 10..11: Deferred to Stage 05
+    # ==================================================================
+    declare -a DEFERRED_ROWS_10_11=(
         "10:坏 .bib 恢复 (bib-recovery/ten.bib, BIB001) — 留给第 5 段"
         "11:BibTeX 字段继承与规范化 (and others, crossref, howpublished) — 留给第 5 段"
-        "12:引用/交叉引用命令表、可选参数、双空格标签、AST 假错误与 Latin-1 — 留给第 2、4 段"
+    )
+    for entry in "${DEFERRED_ROWS_10_11[@]}"; do
+        r_num="${entry%%:*}"
+        r_desc="${entry#*:}"
+        if should_run_row "$r_num"; then
+            echo "== [Row $r_num] $r_desc =="
+            echo "没跑 — $r_desc"
+            record_skip "$r_num" "$r_desc"
+        fi
+    done
+
+    # ==================================================================
+    # Row 12 (Stage 02 encoding part): Latin-1 / Windows-1252 root & child files (ENC001)
+    # ==================================================================
+    if should_run_row 12; then
+        echo "== [Row 12] Latin-1 / Windows-1252 主文件与子文件读取及 ENC001 警告（S64/S65/S66/S67 命令表与解析器部分留给第 4 段） =="
+        set +e
+        ROW12_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home = sys.argv[1:4]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+enc_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "loader-encoding")
+main_tex = os.path.join(enc_dir, "main.tex")
+sub_tex = os.path.join(enc_dir, "sub.tex")
+failures = []
+
+for label, fpath in [("main.tex", main_tex), ("sub.tex", sub_tex)]:
+    raw = open(fpath, "rb").read()
+    try:
+        raw.decode("utf-8")
+        failures.append(f"{label} unexpectedly valid UTF-8 on disk")
+    except UnicodeDecodeError:
+        pass
+
+p_diag = subprocess.run([cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+p_out = subprocess.run([cli_bin, "outline", main_tex, "--json", "--lang", "en"], env=env, capture_output=True)
+
+if p_diag.returncode == 2:
+    failures.append(f"diagnostics exited 2 on Windows-1252 manuscript: {p_diag.stderr.decode('utf-8', 'replace')}")
+elif p_out.returncode != 0:
+    failures.append(f"outline exited {p_out.returncode} on Windows-1252 manuscript: {p_out.stderr.decode('utf-8', 'replace')}")
+else:
+    obj = json.loads(p_diag.stdout.decode("utf-8"))
+    outline = json.loads(p_out.stdout.decode("utf-8"))
+    files = [(f.get("path"), f.get("encoding"), f.get("includedFrom")) for f in obj.get("files", [])]
+    exp_files = [("main.tex", "windows-1252", None), ("sub.tex", "windows-1252", "main.tex:5")]
+    labels = sorted(l.get("key") for l in obj.get("labels", []))
+    cites = sorted(c.get("key") for c in obj.get("citations", []))
+    enc001 = [d for d in obj.get("diagnostics", []) if d.get("code") == "ENC001"]
+    inc002 = [d for d in obj.get("diagnostics", []) if d.get("code") == "INC002"]
+    titles = [e.get("title", "") for e in outline]
+
+    print(
+        f"  [loader-encoding] exit={p_diag.returncode} files={files} labels={labels} cites={cites} "
+        f"ENC001={[(d['severity'], d['file']) for d in enc001]} titles={titles} "
+        "(note: S64/S65/S66/S67 command & parser checks deferred to Stage 04)"
+    )
+    if files != exp_files:
+        failures.append(f"files mismatch: {files} != {exp_files}")
+    if labels != ["sec:gauss", "sec:poincare"]:
+        failures.append(f"labels mismatch: {labels}")
+    if cites != ["knuth1968", "lecun2015"]:
+        failures.append(f"citations mismatch: {cites}")
+    if inc002:
+        failures.append(f"unexpected INC002: {inc002}")
+    if len(enc001) != 2 or {d.get("file") for d in enc001} != {"main.tex", "sub.tex"}:
+        failures.append(f"expected 2 ENC001 warnings for main.tex & sub.tex, got {enc001}")
+    for d in enc001:
+        if d.get("severity") != "WARNING" or d.get("category") != "structure" or d.get("file", "") not in d.get("message", ""):
+            failures.append(f"malformed ENC001 diagnostic: {d}")
+    if not any("Poincaré" in t for t in titles) or not any("Gauß" in t and "Müller" in t for t in titles):
+        failures.append(f"decoded outline titles missing Latin-1 characters: {titles}")
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW12_RC=$?
+        set -e
+        echo "$ROW12_OUT"
+        if [[ "$ROW12_RC" -eq 0 ]]; then
+            record_pass 12 "Latin-1 / Windows-1252 root and child files decode cleanly, extract symbols/outline, emit WARNING ENC001, and do not exit 2 (S64-S67 deferred to Stage 04)"
+        else
+            record_fail 12 "Latin-1 / Windows-1252 encoding fallback or ENC001 check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Rows 13..20: Deferred to subsequent M2 stages (marked 没跑 / SKIPPED)
+    # ==================================================================
+    declare -a DEFERRED_ROWS_13_20=(
         "13:引用核查按唯一键汇总 (ERR_UNVERIFIED_CITATION) 与结构诊断分离 — 留给第 7 段"
         "14:带 x-firewall-class={VERIFIED} 的编造 DOI 在 diagnostics --registry-replay 下拦截与新退出码 — 留给第 7 段"
         "15:MCP scholar_lsp_diagnostics 支持 path 参数并与 CLI --json 逐字节相同 — 留给第 7 段"
@@ -507,7 +821,7 @@ PY
         "20:跑后环境与工作区洁净检查 — 留给第 8 段"
     )
 
-    for entry in "${DEFERRED_ROWS[@]}"; do
+    for entry in "${DEFERRED_ROWS_13_20[@]}"; do
         r_num="${entry%%:*}"
         r_desc="${entry#*:}"
         if should_run_row "$r_num"; then
