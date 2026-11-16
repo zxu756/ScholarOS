@@ -1594,26 +1594,38 @@ public struct BibTeXCodec: Sendable {
         let pages = take("pages", "eid", "articleno").map { normalizePageDash(latexCodec.decode($0)) }
 
         let rawDOI = take("doi")
-        let cleanedDOI = cleanDOIField(rawDOI)
+        var cleanedDOI = cleanDOIField(rawDOI)
 
         let eprint = take("eprint")
-        let eprintType = take("eprinttype", "archiveprefix")?.lowercased()
+        let eprintType = take("eprinttype", "archiveprefix")
+            .map { latexCodec.decode($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .flatMap { $0.isEmpty ? nil : $0 }
         let explicitArxiv = take("arxivid", "arxiv")
         let explicitPMID = take("pmid")
         let rawURL = take("url")
 
         var resolvedArxiv: String? = cleanArXivField(explicitArxiv)
-        var resolvedPMID: String? = explicitPMID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var ignoredNonArXivEprint: String? = nil
+        let resolvedPMID: String? = explicitPMID?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let eprint {
-            if eprintType == "pubmed" || eprintType == "pmid" {
-                if resolvedPMID == nil { resolvedPMID = eprint }
-            } else if eprintType == "arxiv" || resolvedArxiv == nil && looksLikeArXivIdentifier(eprint) {
+            if eprintType == "arxiv" {
                 resolvedArxiv = cleanArXivField(eprint)
+            } else if eprintType == nil, Self.matchesBareArXivIdentifierSyntax(eprint) {
+                if resolvedArxiv == nil {
+                    resolvedArxiv = cleanArXivField(eprint)
+                }
+            } else {
+                ignoredNonArXivEprint = eprint
             }
         }
-        if resolvedArxiv == nil, let rawURL, let urlArxiv = extractArXivFromURL(rawURL) {
-            resolvedArxiv = urlArxiv
+        if let rawURL {
+            if resolvedArxiv == nil, let urlArxiv = Self.extractFirstArXivIDFromURLField(rawURL) {
+                resolvedArxiv = urlArxiv
+            }
+            if cleanedDOI == nil, let urlDOI = Self.extractFirstDOIFromURLField(rawURL) {
+                cleanedDOI = urlDOI
+            }
         }
         if resolvedArxiv == nil, decodedVenue.lowercased().hasPrefix("arxiv:"), let vArxiv = cleanArXivField(decodedVenue) {
             resolvedArxiv = vArxiv
@@ -1671,6 +1683,7 @@ public struct BibTeXCodec: Sendable {
             firewallAuditNote: firewallNote,
             untrustedDeclaredFirewallClass: untrustedFWClass,
             untrustedDeclaredFirewallNote: untrustedFWNote,
+            ignoredNonArXivEprint: ignoredNonArXivEprint,
             attachedPDFPath: attachedPDF,
             citedByKeys: citedByKeys,
             referencesKeys: referencesKeys
@@ -1769,7 +1782,7 @@ public struct BibTeXCodec: Sendable {
         guard var s = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else {
             return nil
         }
-        if let urlExtracted = extractArXivFromURL(s) {
+        if !s.contains(where: \.isWhitespace), let urlExtracted = Self.extractArXivIDFromSingleURL(s) {
             return urlExtracted
         }
         if s.lowercased().hasPrefix("arxiv:") {
@@ -1778,28 +1791,144 @@ public struct BibTeXCodec: Sendable {
         return s.isEmpty ? nil : s
     }
 
-    private func extractArXivFromURL(_ url: String) -> String? {
-        let lower = url.lowercased()
-        for marker in ["arxiv.org/abs/", "arxiv.org/pdf/"] {
-            if let range = lower.range(of: marker) {
-                var id = String(url[range.upperBound...])
-                if id.lowercased().hasSuffix(".pdf") {
-                    id = String(id.dropLast(4))
-                }
-                id = id.trimmingCharacters(in: CharacterSet(charactersIn: "/ \t\r\n"))
-                if !id.isEmpty { return id }
+    static func matchesBareArXivIdentifierSyntax(_ raw: String) -> Bool {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return false }
+        let lower = s.lowercased()
+        if lower.contains("://")
+            || lower.hasPrefix("http:")
+            || lower.hasPrefix("https:")
+            || lower.hasPrefix("ftp:")
+            || lower.hasPrefix("www.")
+            || lower.hasPrefix("arxiv.org/")
+            || lower.hasPrefix("export.arxiv.org/")
+        {
+            return false
+        }
+        if lower.hasPrefix("arxiv:") {
+            s = String(s.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !s.isEmpty,
+              !s.contains(where: \.isWhitespace),
+              !s.lowercased().hasSuffix(".pdf")
+        else {
+            return false
+        }
+        return ScholarlyIdentifierValidator.validateArXivID(s).isValid
+    }
+
+    static func extractFirstArXivIDFromURLField(_ rawURL: String) -> String? {
+        for rawToken in rawURL.split(whereSeparator: \.isWhitespace) {
+            let token = unwrapBibURLToken(String(rawToken))
+            guard !token.isEmpty else { continue }
+            if let id = extractArXivIDFromSingleURL(token) {
+                return id
             }
         }
         return nil
     }
 
-    private func looksLikeArXivIdentifier(_ text: String) -> Bool {
-        let s = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.contains("/") { return true }
-        let base = s.split(separator: "v").first.map(String.init) ?? s
-        let parts = base.split(separator: ".")
-        return parts.count == 2 && parts[0].count == 4 && parts[0].allSatisfy(\.isNumber)
-            && (parts[1].count == 4 || parts[1].count == 5) && parts[1].allSatisfy(\.isNumber)
+    static func extractFirstDOIFromURLField(_ rawURL: String) -> String? {
+        for rawToken in rawURL.split(whereSeparator: \.isWhitespace) {
+            let token = unwrapBibURLToken(String(rawToken))
+            guard !token.isEmpty else { continue }
+            if let doi = extractDOIFromSingleURL(token) {
+                return doi
+            }
+        }
+        return nil
+    }
+
+    private static func unwrapBibURLToken(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        while let last = s.last, (last == "," || last == ";") {
+            s.removeLast()
+        }
+        if s.lowercased().hasPrefix("\\url{"), s.hasSuffix("}") {
+            s = String(s.dropFirst(5).dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if s.hasPrefix("{"), s.hasSuffix("}"), s.count >= 2 {
+            s = String(s.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return s
+            .replacingOccurrences(of: "\\%", with: "%")
+            .replacingOccurrences(of: "\\_", with: "_")
+            .replacingOccurrences(of: "\\#", with: "#")
+            .replacingOccurrences(of: "\\&", with: "&")
+    }
+
+    private static func extractArXivIDFromSingleURL(_ urlString: String) -> String? {
+        var candidate = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerCandidate = candidate.lowercased()
+        if !lowerCandidate.contains("://") {
+            if lowerCandidate.hasPrefix("arxiv.org/")
+                || lowerCandidate.hasPrefix("www.arxiv.org/")
+                || lowerCandidate.hasPrefix("export.arxiv.org/")
+            {
+                candidate = "https://" + candidate
+            } else {
+                return nil
+            }
+        }
+        guard let components = URLComponents(string: candidate),
+              let scheme = components.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              let host = components.host?.lowercased(),
+              (host == "arxiv.org" || host.hasSuffix(".arxiv.org"))
+        else {
+            return nil
+        }
+        let path = components.path
+        let lowerPath = path.lowercased()
+        let rawSegment: String
+        if lowerPath.hasPrefix("/abs/") {
+            rawSegment = String(path.dropFirst(5))
+        } else if lowerPath.hasPrefix("/pdf/") {
+            rawSegment = String(path.dropFirst(5))
+        } else {
+            return nil
+        }
+        var id = rawSegment.trimmingCharacters(in: CharacterSet(charactersIn: "/ \t\r\n"))
+        if id.lowercased().hasSuffix(".pdf") {
+            id = String(id.dropLast(4)).trimmingCharacters(in: CharacterSet(charactersIn: "/ \t\r\n"))
+        }
+        guard !id.isEmpty, !id.contains(where: \.isWhitespace) else {
+            return nil
+        }
+        return id
+    }
+
+    private static func extractDOIFromSingleURL(_ urlString: String) -> String? {
+        var candidate = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerCandidate = candidate.lowercased()
+        if !lowerCandidate.contains("://") {
+            if lowerCandidate.hasPrefix("doi.org/")
+                || lowerCandidate.hasPrefix("dx.doi.org/")
+                || lowerCandidate.hasPrefix("www.doi.org/")
+            {
+                candidate = "https://" + candidate
+            } else {
+                return nil
+            }
+        }
+        guard let components = URLComponents(string: candidate),
+              let scheme = components.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              let host = components.host?.lowercased(),
+              (host == "doi.org" || host == "dx.doi.org" || host == "www.doi.org")
+        else {
+            return nil
+        }
+        var doi = components.path
+        while doi.hasPrefix("/") {
+            doi.removeFirst()
+        }
+        while let last = doi.last, (last == "." || last == "," || last == ";" || last == " ") {
+            doi.removeLast()
+        }
+        guard doi.hasPrefix("10."), doi.contains("/"), !doi.contains(where: \.isWhitespace) else {
+            return nil
+        }
+        return doi
     }
 
     private func extractFileAttachmentPath(from raw: String?) -> String? {

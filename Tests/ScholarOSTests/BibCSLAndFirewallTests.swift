@@ -4263,4 +4263,204 @@ struct BibCSLAndFirewallTests {
         let authors = BibTeXAuthorParser.parseAuthors("Bratteli, O.\r\nand\rRobinson, D.W.")
         #expect(authors.map(\.familyName) == ["Bratteli", "Robinson"])
     }
+
+    // MARK: - M1 Stage 09: S52 (Non-arXiv eprint, Multi-URL url, and Valid DOI + Malformed Explicit arXiv)
+
+    @Test("S52 regression: 5 real entries in eprint-url-not-arxiv.bib all evaluate offline to UNVERIFIED (offline) with 0 NOT_FOUND")
+    func s52FiveEntriesInEprintURLNotArXivEvaluateOfflineToUnverifiedZeroNotFound() async throws {
+        let fixturesDir = Self.recordedRegistryFixturesURL.deletingLastPathComponent()
+        let bibURL = fixturesDir.appendingPathComponent("eprint-url-not-arxiv.bib")
+        let rawBib = try String(contentsOf: bibURL, encoding: .utf8)
+        let entries = try BibTeXCodec().parse(rawBib)
+        #expect(entries.count == 5)
+
+        // Entry 1 (real_human_011): url has two whitespace-separated URLs -> clean arXiv ID 2107.07597
+        let e1 = try #require(entries.first { $0.citeKey == "real_human_011" })
+        #expect(e1.doi == "10.1137/21M1434180")
+        #expect(e1.arxivID == "2107.07597")
+
+        // Entries 2..5: publisher PDF / doi.org eprint without archivePrefix -> NOT treated as arXiv ID
+        for key in ["real_human_031", "real_human_059", "real_human_081", "real_human_099"] {
+            let entry = try #require(entries.first { $0.citeKey == key })
+            #expect(entry.arxivID == nil, "Expected nil arxivID on \(key), got \(String(describing: entry.arxivID))")
+            #expect(entry.doi != nil)
+        }
+
+        let enRes = try await CitationVerificationFirewall.verifyBibliography(
+            entries: entries,
+            mode: .offline,
+            language: .en
+        )
+        #expect(enRes.report.notFoundCount == 0)
+        #expect(enRes.report.unverifiedCount == 5)
+        for v in enRes.report.verdicts {
+            #expect(v.firewallClass == .unverified)
+            #expect(v.reasons == ["offline"])
+            #expect(!v.reasons.contains("invalid_identifier"))
+        }
+
+        let zhRes = try await CitationVerificationFirewall.verifyBibliography(
+            entries: entries,
+            mode: .offline,
+            language: .zhHans
+        )
+        #expect(zhRes.report.notFoundCount == 0)
+        #expect(zhRes.report.unverifiedCount == 5)
+        for key in ["real_human_031", "real_human_059", "real_human_081", "real_human_099"] {
+            let vZH = try #require(zhRes.report.verdicts.first { $0.citeKey == key })
+            #expect(
+                vZH.findings.contains { $0.detail.contains("eprint 字段不是 arXiv 编号，未当作标识符") },
+                "Expected ZH non-arXiv eprint finding on \(key), got \(vZH.findings)"
+            )
+            let vEN = try #require(enRes.report.verdicts.first { $0.citeKey == key })
+            #expect(
+                vEN.findings.contains { $0.field == "eprint" && $0.detail.contains("not an arXiv identifier") },
+                "Expected EN non-arXiv eprint finding on \(key), got \(vEN.findings)"
+            )
+        }
+    }
+
+    @Test("S52 unit rules 1-3: bare eprint arXiv formats, non-arXiv eprint finding, multi-URL arXiv/DOI extraction, and valid DOI + malformed explicit arXiv -> DRIFT")
+    func s52UnitRulesBareEprintMultiURLAndValidDOIWithMalformedExplicitArXiv() async throws {
+        let codec = BibTeXCodec()
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        // Rule 1a: Valid arXiv IDs in eprint WITHOUT archivePrefix/eprinttype (modern, versioned, arXiv: prefix, legacy) are recognized
+        let bareArXivCases: [(String, String)] = [
+            ("2107.07597", "2107.07597"),
+            ("2107.07597v3", "2107.07597v3"),
+            ("arXiv:1706.03762v5", "1706.03762v5"),
+            ("1409.4842", "1409.4842"),
+            ("hep-th/9901001", "hep-th/9901001"),
+            ("arXiv:math.GT/0309136v2", "math.GT/0309136v2")
+        ]
+        for (rawVal, expectedID) in bareArXivCases {
+            let bib = """
+            @misc{test_bare,
+              author = {Author, A.},
+              title  = {Test Paper},
+              year   = {2021},
+              eprint = {\(rawVal)}
+            }
+            """
+            let parsed = try #require(try codec.parse(bib).first)
+            #expect(parsed.arxivID == expectedID, "Expected '\(rawVal)' without archivePrefix to parse as arxivID '\(expectedID)', got \(String(describing: parsed.arxivID))")
+            let v = CitationVerificationFirewall().evaluate(parsed)
+            #expect(v.firewallClass == .unverified)
+            #expect(v.reasons == ["offline"])
+            #expect(!v.findings.contains { $0.field == "eprint" })
+        }
+
+        // Rule 1b: eprint = {https://...pdf} or non-arXiv repo ID -> NOT recognized as arXiv ID, emits finding, no invalid_identifier
+        let pdfEprintBib = """
+        @article{pdf_eprint_only,
+          author = {Author, B.},
+          title  = {Publisher PDF in Eprint},
+          year   = {2022},
+          eprint = {https://publisher.example.org/journal/paper.pdf}
+        }
+        """
+        let pdfEntry = try #require(try codec.parse(pdfEprintBib).first)
+        #expect(pdfEntry.arxivID == nil)
+        let zhPDFRes = try await CitationVerificationFirewall.verifyBibliography(
+            entries: [pdfEntry],
+            mode: .offline,
+            language: .zhHans
+        )
+        let zhPDFVerdict = try #require(zhPDFRes.report.verdicts.first)
+        #expect(zhPDFVerdict.firewallClass == .unverified)
+        #expect(!zhPDFVerdict.reasons.contains("invalid_identifier"))
+        #expect(zhPDFVerdict.findings.contains { $0.detail.contains("eprint 字段不是 arXiv 编号，未当作标识符") })
+
+        // Rule 2a: url with multiple whitespace-separated URLs -> takes first arxiv.org abs/pdf ID only; ignores non-abs/pdf URLs
+        let multiURLBib = """
+        @article{multi_url_entry,
+          author = {Park, Youngmin},
+          title  = {Multi URL Test},
+          year   = {2021},
+          url    = {https://arxiv.org/list/cs.LG/recent https://export.arxiv.org/pdf/1706.03762v5.pdf http://arxiv.org/abs/2107.07597 http://dx.doi.org/10.1038/nature14539}
+        }
+        """
+        let multiParsed = try #require(try codec.parse(multiURLBib).first)
+        #expect(multiParsed.arxivID == "1706.03762v5")
+        // Rule 2b: url has dx.doi.org and entry has NO doi field -> populates doi from url!
+        #expect(multiParsed.doi == "10.1038/nature14539")
+
+        // Rule 2c: When entry HAS a doi field, doi.org in url is ignored for doi
+        let explicitDOIBib = """
+        @article{explicit_doi_entry,
+          author = {LeCun, Yann},
+          title  = {Deep learning},
+          year   = {2015},
+          doi    = {10.1038/nature14539},
+          url    = {https://doi.org/10.1145/9999999.8888888 https://arxiv.org/abs/2107.07597}
+        }
+        """
+        let explicitDOIParsed = try #require(try codec.parse(explicitDOIBib).first)
+        #expect(explicitDOIParsed.doi == "10.1038/nature14539")
+        #expect(explicitDOIParsed.arxivID == "2107.07597")
+
+        // Rule 3a: Valid DOI + explicit archivePrefix={arXiv} + malformed eprint -> looks up by DOI, records malformed arxivID in fields, yields DRIFT (not NOT_FOUND, not VERIFIED)
+        let validDOIInvalidArXivBib = """
+        @article{lecun_bad_explicit_arxiv,
+          author        = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title         = {Deep learning},
+          journal       = {Nature},
+          year          = {2015},
+          doi           = {10.1038/nature14539},
+          archivePrefix = {arXiv},
+          eprint        = {not-a-valid-arxiv-99}
+        }
+        """
+        let mixedEntry = try #require(try codec.parse(validDOIInvalidArXivBib).first)
+        let offlineMixed = CitationVerificationFirewall().evaluate(mixedEntry)
+        #expect(offlineMixed.firewallClass == .unverified, "Offline valid DOI + invalid arXiv must be UNVERIFIED, not NOT_FOUND")
+        #expect(offlineMixed.reasons == ["offline"])
+
+        let replaySnapshot = try RegistryReplaySnapshot(directoryURL: Self.recordedRegistryFixturesURL)
+        let onlineMixedZH = try await CitationVerificationFirewall.verifyBibliography(
+            entries: [mixedEntry],
+            mode: .replay(snapshot: replaySnapshot),
+            language: .zhHans
+        )
+        let mixedVerdictZH = try #require(onlineMixedZH.report.verdicts.first)
+        #expect(mixedVerdictZH.firewallClass == .drift)
+        #expect(mixedVerdictZH.insertable == false)
+        #expect(!mixedVerdictZH.sources.isEmpty, "Must query registry by valid DOI")
+        #expect(
+            mixedVerdictZH.fields.contains {
+                $0.field == "arxivID"
+                    && $0.localValue == "not-a-valid-arxiv-99"
+                    && ($0.remoteValue.contains("格式不合法") || ($0.note ?? "").contains("格式不合法"))
+            },
+            "Expected fields to record localValue and '格式不合法', got \(mixedVerdictZH.fields)"
+        )
+
+        let onlineMixedEN = try await CitationVerificationFirewall.verifyBibliography(
+            entries: [mixedEntry],
+            mode: .replay(snapshot: replaySnapshot),
+            language: .en
+        )
+        let mixedVerdictEN = try #require(onlineMixedEN.report.verdicts.first)
+        #expect(mixedVerdictEN.firewallClass == .drift)
+        #expect(mixedVerdictEN.fields.contains { $0.field == "arxivID" && $0.localValue == "not-a-valid-arxiv-99" })
+
+        // Rule 3b: Entry with ONLY arXiv and malformed format -> still NOT_FOUND (invalid_identifier)
+        let onlyBadArXivBib = """
+        @misc{only_bad_arxiv,
+          author        = {Lovelace, Ada},
+          title         = {Only Malformed ArXiv},
+          year          = {2024},
+          archivePrefix = {arXiv},
+          eprint        = {not-a-valid-arxiv-99}
+        }
+        """
+        let onlyBadEntry = try #require(try codec.parse(onlyBadArXivBib).first)
+        let onlyBadOffline = CitationVerificationFirewall().evaluate(onlyBadEntry)
+        #expect(onlyBadOffline.firewallClass == .notFound)
+        #expect(onlyBadOffline.reasons == ["invalid_identifier"])
+        let onlyBadOnline = await CitationVerificationFirewall().verifyAgainstPublicRegistries(entry: onlyBadEntry, session: replay)
+        #expect(onlyBadOnline.firewallClass == .notFound)
+        #expect(onlyBadOnline.reasons == ["invalid_identifier"])
+    }
 }

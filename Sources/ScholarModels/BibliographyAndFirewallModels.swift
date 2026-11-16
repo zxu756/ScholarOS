@@ -96,6 +96,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
     public var firewallAuditNote: String
     public var untrustedDeclaredFirewallClass: String?
     public var untrustedDeclaredFirewallNote: String?
+    public var ignoredNonArXivEprint: String?
     public var attachedPDFPath: String?
     public var citedByKeys: [String]
     public var referencesKeys: [String]
@@ -120,6 +121,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         firewallAuditNote: String = "",
         untrustedDeclaredFirewallClass: String? = nil,
         untrustedDeclaredFirewallNote: String? = nil,
+        ignoredNonArXivEprint: String? = nil,
         attachedPDFPath: String? = nil,
         citedByKeys: [String] = [],
         referencesKeys: [String] = []
@@ -143,6 +145,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         self.firewallAuditNote = firewallAuditNote
         self.untrustedDeclaredFirewallClass = untrustedDeclaredFirewallClass
         self.untrustedDeclaredFirewallNote = untrustedDeclaredFirewallNote
+        self.ignoredNonArXivEprint = ignoredNonArXivEprint
         self.attachedPDFPath = attachedPDFPath
         self.citedByKeys = citedByKeys
         self.referencesKeys = referencesKeys

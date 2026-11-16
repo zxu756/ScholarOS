@@ -900,6 +900,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         firewallAuditNote: entry.firewallAuditNote,
                         untrustedDeclaredFirewallClass: entry.untrustedDeclaredFirewallClass,
                         untrustedDeclaredFirewallNote: entry.untrustedDeclaredFirewallNote,
+                        ignoredNonArXivEprint: entry.ignoredNonArXivEprint,
                         attachedPDFPath: entry.attachedPDFPath,
                         citedByKeys: entry.citedByKeys,
                         referencesKeys: entry.referencesKeys

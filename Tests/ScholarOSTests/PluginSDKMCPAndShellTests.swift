@@ -3965,6 +3965,36 @@ struct PluginSDKMCPAndShellTests {
             #expect(res.stdout.contains("Unverified=2"))
         }
     }
+
+    @Test("S52 regression: CLI verify-citations --offline on eprint-url-not-arxiv.bib yields 5 UNVERIFIED (offline), 0 NOT_FOUND, exit 3")
+    func s52CLIVerifyCitationsOfflineOnEprintURLNotArXivExits3WithZeroNotFound() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage09-s52")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(
+            environment: [
+                "HOME": isolatedHome.path,
+                "CFFIXED_USER_HOME": isolatedHome.path
+            ]
+        )
+
+        let fixtureURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/eprint-url-not-arxiv.bib")
+        for lang in ["en", "zh"] {
+            let res = await runner.runWithExitStatus(
+                arguments: ["verify-citations", fixtureURL.path, "--offline", "--lang", lang]
+            )
+            #expect(res.exitCode == 3, "Expected exit 3 on eprint-url-not-arxiv.bib (--lang \(lang)), got \(res.exitCode): \(res.stdout)")
+            #expect(res.stdout.contains("Evaluated=5 Verified=0 Drift=0 NotFound=0 Retracted=0 Unverified=5"))
+            #expect(!res.stdout.contains("[NOT_FOUND]"))
+        }
+        let zhJSON = await runner.runWithExitStatus(
+            arguments: ["verify-citations", fixtureURL.path, "--offline", "--json", "--lang", "zh"]
+        )
+        #expect(zhJSON.exitCode == 3)
+        #expect(zhJSON.stdout.contains("eprint 字段不是 arXiv 编号，未当作标识符"))
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

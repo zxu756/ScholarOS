@@ -25,6 +25,7 @@ public enum FirewallFindingCode: String, Sendable, Codable, Hashable, CaseIterab
     case registryLookupNotFound = "FW_REGISTRY_NOT_FOUND"
     case registryTransportUnavailable = "FW_REGISTRY_OFFLINE"
     case untrustedEmbeddedFirewallTag = "FW_UNTRUSTED_FILE_TAG"
+    case ignoredNonArXivEprint = "FW_IGNORED_EPRINT"
 }
 
 /// Closed set of allowed `UNVERIFIED` reason codes defined in M1 item 1.
@@ -767,6 +768,7 @@ public struct CitationVerificationFirewall: Sendable {
         var hasBuiltInRetractedDOI = false
         var hasInvalidIdentifierSyntax = false
         var hasSyntacticallyValidPID = false
+        var hasSyntacticallyValidDOI = false
 
         // 0. Record untrusted embedded x-firewall-class from .bib if present (M1 item 8 / S42)
         if let declared = nonEmpty(entry.untrustedDeclaredFirewallClass) {
@@ -776,6 +778,18 @@ public struct CitationVerificationFirewall: Sendable {
                     severity: .warning,
                     field: "x-firewall-class",
                     detail: "File declared x-firewall-class '\(declared)', \(CitationAuditWording.untrustedFileClassMarker)."
+                )
+            )
+        }
+
+        // 0b. Record non-arXiv eprint field ignored as identifier (S52 Rule 1)
+        if let ignoredEprint = nonEmpty(entry.ignoredNonArXivEprint) {
+            findings.append(
+                FirewallFinding(
+                    code: .ignoredNonArXivEprint,
+                    severity: .advisory,
+                    field: "eprint",
+                    detail: "eprint field '\(ignoredEprint)' is not an arXiv identifier; not treated as an identifier."
                 )
             )
         }
@@ -903,6 +917,8 @@ public struct CitationVerificationFirewall: Sendable {
                 let normDOI = doiCheck.normalized
                 if retractedDOIs.contains(normDOI) {
                     hasBuiltInRetractedDOI = true
+                    hasSyntacticallyValidDOI = true
+                    hasSyntacticallyValidPID = true
                     findings.append(
                         FirewallFinding(
                             code: .blockedRetractedWork,
@@ -918,6 +934,7 @@ public struct CitationVerificationFirewall: Sendable {
                         maxYear: maxAllowedPublicationYear
                     )
                     if arxivCheck.isValid {
+                        hasSyntacticallyValidDOI = true
                         hasSyntacticallyValidPID = true
                         findings.append(
                             FirewallFinding(
@@ -939,6 +956,7 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     }
                 } else {
+                    hasSyntacticallyValidDOI = true
                     hasSyntacticallyValidPID = true
                     if isPlaceholderSentinelDOI(normDOI) {
                         findings.append(
@@ -972,22 +990,33 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
-        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> NOT_FOUND `invalid_identifier`)
+        // 5. arXiv identifier calendar & sequence bounds check (`2319.99999` month 19 -> NOT_FOUND `invalid_identifier` when no valid DOI)
         if let rawArXiv = nonEmpty(entry.arxivID) {
             let arxivCheck = ScholarlyIdentifierValidator.validateArXivID(
                 rawArXiv,
                 maxYear: maxAllowedPublicationYear
             )
             if !arxivCheck.isValid {
-                hasInvalidIdentifierSyntax = true
-                findings.append(
-                    FirewallFinding(
-                        code: .invalidArXivCalendarBounds,
-                        severity: .criticalBlock,
-                        field: "arxivID",
-                        detail: arxivCheck.failureReason ?? "Invalid arXiv identifier '\(rawArXiv)'."
+                if hasSyntacticallyValidDOI && !hasInvalidIdentifierSyntax {
+                    findings.append(
+                        FirewallFinding(
+                            code: .invalidArXivCalendarBounds,
+                            severity: .warning,
+                            field: "arxivID",
+                            detail: arxivCheck.failureReason ?? "Invalid arXiv identifier '\(rawArXiv)'."
+                        )
                     )
-                )
+                } else {
+                    hasInvalidIdentifierSyntax = true
+                    findings.append(
+                        FirewallFinding(
+                            code: .invalidArXivCalendarBounds,
+                            severity: .criticalBlock,
+                            field: "arxivID",
+                            detail: arxivCheck.failureReason ?? "Invalid arXiv identifier '\(rawArXiv)'."
+                        )
+                    )
+                }
             } else {
                 hasSyntacticallyValidPID = true
                 findings.append(
@@ -1341,18 +1370,53 @@ public struct CitationVerificationFirewall: Sendable {
         guard language == .zhHans else { return report }
         var changed = false
         let updatedVerdicts = report.verdicts.map { verdict -> CitationFirewallEntryVerdict in
-            guard let declared = verdict.auditedEntry.untrustedDeclaredFirewallClass, !declared.isEmpty else {
+            let declared = firewall.nonEmpty(verdict.auditedEntry.untrustedDeclaredFirewallClass)
+            let ignoredEprint = firewall.nonEmpty(verdict.auditedEntry.ignoredNonArXivEprint)
+            let hasInvalidArXivDiscrepancy = verdict.fields.contains {
+                $0.field == "arxivID" && $0.remoteValue == "invalid format"
+            }
+            guard declared != nil || ignoredEprint != nil || hasInvalidArXivDiscrepancy else {
                 return verdict
             }
             changed = true
             let updatedFindings = verdict.findings.map { finding -> FirewallFinding in
-                guard finding.code == .untrustedEmbeddedFirewallTag else { return finding }
-                return FirewallFinding(
-                    code: finding.code,
-                    severity: finding.severity,
-                    field: finding.field,
-                    detail: "文件里写着 \(declared)，未采信。"
-                )
+                switch finding.code {
+                case .untrustedEmbeddedFirewallTag:
+                    if let declared {
+                        return FirewallFinding(
+                            code: finding.code,
+                            severity: finding.severity,
+                            field: finding.field,
+                            detail: "文件里写着 \(declared)，未采信。"
+                        )
+                    }
+                    return finding
+                case .ignoredNonArXivEprint:
+                    if let ignoredEprint {
+                        return FirewallFinding(
+                            code: finding.code,
+                            severity: finding.severity,
+                            field: finding.field,
+                            detail: "eprint 字段不是 arXiv 编号，未当作标识符（\(ignoredEprint)）。"
+                        )
+                    }
+                    return finding
+                default:
+                    return finding
+                }
+            }
+            let updatedFields = verdict.fields.map { discrepancy -> CitationFieldDiscrepancy in
+                if discrepancy.field == "arxivID" && discrepancy.remoteValue == "invalid format" {
+                    return CitationFieldDiscrepancy(
+                        field: discrepancy.field,
+                        localValue: discrepancy.localValue,
+                        remoteValue: "格式不合法",
+                        source: discrepancy.source,
+                        severity: discrepancy.severity,
+                        note: "arXiv 编号 '\(discrepancy.localValue)' 格式不合法。"
+                    )
+                }
+                return discrepancy
             }
             return CitationFirewallEntryVerdict(
                 citeKey: verdict.citeKey,
@@ -1360,7 +1424,7 @@ public struct CitationVerificationFirewall: Sendable {
                 insertable: verdict.insertable,
                 reasons: verdict.reasons,
                 sources: verdict.sources,
-                fields: verdict.fields,
+                fields: updatedFields,
                 findings: updatedFindings,
                 auditNote: verdict.auditNote,
                 auditedEntry: verdict.auditedEntry
@@ -1461,40 +1525,72 @@ public struct CitationVerificationFirewall: Sendable {
                 isBuiltInRetracted: isBuiltInRetracted,
                 session: session
             )
-            if let explicitArXivID = ReferenceIdentifierNormalizer.normalizeArXivID(entry.arxivID, stripVersion: true) {
-                return await crossCheckArXivAlongsideDOIVerdict(
-                    entry: entry,
-                    normalizedDOI: normDOI,
-                    arxivID: explicitArXivID,
-                    doiVerdict: doiVerdict,
-                    offlineVerdict: offlineVerdict,
-                    isBuiltInRetracted: isBuiltInRetracted,
-                    session: session
+            if let rawArXiv = nonEmpty(entry.arxivID) {
+                let arxivCheck = ScholarlyIdentifierValidator.validateArXivID(
+                    rawArXiv,
+                    maxYear: maxAllowedPublicationYear
                 )
+                if arxivCheck.isValid {
+                    return await crossCheckArXivAlongsideDOIVerdict(
+                        entry: entry,
+                        normalizedDOI: normDOI,
+                        arxivID: arxivCheck.canonicalBaseID,
+                        doiVerdict: doiVerdict,
+                        offlineVerdict: offlineVerdict,
+                        isBuiltInRetracted: isBuiltInRetracted,
+                        session: session
+                    )
+                } else {
+                    return applyMalformedExplicitArXivToDOIVerdict(
+                        entry: entry,
+                        rawArXiv: rawArXiv,
+                        doiVerdict: doiVerdict,
+                        offlineVerdict: offlineVerdict
+                    )
+                }
             }
             return doiVerdict
         }
 
         // Path B: Resolve arXiv preprint (including `10.48550/arXiv.*` DataCite DOIs) via arXiv Atom API
-        let candidateArXiv: String? = {
-            if let a = ReferenceIdentifierNormalizer.normalizeArXivID(entry.arxivID, stripVersion: true) {
-                return a
-            }
+        let rawExplicitArXiv = nonEmpty(entry.arxivID)
+        let explicitArXivValidation = rawExplicitArXiv.map {
+            ScholarlyIdentifierValidator.validateArXivID($0, maxYear: maxAllowedPublicationYear)
+        }
+        let doiEmbeddedArXiv: String? = {
             if let d = ReferenceIdentifierNormalizer.normalizeDOI(entry.doi), d.hasPrefix("10.48550/arxiv.") {
                 return String(d.dropFirst("10.48550/arxiv.".count))
             }
             return nil
         }()
 
-        if let arxivID = candidateArXiv {
+        if let explicitCheck = explicitArXivValidation, explicitCheck.isValid {
             return await verifyArXivEntry(
                 entry: entry,
-                arxivID: arxivID,
+                arxivID: explicitCheck.canonicalBaseID,
                 offlineVerdict: offlineVerdict,
                 initialFindings: findings,
                 isBuiltInRetracted: isBuiltInRetracted,
                 session: session
             )
+        } else if let doiArXiv = doiEmbeddedArXiv {
+            let doiArXivVerdict = await verifyArXivEntry(
+                entry: entry,
+                arxivID: doiArXiv,
+                offlineVerdict: offlineVerdict,
+                initialFindings: findings,
+                isBuiltInRetracted: isBuiltInRetracted,
+                session: session
+            )
+            if let rawArXiv = rawExplicitArXiv, explicitArXivValidation?.isValid == false {
+                return applyMalformedExplicitArXivToDOIVerdict(
+                    entry: entry,
+                    rawArXiv: rawArXiv,
+                    doiVerdict: doiArXivVerdict,
+                    offlineVerdict: offlineVerdict
+                )
+            }
+            return doiArXivVerdict
         }
 
         // Path C: Resolve PubMed PMID via E-utilities `esummary`
@@ -2019,6 +2115,66 @@ public struct CitationVerificationFirewall: Sendable {
                 overrideNote: doiVerdict.auditNote
             )
         }
+    }
+
+    /// Applies S52 Rule 3 when an entry has a syntactically valid DOI AND an explicit `arXiv`
+    /// identifier whose format is invalid: the DOI lookup verdict governs, the malformed arXiv ID
+    /// is recorded in `fields`, and a found DOI record (`.verified` / `.drift`) becomes `.drift`.
+    private func applyMalformedExplicitArXivToDOIVerdict(
+        entry: BibliographyEntry,
+        rawArXiv: String,
+        doiVerdict: CitationFirewallEntryVerdict,
+        offlineVerdict: CitationFirewallEntryVerdict
+    ) -> CitationFirewallEntryVerdict {
+        if doiVerdict == offlineVerdict && doiVerdict.sources.isEmpty {
+            return offlineVerdict
+        }
+        let invalidDiscrepancy = CitationFieldDiscrepancy(
+            field: "arxivID",
+            localValue: rawArXiv,
+            remoteValue: "invalid format",
+            source: "arXiv",
+            severity: "error",
+            note: "arXiv identifier '\(rawArXiv)' has invalid format."
+        )
+        var discrepancies = doiVerdict.fields
+        discrepancies.append(invalidDiscrepancy)
+        var findings = doiVerdict.findings
+
+        if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
+            var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+            if !reasons.contains("arxiv_mismatch") {
+                reasons.append("arxiv_mismatch")
+            }
+            let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: "arXiv")
+            findings.append(
+                FirewallFinding(
+                    code: .metadataDriftDetected,
+                    severity: .warning,
+                    field: "arxivID",
+                    detail: driftSummary
+                )
+            )
+            return buildUpdatedVerdict(
+                for: entry,
+                assignedClass: .drift,
+                reasons: reasons,
+                sources: doiVerdict.sources,
+                fields: discrepancies,
+                findings: findings,
+                overrideNote: "[DRIFT] \(driftSummary)"
+            )
+        }
+
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: doiVerdict.firewallClass,
+            reasons: doiVerdict.reasons,
+            sources: doiVerdict.sources,
+            fields: discrepancies,
+            findings: findings,
+            overrideNote: doiVerdict.auditNote
+        )
     }
 
     // MARK: - PubMed PMID Lookup via E-utilities `esummary` (M1 Item 3)
