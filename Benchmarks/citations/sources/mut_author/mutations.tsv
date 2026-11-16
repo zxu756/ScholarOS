@@ -1,0 +1,21 @@
+key	source_key	donor_key	field	original_first_author	mutated_first_author
+mut_author_001	real_clean_026	real_clean_038	Medicine	Kawauchi, Motohiro	Mizen, Amy
+mut_author_002	real_clean_041	real_clean_049	Physics and Astronomy	Menzies, J. W.	Kochelaev, B. I.
+mut_author_003	real_clean_079	real_clean_071	Biochemistry, Genetics and Molecular Biology	Yang, Naisu	Parson, W.
+mut_author_004	real_clean_060	real_clean_053	Physics and Astronomy	Beuther, H.	Henderson, Leah
+mut_author_005	real_clean_047	real_clean_053	Physics and Astronomy	Warner, Brian	Henderson, Leah
+mut_author_006	real_clean_059	real_clean_046	Physics and Astronomy	Borocci, Stefano	HOLLENBERG, L. C. L.
+mut_author_007	real_clean_052	real_clean_046	Physics and Astronomy	Zhang, Qian-Ming	HOLLENBERG, L. C. L.
+mut_author_008	real_clean_030	real_clean_039	Medicine	Asif, Arif	Chang, Jing
+mut_author_009	real_clean_057	real_clean_044	Physics and Astronomy	Ren, Zejian	Ritz, Victor H.
+mut_author_010	real_clean_083	real_clean_096	Social Sciences	RUBIN, ALAN M.	Vinsensius Tamelab
+mut_author_011	real_clean_025	real_clean_033	Medicine	Vanderburgh, Paul M.	Ramalho, F. N.
+mut_author_012	real_clean_024	real_clean_021	Medicine	Benson, Jane M.	Thomas, Sally
+mut_author_013	real_clean_080	real_clean_065	Biochemistry, Genetics and Molecular Biology	Sapitri, Ni Kadek Emik	Tsou, Amy Y.
+mut_author_014	real_clean_093	real_clean_086	Social Sciences	Pritandhari, Meyta P	Domínguez Castro, José
+mut_author_015	real_clean_022	real_clean_033	Medicine	Barnes, Gordon E.	Ramalho, F. N.
+mut_author_016	real_clean_061	real_clean_072	Biochemistry, Genetics and Molecular Biology	Kirkwood, Thomas B. L.	Gao, Feng
+mut_author_017	real_clean_066	real_clean_069	Biochemistry, Genetics and Molecular Biology	Kato, Shin-ichi	Szczesna, Miroslawa
+mut_author_018	real_clean_064	real_clean_069	Biochemistry, Genetics and Molecular Biology	Giagia-Athanasopoulou, Eva B.	Szczesna, Miroslawa
+mut_author_019	real_clean_021	real_clean_024	Medicine	Thomas, Sally	Benson, Jane M.
+mut_author_020	real_clean_015	real_clean_007	Computer Science	Wen, Zhengqi	Kheddouci, Hamamache

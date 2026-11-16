@@ -1,0 +1,2 @@
+page	offset	notices_returned	candidate_targets	accepted_count	crossref_search_url
+1	0	100	115	30	https://api.crossref.org/works?filter=update-type%3Aretraction&offset=0&order=desc&rows=100&sort=published

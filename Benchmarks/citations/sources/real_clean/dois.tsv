@@ -1,0 +1,101 @@
+key	stratum_id	field_name	year_band	doi	issued_year	published_print	published_online	issued	crossref_url
+real_clean_001	cs_1980_1999	Computer Science	1980-1999	10.1109/66.728565	1998	1998		1998	https://api.crossref.org/works/10.1109/66.728565
+real_clean_002	cs_1980_1999	Computer Science	1980-1999	10.1023/a:1002032032618	1999	1999-05		1999-05	https://api.crossref.org/works/10.1023/a%3A1002032032618
+real_clean_003	cs_1980_1999	Computer Science	1980-1999	10.1145/274790.273181	1998	1998-03	1998-03	1998-03	https://api.crossref.org/works/10.1145/274790.273181
+real_clean_004	cs_1980_1999	Computer Science	1980-1999	10.1117/12.57512	1992	1992-06-01		1992-06-01	https://api.crossref.org/works/10.1117/12.57512
+real_clean_005	cs_1980_1999	Computer Science	1980-1999	10.1145/6138.6149	1986	1986-07	1986-07	1986-07	https://api.crossref.org/works/10.1145/6138.6149
+real_clean_006	cs_2000_2009	Computer Science	2000-2009	10.3390/s8127866	2008		2008-12-04	2008-12-04	https://api.crossref.org/works/10.3390/s8127866
+real_clean_007	cs_2000_2009	Computer Science	2000-2009	10.1016/s1571-0653(05)80164-7	2000	2000-07		2000-07	https://api.crossref.org/works/10.1016/s1571-0653%2805%2980164-7
+real_clean_008	cs_2000_2009	Computer Science	2000-2009	10.1109/26.837035	2000	2000-03		2000-03	https://api.crossref.org/works/10.1109/26.837035
+real_clean_009	cs_2000_2009	Computer Science	2000-2009	10.5391/ijfis.2006.6.2.155	2006	2006-06-01		2006-06-01	https://api.crossref.org/works/10.5391/ijfis.2006.6.2.155
+real_clean_010	cs_2000_2009	Computer Science	2000-2009	10.1016/s1353-4858(08)70039-4	2007	2007-11		2007-11	https://api.crossref.org/works/10.1016/s1353-4858%2808%2970039-4
+real_clean_011	cs_2010_2019	Computer Science	2010-2019	10.1007/s00453-012-9720-9	2012	2013-10	2012-12-27	2012-12-27	https://api.crossref.org/works/10.1007/s00453-012-9720-9
+real_clean_012	cs_2010_2019	Computer Science	2010-2019	10.3169/itej.66.j322	2012	2012		2012	https://api.crossref.org/works/10.3169/itej.66.j322
+real_clean_013	cs_2010_2019	Computer Science	2010-2019	10.5391/ijfis.2010.10.1.031	2010	2010-03-31		2010-03-31	https://api.crossref.org/works/10.5391/ijfis.2010.10.1.031
+real_clean_014	cs_2010_2019	Computer Science	2010-2019	10.17648/enig.v2i1.46	2016		2016-05-04	2016-05-04	https://api.crossref.org/works/10.17648/enig.v2i1.46
+real_clean_015	cs_2010_2019	Computer Science	2010-2019	10.1007/s11265-017-1293-z	2017	2018-07	2017-10-02	2017-10-02	https://api.crossref.org/works/10.1007/s11265-017-1293-z
+real_clean_016	cs_2020_2024	Computer Science	2020-2024	10.46764/teknimedia.v3i1.58	2022		2022-06-20	2022-06-20	https://api.crossref.org/works/10.46764/teknimedia.v3i1.58
+real_clean_017	cs_2020_2024	Computer Science	2020-2024	10.1017/pds.2022.54	2022	2022-05	2022-05-26	2022-05	https://api.crossref.org/works/10.1017/pds.2022.54
+real_clean_018	cs_2020_2024	Computer Science	2020-2024	10.1109/tkde.2024.3392836	2024	2024-11		2024-11	https://api.crossref.org/works/10.1109/tkde.2024.3392836
+real_clean_019	cs_2020_2024	Computer Science	2020-2024	10.1016/j.eswa.2024.123738	2024	2024-09		2024-09	https://api.crossref.org/works/10.1016/j.eswa.2024.123738
+real_clean_020	cs_2020_2024	Computer Science	2020-2024	10.1080/01630563.2023.2209147	2023	2023-07-04	2023-05-12	2023-05-12	https://api.crossref.org/works/10.1080/01630563.2023.2209147
+real_clean_021	medicine_1980_1999	Medicine	1980-1999	10.1080/09595239500185011	1995	1995-01	2009-05-29	1995-01	https://api.crossref.org/works/10.1080/09595239500185011
+real_clean_022	medicine_1980_1999	Medicine	1980-1999	10.3109/10826088509047775	1985	1985-01	2009-07-03	1985-01	https://api.crossref.org/works/10.3109/10826088509047775
+real_clean_023	medicine_1980_1999	Medicine	1980-1999	10.1006/exer.1998.0585	1999	1999-01		1999-01	https://api.crossref.org/works/10.1006/exer.1998.0585
+real_clean_024	medicine_1980_1999	Medicine	1980-1999	10.1016/0049-3848(96)00106-5	1996	1996-07		1996-07	https://api.crossref.org/works/10.1016/0049-3848%2896%2900106-5
+real_clean_025	medicine_1980_1999	Medicine	1980-1999	10.1519/00124278-199511000-00013	1995	1995-11		1995-11	https://api.crossref.org/works/10.1519/00124278-199511000-00013
+real_clean_026	medicine_2000_2009	Medicine	2000-2009	10.1007/bf03218132	2000	2000-04		2000-04	https://api.crossref.org/works/10.1007/bf03218132
+real_clean_027	medicine_2000_2009	Medicine	2000-2009	10.1212/01.wnl.0000133407.47811.b2	2004	2004-08-10		2004-08-10	https://api.crossref.org/works/10.1212/01.wnl.0000133407.47811.b2
+real_clean_028	medicine_2000_2009	Medicine	2000-2009	10.1016/j.jocn.2007.09.016	2008	2008-09		2008-09	https://api.crossref.org/works/10.1016/j.jocn.2007.09.016
+real_clean_029	medicine_2000_2009	Medicine	2000-2009	10.3892/ijo.24.1.107	2004		2004-01-01	2004-01-01	https://api.crossref.org/works/10.3892/ijo.24.1.107
+real_clean_030	medicine_2000_2009	Medicine	2000-2009	10.1111/j.1523-1755.2005.00347.x	2005	2005-06		2005-06	https://api.crossref.org/works/10.1111/j.1523-1755.2005.00347.x
+real_clean_031	medicine_2010_2019	Medicine	2010-2019	10.1111/ahe.12280	2017	2017-08	2017-07-04	2017-07-04	https://api.crossref.org/works/10.1111/ahe.12280
+real_clean_032	medicine_2010_2019	Medicine	2010-2019	10.1016/j.jcjd.2013.07.012	2013	2013-10		2013-10	https://api.crossref.org/works/10.1016/j.jcjd.2013.07.012
+real_clean_033	medicine_2010_2019	Medicine	2010-2019	10.1186/s13098-017-0282-5	2017	2017-12	2017-10-13	2017-10-13	https://api.crossref.org/works/10.1186/s13098-017-0282-5
+real_clean_034	medicine_2010_2019	Medicine	2010-2019	10.1016/j.jad.2018.02.067	2018	2018-07		2018-07	https://api.crossref.org/works/10.1016/j.jad.2018.02.067
+real_clean_035	medicine_2010_2019	Medicine	2010-2019	10.1016/j.wneu.2017.07.152	2017	2017-11		2017-11	https://api.crossref.org/works/10.1016/j.wneu.2017.07.152
+real_clean_036	medicine_2020_2024	Medicine	2020-2024	10.4103/pajo.pajo_8_22	2022	2022-01		2022-01	https://api.crossref.org/works/10.4103/pajo.pajo_8_22
+real_clean_037	medicine_2020_2024	Medicine	2020-2024	10.4103/roaic.roaic_43_19	2020	2020		2020	https://api.crossref.org/works/10.4103/roaic.roaic_43_19
+real_clean_038	medicine_2020_2024	Medicine	2020-2024	10.1016/s2352-4642(24)00259-1	2025	2025-02		2025-02	https://api.crossref.org/works/10.1016/s2352-4642%2824%2900259-1
+real_clean_039	medicine_2020_2024	Medicine	2020-2024	10.21037/apm-20-1625	2021	2021-03	2021-03	2021-03	https://api.crossref.org/works/10.21037/apm-20-1625
+real_clean_040	medicine_2020_2024	Medicine	2020-2024	10.2147/ijn.s276033	2021		2021-03	2021-03	https://api.crossref.org/works/10.2147/ijn.s276033
+real_clean_041	physics_astronomy_1980_1999	Physics and Astronomy	1980-1999	10.1093/mnras/248.4.642	1991	1991-02-15		1991-02-15	https://api.crossref.org/works/10.1093/mnras/248.4.642
+real_clean_042	physics_astronomy_1980_1999	Physics and Astronomy	1980-1999	10.1016/0370-2693(87)91697-2	1987	1987-07		1987-07	https://api.crossref.org/works/10.1016/0370-2693%2887%2991697-2
+real_clean_043	physics_astronomy_1980_1999	Physics and Astronomy	1980-1999	10.1111/j.1749-6632.1980.tb15942.x	1980	1980-02	2006-12-16	1980-02	https://api.crossref.org/works/10.1111/j.1749-6632.1980.tb15942.x
+real_clean_044	physics_astronomy_1980_1999	Physics and Astronomy	1980-1999	10.1002/sia.740150219	1990	1990-02	2004-09-15	1990-02	https://api.crossref.org/works/10.1002/sia.740150219
+real_clean_045	physics_astronomy_1980_1999	Physics and Astronomy	1980-1999	10.1016/0009-2614(95)00942-w	1995	1995-10		1995-10	https://api.crossref.org/works/10.1016/0009-2614%2895%2900942-w
+real_clean_046	physics_astronomy_2000_2009	Physics and Astronomy	2000-2009	10.1142/s0217751x07038359	2007	2007-10-30	2012-01-25	2007-10-30	https://api.crossref.org/works/10.1142/s0217751x07038359
+real_clean_047	physics_astronomy_2000_2009	Physics and Astronomy	2000-2009	10.1111/j.1468-4004.2006.47129.x	2006	2006-02		2006-02	https://api.crossref.org/works/10.1111/j.1468-4004.2006.47129.x
+real_clean_048	physics_astronomy_2000_2009	Physics and Astronomy	2000-2009	10.1103/physreva.67.032302	2003		2003-03-10	2003-03-10	https://api.crossref.org/works/10.1103/physreva.67.032302
+real_clean_049	physics_astronomy_2000_2009	Physics and Astronomy	2000-2009	10.1140/epjb/e2009-00386-9	2009	2009-12	2009-11-10	2009-11-10	https://api.crossref.org/works/10.1140/epjb/e2009-00386-9
+real_clean_050	physics_astronomy_2000_2009	Physics and Astronomy	2000-2009	10.1134/1.1842301	2004	2004-12		2004-12	https://api.crossref.org/works/10.1134/1.1842301
+real_clean_051	physics_astronomy_2010_2019	Physics and Astronomy	2010-2019	10.1016/j.ijrobp.2016.06.2211	2016	2016-10		2016-10	https://api.crossref.org/works/10.1016/j.ijrobp.2016.06.2211
+real_clean_052	physics_astronomy_2010_2019	Physics and Astronomy	2010-2019	10.1038/srep10350	2015		2015-06-11	2015-06-11	https://api.crossref.org/works/10.1038/srep10350
+real_clean_053	physics_astronomy_2010_2019	Physics and Astronomy	2010-2019	10.1016/j.shpsb.2014.06.001	2014	2014-08		2014-08	https://api.crossref.org/works/10.1016/j.shpsb.2014.06.001
+real_clean_054	physics_astronomy_2010_2019	Physics and Astronomy	2010-2019	10.1111/j.1365-2966.2011.18878.x	2011	2011-08-11	2011-05-20	2011-05-20	https://api.crossref.org/works/10.1111/j.1365-2966.2011.18878.x
+real_clean_055	physics_astronomy_2010_2019	Physics and Astronomy	2010-2019	10.14704/nq.2011.9.1.305	2010		2010-09-29	2010-09-29	https://api.crossref.org/works/10.14704/nq.2011.9.1.305
+real_clean_056	physics_astronomy_2020_2024	Physics and Astronomy	2020-2024	10.1088/1674-1056/abd468	2021	2021-05-01		2021-05-01	https://api.crossref.org/works/10.1088/1674-1056/abd468
+real_clean_057	physics_astronomy_2020_2024	Physics and Astronomy	2020-2024	10.1063/5.0219170	2024	2024-12-01	2024-11-22	2024-11-22	https://api.crossref.org/works/10.1063/5.0219170
+real_clean_058	physics_astronomy_2020_2024	Physics and Astronomy	2020-2024	10.24275/azcatl2024a001	2024		2024-07-31	2024-07-31	https://api.crossref.org/works/10.24275/azcatl2024a001
+real_clean_059	physics_astronomy_2020_2024	Physics and Astronomy	2020-2024	10.1063/5.0077119	2022	2022-01-07	2022-01-03	2022-01-03	https://api.crossref.org/works/10.1063/5.0077119
+real_clean_060	physics_astronomy_2020_2024	Physics and Astronomy	2020-2024	10.1051/0004-6361/202346167	2023	2023-05	2023-05-18	2023-05	https://api.crossref.org/works/10.1051/0004-6361/202346167
+real_clean_061	biochem_genetics_molbio_1980_1999	Biochemistry, Genetics and Molecular Biology	1980-1999	10.1007/bf00569695	1982	1982		1982	https://api.crossref.org/works/10.1007/bf00569695
+real_clean_062	biochem_genetics_molbio_1980_1999	Biochemistry, Genetics and Molecular Biology	1980-1999	10.1248/bpb1978.11.262	1988	1988		1988	https://api.crossref.org/works/10.1248/bpb1978.11.262
+real_clean_063	biochem_genetics_molbio_1980_1999	Biochemistry, Genetics and Molecular Biology	1980-1999	10.1016/0260-8774(88)90041-6	1988	1988-01		1988-01	https://api.crossref.org/works/10.1016/0260-8774%2888%2990041-6
+real_clean_064	biochem_genetics_molbio_1980_1999	Biochemistry, Genetics and Molecular Biology	1980-1999	10.4098/at.arch.95-15	1995	1995-03-10	1995-03-10	1995-03-10	https://api.crossref.org/works/10.4098/at.arch.95-15
+real_clean_065	biochem_genetics_molbio_1980_1999	Biochemistry, Genetics and Molecular Biology	1980-1999	10.1021/bi00429a008	1989	1989-02-07	2002-05-01	1989-02-07	https://api.crossref.org/works/10.1021/bi00429a008
+real_clean_066	biochem_genetics_molbio_2000_2009	Biochemistry, Genetics and Molecular Biology	2000-2009	10.1016/j.tet.2004.09.080	2004	2004-12		2004-12	https://api.crossref.org/works/10.1016/j.tet.2004.09.080
+real_clean_067	biochem_genetics_molbio_2000_2009	Biochemistry, Genetics and Molecular Biology	2000-2009	10.1016/j.etap.2009.11.004	2010	2010-01		2010-01	https://api.crossref.org/works/10.1016/j.etap.2009.11.004
+real_clean_068	biochem_genetics_molbio_2000_2009	Biochemistry, Genetics and Molecular Biology	2000-2009	10.1093/toxsci/kfg141	2003	2003-08-01	2003-05-28	2003-05-28	https://api.crossref.org/works/10.1093/toxsci/kfg141
+real_clean_069	biochem_genetics_molbio_2000_2009	Biochemistry, Genetics and Molecular Biology	2000-2009	10.1016/s1381-1177(00)00151-x	2001	2001-01		2001-01	https://api.crossref.org/works/10.1016/s1381-1177%2800%2900151-x
+real_clean_070	biochem_genetics_molbio_2000_2009	Biochemistry, Genetics and Molecular Biology	2000-2009	10.1038/nbt0808-881	2008	2008-08		2008-08	https://api.crossref.org/works/10.1038/nbt0808-881
+real_clean_071	biochem_genetics_molbio_2010_2019	Biochemistry, Genetics and Molecular Biology	2010-2019	10.1016/j.fsigen.2014.07.010	2014	2014-11		2014-11	https://api.crossref.org/works/10.1016/j.fsigen.2014.07.010
+real_clean_072	biochem_genetics_molbio_2010_2019	Biochemistry, Genetics and Molecular Biology	2010-2019	10.1038/nbt0517-481a	2016	2017-05	2016-11-28	2016-11-28	https://api.crossref.org/works/10.1038/nbt0517-481a
+real_clean_073	biochem_genetics_molbio_2010_2019	Biochemistry, Genetics and Molecular Biology	2010-2019	10.1016/j.jalz.2011.05.1587	2011	2011-07	2011-07	2011-07	https://api.crossref.org/works/10.1016/j.jalz.2011.05.1587
+real_clean_074	biochem_genetics_molbio_2010_2019	Biochemistry, Genetics and Molecular Biology	2010-2019	10.1016/j.jfca.2012.10.004	2013	2013-02		2013-02	https://api.crossref.org/works/10.1016/j.jfca.2012.10.004
+real_clean_075	biochem_genetics_molbio_2010_2019	Biochemistry, Genetics and Molecular Biology	2010-2019	10.1507/endocrj.ej17-0399	2018	2018		2018	https://api.crossref.org/works/10.1507/endocrj.ej17-0399
+real_clean_076	biochem_genetics_molbio_2020_2024	Biochemistry, Genetics and Molecular Biology	2020-2024	10.1073/pnas.2010906117	2020	2020-12-15	2020-11-30	2020-11-30	https://api.crossref.org/works/10.1073/pnas.2010906117
+real_clean_077	biochem_genetics_molbio_2020_2024	Biochemistry, Genetics and Molecular Biology	2020-2024	10.3390/ijms22020798	2021		2021-01-14	2021-01-14	https://api.crossref.org/works/10.3390/ijms22020798
+real_clean_078	biochem_genetics_molbio_2020_2024	Biochemistry, Genetics and Molecular Biology	2020-2024	10.15360/1813-9779-2022-2-76-82	2022		2022-04-30	2022-04-30	https://api.crossref.org/works/10.15360/1813-9779-2022-2-76-82
+real_clean_079	biochem_genetics_molbio_2020_2024	Biochemistry, Genetics and Molecular Biology	2020-2024	10.1093/jas/skae234.504	2024	2024-09-14	2024-09-14	2024-09-01	https://api.crossref.org/works/10.1093/jas/skae234.504
+real_clean_080	biochem_genetics_molbio_2020_2024	Biochemistry, Genetics and Molecular Biology	2020-2024	10.30598/barekengvol18iss3pp1909-1918	2024		2024-07-31	2024-07-31	https://api.crossref.org/works/10.30598/barekengvol18iss3pp1909-1918
+real_clean_081	social_sciences_1980_1999	Social Sciences	1980-1999	10.1080/12259276.1998.11665819	1998	1998-01	2016-01-04	1998-01	https://api.crossref.org/works/10.1080/12259276.1998.11665819
+real_clean_082	social_sciences_1980_1999	Social Sciences	1980-1999	10.2307/2702514	1982	1982-09		1982-09	https://api.crossref.org/works/10.2307/2702514
+real_clean_083	social_sciences_1980_1999	Social Sciences	1980-1999	10.1177/009365087014001004	1987	1987-02	1987-02-01	1987-02	https://api.crossref.org/works/10.1177/009365087014001004
+real_clean_084	social_sciences_1980_1999	Social Sciences	1980-1999	10.1177/095624789700900110	1997	1997-04	1997-04-01	1997-04	https://api.crossref.org/works/10.1177/095624789700900110
+real_clean_085	social_sciences_1980_1999	Social Sciences	1980-1999	10.1097/00001888-199311000-00010	1993	1993-11		1993-11	https://api.crossref.org/works/10.1097/00001888-199311000-00010
+real_clean_086	social_sciences_2000_2009	Social Sciences	2000-2009	10.59991/rvam/2008/m.6/520	2008		2008-06-01	2008-06-01	https://api.crossref.org/works/10.59991/rvam/2008/m.6/520
+real_clean_087	social_sciences_2000_2009	Social Sciences	2000-2009	10.1017/s1537592704810971	2004	2004-06	2004-06-01	2004-06	https://api.crossref.org/works/10.1017/s1537592704810971
+real_clean_088	social_sciences_2000_2009	Social Sciences	2000-2009	10.1080/00028533.2002.11821579	2002	2002-09	2017-02-02	2002-09	https://api.crossref.org/works/10.1080/00028533.2002.11821579
+real_clean_089	social_sciences_2000_2009	Social Sciences	2000-2009	10.11606/issn.1983-6023.sank.2008.88723	2008		2008-06-06	2008-06-06	https://api.crossref.org/works/10.11606/issn.1983-6023.sank.2008.88723
+real_clean_090	social_sciences_2000_2009	Social Sciences	2000-2009	10.1628/002268808784614961	2008	2008		2008	https://api.crossref.org/works/10.1628/002268808784614961
+real_clean_091	social_sciences_2010_2019	Social Sciences	2010-2019	10.59236/emro.v12i10a4507	2010		2010-10-07	2010-10-07	https://api.crossref.org/works/10.59236/emro.v12i10a4507
+real_clean_092	social_sciences_2010_2019	Social Sciences	2010-2019	10.1016/j.ijer.2019.101497	2020	2020		2020	https://api.crossref.org/works/10.1016/j.ijer.2019.101497
+real_clean_093	social_sciences_2010_2019	Social Sciences	2010-2019	10.24127/ja.v5i1.845	2017		2017-06-01	2017-06-01	https://api.crossref.org/works/10.24127/ja.v5i1.845
+real_clean_094	social_sciences_2010_2019	Social Sciences	2010-2019	10.7146/ntfk.v100i1.70134	2013		2013-03-29	2013-03-29	https://api.crossref.org/works/10.7146/ntfk.v100i1.70134
+real_clean_095	social_sciences_2010_2019	Social Sciences	2010-2019	10.12967/riem-2017-5-p129-138	2017	2017-07	2017-07-01	2017-07	https://api.crossref.org/works/10.12967/riem-2017-5-p129-138
+real_clean_096	social_sciences_2020_2024	Social Sciences	2020-2024	10.58192/populer.v2i3.1208	2023		2023-08-11	2023-08-11	https://api.crossref.org/works/10.58192/populer.v2i3.1208
+real_clean_097	social_sciences_2020_2024	Social Sciences	2020-2024	10.18061/dsq.v42i1.7516	2022		2022-08-18	2022-08-18	https://api.crossref.org/works/10.18061/dsq.v42i1.7516
+real_clean_098	social_sciences_2020_2024	Social Sciences	2020-2024	10.55380/taqorrub.v1i1.41	2020		2020-01-21	2020-01-21	https://api.crossref.org/works/10.55380/taqorrub.v1i1.41
+real_clean_099	social_sciences_2020_2024	Social Sciences	2020-2024	10.32689/2523-4625-2024-3(75)-9	2024		2024-12-10	2024-12-10	https://api.crossref.org/works/10.32689/2523-4625-2024-3%2875%29-9
+real_clean_100	social_sciences_2020_2024	Social Sciences	2020-2024	10.30570/2078-5089-2024-114-3-82-108	2024	2024-09-24	2024-09-24	2024-09-24	https://api.crossref.org/works/10.30570/2078-5089-2024-114-3-82-108

@@ -1,0 +1,1 @@
+{"body": "Resource not found.", "fetched_at": "2026-11-16T02:36:11Z", "headers": {"content-type": "text/plain", "date": "Mon, 16 Nov 2026 02:36:11 GMT", "x-concurrency-limit": "1", "x-rate-limit-interval": "1s", "x-rate-limit-limit": "5"}, "status": 404, "url": "https://api.crossref.org/works/10.14456/mijst.2013.10"}
