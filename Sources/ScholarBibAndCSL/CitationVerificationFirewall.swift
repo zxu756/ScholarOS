@@ -3989,11 +3989,42 @@ public struct CitationVerificationFirewall: Sendable {
         let firstAuthorSurname: String?
         let firstAuthorFullName: String?
         let firstAuthorHasExplicitFamilyField: Bool
+        let firstAuthorFamilyOnlyWithoutGiven: Bool
         let firstAuthorIsCorporate: Bool
         let authorSurnames: [String]
         let publicationYears: [Int]
         let venues: [String]
         let retractionField: String?
+
+        init(
+            sourceName: String,
+            doi: String?,
+            title: String,
+            firstAuthorDisplay: String?,
+            firstAuthorSurname: String?,
+            firstAuthorFullName: String?,
+            firstAuthorHasExplicitFamilyField: Bool,
+            firstAuthorFamilyOnlyWithoutGiven: Bool = false,
+            firstAuthorIsCorporate: Bool,
+            authorSurnames: [String],
+            publicationYears: [Int],
+            venues: [String],
+            retractionField: String?
+        ) {
+            self.sourceName = sourceName
+            self.doi = doi
+            self.title = title
+            self.firstAuthorDisplay = firstAuthorDisplay
+            self.firstAuthorSurname = firstAuthorSurname
+            self.firstAuthorFullName = firstAuthorFullName
+            self.firstAuthorHasExplicitFamilyField = firstAuthorHasExplicitFamilyField
+            self.firstAuthorFamilyOnlyWithoutGiven = firstAuthorFamilyOnlyWithoutGiven
+            self.firstAuthorIsCorporate = firstAuthorIsCorporate
+            self.authorSurnames = authorSurnames
+            self.publicationYears = publicationYears
+            self.venues = venues
+            self.retractionField = retractionField
+        }
     }
 
     private enum RegistryPayloadParseOutcome {
@@ -4188,13 +4219,27 @@ public struct CitationVerificationFirewall: Sendable {
             return (nil, nil)
         }
 
+        let trimmedLocalSurname = localFirst.familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remoteSurnameRaw = remote.firstAuthorSurname ?? remoteDisplay
+        let trimmedRemoteSurname = remoteSurnameRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // S54: Character-for-character identical surnames always match, even if normalized form is empty (e.g. ".").
+        if !remote.firstAuthorIsCorporate && !trimmedLocalSurname.isEmpty && trimmedLocalSurname == trimmedRemoteSurname {
+            return (nil, nil)
+        }
+
         let localIsCorporate = localFirst.givenName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && localFirst.familyName.trimmingCharacters(in: .whitespacesAndNewlines).contains(" ")
+            && trimmedLocalSurname.contains(" ")
 
         if remote.firstAuthorIsCorporate || localIsCorporate {
             let remoteCorpCandidate = remote.firstAuthorIsCorporate
                 ? remoteDisplay
                 : (remote.firstAuthorFullName ?? remoteDisplay)
+            let trimmedLocalDesc = localFirst.description.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedRemoteCorp = remoteCorpCandidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedLocalDesc.isEmpty && trimmedLocalDesc == trimmedRemoteCorp {
+                return (nil, nil)
+            }
             let localFull = Self.normalizeCorporateOrAuthorToken(localFirst.description)
             let remoteFull = Self.normalizeCorporateOrAuthorToken(remoteCorpCandidate)
             guard !localFull.isEmpty, localFull == remoteFull else {
@@ -4214,11 +4259,38 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         let localNormSurname = Self.normalizeCorporateOrAuthorToken(localFirst.familyName)
-        let remoteSurnameRaw = remote.firstAuthorSurname ?? remoteDisplay
         let remoteNormSurname = Self.normalizeCorporateOrAuthorToken(remoteSurnameRaw)
 
         if !localNormSurname.isEmpty && localNormSurname == remoteNormSurname {
             return (nil, nil)
+        }
+
+        // S54: When remote first author has only `family` (no `given`) and `family` has multiple whitespace-separated words,
+        // match if local surname equals the last word OR local "given family" as a whole equals remote `family`.
+        if remote.firstAuthorFamilyOnlyWithoutGiven {
+            let remoteFamilyWords = trimmedRemoteSurname.split(whereSeparator: \.isWhitespace).map(String.init)
+            if remoteFamilyWords.count >= 2, let lastWord = remoteFamilyWords.last {
+                let lastWordNorm = Self.normalizeCorporateOrAuthorToken(lastWord)
+                if trimmedLocalSurname == lastWord || (!localNormSurname.isEmpty && localNormSurname == lastWordNorm) {
+                    return (nil, nil)
+                }
+                let localGivenTrimmed = localFirst.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let localGivenAndFamily = localGivenTrimmed.isEmpty
+                    ? trimmedLocalSurname
+                    : "\(localGivenTrimmed) \(trimmedLocalSurname)"
+                let collapsedLocalFull = localGivenAndFamily.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+                let collapsedRemoteFamily = remoteFamilyWords.joined(separator: " ")
+                let localFullWords = Self.splitAlphanumericWords(
+                    Self.foldLigaturesAndDiacritics(LaTeXTextCodec().decode(localGivenAndFamily))
+                )
+                let remoteFamilyNormWords = Self.splitAlphanumericWords(
+                    Self.foldLigaturesAndDiacritics(LaTeXTextCodec().decode(trimmedRemoteSurname))
+                )
+                if collapsedLocalFull == collapsedRemoteFamily
+                    || (!localFullWords.isEmpty && localFullWords == remoteFamilyNormWords) {
+                    return (nil, nil)
+                }
+            }
         }
 
         // Compound surname check (S37, e.g. "García Márquez") when remote source (OpenAlex/arXiv)
@@ -4592,6 +4664,7 @@ public struct CitationVerificationFirewall: Sendable {
         var firstAuthorSurname: String?
         var firstAuthorFullName: String?
         var firstAuthorHasExplicitFamilyField = false
+        var firstAuthorFamilyOnlyWithoutGiven = false
         var firstAuthorIsCorporate = false
         var authorSurnames: [String] = []
 
@@ -4605,8 +4678,10 @@ public struct CitationVerificationFirewall: Sendable {
                 firstAuthorSurname = fam
                 if let giv = nonEmpty(firstObj["given"] as? String) {
                     firstAuthorFullName = "\(giv) \(fam)"
+                    firstAuthorFamilyOnlyWithoutGiven = false
                 } else {
                     firstAuthorFullName = fam
+                    firstAuthorFamilyOnlyWithoutGiven = true
                 }
                 firstAuthorHasExplicitFamilyField = true
                 firstAuthorIsCorporate = false
@@ -4615,6 +4690,7 @@ public struct CitationVerificationFirewall: Sendable {
                 firstAuthorSurname = corpName
                 firstAuthorFullName = corpName
                 firstAuthorHasExplicitFamilyField = false
+                firstAuthorFamilyOnlyWithoutGiven = false
                 firstAuthorIsCorporate = true
             }
 
@@ -4685,6 +4761,7 @@ public struct CitationVerificationFirewall: Sendable {
                 firstAuthorSurname: firstAuthorSurname,
                 firstAuthorFullName: firstAuthorFullName,
                 firstAuthorHasExplicitFamilyField: firstAuthorHasExplicitFamilyField,
+                firstAuthorFamilyOnlyWithoutGiven: firstAuthorFamilyOnlyWithoutGiven,
                 firstAuthorIsCorporate: firstAuthorIsCorporate,
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,

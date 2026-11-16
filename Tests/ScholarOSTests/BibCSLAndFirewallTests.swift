@@ -4918,4 +4918,127 @@ struct BibCSLAndFirewallTests {
         #expect(replayAfterCancel.manifest.count == 86)
         #expect(replayAfterCancel.manifest.totalHTTPRequestsSent == 86)
     }
+
+    // MARK: - 14. M1 Stage 12 Post-Benchmark Refinements (S54, S55, S56, S57)
+
+    private static var benchmarkCitationsURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Benchmarks/citations", isDirectory: true)
+    }
+
+    private func loadBenchmarkEntries(group: String, keys: Set<String>? = nil) throws -> [BibliographyEntry] {
+        let bibURL = Self.benchmarkCitationsURL
+            .appendingPathComponent("entries/\(group).bib", isDirectory: false)
+        let raw = try String(contentsOf: bibURL, encoding: .utf8)
+        let all = try BibTeXCodec().parseDocument(raw).entries
+        guard let keys else { return all }
+        return all.filter { keys.contains($0.citeKey) }
+    }
+
+    @Test("M1 stage 12 (S54): first-author check accepts identical non-alphanumeric surnames and Crossref family-only multi-word names while keeping mut_author and LeCunn/Hochriter as DRIFT")
+    func m1Stage12S54FirstAuthorExactCharacterAndFamilyOnlyMultiWordMatch() async throws {
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+        let cleanPair = try loadBenchmarkEntries(group: "real_clean", keys: ["real_clean_094", "real_clean_096"])
+        #expect(cleanPair.count == 2)
+
+        let cleanResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: cleanPair,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let cleanByKey = Dictionary(uniqueKeysWithValues: cleanResult.report.verdicts.map { ($0.citeKey, $0) })
+        let v094 = try #require(cleanByKey["real_clean_094"])
+        let v096 = try #require(cleanByKey["real_clean_096"])
+        #expect(v094.firewallClass == .verified)
+        #expect(v094.insertable == true)
+        #expect(v094.reasons == ["verified_match"])
+        #expect(v094.fields.isEmpty)
+        #expect(v096.firewallClass == .verified)
+        #expect(v096.insertable == true)
+        #expect(v096.reasons == ["verified_match"])
+        #expect(v096.fields.isEmpty)
+
+        // Also test the "given + family equals remote family-only" branch directly when surname != last word,
+        // and verify punctuation surname mismatch ('.' vs '..') still yields DRIFT.
+        let firewall = CitationVerificationFirewall()
+        let familyOnlyThreeWordRemote = CitationVerificationFirewall.RemoteWorkRecord(
+            sourceName: "Crossref",
+            doi: "10.1000/test",
+            title: "Test",
+            firstAuthorDisplay: "Mericiana Yulita Tae",
+            firstAuthorSurname: "Mericiana Yulita Tae",
+            firstAuthorFullName: "Mericiana Yulita Tae",
+            firstAuthorHasExplicitFamilyField: true,
+            firstAuthorFamilyOnlyWithoutGiven: true,
+            firstAuthorIsCorporate: false,
+            authorSurnames: ["Mericiana Yulita Tae"],
+            publicationYears: [2023],
+            venues: ["Test Journal"],
+            retractionField: nil
+        )
+        let fullNameAligned = firewall.compareFirstAuthor(
+            localAuthors: [BibAuthor(givenName: "Mericiana", familyName: "Yulita Tae")],
+            remote: familyOnlyThreeWordRemote
+        )
+        #expect(fullNameAligned.discrepancy == nil)
+
+        let punctRemote = CitationVerificationFirewall.RemoteWorkRecord(
+            sourceName: "Crossref",
+            doi: "10.1000/test",
+            title: "Test",
+            firstAuthorDisplay: "..",
+            firstAuthorSurname: "..",
+            firstAuthorFullName: "NTfK ..",
+            firstAuthorHasExplicitFamilyField: true,
+            firstAuthorIsCorporate: false,
+            authorSurnames: [".."],
+            publicationYears: [2013],
+            venues: ["Test Journal"],
+            retractionField: nil
+        )
+        let punctMismatch = firewall.compareFirstAuthor(
+            localAuthors: [BibAuthor(givenName: "NTfK", familyName: ".")],
+            remote: punctRemote
+        )
+        #expect(punctMismatch.reason == "first_author_mismatch")
+
+        // mut_author: all 20 entries must remain DRIFT
+        let mutAuthorEntries = try loadBenchmarkEntries(group: "mut_author")
+        #expect(mutAuthorEntries.count == 20)
+        let mutAuthorResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: mutAuthorEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        #expect(mutAuthorResult.report.driftCount == 20)
+        #expect(mutAuthorResult.report.verifiedCount == 0)
+        for verdict in mutAuthorResult.report.verdicts {
+            #expect(verdict.firewallClass == .drift)
+            #expect(verdict.insertable == false)
+        }
+
+        // audit_manual surname typos (audit_017 LeCunn, audit_018 Hochriter) must remain DRIFT
+        let auditSurnameTypos = try loadBenchmarkEntries(group: "audit_manual", keys: ["audit_017", "audit_018"])
+        #expect(auditSurnameTypos.count == 2)
+        let auditResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: auditSurnameTypos,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        for verdict in auditResult.report.verdicts {
+            #expect(verdict.firewallClass == .drift)
+            #expect(verdict.insertable == false)
+            #expect(verdict.reasons.contains("first_author_mismatch"))
+        }
+    }
 }
