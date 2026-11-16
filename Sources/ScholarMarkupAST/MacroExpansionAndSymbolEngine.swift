@@ -469,7 +469,7 @@ public struct ManuscriptSymbolTable: Sendable, Codable, Hashable {
         guard !target.isEmpty, !labelsByKey.isEmpty else { return nil }
         var bestKey: String? = nil
         var bestDist = Int.max
-        for candidate in labelsByKey.keys {
+        for candidate in labelsByKey.keys.sorted() {
             let dist = Self.levenshteinDistance(target, candidate)
             if dist < bestDist && dist <= 3 {
                 bestDist = dist

@@ -4573,6 +4573,230 @@ struct PluginSDKMCPAndShellTests {
         let hintRangeEN = try #require(enEntryLine.range(of: "Venue note:"))
         #expect(matchedRangeEN.upperBound <= hintRangeEN.lowerBound)
     }
+
+    // MARK: - 17. M2 Stage 01: `diagnostics --json` Structured Schema (`scholaros.diagnostics/1`) & Byte-Identical Determinism
+
+    @Test("M2 item 6 (Stage 01): diagnostics --json emits scholaros.diagnostics/1 object with files, bibliographySources, citations, uncitedEntries, labels, references, categorized diagnostics, complete, and counts while keeping text output unchanged")
+    func m2Stage01DiagnosticsJSONSchemaAndObjectStructure() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage01-schema")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let env: [String: String] = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        let sectionsDir = tempDir.appendingPathComponent("sections", isDirectory: true)
+        try FileManager.default.createDirectory(at: sectionsDir, withIntermediateDirectories: true)
+
+        let mainTexURL = tempDir.appendingPathComponent("main.tex")
+        let subTexURL = sectionsDir.appendingPathComponent("sub.tex")
+        let bibURL = tempDir.appendingPathComponent("refs.bib")
+
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Introduction}\\label{sec:intro}
+        \\label{sec:dup}
+        Prior work~\\cite{real_lecun} and missing~\\cite{missing_key}.
+        \\input{sections/sub}
+        \\bibliography{refs}
+        \\end{document}
+        """.write(to: mainTexURL, atomically: true, encoding: .utf8)
+
+        try """
+        \\subsection{Details}
+        \\label{sec:dup}
+        See Section~\\ref{sec:intro} and~\\ref{sec:missing}, plus~\\citep{real_lecun}.
+        """.write(to: subTexURL, atomically: true, encoding: .utf8)
+
+        try """
+        @article{real_lecun,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        @article{uncited_entry,
+          author  = {Knuth, Donald E.},
+          title   = {The Art of Computer Programming},
+          publisher = {Addison-Wesley},
+          year    = {1968}
+        }
+        """.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let runner = ScholarCLIRunner(environment: env)
+
+        // 1. Offline JSON output structure
+        let offlineRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTexURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(offlineRes.exitCode == 0, "stderr=\(offlineRes.stderr)")
+
+        let topObj = try #require(
+            try JSONSerialization.jsonObject(with: Data(offlineRes.stdout.utf8)) as? [String: Any],
+            "diagnostics --json must be a top-level JSON object, not an array"
+        )
+        let expectedTopKeys: Set<String> = [
+            "schema", "mode", "root", "files", "bibliographySources",
+            "citations", "uncitedEntries", "labels", "references",
+            "diagnostics", "complete", "counts"
+        ]
+        #expect(Set(topObj.keys) == expectedTopKeys)
+        #expect(topObj["schema"] as? String == "scholaros.diagnostics/1")
+        #expect(topObj["mode"] as? String == "offline")
+        #expect(topObj["root"] as? String == "main.tex")
+        #expect(topObj["complete"] as? Bool == false)
+
+        let files = try #require(topObj["files"] as? [[String: Any]])
+        #expect(files.count == 2)
+        #expect(files[0]["path"] as? String == "main.tex")
+        #expect(files[0]["encoding"] as? String == "utf-8")
+        #expect(files[0]["includedFrom"] is NSNull)
+        #expect(files[1]["path"] as? String == "sections/sub.tex")
+        #expect(files[1]["encoding"] as? String == "utf-8")
+        #expect(files[1]["includedFrom"] as? String == "main.tex:6")
+
+        let bibSources = try #require(topObj["bibliographySources"] as? [[String: Any]])
+        #expect(bibSources.count == 1)
+        #expect(bibSources[0]["kind"] as? String == "bib")
+        #expect(bibSources[0]["path"] as? String == "refs.bib")
+        #expect(bibSources[0]["entries"] as? Int == 2)
+        #expect((bibSources[0]["errors"] as? [Any])?.isEmpty == true)
+
+        let citations = try #require(topObj["citations"] as? [[String: Any]])
+        #expect(citations.map { $0["key"] as? String } == ["missing_key", "real_lecun"])
+
+        let missingCite = citations[0]
+        #expect(missingCite["defined"] as? Bool == false)
+        #expect(missingCite["source"] is NSNull)
+        #expect(missingCite["verification"] is NSNull)
+        let missingOccs = try #require(missingCite["occurrences"] as? [[String: Any]])
+        #expect(missingOccs.count == 1)
+        #expect(missingOccs[0]["file"] as? String == "main.tex")
+        #expect(missingOccs[0]["command"] as? String == "\\cite")
+
+        let definedCite = citations[1]
+        #expect(definedCite["defined"] as? Bool == true)
+        #expect(definedCite["source"] as? String == "refs.bib")
+        let definedOccs = try #require(definedCite["occurrences"] as? [[String: Any]])
+        #expect(definedOccs.count == 2)
+        let verification = try #require(definedCite["verification"] as? [String: Any])
+        #expect(verification["verdict"] as? String == "UNVERIFIED")
+        #expect(verification["reasons"] as? [String] == ["offline"])
+        #expect(verification["insertable"] as? Bool == false)
+        #expect((verification["sources"] as? [Any])?.isEmpty == true)
+        #expect((verification["fields"] as? [Any])?.isEmpty == true)
+
+        let uncited = try #require(topObj["uncitedEntries"] as? [String])
+        #expect(uncited == ["uncited_entry"])
+
+        // Labels: duplicate `sec:dup` must appear once per occurrence (2 entries) + `sec:intro` (1 entry) = 3 total
+        let labels = try #require(topObj["labels"] as? [[String: Any]])
+        #expect(labels.count == 3)
+        let dupLabels = labels.filter { ($0["key"] as? String) == "sec:dup" }
+        #expect(dupLabels.count == 2)
+        #expect(Set(dupLabels.compactMap { $0["file"] as? String }) == ["main.tex", "sections/sub.tex"])
+
+        let refs = try #require(topObj["references"] as? [[String: Any]])
+        #expect(refs.count == 2)
+        let introRef = try #require(refs.first { ($0["key"] as? String) == "sec:intro" })
+        #expect(introRef["resolved"] as? Bool == true)
+        #expect(introRef["command"] as? String == "\\ref")
+        let missingRef = try #require(refs.first { ($0["key"] as? String) == "sec:missing" })
+        #expect(missingRef["resolved"] as? Bool == false)
+
+        let diags = try #require(topObj["diagnostics"] as? [[String: Any]])
+        #expect(!diags.isEmpty)
+        let expectedDiagKeys: Set<String> = ["code", "category", "severity", "file", "line", "column", "message"]
+        for d in diags {
+            #expect(Set(d.keys) == expectedDiagKeys, "Diagnostic object must not include random id or extra keys: \(d)")
+        }
+        #expect(diags.contains { ($0["code"] as? String) == "CITE404" && ($0["category"] as? String) == "structure" })
+        #expect(diags.contains { ($0["code"] as? String) == "SYM003" && ($0["category"] as? String) == "structure" })
+        #expect(diags.contains { ($0["code"] as? String) == "SYM004" && ($0["category"] as? String) == "structure" })
+        #expect(diags.contains { ($0["code"] as? String) == "ERR_UNVERIFIED_CITATION" && ($0["category"] as? String) == "citation" })
+        #expect(diags.contains { ($0["code"] as? String) == "LINT_UNCITED_BIB_ENTRY" && ($0["category"] as? String) == "lint" })
+
+        let counts = try #require(topObj["counts"] as? [String: Any])
+        let byCode = try #require(counts["byCode"] as? [String: Int])
+        let bySeverity = try #require(counts["bySeverity"] as? [String: Int])
+        let verdictCounts = try #require(counts["verdicts"] as? [String: Int])
+        #expect(byCode.values.reduce(0, +) == diags.count)
+        #expect(bySeverity.values.reduce(0, +) == diags.count)
+        #expect(verdictCounts["UNVERIFIED"] == 1)
+        #expect(verdictCounts["VERIFIED"] == 0)
+
+        // 2. Replay mode sets top-level "mode": "REPLAY" and "complete": true when all cited defined entries resolve
+        let replayTexURL = tempDir.appendingPathComponent("replay.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}
+        Verified~\\cite{real_lecun}.
+        \\end{document}
+        """.write(to: replayTexURL, atomically: true, encoding: .utf8)
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let replayRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", replayTexURL.path, "--bib", bibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(replayRes.exitCode == 0, "stderr=\(replayRes.stderr)")
+        let replayObj = try #require(try JSONSerialization.jsonObject(with: Data(replayRes.stdout.utf8)) as? [String: Any])
+        #expect(replayObj["mode"] as? String == "REPLAY")
+        #expect(replayObj["complete"] as? Bool == true)
+
+        // 3. Plain-text output remains unchanged (`[SEVERITY] CODE file:line:col - message`)
+        let textRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTexURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(textRes.stdout.contains("[ERROR] CITE404 main.tex:"))
+    }
+
+    @Test("M2 item 6 & S63 (Stage 01): diagnostics --json and LSPDiagnostic contain no random UUIDs and produce byte-identical output across repeated runs")
+    func m2Stage01DiagnosticsJSONByteIdenticalAcrossRepeatedRunsAndNoRandomID() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage01-det")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let env: [String: String] = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        // 1. Two separately constructed LSPDiagnostic values with identical fields must be equal and encode identically
+        let span = TextSpan(
+            filePath: "main.tex",
+            start: TextPosition(line: 10, column: 5),
+            end: TextPosition(line: 10, column: 20)
+        )
+        let d1 = LSPDiagnostic(code: "SYM003", severity: .error, message: "Duplicate label 'x'.", span: span)
+        let d2 = LSPDiagnostic(code: "SYM003", severity: .error, message: "Duplicate label 'x'.", span: span)
+        #expect(d1 == d2, "LSPDiagnostic must not carry a random UUID per instance")
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        let d1Bytes = try enc.encode(d1)
+        let d2Bytes = try enc.encode(d2)
+        #expect(d1Bytes == d2Bytes)
+
+        // 2. Repeated `diagnostics <paper.tex> --offline --json` runs on a real multi-diagnostic benchmark manuscript must be byte-for-byte identical
+        let benchmarkTex = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2503.18124v1/src/main.tex")
+        let runner1 = ScholarCLIRunner(environment: env)
+        let runner2 = ScholarCLIRunner(environment: env)
+
+        let run1 = await runner1.runWithExitStatus(arguments: ["diagnostics", benchmarkTex.path, "--offline", "--json", "--lang", "en"])
+        let run2 = await runner2.runWithExitStatus(arguments: ["diagnostics", benchmarkTex.path, "--offline", "--json", "--lang", "en"])
+        #expect(run1.exitCode == 0)
+        #expect(run2.exitCode == 0)
+        #expect(!run1.stdout.isEmpty)
+        #expect(!run1.stdout.contains("\"id\""), "diagnostics --json must not contain random id fields")
+        #expect(Data(run1.stdout.utf8) == Data(run2.stdout.utf8), "Two runs of diagnostics --offline --json must be byte-for-byte identical")
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

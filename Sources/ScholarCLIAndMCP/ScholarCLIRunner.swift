@@ -346,19 +346,26 @@ public struct ScholarCLIRunner: Sendable {
                     lang: lang
                 )
                 defer { opened.db.close() }
-                lsp = try makeLSPService(from: opened.db)
+                let sourceLabel = opened.isDemo
+                    ? "demo"
+                    : URL(fileURLWithPath: parsed.values["--project"] ?? "project.scholarproj").lastPathComponent
+                lsp = try makeLSPService(from: opened.db, bibliographySourcePath: sourceLabel)
                 isDemo = opened.isDemo
             }
 
             let cacheWarningCollector = CacheWarningCollector()
             let mode: BibliographyVerificationMode
+            let jsonModeLabel: String
             if let replayDir {
                 let snapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayDir))
                 mode = .replay(snapshot: snapshot)
+                jsonModeLabel = "REPLAY"
             } else if isOffline || isDemo {
                 mode = .offline
+                jsonModeLabel = "offline"
             } else {
                 mode = .online(transport: registryTransport)
+                jsonModeLabel = "online"
             }
 
             let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
@@ -380,10 +387,31 @@ public struct ScholarCLIRunner: Sendable {
                     Self.replayBannerLine(usesCache: verificationResult.replayUsesCache, lang: lang)
                 )
             }
+            if emitJSON {
+                if isDemo {
+                    fputs(
+                        lang.L(
+                            "[DEMO] Using built-in sample unverified dataset\n",
+                            "[DEMO / 演示数据] 当前使用内置未核查示例数据集\n"
+                        ),
+                        stderr
+                    )
+                }
+                let jsonReport = lsp.buildDiagnosticsJSONReport(
+                    mode: jsonModeLabel,
+                    verificationReport: verificationResult.report
+                )
+                let data = try jsonReport.encodeJSONData(sortedKeys: true)
+                return CLIExecutionOutput(
+                    stdout: String(decoding: data, as: UTF8.self),
+                    stderr: stderrLines.joined(separator: "\n"),
+                    exitCode: 0
+                )
+            }
             return CLIExecutionOutput(
                 stdout: try formatDiagnostics(
                     lsp.diagnosticsReport(),
-                    asJSON: emitJSON,
+                    asJSON: false,
                     isDemo: isDemo,
                     isReplay: verificationResult.isReplay,
                     replayUsesCache: verificationResult.replayUsesCache,
@@ -1305,9 +1333,23 @@ public struct ScholarCLIRunner: Sendable {
         collectRelativeIncludes(in: rootContent, baseDir: baseDir, into: &files, visited: &visited)
 
         var entries: [BibliographyEntry] = []
+        var bibSources: [DiagnosticsBibliographySource] = []
+        var entrySourceByKey: [String: String] = [:]
+
         if let explicitBibPath {
             let rawBib = try readRequiredRegularFile(atPath: explicitBibPath)
             entries = try BibTeXCodec().parse(rawBib)
+            let displayPath = Self.displayRelativeBibliographyPath(explicitBibPath, baseDir: baseDir)
+            bibSources.append(
+                DiagnosticsBibliographySource(
+                    kind: "bib",
+                    path: displayPath,
+                    entries: Set(entries.map(\.citeKey)).count
+                )
+            )
+            for entry in entries {
+                entrySourceByKey[entry.citeKey] = displayPath
+            }
         } else {
             let bibCandidates = extractBibliographyPaths(from: rootContent, baseDir: baseDir)
             for bibURL in bibCandidates {
@@ -1315,16 +1357,43 @@ public struct ScholarCLIRunner: Sendable {
                    let parsed = try? BibTeXCodec().parse(rawBib)
                 {
                     entries.append(contentsOf: parsed)
+                    let displayPath = Self.displayRelativeBibliographyPath(bibURL.path, baseDir: baseDir)
+                    bibSources.append(
+                        DiagnosticsBibliographySource(
+                            kind: "bib",
+                            path: displayPath,
+                            entries: Set(parsed.map(\.citeKey)).count
+                        )
+                    )
+                    for entry in parsed {
+                        entrySourceByKey[entry.citeKey] = displayPath
+                    }
                 }
             }
         }
 
-        return ScholarLSPWorkspaceService(
+        let lsp = ScholarLSPWorkspaceService(
             rootFilePath: rootKey,
             files: files,
             bibliography: entries,
             clock: registryClock
         )
+        lsp.configureSourceMetadata(
+            bibliographySources: bibSources,
+            entrySourceByKey: entrySourceByKey
+        )
+        return lsp
+    }
+
+    private static func displayRelativeBibliographyPath(_ rawPath: String, baseDir: URL) -> String {
+        let targetURL = URL(fileURLWithPath: rawPath).standardizedFileURL
+        let basePath = baseDir.standardizedFileURL.path
+        let targetPath = targetURL.path
+        let prefix = basePath.hasSuffix("/") ? basePath : (basePath + "/")
+        if targetPath.hasPrefix(prefix) {
+            return String(targetPath.dropFirst(prefix.count))
+        }
+        return targetURL.lastPathComponent
     }
 
     private func collectRelativeIncludes(
@@ -1679,19 +1748,43 @@ public struct ScholarCLIRunner: Sendable {
         return (headerLines + [body]).joined(separator: "\n")
     }
 
-    private func makeLSPService(from db: ScholarProjectDatabase) throws -> ScholarLSPWorkspaceService {
+    private func makeLSPService(
+        from db: ScholarProjectDatabase,
+        bibliographySourcePath: String = "project.scholarproj"
+    ) throws -> ScholarLSPWorkspaceService {
         var files: [String: String] = [:]
         for rec in try db.listManuscriptFiles() {
             files[rec.path] = rec.content
         }
         let entries = try db.listBibliographyEntries()
         let primary = (try? db.primaryManuscriptFile()) ?? "main.tex"
-        return ScholarLSPWorkspaceService(
+        let lsp = ScholarLSPWorkspaceService(
             rootFilePath: primary,
             files: files,
             bibliography: entries,
             clock: registryClock
         )
+        let bibSources: [DiagnosticsBibliographySource]
+        var entrySourceByKey: [String: String] = [:]
+        if entries.isEmpty {
+            bibSources = []
+        } else {
+            bibSources = [
+                DiagnosticsBibliographySource(
+                    kind: "bib",
+                    path: bibliographySourcePath,
+                    entries: Set(entries.map(\.citeKey)).count
+                )
+            ]
+            for entry in entries {
+                entrySourceByKey[entry.citeKey] = bibliographySourcePath
+            }
+        }
+        lsp.configureSourceMetadata(
+            bibliographySources: bibSources,
+            entrySourceByKey: entrySourceByKey
+        )
+        return lsp
     }
 
     public static let helpBanner = localizedHelpBanner(.en)

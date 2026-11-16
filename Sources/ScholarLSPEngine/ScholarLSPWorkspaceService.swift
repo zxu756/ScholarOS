@@ -105,6 +105,9 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         var bibliographyByKey: [String: BibliographyEntry]
         var orderedBibliographyKeys: [String]
         var bibliographyRawFiles: [String: String]
+        var fileEncodingsByPath: [String: String]
+        var bibliographySourceRecords: [DiagnosticsBibliographySource]?
+        var entrySourceByKey: [String: String]
         var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
         var cachedWorkspaceAST: MergedManuscriptWorkspaceAST?
         var cachedDiagnosticsReport: WorkspaceDiagnosticsReport?
@@ -176,7 +179,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         }
 
         var rawBibs: [String: String] = [:]
-        for (bPath, bText) in bibliographyFiles {
+        var derivedEntrySources: [String: String] = [:]
+        for (bPath, bText) in bibliographyFiles.sorted(by: { $0.key < $1.key }) {
             let normBib = Self.normalizeWorkspacePath(bPath)
             rawBibs[normBib] = bText
             if let parsed = try? bibCodec.parse(bText) {
@@ -184,6 +188,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     if bibMap[entry.citeKey] == nil {
                         bibOrder.append(entry.citeKey)
                         bibMap[entry.citeKey] = entry
+                        derivedEntrySources[entry.citeKey] = normBib
                     }
                 }
             }
@@ -203,6 +208,9 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             bibliographyByKey: bibMap,
             orderedBibliographyKeys: bibOrder,
             bibliographyRawFiles: rawBibs,
+            fileEncodingsByPath: [:],
+            bibliographySourceRecords: nil,
+            entrySourceByKey: derivedEntrySources,
             inRunVerdictsByKey: [:],
             cachedWorkspaceAST: nil,
             cachedDiagnosticsReport: nil,
@@ -818,6 +826,169 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         withLock { st in
             let ws = ensureWorkspaceAST(&st)
             return ensureDiagnosticsReport(&st, workspace: ws)
+        }
+    }
+
+    public func configureSourceMetadata(
+        fileEncodingsByPath: [String: String] = [:],
+        bibliographySources: [DiagnosticsBibliographySource] = [],
+        entrySourceByKey: [String: String] = [:]
+    ) {
+        withLock { st in
+            var normalizedEncodings: [String: String] = [:]
+            for (rawPath, enc) in fileEncodingsByPath {
+                normalizedEncodings[Self.normalizeWorkspacePath(rawPath)] = enc
+            }
+            st.fileEncodingsByPath = normalizedEncodings
+            st.bibliographySourceRecords = bibliographySources
+            st.entrySourceByKey = entrySourceByKey
+        }
+    }
+
+    public func buildDiagnosticsJSONReport(
+        mode: String,
+        verificationReport: CitationFirewallAuditReport
+    ) -> ScholarDiagnosticsJSONReport {
+        withLock { st in
+            let ws = ensureWorkspaceAST(&st)
+            let diagReport = ensureDiagnosticsReport(&st, workspace: ws)
+
+            let orderedFilePaths = ws.includeGraph.documentReadingOrder.isEmpty
+                ? st.documents.keys.sorted()
+                : ws.includeGraph.documentReadingOrder
+            var includedFromByTarget: [String: String] = [:]
+            for edge in ws.includeGraph.edges where !edge.isBibliographyResource && edge.targetExists {
+                if includedFromByTarget[edge.resolvedTargetFile] == nil {
+                    includedFromByTarget[edge.resolvedTargetFile] = "\(edge.sourceFile):\(edge.directiveSpan.start.line)"
+                }
+            }
+            let fileRecords = orderedFilePaths.map { path in
+                DiagnosticsFileRecord(
+                    path: path,
+                    encoding: st.fileEncodingsByPath[path] ?? "utf-8",
+                    includedFrom: (path == st.rootFilePath) ? nil : includedFromByTarget[path]
+                )
+            }
+
+            let effectiveBibSources: [DiagnosticsBibliographySource]
+            if let configured = st.bibliographySourceRecords {
+                effectiveBibSources = configured
+            } else if !st.bibliographyRawFiles.isEmpty {
+                effectiveBibSources = st.bibliographyRawFiles.keys.sorted().map { bibPath in
+                    let count: Int
+                    if let raw = st.bibliographyRawFiles[bibPath],
+                       let parsed = try? bibCodec.parse(raw)
+                    {
+                        count = Set(parsed.map(\.citeKey)).count
+                    } else {
+                        count = 0
+                    }
+                    return DiagnosticsBibliographySource(kind: "bib", path: bibPath, entries: count)
+                }
+            } else if !st.orderedBibliographyKeys.isEmpty {
+                effectiveBibSources = [
+                    DiagnosticsBibliographySource(
+                        kind: "bib",
+                        path: "workspace.bib",
+                        entries: Set(st.orderedBibliographyKeys).count
+                    )
+                ]
+            } else {
+                effectiveBibSources = []
+            }
+
+            var verdictsByKey = st.inRunVerdictsByKey
+            for verdict in verificationReport.verdicts {
+                verdictsByKey[verdict.citeKey] = verdict
+            }
+
+            let sortedCitedKeys = ws.symbolTable.citationsByKey.keys.sorted()
+            let fallbackBibSourcePath = effectiveBibSources.first?.path
+            let citationRecords = sortedCitedKeys.map { key -> DiagnosticsCitationEntry in
+                let isDefined = st.bibliographyByKey[key] != nil
+                let src: String? = isDefined ? (st.entrySourceByKey[key] ?? fallbackBibSourcePath) : nil
+                let occs = (ws.symbolTable.citationsByKey[key] ?? []).map { occ in
+                    DiagnosticsCitationOccurrence(
+                        file: occ.span.filePath,
+                        line: occ.span.start.line,
+                        column: occ.span.start.column,
+                        command: occ.command
+                    )
+                }
+                let verif: DiagnosticsCitationVerification? = isDefined
+                    ? verdictsByKey[key].map(DiagnosticsCitationVerification.init(from:))
+                    : nil
+                return DiagnosticsCitationEntry(
+                    key: key,
+                    defined: isDefined,
+                    source: src,
+                    occurrences: occs,
+                    verification: verif
+                )
+            }
+
+            let citedKeySet = Set(sortedCitedKeys)
+            let uncitedEntries = Set(st.orderedBibliographyKeys.filter { !citedKeySet.contains($0) }).sorted()
+
+            let labelRecords = ws.symbolTable.allLabelDeclarations
+                .map { decl in
+                    DiagnosticsLabelRecord(key: decl.key, file: decl.filePath, line: decl.span.start.line)
+                }
+                .sorted { lhs, rhs in
+                    if lhs.key != rhs.key { return lhs.key < rhs.key }
+                    if lhs.file != rhs.file { return lhs.file < rhs.file }
+                    return lhs.line < rhs.line
+                }
+
+            let referenceRecords = ws.symbolTable.crossReferences.map { ref in
+                DiagnosticsReferenceRecord(
+                    key: ref.targetKey,
+                    file: ref.span.filePath,
+                    line: ref.span.start.line,
+                    command: ref.command,
+                    resolved: !ref.targetKey.isEmpty && ws.symbolTable.labelsByKey[ref.targetKey] != nil
+                )
+            }
+
+            let itemRecords = diagReport.diagnostics.map(DiagnosticsItemRecord.init(from:))
+
+            var byCode: [String: Int] = [:]
+            var bySeverity: [String: Int] = [
+                LSPDiagnosticSeverity.error.rawValue: 0,
+                LSPDiagnosticSeverity.warning.rawValue: 0,
+                LSPDiagnosticSeverity.info.rawValue: 0,
+                LSPDiagnosticSeverity.hint.rawValue: 0
+            ]
+            for d in itemRecords {
+                byCode[d.code, default: 0] += 1
+                bySeverity[d.severity.rawValue, default: 0] += 1
+            }
+
+            let verdictCounts: [String: Int] = [
+                CitationFirewallClass.verified.rawValue: verificationReport.verifiedCount,
+                CitationFirewallClass.drift.rawValue: verificationReport.driftCount,
+                CitationFirewallClass.notFound.rawValue: verificationReport.notFoundCount,
+                CitationFirewallClass.retracted.rawValue: verificationReport.retractedCount,
+                CitationFirewallClass.unverified.rawValue: verificationReport.unverifiedCount
+            ]
+
+            return ScholarDiagnosticsJSONReport(
+                mode: mode,
+                root: st.rootFilePath,
+                files: fileRecords,
+                bibliographySources: effectiveBibSources,
+                citations: citationRecords,
+                uncitedEntries: uncitedEntries,
+                labels: labelRecords,
+                references: referenceRecords,
+                diagnostics: itemRecords,
+                complete: verificationReport.complete,
+                counts: DiagnosticsCountsSummary(
+                    byCode: byCode,
+                    bySeverity: bySeverity,
+                    verdicts: verdictCounts
+                )
+            )
         }
     }
 

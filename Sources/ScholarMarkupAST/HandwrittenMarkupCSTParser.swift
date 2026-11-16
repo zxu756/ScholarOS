@@ -54,7 +54,6 @@ public struct MarkupParseIssue: Sendable, Codable, Hashable, Identifiable {
     /// Converts this parse recovery issue directly into a `ScholarModels.LSPDiagnostic`.
     public func toLSPDiagnostic() -> LSPDiagnostic {
         LSPDiagnostic(
-            id: id,
             code: code.rawValue,
             severity: severity,
             message: message,

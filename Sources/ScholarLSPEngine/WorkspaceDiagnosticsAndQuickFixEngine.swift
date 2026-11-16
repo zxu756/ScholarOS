@@ -234,7 +234,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         sourcesByFile: [String: String]
     ) -> [LSPCodeAction] {
         var actions: [LSPCodeAction] = []
-        let allLabelKeys = Array(workspace.symbolTable.labelsByKey.keys)
+        let allLabelKeys = workspace.symbolTable.labelsByKey.keys.sorted()
 
         // Unresolved cross-references (`SYM004`): fuzzy-suggest closest existing label!
         for unresolved in workspace.symbolTable.unresolvedCrossReferences {
@@ -342,7 +342,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         let verifiedCiteKeys = bibliography
             .filter { resolveEffectiveFirewall(for: $0, inRunVerdictsByKey: inRunVerdictsByKey).0.allowsManuscriptInsertion }
             .map(\.citeKey)
-        let allCiteKeys = Array(bibByKey.keys)
+        let allCiteKeys = bibByKey.keys.sorted()
 
         for occ in workspace.symbolTable.allCitationOccurrences {
             guard let entry = bibByKey[occ.citeKey] else {
@@ -1074,7 +1074,13 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             if lhs.span.filePath != rhs.span.filePath {
                 return lhs.span.filePath < rhs.span.filePath
             }
-            return lhs.span.start < rhs.span.start
+            if lhs.span.start != rhs.span.start {
+                return lhs.span.start < rhs.span.start
+            }
+            if lhs.code != rhs.code {
+                return lhs.code < rhs.code
+            }
+            return lhs.message < rhs.message
         }
     }
 

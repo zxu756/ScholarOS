@@ -86,24 +86,43 @@ public enum LSPDiagnosticSeverity: String, Sendable, Codable, Hashable, Comparab
     }
 }
 
+public enum LSPDiagnosticCategory: String, Sendable, Codable, Hashable, CaseIterable {
+    case structure = "structure"
+    case citation = "citation"
+    case lint = "lint"
+
+    public static func infer(fromCode code: String) -> LSPDiagnosticCategory {
+        if code == "ERR_UNVERIFIED_CITATION" || code.hasPrefix("FW_") {
+            return .citation
+        }
+        if code.hasPrefix("LINT_") {
+            return .lint
+        }
+        return .structure
+    }
+}
+
 public struct LSPDiagnostic: Sendable, Codable, Hashable, Identifiable {
-    public let id: UUID
+    public var id: String {
+        "\(code)|\(span.filePath):\(span.start.line):\(span.start.column)|\(message)"
+    }
     public let code: String
+    public let category: LSPDiagnosticCategory
     public let severity: LSPDiagnosticSeverity
     public let message: String
     public let span: TextSpan
     public let suggestedFix: String?
 
     public init(
-        id: UUID = UUID(),
         code: String,
+        category: LSPDiagnosticCategory? = nil,
         severity: LSPDiagnosticSeverity,
         message: String,
         span: TextSpan,
         suggestedFix: String? = nil
     ) {
-        self.id = id
         self.code = code
+        self.category = category ?? LSPDiagnosticCategory.infer(fromCode: code)
         self.severity = severity
         self.message = message
         self.span = span
