@@ -4501,6 +4501,78 @@ struct PluginSDKMCPAndShellTests {
         let snapshotDefaultCap = try RegistryReplaySnapshot(directoryURL: defaultCapDir)
         #expect(snapshotDefaultCap.manifest.count == 80)
     }
+
+    @Test("M1 stage 12 (S55): CLI verify-citations emits venue hint in fields, findings, and text output after 'Matched in / 在 <数据源> 查到' in EN and ZH")
+    func m1Stage12S55CLIVerifyCitationsVenueHintTextAndJSONInENAndZH() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage12-s55")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let env: [String: String] = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        let wrongVenueBib = tempDir.appendingPathComponent("wrong_venue.bib")
+        let bibContent = """
+        @article{audit_020,
+          author = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title = {Deep learning},
+          journal = {Science},
+          year = {2015},
+          doi = {10.1038/nature14539}
+        }
+        """
+        try bibContent.write(to: wrongVenueBib, atomically: true, encoding: .utf8)
+
+        let recordingsDir = repositoryRoot.appendingPathComponent("Benchmarks/citations/recordings", isDirectory: true)
+        let runner = ScholarCLIRunner(environment: env)
+
+        // 1. Chinese JSON & text output
+        let zhJSON = await runner.runWithExitStatus(
+            arguments: ["verify-citations", wrongVenueBib.path, "--registry-replay", recordingsDir.path, "--json", "--lang", "zh"]
+        )
+        #expect(zhJSON.exitCode == 0, "stderr=\(zhJSON.stderr)")
+        let zhObj = try #require(JSONSerialization.jsonObject(with: Data(zhJSON.stdout.utf8)) as? [String: Any])
+        let zhVerdicts = try #require(zhObj["verdicts"] as? [[String: Any]])
+        let zhV = try #require(zhVerdicts.first)
+        #expect(zhV["firewallClass"] as? String == "VERIFIED")
+        #expect(zhV["insertable"] as? Bool == true)
+        #expect(zhV["reasons"] as? [String] == ["verified_match"])
+        let zhFields = try #require(zhV["fields"] as? [[String: Any]])
+        let zhVenueField = try #require(zhFields.first { ($0["field"] as? String) == "venue" })
+        #expect(zhVenueField["localValue"] as? String == "Science")
+        #expect(zhVenueField["remoteValue"] as? String == "Nature")
+        #expect(zhVenueField["severity"] as? String == "advisory")
+        #expect((zhVenueField["note"] as? String ?? "").contains("刊名写法不同，未作为不一致处理"))
+        let zhFindings = try #require(zhV["findings"] as? [[String: Any]])
+        #expect(zhFindings.contains {
+            ($0["field"] as? String) == "venue"
+                && ($0["detail"] as? String ?? "").contains("刊名写法不同，未作为不一致处理")
+        })
+
+        let zhText = await runner.runWithExitStatus(
+            arguments: ["verify-citations", wrongVenueBib.path, "--registry-replay", recordingsDir.path, "--lang", "zh"]
+        )
+        #expect(zhText.exitCode == 0)
+        let zhEntryLine = try #require(zhText.stdout.split(separator: "\n").map(String.init).first { $0.contains("audit_020:") })
+        let matchedRangeZH = try #require(zhEntryLine.range(of: "在 Crossref 查到"))
+        let hintRangeZH = try #require(zhEntryLine.range(of: "刊名提示"))
+        #expect(matchedRangeZH.upperBound <= hintRangeZH.lowerBound)
+        #expect(zhEntryLine.contains("刊名写法不同，未作为不一致处理"))
+
+        // 2. English text output (S32: no Chinese characters)
+        let enText = await runner.runWithExitStatus(
+            arguments: ["verify-citations", wrongVenueBib.path, "--registry-replay", recordingsDir.path, "--lang", "en"]
+        )
+        #expect(enText.exitCode == 0)
+        #expect(!containsChineseCharacters(enText.stdout))
+        let enEntryLine = try #require(enText.stdout.split(separator: "\n").map(String.init).first { $0.contains("audit_020:") })
+        let matchedRangeEN = try #require(enEntryLine.range(of: "Matched in Crossref"))
+        let hintRangeEN = try #require(enEntryLine.range(of: "Venue note:"))
+        #expect(matchedRangeEN.upperBound <= hintRangeEN.lowerBound)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

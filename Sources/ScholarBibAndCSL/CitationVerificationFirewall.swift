@@ -1396,7 +1396,15 @@ public struct CitationVerificationFirewall: Sendable {
             let hasInvalidArXivDiscrepancy = verdict.fields.contains {
                 $0.field == "arxivID" && $0.remoteValue == "invalid format"
             }
-            guard declared != nil || declaredNote != nil || ignoredEprint != nil || hasInvalidArXivDiscrepancy else {
+            let advisoryVenueField = verdict.fields.first {
+                $0.field == "venue" && $0.severity == "advisory"
+            }
+            guard declared != nil
+                || declaredNote != nil
+                || ignoredEprint != nil
+                || hasInvalidArXivDiscrepancy
+                || advisoryVenueField != nil
+            else {
                 return verdict
             }
             changed = true
@@ -1430,6 +1438,16 @@ public struct CitationVerificationFirewall: Sendable {
                         )
                     }
                     return finding
+                case .metadataDriftDetected:
+                    if finding.field == "venue", finding.severity == .advisory, let advisoryVenueField {
+                        return FirewallFinding(
+                            code: finding.code,
+                            severity: finding.severity,
+                            field: finding.field,
+                            detail: "刊名提示：本地 '\(advisoryVenueField.localValue)'，\(advisoryVenueField.source) '\(advisoryVenueField.remoteValue)'（\(CitationAuditWording.venueWordingNotDiscrepancyChineseNotice)）。"
+                        )
+                    }
+                    return finding
                 default:
                     return finding
                 }
@@ -1443,6 +1461,16 @@ public struct CitationVerificationFirewall: Sendable {
                         source: discrepancy.source,
                         severity: discrepancy.severity,
                         note: "arXiv 编号 '\(discrepancy.localValue)' 格式不合法。"
+                    )
+                }
+                if discrepancy.field == "venue" && discrepancy.severity == "advisory" {
+                    return CitationFieldDiscrepancy(
+                        field: discrepancy.field,
+                        localValue: discrepancy.localValue,
+                        remoteValue: discrepancy.remoteValue,
+                        source: discrepancy.source,
+                        severity: discrepancy.severity,
+                        note: "\(CitationAuditWording.venueWordingNotDiscrepancyChineseNotice)（本地：\(discrepancy.localValue)，\(discrepancy.source)：\(discrepancy.remoteValue)）。"
                     )
                 }
                 return discrepancy
@@ -2160,6 +2188,12 @@ public struct CitationVerificationFirewall: Sendable {
 
                 if !doiLinked && !authorAligned && !titleAligned {
                     var discrepancies = doiVerdict.fields
+                    var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+                    Self.promoteAdvisoryVenueToDriftError(
+                        fields: &discrepancies,
+                        reasons: &reasons,
+                        findings: &findings
+                    )
                     discrepancies.append(
                         CitationFieldDiscrepancy(
                             field: "arxivID",
@@ -2170,7 +2204,6 @@ public struct CitationVerificationFirewall: Sendable {
                             note: "arXiv:\(arxivID) points to a different work ('\(arxivRemote.title)') than the DOI record."
                         )
                     )
-                    var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
                     if !reasons.contains("arxiv_mismatch") {
                         reasons.append("arxiv_mismatch")
                     }
@@ -2229,6 +2262,12 @@ public struct CitationVerificationFirewall: Sendable {
             }
             if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
                 var discrepancies = doiVerdict.fields
+                var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+                Self.promoteAdvisoryVenueToDriftError(
+                    fields: &discrepancies,
+                    reasons: &reasons,
+                    findings: &findings
+                )
                 discrepancies.append(
                     CitationFieldDiscrepancy(
                         field: "arxivID",
@@ -2239,7 +2278,6 @@ public struct CitationVerificationFirewall: Sendable {
                         note: "arXiv reported that identifier 'arXiv:\(arxivID)' does not exist."
                     )
                 )
-                var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
                 if !reasons.contains("arxiv_not_found") {
                     reasons.append("arxiv_not_found")
                 }
@@ -2329,6 +2367,11 @@ public struct CitationVerificationFirewall: Sendable {
 
         if doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift {
             var reasons = doiVerdict.firewallClass == .drift ? doiVerdict.reasons : []
+            Self.promoteAdvisoryVenueToDriftError(
+                fields: &discrepancies,
+                reasons: &reasons,
+                findings: &findings
+            )
             if !reasons.contains("arxiv_mismatch") {
                 reasons.append("arxiv_mismatch")
             }
@@ -2872,7 +2915,12 @@ public struct CitationVerificationFirewall: Sendable {
             if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: sourceName).discrepancy != nil {
                 mismatches += 1
             }
-            if compareVenue(localVenue: entry.venue, remoteVenues: cand.venues, sourceName: sourceName).discrepancy != nil {
+            if compareVenue(
+                localVenue: entry.venue,
+                remoteVenues: cand.venues,
+                remoteShortVenues: cand.shortVenues,
+                sourceName: sourceName
+            ).discrepancy != nil {
                 mismatches += 1
             }
             return (cand, mismatches)
@@ -2925,7 +2973,11 @@ public struct CitationVerificationFirewall: Sendable {
         let updatedNote: String
         if baseVerdict.firewallClass == .verified {
             let dateLabel = Self.shortDateLabel(from: primarySource.fetchedAt)
-            updatedNote = "[VERIFIED] Matched in \(remote.sourceName), fetched \(dateLabel) (\(primarySource.origin.rawValue)); DOI: \(remoteDOI)."
+            var verifiedText = "[VERIFIED] Matched in \(remote.sourceName), fetched \(dateLabel) (\(primarySource.origin.rawValue)); DOI: \(remoteDOI)."
+            if let venueHint = updatedFields.first(where: { $0.field == "venue" && $0.severity == "advisory" }) {
+                verifiedText += " Venue note: local '\(venueHint.localValue)' vs \(venueHint.source) '\(venueHint.remoteValue)' (\(CitationAuditWording.venueWordingNotDiscrepancyNotice))."
+            }
+            updatedNote = verifiedText
         } else {
             updatedNote = "\(baseVerdict.auditNote) Matched DOI: \(remoteDOI)."
         }
@@ -3843,7 +3895,12 @@ public struct CitationVerificationFirewall: Sendable {
                 if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: "Crossref").discrepancy != nil {
                     mismatches += 1
                 }
-                if compareVenue(localVenue: entry.venue, remoteVenues: cand.venues, sourceName: "Crossref").discrepancy != nil {
+                if compareVenue(
+                    localVenue: entry.venue,
+                    remoteVenues: cand.venues,
+                    remoteShortVenues: cand.shortVenues,
+                    sourceName: "Crossref"
+                ).discrepancy != nil {
                     mismatches += 1
                 }
                 return (cand, mismatches)
@@ -3925,7 +3982,12 @@ public struct CitationVerificationFirewall: Sendable {
         let secondaryChecks: [(CitationFieldDiscrepancy?, String?)] = [
             compareAuthorCount(localAuthors: entry.authors, remote: matchedCandidate),
             comparePublicationYear(localYear: entry.year, remoteYears: matchedCandidate.publicationYears, sourceName: "Crossref"),
-            compareVenue(localVenue: entry.venue, remoteVenues: matchedCandidate.venues, sourceName: "Crossref")
+            compareVenue(
+                localVenue: entry.venue,
+                remoteVenues: matchedCandidate.venues,
+                remoteShortVenues: matchedCandidate.shortVenues,
+                sourceName: "Crossref"
+            )
         ]
         for (disc, reason) in secondaryChecks {
             if let disc {
@@ -3994,6 +4056,7 @@ public struct CitationVerificationFirewall: Sendable {
         let authorSurnames: [String]
         let publicationYears: [Int]
         let venues: [String]
+        let shortVenues: [String]
         let retractionField: String?
 
         init(
@@ -4009,6 +4072,7 @@ public struct CitationVerificationFirewall: Sendable {
             authorSurnames: [String],
             publicationYears: [Int],
             venues: [String],
+            shortVenues: [String] = [],
             retractionField: String?
         ) {
             self.sourceName = sourceName
@@ -4023,6 +4087,7 @@ public struct CitationVerificationFirewall: Sendable {
             self.authorSurnames = authorSurnames
             self.publicationYears = publicationYears
             self.venues = venues
+            self.shortVenues = shortVenues
             self.retractionField = retractionField
         }
     }
@@ -4451,15 +4516,17 @@ public struct CitationVerificationFirewall: Sendable {
         )
     }
 
-    /// Venue / journal / conference comparison supporting ISO-4 abbreviations and standard acronyms.
+    /// Venue / journal / conference comparison supporting S55 three same-venue checks,
+    /// ISO-4 abbreviations, and standard acronyms.
     /// Skipped when either local or remote has no venue (e.g., arXiv preprints without `journal_ref`).
     func compareVenue(
         localVenue: String,
         remoteVenues: [String],
+        remoteShortVenues: [String] = [],
         sourceName: String
     ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
         let trimmedLocal = localVenue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedLocal.isEmpty, !remoteVenues.isEmpty else {
+        guard !trimmedLocal.isEmpty, (!remoteVenues.isEmpty || !remoteShortVenues.isEmpty) else {
             return (nil, nil)
         }
         let lowerLocal = trimmedLocal.lowercased()
@@ -4467,30 +4534,50 @@ public struct CitationVerificationFirewall: Sendable {
             return (nil, nil)
         }
 
-        if venuesMatch(trimmedLocal, remoteVenues) {
+        if venuesMatch(trimmedLocal, remoteVenues, shortVenues: remoteShortVenues) {
             return (nil, nil)
         }
 
+        let displayRemote = remoteVenues.first ?? remoteShortVenues[0]
         return (
             CitationFieldDiscrepancy(
                 field: "venue",
                 localValue: trimmedLocal,
-                remoteValue: remoteVenues[0],
+                remoteValue: displayRemote,
                 source: sourceName,
                 severity: "error",
-                note: "Local venue '\(trimmedLocal)' differs from \(sourceName) '\(remoteVenues[0])'."
+                note: "Local venue '\(trimmedLocal)' differs from \(sourceName) '\(displayRemote)'."
             ),
             "venue_mismatch"
         )
     }
 
-    /// Checks whether `localVenue` matches any candidate in `remoteVenues` under normalized full name,
-    /// acronym expansion, or ISO-4 token abbreviation alignment.
-    func venuesMatch(_ localVenue: String, _ remoteVenues: [String]) -> Bool {
+    /// Checks whether `localVenue` matches `remoteVenues` / `shortVenues` under the three S55
+    /// "same venue" rules (or established acronym / ISO-4 token alignment):
+    /// 1. Normalized equality with `short-container-title` (`shortVenues`) or `container-title` (`remoteVenues`);
+    /// 2. Local is a per-word prefix abbreviation of a remote venue (dropping periods, skipping stopwords and `&`);
+    /// 3. One normalized venue completely contains the other (contiguous word subsequence of length >= 2 against `remoteVenues`).
+    func venuesMatch(_ localVenue: String, _ remoteVenues: [String], shortVenues: [String] = []) -> Bool {
+        let localPlainWords = Self.normalizeVenueWords(localVenue)
+        if localPlainWords.isEmpty { return true }
+
+        // Check 1: Normalized equality with short-container-title (or container-title)
+        for candidate in shortVenues + remoteVenues {
+            if Self.normalizeVenueWords(candidate) == localPlainWords {
+                return true
+            }
+        }
+
+        // Check 2: Per-word prefix abbreviation (dropping periods, skipping stopwords and `&`)
+        // plus acronym expansions / ISO-4 token alignment
+        for remoteRaw in remoteVenues + shortVenues {
+            if Self.localPerWordPrefixAbbreviationMatches(localVenue, remoteRaw) {
+                return true
+            }
+        }
         let localCandidates = Self.venueTokenCandidates(for: localVenue)
         if localCandidates.isEmpty { return true }
-
-        for remoteRaw in remoteVenues {
+        for remoteRaw in remoteVenues + shortVenues {
             let remoteCandidates = Self.venueTokenCandidates(for: remoteRaw)
             for lTokens in localCandidates {
                 for rTokens in remoteCandidates {
@@ -4500,7 +4587,43 @@ public struct CitationVerificationFirewall: Sendable {
                 }
             }
         }
+
+        // Check 3: Normalized full containment in either direction against full container-title (`remoteVenues`)
+        for remoteRaw in remoteVenues {
+            if Self.venueContainsOtherNormalized(localPlainWords, Self.normalizeVenueWords(remoteRaw)) {
+                return true
+            }
+        }
+
         return false
+    }
+
+    private static func promoteAdvisoryVenueToDriftError(
+        fields: inout [CitationFieldDiscrepancy],
+        reasons: inout [String],
+        findings: inout [FirewallFinding]
+    ) {
+        var promoted = false
+        fields = fields.map { d in
+            if d.field == "venue" && d.severity == "advisory" {
+                promoted = true
+                return CitationFieldDiscrepancy(
+                    field: "venue",
+                    localValue: d.localValue,
+                    remoteValue: d.remoteValue,
+                    source: d.source,
+                    severity: "error",
+                    note: "Local venue '\(d.localValue)' differs from \(d.source) '\(d.remoteValue)'."
+                )
+            }
+            return d
+        }
+        if promoted {
+            findings.removeAll { $0.code == .metadataDriftDetected && $0.field == "venue" && $0.severity == .advisory }
+            if !reasons.contains("venue_mismatch") {
+                reasons.append("venue_mismatch")
+            }
+        }
     }
 
     private func reconcileRemoteRegistryMetadata(
@@ -4552,15 +4675,14 @@ public struct CitationVerificationFirewall: Sendable {
         var discrepancies: [CitationFieldDiscrepancy] = []
         var driftReasons: [String] = []
 
-        let checks: [(CitationFieldDiscrepancy?, String?)] = [
+        let coreChecks: [(CitationFieldDiscrepancy?, String?)] = [
             compareTitle(localTitle: entry.title, remoteTitle: remote.title, sourceName: remote.sourceName),
             compareFirstAuthor(localAuthors: entry.authors, remote: remote),
             compareAuthorCount(localAuthors: entry.authors, remote: remote),
-            comparePublicationYear(localYear: entry.year, remoteYears: remote.publicationYears, sourceName: remote.sourceName),
-            compareVenue(localVenue: entry.venue, remoteVenues: remote.venues, sourceName: remote.sourceName)
+            comparePublicationYear(localYear: entry.year, remoteYears: remote.publicationYears, sourceName: remote.sourceName)
         ]
 
-        for (disc, reason) in checks {
+        for (disc, reason) in coreChecks {
             if let disc {
                 discrepancies.append(disc)
             }
@@ -4569,7 +4691,20 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
+        let venueCheck = compareVenue(
+            localVenue: entry.venue,
+            remoteVenues: remote.venues,
+            remoteShortVenues: remote.shortVenues,
+            sourceName: remote.sourceName
+        )
+
         if !discrepancies.isEmpty {
+            if let vDisc = venueCheck.discrepancy {
+                discrepancies.append(vDisc)
+            }
+            if let vReason = venueCheck.reason, !driftReasons.contains(vReason) {
+                driftReasons.append(vReason)
+            }
             let driftSummary = formatEnglishDriftSummary(discrepancies: discrepancies, sourceName: remote.sourceName)
             findings.append(
                 FirewallFinding(
@@ -4600,14 +4735,40 @@ public struct CitationVerificationFirewall: Sendable {
                 detail: verifiedDetail
             )
         )
+
+        var verifiedFields: [CitationFieldDiscrepancy] = []
+        var verifiedNote = "[VERIFIED] \(verifiedDetail)"
+        if let vDisc = venueCheck.discrepancy {
+            let venueHintText = "Venue note: local '\(vDisc.localValue)' vs \(vDisc.source) '\(vDisc.remoteValue)' (\(CitationAuditWording.venueWordingNotDiscrepancyNotice))."
+            verifiedFields.append(
+                CitationFieldDiscrepancy(
+                    field: "venue",
+                    localValue: vDisc.localValue,
+                    remoteValue: vDisc.remoteValue,
+                    source: vDisc.source,
+                    severity: "advisory",
+                    note: "Local venue '\(vDisc.localValue)' vs \(vDisc.source) '\(vDisc.remoteValue)' (\(CitationAuditWording.venueWordingNotDiscrepancyNotice))."
+                )
+            )
+            findings.append(
+                FirewallFinding(
+                    code: .metadataDriftDetected,
+                    severity: .advisory,
+                    field: "venue",
+                    detail: venueHintText
+                )
+            )
+            verifiedNote += " \(venueHintText)"
+        }
+
         return buildUpdatedVerdict(
             for: entry,
             assignedClass: .verified,
             reasons: ["verified_match"],
             sources: allSources,
-            fields: [],
+            fields: verifiedFields,
             findings: findings,
-            overrideNote: "[VERIFIED] \(verifiedDetail)"
+            overrideNote: verifiedNote
         )
     }
 
@@ -4722,16 +4883,25 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         var venues: [String] = []
-        for venueKey in ["container-title", "short-container-title"] {
-            if let arr = message[venueKey] as? [String] {
-                for item in arr {
-                    if let v = nonEmpty(item), !venues.contains(v) {
-                        venues.append(v)
-                    }
+        if let arr = message["container-title"] as? [String] {
+            for item in arr {
+                if let v = nonEmpty(item), !venues.contains(v) {
+                    venues.append(v)
                 }
-            } else if let single = nonEmpty(message[venueKey] as? String), !venues.contains(single) {
-                venues.append(single)
             }
+        } else if let single = nonEmpty(message["container-title"] as? String), !venues.contains(single) {
+            venues.append(single)
+        }
+
+        var shortVenues: [String] = []
+        if let arr = message["short-container-title"] as? [String] {
+            for item in arr {
+                if let v = nonEmpty(item), !shortVenues.contains(v) {
+                    shortVenues.append(v)
+                }
+            }
+        } else if let single = nonEmpty(message["short-container-title"] as? String), !shortVenues.contains(single) {
+            shortVenues.append(single)
         }
 
         var retractionField: String?
@@ -4766,6 +4936,7 @@ public struct CitationVerificationFirewall: Sendable {
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
                 venues: venues,
+                shortVenues: shortVenues,
                 retractionField: retractionField
             )
         )
@@ -4886,13 +5057,14 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         var venues: [String] = []
+        var shortVenues: [String] = []
         if let primaryLoc = root["primary_location"] as? [String: Any],
            let sourceObj = primaryLoc["source"] as? [String: Any] {
             if let disp = nonEmpty(sourceObj["display_name"] as? String) {
                 venues.append(disp)
             }
-            if let abbr = nonEmpty(sourceObj["abbreviated_title"] as? String), !venues.contains(abbr) {
-                venues.append(abbr)
+            if let abbr = nonEmpty(sourceObj["abbreviated_title"] as? String), !shortVenues.contains(abbr) {
+                shortVenues.append(abbr)
             }
             if let alts = sourceObj["alternate_titles"] as? [String] {
                 for alt in alts {
@@ -4921,6 +5093,7 @@ public struct CitationVerificationFirewall: Sendable {
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
                 venues: venues,
+                shortVenues: shortVenues,
                 retractionField: isRetracted ? "is_retracted" : nil
             )
         )
@@ -5132,9 +5305,16 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         var venues: [String] = []
-        for venueKey in ["fulljournalname", "source", "booktitle"] {
+        for venueKey in ["fulljournalname", "booktitle"] {
             if let v = nonEmpty(doc[venueKey] as? String), !venues.contains(v) {
                 venues.append(v)
+            }
+        }
+        var shortVenues: [String] = []
+        if let src = nonEmpty(doc["source"] as? String) {
+            shortVenues.append(src)
+            if venues.isEmpty {
+                venues.append(src)
             }
         }
 
@@ -5151,6 +5331,7 @@ public struct CitationVerificationFirewall: Sendable {
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
                 venues: venues,
+                shortVenues: shortVenues,
                 retractionField: retractionField
             )
         )
@@ -5507,6 +5688,82 @@ public struct CitationVerificationFirewall: Sendable {
             return false
         }
         return full.hasPrefix(abbr)
+    }
+
+    /// Normalizes a venue string into lowercase alphanumeric words after HTML entity/tag stripping,
+    /// LaTeX decoding, and ligature/diacritic folding (preserving stopwords and section letters).
+    private static func normalizeVenueWords(_ rawVenue: String) -> [String] {
+        let decoded = LaTeXTextCodec().decode(stripHTMLTagsAndEntities(rawVenue))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !decoded.isEmpty else { return [] }
+        let folded = foldLigaturesAndDiacritics(decoded)
+        return splitAlphanumericWords(folded)
+    }
+
+    /// S55 Check 2: after dropping periods and skipping stopwords and `&`, checks whether each word
+    /// in `localVenue` is in order a prefix of the corresponding word in `remoteVenue`.
+    private static func localPerWordPrefixAbbreviationMatches(_ localVenue: String, _ remoteVenue: String) -> Bool {
+        let localContent = extractPrefixComparableVenueWords(localVenue)
+        let remoteContent = extractPrefixComparableVenueWords(remoteVenue)
+        guard !localContent.isEmpty, localContent.count == remoteContent.count else {
+            return false
+        }
+        // A single non-dotted word (e.g. "Art" vs "Artificial") must not prefix-match a longer single-word venue.
+        if localContent.count == 1 && !localVenue.contains(".") {
+            return localContent[0] == remoteContent[0]
+        }
+        for (lWord, rWord) in zip(localContent, remoteContent) {
+            if !rWord.hasPrefix(lWord) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func extractPrefixComparableVenueWords(_ rawVenue: String) -> [String] {
+        let decoded = LaTeXTextCodec().decode(stripHTMLTagsAndEntities(rawVenue))
+            .replacingOccurrences(of: ".", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !decoded.isEmpty else { return [] }
+        let chunks = decoded.split(whereSeparator: {
+            $0.isWhitespace || $0 == "/" || $0 == ":" || $0 == "," || $0 == ";" || $0 == "–" || $0 == "—" || $0 == "-"
+        })
+        var rawWords: [String] = []
+        for chunk in chunks {
+            let s = String(chunk)
+            if s == "&" { continue }
+            rawWords.append(contentsOf: splitAlphanumericWords(foldLigaturesAndDiacritics(s)))
+        }
+        var filtered: [String] = []
+        for (idx, word) in rawWords.enumerated() {
+            // Preserve trailing journal section letter "A" (e.g., "Phys. Rev. A"), skip article "a" elsewhere.
+            if word == "a" && idx == rawWords.count - 1 && rawWords.count >= 2 {
+                filtered.append(word)
+                continue
+            }
+            if venueStopwords.contains(word) {
+                continue
+            }
+            filtered.append(word)
+        }
+        return filtered
+    }
+
+    /// S55 Check 3: checks whether one normalized venue word sequence (>= 2 words) appears as a
+    /// contiguous subsequence of the other.
+    private static func venueContainsOtherNormalized(_ lhsWords: [String], _ rhsWords: [String]) -> Bool {
+        let shorter = lhsWords.count <= rhsWords.count ? lhsWords : rhsWords
+        let longer = lhsWords.count <= rhsWords.count ? rhsWords : lhsWords
+        guard shorter.count >= 2, shorter.count <= longer.count else {
+            return false
+        }
+        let maxStart = longer.count - shorter.count
+        for start in 0...maxStart {
+            if Array(longer[start..<(start + shorter.count)]) == shorter {
+                return true
+            }
+        }
+        return false
     }
 
     private func formatEnglishDriftSummary(

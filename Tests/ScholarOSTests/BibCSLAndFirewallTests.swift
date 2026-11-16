@@ -1764,7 +1764,8 @@ struct BibCSLAndFirewallTests {
         #expect(f6.contains { ($0["field"] as? String) == "year" && ($0["remoteValue"] as? String) == "2015" })
         #expect(f6.contains { ($0["field"] as? String) == "firstAuthor" && ($0["remoteValue"] as? String) == "LeCun" })
 
-        // 7. Wrong journal / venue ("Science" vs "Nature")
+        // 7. Wrong journal / venue ("Science" vs "Nature") — per 04-scholaros.md settled decision (2026-11-16, S55),
+        // when title, year, first author, and author count all match, venue mismatch alone yields VERIFIED with a venue advisory hint.
         let v7 = await firewall.verifyAgainstPublicRegistries(
             entry: BibliographyEntry(
                 citeKey: "drift_wrong_venue",
@@ -1777,11 +1778,17 @@ struct BibCSLAndFirewallTests {
             ),
             session: replay
         )
-        #expect(v7.firewallClass == .drift)
+        #expect(v7.firewallClass == .verified)
         let j7 = try encodeVerdictJSONObject(v7)
-        #expect(j7["insertable"] as? Bool == false)
+        #expect(j7["insertable"] as? Bool == true)
+        #expect(j7["reasons"] as? [String] == ["verified_match"])
         let f7 = (j7["fields"] as? [[String: Any]]) ?? []
-        #expect(f7.contains { ($0["field"] as? String) == "venue" && ($0["remoteValue"] as? String) == "Nature" })
+        #expect(f7.contains {
+            ($0["field"] as? String) == "venue"
+                && ($0["localValue"] as? String) == "Science"
+                && ($0["remoteValue"] as? String) == "Nature"
+                && ($0["severity"] as? String) == "advisory"
+        })
     }
 
     @Test("M1 item 1 & 2: clean real entries are VERIFIED with sources/reasons/fields/insertable and no confidenceScore")
@@ -5040,5 +5047,123 @@ struct BibCSLAndFirewallTests {
             #expect(verdict.insertable == false)
             #expect(verdict.reasons.contains("first_author_mismatch"))
         }
+    }
+
+    @Test("M1 stage 12 (S55): venue comparison applies 3 same-venue checks without hint, emits VERIFIED + venue hint when only venue differs, and preserves DRIFT + venue_mismatch when combined with other discrepancies")
+    func m1Stage12S55VenueThreeSameVenueRulesAdvisoryVerifiedAndCombinedDrift() async throws {
+        let firewall = CitationVerificationFirewall()
+
+        // Direct unit checks for the three "same venue" rules (no hint, no discrepancy):
+        // (a) Matches Crossref short-container-title after normalization
+        #expect(firewall.venuesMatch("Phys. Rev. E", ["Physical Review E"], shortVenues: ["Phys. Rev. E"]))
+        // (b) Per-word prefix abbreviation (dropping periods, skipping stopwords and '&')
+        #expect(firewall.venuesMatch("Ind. Eng. Chem.", ["Industrial & Engineering Chemistry"]))
+        #expect(!firewall.venuesMatch(
+            "Ind. Eng. Chem.",
+            ["Industrial & Engineering Chemistry Research"],
+            shortVenues: ["Ind. Eng. Chem. Res."]
+        ))
+        // (c) Normalized full containment in either direction
+        #expect(firewall.venuesMatch(
+            "Physical Review E - Statistical, Nonlinear, and Soft Matter Physics",
+            ["Physical Review E"]
+        ))
+        #expect(firewall.venuesMatch(
+            "Physical Review E",
+            ["Physical Review E - Statistical, Nonlinear, and Soft Matter Physics"]
+        ))
+        // Non-matching distinct venue must NOT match the 3 checks
+        #expect(!firewall.venuesMatch("Science", ["Nature"]))
+        #expect(!firewall.venuesMatch("Science", ["Lecture Notes in Computer Science"]))
+
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+
+        // 11 real_human entries that previously had ONLY venue_mismatch:
+        // - 7 match one of the 3 same-venue rules -> VERIFIED without venue hint
+        // - 4 do not match -> VERIFIED with venue hint
+        let sameVenueNoHintKeys: Set<String> = [
+            "real_human_025",
+            "real_human_047",
+            "real_human_050",
+            "real_human_061",
+            "real_human_076",
+            "real_human_083",
+            "real_human_092"
+        ]
+        let hintVerifiedKeys: Set<String> = [
+            "real_human_012",
+            "real_human_017",
+            "real_human_049",
+            "real_human_084"
+        ]
+        let yearPlusVenueDriftKeys: Set<String> = [
+            "real_human_006",
+            "real_human_030"
+        ]
+
+        let targetHumanKeys = sameVenueNoHintKeys.union(hintVerifiedKeys).union(yearPlusVenueDriftKeys)
+        let humanEntries = try loadBenchmarkEntries(group: "real_human", keys: targetHumanKeys)
+        #expect(humanEntries.count == 13)
+
+        let humanResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: humanEntries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let byKey = Dictionary(uniqueKeysWithValues: humanResult.report.verdicts.map { ($0.citeKey, $0) })
+
+        for key in sameVenueNoHintKeys.sorted() {
+            let v = try #require(byKey[key], "Missing verdict for \(key)")
+            #expect(v.firewallClass == .verified, "\(key) expected VERIFIED, got \(v.firewallClass)")
+            #expect(v.insertable == true, "\(key) must be insertable")
+            #expect(v.reasons == ["verified_match"], "\(key) unexpected reasons \(v.reasons)")
+            #expect(!v.fields.contains { $0.field == "venue" }, "\(key) matched same-venue rule and must NOT carry a venue hint: \(v.fields)")
+            #expect(!v.findings.contains { $0.field == "venue" && $0.code == .metadataDriftDetected }, "\(key) must NOT carry a venue drift/hint finding")
+        }
+
+        for key in hintVerifiedKeys.sorted() {
+            let v = try #require(byKey[key], "Missing verdict for \(key)")
+            #expect(v.firewallClass == .verified, "\(key) expected VERIFIED with hint, got \(v.firewallClass)")
+            #expect(v.insertable == true, "\(key) must be insertable")
+            #expect(v.reasons == ["verified_match"], "\(key) unexpected reasons \(v.reasons)")
+            let venueField = try #require(v.fields.first { $0.field == "venue" }, "\(key) must carry a venue hint in fields")
+            #expect(!venueField.localValue.isEmpty)
+            #expect(!venueField.remoteValue.isEmpty)
+            #expect(venueField.severity == "advisory")
+            #expect((venueField.note ?? "").contains("venue wording differs; not treated as a discrepancy"))
+            #expect(v.findings.contains { $0.field == "venue" && $0.severity == .advisory })
+            #expect(v.auditNote.contains("Venue note:"))
+        }
+
+        for key in yearPlusVenueDriftKeys.sorted() {
+            let v = try #require(byKey[key], "Missing verdict for \(key)")
+            #expect(v.firewallClass == .drift, "\(key) expected DRIFT, got \(v.firewallClass)")
+            #expect(v.insertable == false)
+            #expect(v.reasons.contains("year_diff_1"))
+            #expect(v.reasons.contains("venue_mismatch"))
+            let venueField = try #require(v.fields.first { $0.field == "venue" })
+            #expect(venueField.severity == "error")
+        }
+
+        // audit_manual wrong-venue entry (audit_020: Science vs Nature) is now VERIFIED with venue hint
+        let audit020Entries = try loadBenchmarkEntries(group: "audit_manual", keys: ["audit_020"])
+        let audit020Result = try await CitationVerificationFirewall.verifyBibliography(
+            entries: audit020Entries,
+            mode: .replay(snapshot: snapshot),
+            noCache: true,
+            environment: [:],
+            language: .en
+        )
+        let vAudit020 = try #require(audit020Result.report.verdicts.first)
+        #expect(vAudit020.firewallClass == .verified)
+        #expect(vAudit020.insertable == true)
+        #expect(vAudit020.reasons == ["verified_match"])
+        let auditVenueHint = try #require(vAudit020.fields.first { $0.field == "venue" })
+        #expect(auditVenueHint.localValue == "Science")
+        #expect(auditVenueHint.remoteValue == "Nature")
+        #expect(auditVenueHint.severity == "advisory")
     }
 }

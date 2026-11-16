@@ -1459,12 +1459,20 @@ public struct ScholarCLIRunner: Sendable {
                 case .replay: originZH = "回放"
                 case .cache: originZH = "缓存"
                 }
+                var base: String
                 if let discoveredDOI = verdict.fields.first(where: {
                     $0.field == "doi" && $0.localValue.isEmpty && !$0.remoteValue.isEmpty
                 })?.remoteValue {
-                    return "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）；DOI：\(discoveredDOI)。" + untrustedSuffix
+                    base = "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）；DOI：\(discoveredDOI)。"
+                } else {
+                    base = "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）。"
                 }
-                return "在 \(primary.source) 查到，\(dateStr) 取得（\(originZH)）。" + untrustedSuffix
+                if let venueHint = verdict.fields.first(where: {
+                    $0.field == "venue" && $0.severity == "advisory"
+                }) {
+                    base += " 刊名提示：本地 '\(venueHint.localValue)'，\(venueHint.source) '\(venueHint.remoteValue)'（\(CitationAuditWording.venueWordingNotDiscrepancyChineseNotice)）。"
+                }
+                return base + untrustedSuffix
             }
             return verdict.auditedEntry.localizedFirewallAuditNote(lang)
 

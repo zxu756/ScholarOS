@@ -580,6 +580,10 @@ public enum CitationAuditWording {
     public static let yearOnlineVsPrintNotice = "may reflect online-first vs. print issue year difference"
     /// Marker recorded in findings when a .bib file carries an untrusted x-firewall-class field.
     public static let untrustedFileClassMarker = "not trusted (ignored)"
+    /// Advisory note when venue wording differs while title, year, and first author match (S55).
+    public static let venueWordingNotDiscrepancyNotice = "venue wording differs; not treated as a discrepancy"
+    /// Localized Chinese advisory note for S55 venue wording differences.
+    public static let venueWordingNotDiscrepancyChineseNotice = "刊名写法不同，未作为不一致处理"
     /// Honest explanation when an identifierless entry has no matching candidate in either Crossref or OpenAlex search.
     public static let noMatchInSearchNotice =
         "Neither Crossref nor OpenAlex returned a matching record; the work may not exist, or it may not be indexed by either source (for example, a book, book chapter, or older publication)."

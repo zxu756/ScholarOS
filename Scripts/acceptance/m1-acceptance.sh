@@ -608,15 +608,25 @@ expected_cases = {
 }
 for key, (field_name, expected_remote_substr) in expected_cases.items():
     v = by_key[key]
-    if v["firewallClass"] != "DRIFT":
-        print(f"FAIL {key}: expected DRIFT, got {v['firewallClass']}")
-        sys.exit(1)
-    if v["insertable"] is not False:
-        print(f"FAIL {key}: insertable must be false")
-        sys.exit(1)
+    if key == "audit_020":
+        # Per 04-scholaros.md settled decision (2026-11-16, S55), wrong-venue alone allows VERIFIED (with venue hint) or DRIFT
+        if v["firewallClass"] not in ("VERIFIED", "DRIFT"):
+            print(f"FAIL {key}: expected VERIFIED or DRIFT, got {v['firewallClass']}")
+            sys.exit(1)
+        expected_ins = (v["firewallClass"] == "VERIFIED")
+        if v["insertable"] is not expected_ins:
+            print(f"FAIL {key}: insertable={v['insertable']} inconsistent with {v['firewallClass']}")
+            sys.exit(1)
+    else:
+        if v["firewallClass"] != "DRIFT":
+            print(f"FAIL {key}: expected DRIFT, got {v['firewallClass']}")
+            sys.exit(1)
+        if v["insertable"] is not False:
+            print(f"FAIL {key}: insertable must be false")
+            sys.exit(1)
     fields = v.get("fields") or []
     if not fields:
-        print(f"FAIL {key}: empty fields on DRIFT")
+        print(f"FAIL {key}: empty fields on {v['firewallClass']}")
         sys.exit(1)
     matching = [f for f in fields if f.get("field") == field_name and expected_remote_substr.lower() in str(f.get("remoteValue", "")).lower()]
     if not matching:
@@ -627,14 +637,14 @@ f19_names = {f["field"] for f in by_key["audit_019"]["fields"]}
 if not {"firstAuthor", "year"}.issubset(f19_names):
     print(f"FAIL audit_019: expected firstAuthor and year in fields, got {f19_names}")
     sys.exit(1)
-print("verified_cases=8/8 (audit_013..audit_020 all DRIFT, insertable=false, remote values populated)")
+print(f"verified_cases=8/8 (audit_013..audit_019 DRIFT, audit_020={by_key['audit_020']['firewallClass']}, remote values populated)")
 PY
 )"
         ROW9_RC=$?
         set -e
         echo "$ROW9_CHECK"
         if [[ "$ROW9_RC" -eq 0 ]]; then
-            record_pass 9 "All 8 fixed near-title / surname-typo / missing-field / wrong-venue cases return DRIFT with remote fields"
+            record_pass 9 "All 8 fixed Row 9 cases return expected DRIFT / VERIFIED+venue-hint with remote fields"
         else
             record_fail 9 "One or more fixed Row 9 drift cases failed"
         fi
