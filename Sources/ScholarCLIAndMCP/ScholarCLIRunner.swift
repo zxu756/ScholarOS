@@ -129,12 +129,19 @@ public struct ScholarCLIRunner: Sendable {
                 desc = "命令行参数错误：\(detail)"
             case .fileNotFound(let path) where cliLang == .zhHans:
                 desc = "未找到文件或工程路径：\(path)"
+            case .unverifiedCitationBlocked(let key, let status, let reason):
+                if cliLang == .zhHans {
+                    desc = "引文键 '\(key)'（\(status)）未通过引用核查：\(reason)"
+                } else {
+                    desc = "Key '\(key)' (\(status)) rejected by Citation Firewall: \(reason)"
+                }
             default:
                 desc = error.localizedDescription
             }
+            let prefix = "[\(error.errorCodeIdentifier)] "
             return CLIProcessResult(
                 stdout: "",
-                stderr: "[\(error.errorCodeIdentifier)] \(desc)",
+                stderr: desc.hasPrefix("[") ? desc : (prefix + desc),
                 exitCode: 2
             )
         } catch let error as RegistryReplayError {
@@ -635,77 +642,128 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--bib", "--registry-replay"],
-                boolFlags: ["--demo"],
+                boolFlags: ["--demo", "--offline", "--no-cache"],
                 maxPositionals: 1,
                 lang: lang
             )
+            let citeUsage = lang.L(
+                "Usage: scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--offline | --registry-replay <dir>] [--no-cache]",
+                "用法：scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--offline | --registry-replay <目录>] [--no-cache]"
+            )
             guard let citeKey = parsed.positionals.first else {
-                throw ScholarOSError.invalidCLIArguments(
-                    "Usage: scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--registry-replay <dir>]"
-                )
+                throw ScholarOSError.invalidCLIArguments(citeUsage)
             }
+            let isOffline = parsed.bools.contains("--offline")
+            let noCache = parsed.bools.contains("--no-cache")
             let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let replayDir, replayDir.isEmpty {
                 throw ScholarOSError.invalidCLIArguments(
-                    "Option '--registry-replay' requires a non-empty directory path."
+                    lang.L(
+                        "Option '--registry-replay' requires a non-empty directory path.",
+                        "选项 '--registry-replay' 需要提供非空目录路径。"
+                    )
+                )
+            }
+            if isOffline && replayDir != nil {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --offline with --registry-replay.",
+                        "不能将 --offline 与 --registry-replay 同时使用。"
+                    )
                 )
             }
             if parsed.bools.contains("--demo") && replayDir != nil {
                 throw ScholarOSError.invalidCLIArguments(
-                    "Cannot combine --demo with --registry-replay."
+                    lang.L(
+                        "Cannot combine --demo with --registry-replay.",
+                        "不能将 --demo 与 --registry-replay 同时使用。"
+                    )
                 )
             }
+
+            let entries: [BibliographyEntry]
+            let isDemo: Bool
+            var openedDB: ScholarProjectDatabase? = nil
+            defer { openedDB?.close() }
+
             if let bibPath = parsed.values["--bib"] {
                 if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
                     throw ScholarOSError.invalidCLIArguments(
-                        "Cannot combine --bib '\(bibPath)' with --project or --demo."
+                        lang.L(
+                            "Cannot combine --bib '\(bibPath)' with --project or --demo.",
+                            "不能将 --bib '\(bibPath)' 与 --project 或 --demo 同时使用。"
+                        )
                     )
                 }
                 let rawBib = try readRequiredRegularFile(atPath: bibPath)
-                let entries = try BibTeXCodec().parse(rawBib)
-                var byKey: [String: BibliographyEntry] = [:]
-                for entry in entries {
-                    byKey[entry.citeKey] = entry
-                }
-                let firewall = CitationVerificationFirewall()
-                var inRunVerdicts: [String: CitationFirewallEntryVerdict] = [:]
-                if let replayDir, let targetEntry = byKey[citeKey] {
-                    let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
-                    let verdict = await firewall.verifyAgainstPublicRegistries(entry: targetEntry, session: replaySession)
-                    try await replaySession.throwIfFailed()
-                    inRunVerdicts[citeKey] = verdict
-                }
-                let verified = try firewall.assertCitationAllowed(
+                entries = try BibTeXCodec().parse(rawBib)
+                isDemo = false
+            } else {
+                let opened = try openReadDatabase(
+                    parsed: parsed,
+                    usage: citeUsage,
+                    lang: lang
+                )
+                openedDB = opened.db
+                entries = try opened.db.listBibliographyEntries()
+                isDemo = opened.isDemo
+            }
+
+            var byKey: [String: BibliographyEntry] = [:]
+            for entry in entries {
+                byKey[entry.citeKey] = entry
+            }
+
+            let mode: BibliographyVerificationMode
+            if let replayDir {
+                let snapshot = try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: replayDir))
+                mode = .replay(snapshot: snapshot)
+            } else if isOffline || isDemo {
+                mode = .offline
+            } else {
+                mode = .online(transport: registryTransport)
+            }
+
+            let firewall = CitationVerificationFirewall(clock: registryClock)
+            guard let targetEntry = byKey[citeKey] else {
+                _ = try firewall.assertCitationAllowed(
                     citeKey: citeKey,
                     in: byKey,
-                    verifiedVerdicts: inRunVerdicts
+                    verifiedVerdicts: [:],
+                    language: lang
                 )
-                let formatted = CSLCitationFormatterEngine().formatEntry(verified, style: .apa7)
-                return CLIExecutionOutput(
-                    stdout: "\\cite{\(verified.citeKey)} -> \(formatted.bibliographyPlainText)",
-                    exitCode: 0
-                )
+                return CLIExecutionOutput(stdout: "", exitCode: 2)
             }
-            let opened = try openReadDatabase(
-                parsed: parsed,
-                usage: "Usage: scholaros cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--registry-replay <dir>]",
-                lang: lang
+
+            let cacheWarnings = CacheWarningCollector()
+            let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                entries: [targetEntry],
+                mode: mode,
+                noCache: noCache || isOffline || isDemo,
+                environment: effectiveEnvironment,
+                clock: registryClock,
+                language: lang,
+                cacheWarningHandler: { msg in
+                    cacheWarnings.record(msg)
+                }
             )
-            defer { opened.db.close() }
-            if let replayDir, let targetEntry = try opened.db.bibliographyEntry(citeKey: citeKey) {
-                let replaySession = try RegistryReplaySession(directoryURL: URL(fileURLWithPath: replayDir))
-                let verdict = await CitationVerificationFirewall().verifyAgainstPublicRegistries(
-                    entry: targetEntry,
-                    session: replaySession
-                )
-                try await replaySession.throwIfFailed()
-                opened.db.recordInRunVerdict(verdict)
+            var inRunVerdicts: [String: CitationFirewallEntryVerdict] = [:]
+            for verdict in verificationResult.report.verdicts {
+                inRunVerdicts[verdict.citeKey] = verdict
+                openedDB?.recordInRunVerdict(verdict)
             }
-            let verified = try opened.db.validateCitationKeyForInsertion(citeKey)
+
+            let verified = try firewall.assertCitationAllowed(
+                citeKey: citeKey,
+                in: byKey,
+                verifiedVerdicts: inRunVerdicts,
+                language: lang
+            )
             let formatted = CSLCitationFormatterEngine().formatEntry(verified, style: .apa7)
-            let prefix = opened.isDemo ? "[DEMO] " : ""
+            let prefix = isDemo ? "[DEMO] " : ""
             return CLIExecutionOutput(
                 stdout: "\(prefix)\\cite{\(verified.citeKey)} -> \(formatted.bibliographyPlainText)",
+                stderr: cacheWarnings.allLines().joined(separator: "\n"),
                 exitCode: 0
             )
 
@@ -1169,13 +1227,14 @@ public struct ScholarCLIRunner: Sendable {
             }
             let db = try ScholarProjectDatabase(
                 bundleURL: URL(fileURLWithPath: projectPath),
-                seedDemoIfEmpty: false
+                seedDemoIfEmpty: false,
+                clock: registryClock
             )
             return (db, false)
         }
 
         if useDemo {
-            let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
+            let db = try ScholarProjectDatabase.inMemory(seedDemo: true, clock: registryClock)
             if let currentTitle = try? db.projectTitle(), !currentTitle.hasPrefix("[DEMO]") {
                 try? db.setProjectTitle("[DEMO] \(currentTitle)")
             }
@@ -1226,7 +1285,8 @@ public struct ScholarCLIRunner: Sendable {
         return ScholarLSPWorkspaceService(
             rootFilePath: rootKey,
             files: files,
-            bibliography: entries
+            bibliography: entries,
+            clock: registryClock
         )
     }
 
@@ -1584,7 +1644,8 @@ public struct ScholarCLIRunner: Sendable {
         return ScholarLSPWorkspaceService(
             rootFilePath: primary,
             files: files,
-            bibliography: entries
+            bibliography: entries,
+            clock: registryClock
         )
     }
 
@@ -1615,7 +1676,8 @@ public struct ScholarCLIRunner: Sendable {
             Project Bundle & Demo Commands (require --project <dir.scholarproj> or explicit --demo):
               init [--project <dir.scholarproj>] [--seed-demo]       Initialize .scholarproj SQLite WAL bundle
               status --project <dir.scholarproj> | --demo            Print JSON project statistics
-              cite <citeKey> --project <dir.scholarproj> | --demo    Check citation status & format APA 7th snippet
+              cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--offline | --registry-replay <dir>] [--no-cache]
+                                                                     Verify single citation online/replay & format APA 7th snippet if VERIFIED
               prisma-stats --project <dir.scholarproj> | --demo      Print PRISMA 2020 & nominal Cohen's kappa JSON
               prisma-svg [<out.svg>] --project <dir> | --demo        Export PRISMA 2020 flow diagram SVG
               citation-graph --project <dir.scholarproj> | --demo    Build citation network summary
@@ -1651,7 +1713,8 @@ public struct ScholarCLIRunner: Sendable {
             工程包与演示命令（必须显式指定 --project <dir.scholarproj> 或 --demo）：
               init [--project <dir.scholarproj>] [--seed-demo]       初始化 .scholarproj SQLite WAL 工程包
               status --project <dir.scholarproj> | --demo            输出工程统计 JSON
-              cite <citeKey> --project <dir.scholarproj> | --demo    检查单条引文状态并输出 APA 7th 片段
+              cite <citeKey> [--bib <refs.bib> | --project <dir.scholarproj> | --demo] [--offline | --registry-replay <目录>] [--no-cache]
+                                                                     核查单条引文（默认联网），仅在 VERIFIED 时输出 APA 7th 片段
               prisma-stats --project <dir.scholarproj> | --demo      输出 PRISMA 2020 与多分类 Cohen's kappa JSON
               prisma-svg [<out.svg>] --project <dir> | --demo        导出 PRISMA 2020 矢量流程图 SVG
               citation-graph --project <dir.scholarproj> | --demo    输出引文网络摘要

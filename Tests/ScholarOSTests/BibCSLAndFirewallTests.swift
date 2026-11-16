@@ -4463,4 +4463,312 @@ struct BibCSLAndFirewallTests {
         #expect(onlyBadOnline.firewallClass == .notFound)
         #expect(onlyBadOnline.reasons == ["invalid_identifier"])
     }
+
+    // MARK: - M1 Stage 09: S42 & S48 (.bib Untrusted Tags, Export Round-Trip, Provenance, Clock TTL & Rejection Reasons)
+
+    private final class DialableRegistryClock: RegistryClock, @unchecked Sendable {
+        private let lock = NSLock()
+        private var date: Date
+        private var uptime: TimeInterval = 1_000.0
+
+        init(initialUTCDate: Date) {
+            self.date = initialUTCDate
+        }
+
+        func advance(by seconds: TimeInterval) {
+            lock.lock()
+            date = date.addingTimeInterval(seconds)
+            uptime += seconds
+            lock.unlock()
+        }
+
+        func now() -> TimeInterval {
+            lock.lock()
+            defer { lock.unlock() }
+            return uptime
+        }
+
+        func currentDate() -> Date {
+            lock.lock()
+            defer { lock.unlock() }
+            return date
+        }
+
+        func sleep(_ seconds: TimeInterval) async throws {
+            advance(by: seconds)
+        }
+    }
+
+    @Test("M1 Stage 09 (S42 items 1 & 2): x-firewall-class and x-firewall-note are ignored on parse, logged in findings, never exported, and re-parsed export cannot be inserted before re-verification")
+    func m1Stage09S42Item1And2BibFirewallFieldsIgnoredLoggedAndNeverExported() async throws {
+        let codec = BibTeXCodec()
+        let replaySnapshot = try RegistryReplaySnapshot(directoryURL: Self.recordedRegistryFixturesURL)
+
+        let bibWithBoth = """
+        @article{lecun_tagged,
+          author           = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title            = {Deep learning},
+          journal          = {Nature},
+          year             = {2015},
+          volume           = {521},
+          pages            = {436--444},
+          doi              = {10.1038/nature14539},
+          x-firewall-class = {NOT_FOUND},
+          x-firewall-note  = {Manually overridden in file}
+        }
+        @article{note_only_tagged,
+          author          = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title           = {Deep learning},
+          journal         = {Nature},
+          year            = {2015},
+          doi             = {10.1038/nature14539},
+          x-firewall-note = {Pre-approved note}
+        }
+        """
+
+        let parsed = try codec.parse(bibWithBoth)
+        #expect(parsed.count == 2)
+        for entry in parsed {
+            #expect(entry.firewallClass == .unverified)
+            #expect(entry.firewallAuditNote.isEmpty)
+            #expect(entry.firewallVerifiedSource == nil)
+            #expect(entry.firewallVerifiedAtUTC == nil)
+        }
+
+        // Verify EN and ZH findings record untrusted values for BOTH x-firewall-class and x-firewall-note
+        let zhRes = try await CitationVerificationFirewall.verifyBibliography(
+            entries: parsed,
+            mode: .replay(snapshot: replaySnapshot),
+            language: .zhHans
+        )
+        let v1ZH = try #require(zhRes.report.verdicts.first { $0.citeKey == "lecun_tagged" })
+        #expect(v1ZH.firewallClass == .verified)
+        #expect(v1ZH.findings.contains { $0.detail.contains("文件里写着 NOT_FOUND，未采信") })
+        #expect(v1ZH.findings.contains { $0.detail.contains("文件里写着 Manually overridden in file，未采信") })
+
+        let v2ZH = try #require(zhRes.report.verdicts.first { $0.citeKey == "note_only_tagged" })
+        #expect(v2ZH.firewallClass == .verified)
+        #expect(v2ZH.findings.contains { $0.detail.contains("文件里写着 Pre-approved note，未采信") })
+
+        let enRes = try await CitationVerificationFirewall.verifyBibliography(
+            entries: parsed,
+            mode: .replay(snapshot: replaySnapshot),
+            language: .en
+        )
+        let v1EN = try #require(enRes.report.verdicts.first { $0.citeKey == "lecun_tagged" })
+        #expect(v1EN.findings.contains { $0.detail.contains("NOT_FOUND") && $0.detail.contains("not trusted") })
+        #expect(v1EN.findings.contains { $0.detail.contains("Manually overridden in file") && $0.detail.contains("not trusted") })
+
+        // Export verified auditedEntry to .bib -> never writes x-firewall-class, x-firewall-note, source, or date;
+        // re-reading exported .bib cannot be inserted before re-verifying!
+        let exportedBib = codec.serialize([v1EN.auditedEntry])
+        #expect(!exportedBib.lowercased().contains("x-firewall-class"))
+        #expect(!exportedBib.lowercased().contains("x-firewall-note"))
+        #expect(!exportedBib.lowercased().contains("firewall"))
+
+        let reparsed = try #require(try codec.parse(exportedBib).first)
+        #expect(reparsed.firewallClass == .unverified)
+        #expect(reparsed.firewallVerifiedSource == nil)
+        #expect(reparsed.firewallVerifiedAtUTC == nil)
+        do {
+            _ = try CitationVerificationFirewall().assertCitationAllowed(
+                citeKey: reparsed.citeKey,
+                in: [reparsed.citeKey: reparsed]
+            )
+            Issue.record("Expected re-parsed exported .bib entry to be blocked before re-verification")
+        } catch let err as ScholarOSError {
+            #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+        }
+    }
+
+    @Test("M1 Stage 09 (S42 items 3 & 5, S48 items 1-3): bare firewallClass rejected; clock TTL 30d VERIFIED and 1d NOT_FOUND enforced; rejection messages distinguish unchecked vs problematic")
+    func m1Stage09S42AndS48AssertionProvenanceClockExpirationAndRejectionReasons() async throws {
+        // 2026-11-16T10:00:00Z
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(10 * 3600)
+        let clock = DialableRegistryClock(initialUTCDate: initialUTC)
+        let firewall = CitationVerificationFirewall(clock: clock)
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        // 1. Bare firewallClass = .verified (no source/date, only source, or only date) MUST be rejected
+        let bareVariants = [
+            BibliographyEntry(
+                citeKey: "bare_both_nil",
+                title: "Deep learning",
+                authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539",
+                firewallClass: .verified,
+                firewallAuditNote: "Verified"
+            ),
+            BibliographyEntry(
+                citeKey: "bare_no_date",
+                title: "Deep learning",
+                authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539",
+                firewallClass: .verified,
+                firewallVerifiedSource: "Crossref"
+            ),
+            BibliographyEntry(
+                citeKey: "bare_no_source",
+                title: "Deep learning",
+                authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539",
+                firewallClass: .verified,
+                firewallVerifiedAtUTC: "2026-11-16"
+            )
+        ]
+        for bare in bareVariants {
+            do {
+                _ = try firewall.assertCitationAllowed(citeKey: bare.citeKey, in: [bare.citeKey: bare])
+                Issue.record("Expected bare entry \(bare.citeKey) to be rejected")
+            } catch let err as ScholarOSError {
+                #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+            }
+        }
+
+        // 2. Online/replay verification populates source & UTC day ("2026-11-16"); valid at 0d and 29d, expired past 30d
+        let lecunRaw = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539"
+        )
+        let lecunVerdict = await firewall.verifyAgainstPublicRegistries(entry: lecunRaw, session: replay)
+        #expect(lecunVerdict.firewallClass == .verified)
+        let writtenBackLecun = lecunVerdict.auditedEntry
+        #expect(writtenBackLecun.firewallVerifiedSource?.isEmpty == false)
+        #expect(writtenBackLecun.firewallVerifiedAtUTC == "2026-11-16")
+
+        // t = 0: allowed both via in-run verdict and via written-back entry
+        let immediateAllowed = try firewall.assertCitationAllowed(
+            citeKey: "real_lecun",
+            in: ["real_lecun": lecunRaw],
+            verifiedVerdicts: ["real_lecun": lecunVerdict]
+        )
+        #expect(immediateAllowed.citeKey == "real_lecun")
+
+        // Advance to +29 days: written-back entry STILL allowed without inRunVerdicts
+        clock.advance(by: 29 * 86_400)
+        let day29Allowed = try firewall.assertCitationAllowed(
+            citeKey: "real_lecun",
+            in: ["real_lecun": writtenBackLecun]
+        )
+        #expect(day29Allowed.citeKey == "real_lecun")
+
+        // Advance past 30 days (+2 more days -> +31d total): REJECTED as expired in both ZH and EN!
+        clock.advance(by: 2 * 86_400)
+        do {
+            _ = try firewall.assertCitationAllowed(
+                citeKey: "real_lecun",
+                in: ["real_lecun": writtenBackLecun],
+                language: .zhHans
+            )
+            Issue.record("Expected >30d VERIFIED verdict to expire and be rejected")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
+            #expect(status == "UNVERIFIED")
+            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+        }
+
+        do {
+            _ = try firewall.assertCitationAllowed(
+                citeKey: "real_lecun",
+                in: ["real_lecun": writtenBackLecun],
+                language: .en
+            )
+            Issue.record("Expected >30d VERIFIED verdict to expire and be rejected in EN")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonEN) {
+            #expect(status == "UNVERIFIED")
+            #expect(reasonEN.contains("2026-11-16"))
+            #expect(reasonEN.lowercased().contains("expired"))
+        }
+
+        // 3. NOT_FOUND verdict expires after 1 day -> treated as unchecked (still rejected, message says expired / re-verify!)
+        let clockNF = DialableRegistryClock(initialUTCDate: initialUTC)
+        let firewallNF = CitationVerificationFirewall(clock: clockNF)
+        let fakeRaw = BibliographyEntry(
+            citeKey: "fake_nonsentinel",
+            kind: .article,
+            title: "Quantum Gradient Descent in Biological Neural Networks",
+            authors: [
+                BibAuthor(givenName: "Eleanor", familyName: "Whitfield"),
+                BibAuthor(givenName: "Raj", familyName: "Patel")
+            ],
+            year: 2026,
+            venue: "Nature Machine Intelligence",
+            doi: "10.1038/fake.2026.99999"
+        )
+        let fakeVerdict = await firewallNF.verifyAgainstPublicRegistries(entry: fakeRaw, session: replay)
+        #expect(fakeVerdict.firewallClass == .notFound)
+        let writtenBackFake = fakeVerdict.auditedEntry
+        #expect(writtenBackFake.firewallVerifiedSource?.isEmpty == false)
+        #expect(writtenBackFake.firewallVerifiedAtUTC == "2026-11-16")
+
+        // Within 1 day (t = 0): rejected with NOT_FOUND
+        do {
+            _ = try firewallNF.assertCitationAllowed(
+                citeKey: "fake_nonsentinel",
+                in: ["fake_nonsentinel": writtenBackFake],
+                language: .zhHans
+            )
+            Issue.record("Expected NOT_FOUND entry to be blocked")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, _) {
+            #expect(status == "NOT_FOUND")
+        }
+
+        // Past 1 day (+1 day + 60s): treated as unchecked (UNVERIFIED) with expired re-verification message!
+        clockNF.advance(by: 86_400 + 60)
+        do {
+            _ = try firewallNF.assertCitationAllowed(
+                citeKey: "fake_nonsentinel",
+                in: ["fake_nonsentinel": writtenBackFake],
+                language: .zhHans
+            )
+            Issue.record("Expected expired NOT_FOUND entry to remain blocked")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
+            #expect(status == "UNVERIFIED")
+            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+        }
+
+        // 4. Rejection messages clearly distinguish UNVERIFIED (offline / transport_error) vs NOT_FOUND / DRIFT / RETRACTED
+        let freshFirewall = CitationVerificationFirewall(clock: DialableRegistryClock(initialUTCDate: initialUTC))
+        let offlineVerdict = freshFirewall.evaluate(lecunRaw)
+        do {
+            _ = try freshFirewall.assertCitationAllowed(
+                citeKey: "real_lecun",
+                in: ["real_lecun": lecunRaw],
+                verifiedVerdicts: ["real_lecun": offlineVerdict],
+                language: .zhHans
+            )
+            Issue.record("Expected offline verdict to reject")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
+            #expect(status == "UNVERIFIED")
+            #expect(reasonZH.contains("offline"))
+            #expect(reasonZH.contains("并非"))
+        }
+
+        do {
+            _ = try freshFirewall.assertCitationAllowed(
+                citeKey: "fake_nonsentinel",
+                in: ["fake_nonsentinel": fakeRaw],
+                verifiedVerdicts: ["fake_nonsentinel": fakeVerdict],
+                language: .zhHans
+            )
+            Issue.record("Expected NOT_FOUND verdict to reject")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
+            #expect(status == "NOT_FOUND")
+            #expect(reasonZH.contains("doi_not_registered"))
+        }
+    }
 }

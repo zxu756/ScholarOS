@@ -685,11 +685,12 @@ public final class ScholarStudioViewModel: ObservableObject {
                 else {
                     return item
                 }
+                let effectiveClass = entry.trustedFirewallClass()
                 return LSPCompletionItem(
                     id: item.id,
                     insertText: item.insertText,
                     title: item.title,
-                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(entry.firewallClass.localizedBadgeTitle(lang))",
+                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(effectiveClass.localizedBadgeTitle(lang))",
                     detailMarkdown: item.detailMarkdown,
                     category: item.category,
                     relevanceScore: item.relevanceScore
@@ -699,14 +700,15 @@ public final class ScholarStudioViewModel: ObservableObject {
             let lang = ScholarLocalizer.shared.language
             // Provide deterministic citation completions so popover card is always rich when toggled
             completionCandidates = bibliographyEntries.prefix(6).map { entry in
-                LSPCompletionItem(
+                let effectiveClass = entry.trustedFirewallClass()
+                return LSPCompletionItem(
                     id: "cite-\(entry.citeKey)",
                     insertText: entry.citeKey,
                     title: "@\(entry.citeKey)",
-                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(entry.firewallClass.localizedBadgeTitle(lang))",
+                    subtitle: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) • \(effectiveClass.localizedBadgeTitle(lang))",
                     detailMarkdown: "\(entry.title) — \(entry.venue.isEmpty ? lang.L("Archival Preprint", "预印本档案") : entry.venue)",
                     category: .citation,
-                    relevanceScore: entry.firewallClass.allowsManuscriptInsertion ? 0.96 : 0.15
+                    relevanceScore: effectiveClass.allowsManuscriptInsertion ? 0.96 : 0.15
                 )
             }
         }
@@ -729,12 +731,13 @@ public final class ScholarStudioViewModel: ObservableObject {
         } else if let selectedKey = docking.selectedCiteKey,
                   let entry = bibliographyEntries.first(where: { $0.citeKey == selectedKey })
         {
+            let effectiveClass = entry.trustedFirewallClass()
             let csl = cslEngine.formatEntry(entry, style: selectedCSLStyle)
             activeHoverCard = LSPHoverCard(
                 title: "\(entry.firstAuthorFamily) (\(entry.year.map(String.init) ?? "n.d.")) — @\(entry.citeKey)",
-                categoryBadge: entry.firewallClass.localizedBadgeTitle(lang),
+                categoryBadge: effectiveClass.localizedBadgeTitle(lang),
                 markdownBody: entry.title,
-                firewallClass: entry.firewallClass,
+                firewallClass: effectiveClass,
                 targetSpan: TextSpan(
                     filePath: activePath,
                     start: TextPosition(line: cursor.line, column: cursor.column),
@@ -995,12 +998,12 @@ public final class ScholarStudioViewModel: ObservableObject {
             toastCenter.enqueue(
                 tone: .verified,
                 title: lang.L("Inserted Verified Citation @\(entry.citeKey)", "已插入权威核验引文 @\(entry.citeKey)"),
-                detail: "\(entry.firewallClass.localizedBadgeTitle(lang)) — \(entry.doi ?? entry.arxivID ?? lang.L("Archival Registry", "学术注册库"))"
+                detail: "\(entry.trustedFirewallClass().localizedBadgeTitle(lang)) — \(entry.doi ?? entry.arxivID ?? lang.L("Archival Registry", "学术注册库"))"
             )
             return true
         } catch let error as ScholarOSError {
             let lang = ScholarLocalizer.shared.language
-            let entryClass = bibliographyEntries.first(where: { $0.citeKey == citeKey })?.firewallClass ?? .notFound
+            let entryClass = bibliographyEntries.first(where: { $0.citeKey == citeKey })?.trustedFirewallClass() ?? .notFound
             let rejection = FirewallGateRejectionRecord(
                 citeKey: citeKey,
                 errorCode: error.errorCodeIdentifier,
@@ -1488,7 +1491,7 @@ public final class ScholarStudioViewModel: ObservableObject {
 
     public var filteredBibliographyEntries: [BibliographyEntry] {
         bibliographyEntries.filter { entry in
-            if let cls = firewallClassFilter, entry.firewallClass != cls {
+            if let cls = firewallClassFilter, entry.trustedFirewallClass() != cls {
                 return false
             }
             let q = bibliographySearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

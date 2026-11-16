@@ -478,7 +478,7 @@ public struct ManuscriptLSPEditorStudioView: View {
                         .foregroundColor(CambridgeLinenPalette.driftAmber)
                 case .identifier:
                     let isVerifiedCite = viewModel.bibliographyEntries.contains {
-                        $0.citeKey == lex && $0.firewallClass.allowsManuscriptInsertion
+                        $0.citeKey == lex && $0.trustedFirewallClass().allowsManuscriptInsertion
                     }
                     if isVerifiedCite {
                         composed = composed + Text(lex)
@@ -541,7 +541,7 @@ public struct ManuscriptLSPEditorStudioView: View {
                         Text("@\(entry.citeKey)")
                             .font(CambridgeTypography.monoSmall)
                             .foregroundStyle(
-                                entry.firewallClass.allowsManuscriptInsertion
+                                entry.trustedFirewallClass().allowsManuscriptInsertion
                                     ? CambridgeLinenPalette.libraryForestGreen
                                     : CambridgeLinenPalette.blockedCrimson
                             )
@@ -554,7 +554,7 @@ public struct ManuscriptLSPEditorStudioView: View {
 
                         Spacer(minLength: 4)
 
-                        FirewallBadgeView(firewallClass: entry.firewallClass, compact: true)
+                        FirewallBadgeView(firewallClass: entry.trustedFirewallClass(), compact: true)
                             .fixedSize(horizontal: true, vertical: false)
                     }
                     .padding(.horizontal, 7)

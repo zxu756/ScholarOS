@@ -800,4 +800,152 @@ struct LSPEngineAndSyncTeXTests {
         let syncData = try service.exportSyntheticSyncTeXData(compressed: true)
         #expect(SyncTeXZlibCodec.isCompressedGzipOrZlib(syncData))
     }
+
+    // MARK: - M1 Stage 09: S48 LSP Completion, Hover & Diagnostics Provenance and TTL Expiration
+
+    private final class LSPDialableClock: RegistryClock, @unchecked Sendable {
+        private let lock = NSLock()
+        private var date: Date
+        private var uptime: TimeInterval = 500.0
+
+        init(initialUTCDate: Date) {
+            self.date = initialUTCDate
+        }
+
+        func advance(by seconds: TimeInterval) {
+            lock.lock()
+            date = date.addingTimeInterval(seconds)
+            uptime += seconds
+            lock.unlock()
+        }
+
+        func now() -> TimeInterval {
+            lock.lock()
+            defer { lock.unlock() }
+            return uptime
+        }
+
+        func currentDate() -> Date {
+            lock.lock()
+            defer { lock.unlock() }
+            return date
+        }
+
+        func sleep(_ seconds: TimeInterval) async throws {
+            advance(by: seconds)
+        }
+    }
+
+    @Test("M1 Stage 09 (S48): LSP completion, hover, diagnostics, and assertAllCitedEntriesPassFirewall honor provenance and 30d/1d TTL expiration")
+    func m1Stage09LSPCompletionHoverDiagnosticsRespectProvenanceAndClockExpiration() async throws {
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(9 * 3600)
+        let clock = LSPDialableClock(initialUTCDate: initialUTC)
+        let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+
+        let bareLecun = BibliographyEntry(
+            citeKey: "real_lecun",
+            kind: .article,
+            title: "Deep learning",
+            authors: [
+                BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+            ],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539",
+            firewallClass: .verified,
+            firewallAuditNote: "Legacy bare verified"
+        )
+        let fakeEntry = BibliographyEntry(
+            citeKey: "fake_nonsentinel",
+            kind: .article,
+            title: "Quantum Gradient Descent in Biological Neural Networks",
+            authors: [
+                BibAuthor(givenName: "Eleanor", familyName: "Whitfield"),
+                BibAuthor(givenName: "Raj", familyName: "Patel")
+            ],
+            year: 2026,
+            venue: "Nature Machine Intelligence",
+            doi: "10.1038/fake.2026.99999"
+        )
+
+        let tex = """
+        \\documentclass{article}
+        \\begin{document}
+        Valid cite \\cite{real_lecun} and fake \\cite{fake_nonsentinel}.
+        Typing \\cite{real_l}
+        \\end{document}
+        """
+
+        let service = ScholarLSPWorkspaceService(
+            rootFilePath: "main.tex",
+            files: ["main.tex": tex],
+            bibliography: [bareLecun, fakeEntry],
+            clock: clock
+        )
+
+        // 1. Before online verification: bare `firewallClass = .verified` without source/date is treated as UNVERIFIED everywhere
+        let preHover = try #require(service.hover(atLine: 3, column: 20, in: "main.tex"))
+        #expect(preHover.firewallClass == .unverified)
+        let preCompletions = service.completions(atLine: 4, column: 18, in: "main.tex")
+        let preLecunComp = try #require(preCompletions.first { $0.insertText == "real_lecun" })
+        #expect(!preLecunComp.subtitle.contains("Verified"))
+        let preDiags = service.diagnostics(in: "main.tex")
+        #expect(preDiags.contains { $0.code == "ERR_UNVERIFIED_CITATION" && $0.message.contains("real_lecun") })
+
+        // 2. Run verifyCitationsOnline(using: replay) -> writes source + 2026-11-16 back to entries
+        let onlineReport = await service.verifyCitationsOnline(using: replay)
+        #expect(onlineReport.verifiedCount == 1)
+        #expect(onlineReport.notFoundCount == 1)
+        let storedLecun = try #require(service.bibliographyEntry(forCiteKey: "real_lecun"))
+        #expect(storedLecun.firewallVerifiedSource?.isEmpty == false)
+        #expect(storedLecun.firewallVerifiedAtUTC == "2026-11-16")
+
+        // Create a fresh LSP service from the written-back entries (no inRunVerdicts, testing persisted entry provenance!)
+        let persistedService = ScholarLSPWorkspaceService(
+            rootFilePath: "main.tex",
+            files: ["main.tex": tex],
+            bibliography: service.bibliographyEntries,
+            clock: clock
+        )
+
+        // At +29 days: real_lecun is still VERIFIED in hover, completion, and diagnostics!
+        clock.advance(by: 29 * 86_400)
+        let day29Hover = try #require(persistedService.hover(atLine: 3, column: 20, in: "main.tex"))
+        #expect(day29Hover.firewallClass == .verified)
+        let day29Comp = try #require(persistedService.completions(atLine: 4, column: 18, in: "main.tex").first { $0.insertText == "real_lecun" })
+        #expect(day29Comp.subtitle.contains("Verified"))
+        let day29Diags = persistedService.diagnostics(in: "main.tex")
+        #expect(!day29Diags.contains { $0.code == "ERR_UNVERIFIED_CITATION" && $0.message.contains("real_lecun") })
+        // Meanwhile fake_nonsentinel (NOT_FOUND, 1-day TTL) is already >1d old at +29d -> treated as UNVERIFIED with expired notice!
+        let fakeHoverAt29d = try #require(persistedService.hover(atLine: 3, column: 48, in: "main.tex"))
+        #expect(fakeHoverAt29d.firewallClass == .unverified)
+        #expect(fakeHoverAt29d.markdownBody.contains("2026-11-16"))
+
+        // Advance past 30 days (+2 more days -> +31d total): real_lecun ALSO expires on BOTH persistedService and original service!
+        clock.advance(by: 2 * 86_400)
+        // Force diagnostics cache refresh or re-evaluate via fresh query:
+        for svc in [persistedService, service] {
+            let expHover = try #require(svc.hover(atLine: 3, column: 20, in: "main.tex"))
+            #expect(expHover.firewallClass == .unverified)
+            #expect(expHover.markdownBody.contains("2026-11-16"))
+            let expComp = try #require(svc.completions(atLine: 4, column: 18, in: "main.tex").first { $0.insertText == "real_lecun" })
+            #expect(!expComp.subtitle.contains("• Verified"))
+            #expect(expComp.detailMarkdown.contains("2026-11-16"))
+            #expect(throws: ScholarOSError.self) {
+                try svc.assertAllCitedEntriesPassFirewall()
+            }
+        }
+        let freshExpiredDiagService = ScholarLSPWorkspaceService(
+            rootFilePath: "main.tex",
+            files: ["main.tex": "\\documentclass{article}\\begin{document}\\cite{real_lecun}\\end{document}"],
+            bibliography: [storedLecun],
+            clock: clock
+        )
+        let expDiags = freshExpiredDiagService.diagnostics(in: "main.tex")
+        let expLecunDiag = try #require(expDiags.first { $0.code == "ERR_UNVERIFIED_CITATION" })
+        #expect(expLecunDiag.message.contains("2026-11-16"))
+        #expect(expLecunDiag.localizedMessage(.zhHans).contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+    }
 }

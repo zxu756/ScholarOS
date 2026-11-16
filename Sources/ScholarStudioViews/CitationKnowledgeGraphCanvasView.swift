@@ -232,7 +232,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                 ForEach(viewModel.graphSnapshot.nodes) { node in
                     if let pt = positions[node.citeKey] {
                         let isSelected = (viewModel.selectedGraphCiteKey == node.citeKey)
-                        let fw = bibByKey[node.citeKey]?.firewallClass
+                        let fw = bibByKey[node.citeKey]?.trustedFirewallClass()
                         let isBlocked = (fw == .notFound || fw == .retracted)
                         let r = nodeRadius(for: node)
 
@@ -498,7 +498,7 @@ public struct CitationKnowledgeGraphStudioView: View {
             let isSelected = (viewModel.selectedGraphCiteKey == node.citeKey)
             let isBridge = node.isBridgePaper || bridges.contains(node.citeKey)
             let isSPC = viewModel.graphHighlightMainPath && spcKeys.contains(node.citeKey)
-            let fwClass = bibByKey[node.citeKey]?.firewallClass ?? .unverified
+            let fwClass = bibByKey[node.citeKey]?.trustedFirewallClass() ?? .unverified
 
             // Brandes structural-hole bridge outer concentric halo
             if isBridge {
@@ -759,7 +759,7 @@ public struct CitationKnowledgeGraphStudioView: View {
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                             Spacer()
-                            if let fw = selectedEntry?.firewallClass {
+                            if let fw = selectedEntry?.trustedFirewallClass() {
                                 FirewallBadgeView(firewallClass: fw, compact: true)
                                     .fixedSize(horizontal: true, vertical: false)
                             }

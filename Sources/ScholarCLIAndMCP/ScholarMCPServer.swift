@@ -274,14 +274,11 @@ public struct ScholarMCPServer: Sendable {
         do {
             switch name {
             case "scholar_cite_key":
-                guard let replaySnapshot = try resolveReplaySnapshotIfActive(arguments: arguments) else {
-                    return executeToolCall(name: name, arguments: arguments)
-                }
-                let replaySession = replaySnapshot.makeSession()
-                let firewall = CitationVerificationFirewall()
                 let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
                 let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
+                let callOffline = (arguments["offline"] as? Bool == true)
+                let lang = resolvedLanguage(arguments: arguments)
 
                 let entries: [BibliographyEntry]
                 let isDemo: Bool
@@ -295,20 +292,43 @@ public struct ScholarMCPServer: Sendable {
                     isDemo = opened.isDemo
                 }
 
+                let mode = try resolveVerificationMode(arguments: arguments, isDemo: isDemo)
                 var byKey: [String: BibliographyEntry] = [:]
                 for entry in entries {
                     byKey[entry.citeKey] = entry
                 }
+
+                let firewall = CitationVerificationFirewall(clock: registryClock)
+                guard let targetEntry = byKey[citeKey] else {
+                    let verifiedEntry = try firewall.assertCitationAllowed(
+                        citeKey: citeKey,
+                        in: byKey,
+                        verifiedVerdicts: [:],
+                        language: lang
+                    )
+                    return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
+                }
+
+                let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                    entries: [targetEntry],
+                    mode: mode,
+                    noCache: noCache || isOffline || callOffline || isDemo,
+                    environment: effectiveEnvironment,
+                    clock: registryClock,
+                    sharedRateLimiter: sharedRateLimiter,
+                    sharedStandardCache: sharedStandardCache,
+                    sharedReplayExplicitCache: sharedReplayExplicitCache,
+                    language: lang
+                )
                 var verdicts = inRunVerdictsByKey
-                if let targetEntry = byKey[citeKey] {
-                    let verdict = await firewall.verifyAgainstPublicRegistries(entry: targetEntry, session: replaySession)
-                    try await replaySession.throwIfFailed()
-                    verdicts[citeKey] = verdict
+                for verdict in verificationResult.report.verdicts {
+                    verdicts[verdict.citeKey] = verdict
                 }
                 let verifiedEntry = try firewall.assertCitationAllowed(
                     citeKey: citeKey,
                     in: byKey,
-                    verifiedVerdicts: verdicts
+                    verifiedVerdicts: verdicts,
+                    language: lang
                 )
                 return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
 
@@ -359,7 +379,8 @@ public struct ScholarMCPServer: Sendable {
                     let lsp = ScholarLSPWorkspaceService(
                         rootFilePath: path,
                         files: [path: inlineSource],
-                        bibliography: entries
+                        bibliography: entries,
+                        clock: registryClock
                     )
                     let mode = try resolveVerificationMode(arguments: arguments, isDemo: isDemo)
                     let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
@@ -393,7 +414,8 @@ public struct ScholarMCPServer: Sendable {
                 let lsp = ScholarLSPWorkspaceService(
                     rootFilePath: primary,
                     files: files,
-                    bibliography: entries
+                    bibliography: entries,
+                    clock: registryClock
                 )
                 let mode = try resolveVerificationMode(arguments: arguments, isDemo: opened.isDemo)
                 let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
@@ -431,7 +453,7 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public func executeToolCall(name: String, arguments: [String: Any]) -> [String: Any] {
-        if name == "scholar_verify_bibliography" || name == "scholar_lsp_diagnostics" {
+        if name == "scholar_verify_bibliography" || name == "scholar_lsp_diagnostics" || name == "scholar_cite_key" {
             final class Box: @unchecked Sendable {
                 var value: [String: Any] = [:]
             }
@@ -449,40 +471,6 @@ public struct ScholarMCPServer: Sendable {
 
         do {
             switch name {
-            case "scholar_cite_key":
-                let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
-                let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
-
-                let entries: [BibliographyEntry]
-                let isDemo: Bool
-                var effectiveVerdicts = inRunVerdictsByKey
-
-                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
-                    entries = try BibTeXCodec().parse(rawBib)
-                    isDemo = false
-                } else {
-                    let opened = try openDatabase(from: arguments)
-                    defer { opened.db.close() }
-                    entries = try opened.db.listBibliographyEntries()
-                    isDemo = opened.isDemo
-                    for (k, v) in opened.db.inRunVerdicts() where effectiveVerdicts[k] == nil {
-                        effectiveVerdicts[k] = v
-                    }
-                }
-
-                var byKey: [String: BibliographyEntry] = [:]
-                for entry in entries {
-                    byKey[entry.citeKey] = entry
-                }
-
-                let verifiedEntry = try CitationVerificationFirewall().assertCitationAllowed(
-                    citeKey: citeKey,
-                    in: byKey,
-                    verifiedVerdicts: effectiveVerdicts
-                )
-                return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
-
             case "scholar_search_provenance":
                 let claim = arguments["claim"] as? String ?? ""
                 let opened = try openDatabase(from: arguments)
@@ -618,7 +606,8 @@ public struct ScholarMCPServer: Sendable {
             }
             let db = try ScholarProjectDatabase(
                 bundleURL: URL(fileURLWithPath: projectPath),
-                seedDemoIfEmpty: false
+                seedDemoIfEmpty: false,
+                clock: registryClock
             )
             return (db, false)
         }
@@ -628,12 +617,13 @@ public struct ScholarMCPServer: Sendable {
             }
             let db = try ScholarProjectDatabase(
                 bundleURL: URL(fileURLWithPath: defaultProjectBundlePath),
-                seedDemoIfEmpty: false
+                seedDemoIfEmpty: false,
+                clock: registryClock
             )
             return (db, false)
         }
         if (arguments["demo"] as? Bool == true) || allowDemoMode {
-            let db = try ScholarProjectDatabase.inMemory(seedDemo: true)
+            let db = try ScholarProjectDatabase.inMemory(seedDemo: true, clock: registryClock)
             return (db, true)
         }
         throw ScholarOSError.invalidCLIArguments(
@@ -679,7 +669,7 @@ public struct ScholarMCPServer: Sendable {
         [
         [
             "name": "scholar_cite_key",
-            "description": "Citation insertion check. Returns formatted \\cite{key} or #cite(<key>) ONLY if the entry is VERIFIED in the current run; otherwise returns ERR_UNVERIFIED_CITATION.",
+            "description": "Citation insertion check. Verifies the target entry through the shared Citation Verification Firewall (online by default unless offline: true or registryReplayPath is set) and returns formatted \\cite{key} or #cite(<key>) ONLY if VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -688,6 +678,7 @@ public struct ScholarMCPServer: Sendable {
                     "manuscriptFormat": ["type": "string"],
                     "bibtex": ["type": "string"],
                     "projectPath": ["type": "string"],
+                    "offline": ["type": "boolean"],
                     "registryReplayPath": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ],

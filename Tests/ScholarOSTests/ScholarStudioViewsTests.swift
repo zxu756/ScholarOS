@@ -184,4 +184,73 @@ struct ScholarStudioViewsTests {
         let ranFiltered = ScholarDrawerEmptyStateCopy.editorialAudit(manuscriptFileCount: 1, pluginsRunCount: 2, totalFindingCount: 4, language: .en)
         #expect(!ranFiltered.reportsCleanResult)
     }
+
+    @Test("M1 Stage 09 (S48 item 5): ScholarStudioViewModel and Command Palette never display sourceless or expired VERIFIED entries as Verified")
+    @MainActor
+    func m1Stage09StudioViewModelAndPaletteNeverShowExpiredOrSourcelessVerifiedAsVerified() {
+        let vm = ScholarStudioViewModel()
+        let sourcelessVerified = BibliographyEntry(
+            citeKey: "sourceless_verified",
+            title: "Sourceless Entry",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539",
+            firewallClass: .verified,
+            firewallAuditNote: "Legacy bare verified"
+        )
+        let expiredVerified = BibliographyEntry(
+            citeKey: "expired_verified",
+            title: "Old Entry",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539",
+            firewallClass: .verified,
+            firewallAuditNote: "Old verified",
+            firewallVerifiedSource: "Crossref",
+            firewallVerifiedAtUTC: "2020-01-01"
+        )
+        let todayUTC = BibliographyEntry.formatUTCDay(Date())
+        let freshVerified = BibliographyEntry(
+            citeKey: "fresh_verified",
+            title: "Fresh Entry",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Nature",
+            doi: "10.1038/nature14539",
+            firewallClass: .verified,
+            firewallAuditNote: "Fresh verified",
+            firewallVerifiedSource: "Crossref",
+            firewallVerifiedAtUTC: todayUTC
+        )
+
+        vm.bibliographyEntries = [sourcelessVerified, expiredVerified, freshVerified]
+        vm.docking.selectedCiteKey = "sourceless_verified"
+        vm.refreshActiveEditorLSPState()
+
+        let activeLang = ScholarLocalizer.shared.language
+        let verifiedBadge = CitationFirewallClass.verified.localizedBadgeTitle(activeLang)
+        let unverifiedBadge = CitationFirewallClass.unverified.localizedBadgeTitle(activeLang)
+
+        #expect(vm.activeHoverCard?.firewallClass == .unverified)
+        let sourcelessComp = vm.completionCandidates.first { $0.insertText == "sourceless_verified" }
+        #expect(sourcelessComp?.subtitle.contains(unverifiedBadge) == true)
+        #expect(sourcelessComp?.subtitle.contains("• \(verifiedBadge)") == false)
+        let expiredComp = vm.completionCandidates.first { $0.insertText == "expired_verified" }
+        #expect(expiredComp?.subtitle.contains(unverifiedBadge) == true)
+        #expect(expiredComp?.subtitle.contains("• \(verifiedBadge)") == false)
+        let freshComp = vm.completionCandidates.first { $0.insertText == "fresh_verified" }
+        #expect(freshComp?.subtitle.contains(verifiedBadge) == true)
+
+        let paletteItems = ScholarCommandPaletteCatalog.buildItems(
+            bibliographyEntries: [sourcelessVerified, expiredVerified, freshVerified]
+        )
+        let pSourceless = paletteItems.first { $0.id == "cite.sourceless_verified" }
+        let pExpired = paletteItems.first { $0.id == "cite.expired_verified" }
+        let pFresh = paletteItems.first { $0.id == "cite.fresh_verified" }
+        #expect(pSourceless?.firewallClass == .unverified)
+        #expect(pExpired?.firewallClass == .unverified)
+        #expect(pFresh?.firewallClass == .verified)
+    }
 }

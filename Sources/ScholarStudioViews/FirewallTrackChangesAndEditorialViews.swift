@@ -326,14 +326,15 @@ public struct CitationFirewallAndTrackChangesStudioView: View {
 
     private func firewallEntryRow(_ entry: BibliographyEntry) -> some View {
         let isSelected = (viewModel.docking.selectedCiteKey == entry.citeKey)
-        let isBlocked = !entry.firewallClass.allowsManuscriptInsertion
+        let effectiveClass = entry.trustedFirewallClass()
+        let isBlocked = !effectiveClass.allowsManuscriptInsertion
 
         return Button {
             viewModel.docking.selectedCiteKey = entry.citeKey
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
-                    FirewallBadgeView(firewallClass: entry.firewallClass, compact: true)
+                    FirewallBadgeView(firewallClass: effectiveClass, compact: true)
                         .fixedSize(horizontal: true, vertical: false)
 
                     Text("@\(entry.citeKey)")

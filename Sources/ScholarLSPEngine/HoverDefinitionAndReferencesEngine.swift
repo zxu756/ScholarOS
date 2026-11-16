@@ -520,34 +520,10 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
             )
         }
 
-        let offline = firewall.evaluate(entry)
-        let effectiveFirewallClass: CitationFirewallClass
-        let effectiveAuditNote: String
-        if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
-            if let inRun = inRunVerdictsByKey[entry.citeKey], !inRun.sources.isEmpty {
-                effectiveFirewallClass = inRun.firewallClass
-                effectiveAuditNote = inRun.auditNote
-            } else {
-                effectiveFirewallClass = offline.firewallClass
-                effectiveAuditNote = offline.auditNote
-            }
-        } else if let inRun = inRunVerdictsByKey[entry.citeKey] {
-            if inRun.firewallClass == .verified {
-                if inRun.insertable && !inRun.sources.isEmpty {
-                    effectiveFirewallClass = .verified
-                    effectiveAuditNote = inRun.auditNote
-                } else {
-                    effectiveFirewallClass = offline.firewallClass
-                    effectiveAuditNote = offline.auditNote
-                }
-            } else {
-                effectiveFirewallClass = inRun.firewallClass
-                effectiveAuditNote = inRun.auditNote
-            }
-        } else {
-            effectiveFirewallClass = offline.firewallClass
-            effectiveAuditNote = offline.auditNote
-        }
+        let (effectiveFirewallClass, effectiveAuditNote) = firewall.resolveEffectiveStatus(
+            for: entry,
+            inRunVerdictsByKey: inRunVerdictsByKey
+        )
 
         let apaFormatted = cslFormatter.formatEntry(entry, style: .apa7)
         let ieeeFormatted = cslFormatter.formatEntry(entry, style: .ieee, citationNumber: 1)

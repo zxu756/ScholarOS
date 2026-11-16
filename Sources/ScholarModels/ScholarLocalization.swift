@@ -486,6 +486,9 @@ extension LSPDiagnostic {
         }
         if code == "ERR_UNVERIFIED_CITATION" {
             let key = Self.extractCiteKey(from: message) ?? "该条目"
+            if let expiredDay = Self.extractExpiredFetchedDay(from: message) {
+                return "引文防火墙提醒：\(key) 结论是 \(expiredDay) 取得的，已过期，需要重新核查 (ERR_UNVERIFIED_CITATION)。"
+            }
             if message.contains("RETRACTED") {
                 if message.contains("built-in list") {
                     return "引文防火墙拦截：\(key) 命中内置离线撤稿名单（内置名单，不完整）。"
@@ -543,6 +546,25 @@ extension LSPDiagnostic {
         }
         return nil
     }
+
+    fileprivate static func extractExpiredFetchedDay(from text: String) -> String? {
+        if let r = text.range(of: "fetched on ") {
+            let tail = text[r.upperBound...]
+            let candidate = String(tail.prefix(10))
+            if BibliographyEntry.parseUTCDayStart(candidate) != nil,
+               tail.contains("expired") {
+                return candidate
+            }
+        }
+        if let r = text.range(of: "结论是 "),
+           let end = text[r.upperBound...].range(of: " 取得的，已过期") {
+            let candidate = String(text[r.upperBound..<end.lowerBound])
+            if BibliographyEntry.parseUTCDayStart(candidate) != nil {
+                return candidate
+            }
+        }
+        return nil
+    }
 }
 
 /// English phrases that the citation firewall writes into audit notes and that the Chinese
@@ -590,6 +612,9 @@ extension BibliographyEntry {
             }
             return ""
         }()
+        if let expiredDay = LSPDiagnostic.extractExpiredFetchedDay(from: firewallAuditNote) {
+            return "结论是 \(expiredDay) 取得的，已过期，需要重新核查。" + untrustedSuffix
+        }
         if firewallAuditNote.contains(CitationAuditWording.builtInRetractionListNotice) {
             if let doi, !doi.isEmpty {
                 return "撤稿提示：DOI '\(doi)' 命中内置撤稿名单（内置名单，不完整）。" + untrustedSuffix

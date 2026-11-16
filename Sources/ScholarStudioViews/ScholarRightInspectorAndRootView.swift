@@ -119,7 +119,7 @@ public struct ScholarContextualRightInspectorView: View {
                                 .font(CambridgeTypography.uiSectionLabel)
                                 .foregroundStyle(CambridgeLinenPalette.libraryForestGreen)
                             Spacer()
-                            FirewallBadgeView(firewallClass: entry.firewallClass, compact: true)
+                            FirewallBadgeView(firewallClass: entry.trustedFirewallClass(), compact: true)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
 

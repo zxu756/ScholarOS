@@ -455,23 +455,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         for entry: BibliographyEntry,
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     ) -> (CitationFirewallClass, String) {
-        let offline = firewall.evaluate(entry)
-        if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
-            if let inRun = inRunVerdictsByKey[entry.citeKey], !inRun.sources.isEmpty {
-                return (inRun.firewallClass, inRun.auditNote)
-            }
-            return (offline.firewallClass, offline.auditNote)
-        }
-        if let inRun = inRunVerdictsByKey[entry.citeKey] {
-            if inRun.firewallClass == .verified {
-                if inRun.insertable && !inRun.sources.isEmpty {
-                    return (.verified, inRun.auditNote)
-                }
-                return (offline.firewallClass, offline.auditNote)
-            }
-            return (inRun.firewallClass, inRun.auditNote)
-        }
-        return (offline.firewallClass, offline.auditNote)
+        firewall.resolveEffectiveStatus(for: entry, inRunVerdictsByKey: inRunVerdictsByKey)
     }
 
     // MARK: - Layer 5: Structural Academic Lint Rules & Quick-Fixes

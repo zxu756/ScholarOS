@@ -1172,7 +1172,10 @@ public struct ScholarBottomDrawerView: View {
         case .diagnostics:
             return diagnostics.count
         case .citationFirewall:
-            return bibliographyEntries.filter { !$0.firewallClass.allowsManuscriptInsertion || $0.firewallClass == .drift }.count
+            return bibliographyEntries.filter {
+                let cls = $0.trustedFirewallClass()
+                return !cls.allowsManuscriptInsertion || cls == .drift
+            }.count
         case .editorialAudit:
             return editorialFindings.count
         case .syncTeXLog:
@@ -1249,13 +1252,13 @@ public struct ScholarBottomDrawerView: View {
     private var citationFirewallChannelContent: some View {
         let filtered = bibliographyEntries.filter { entry in
             if !firewallFilterOnlyIssues { return true }
-            return entry.firewallClass != .verified
+            return entry.trustedFirewallClass() != .verified
         }
         return ScrollView {
             if filtered.isEmpty {
                 let copy = ScholarDrawerEmptyStateCopy.citationFirewall(
                     bibliographyEntryCount: bibliographyEntries.count,
-                    verifiedCount: bibliographyEntries.filter { $0.firewallClass == .verified }.count,
+                    verifiedCount: bibliographyEntries.filter { $0.trustedFirewallClass() == .verified }.count,
                     language: localizer.language
                 )
                 emptyDrawerPlaceholder(
@@ -1268,7 +1271,7 @@ public struct ScholarBottomDrawerView: View {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(filtered) { entry in
                         HStack(alignment: .center, spacing: 10) {
-                            FirewallBadgeView(firewallClass: entry.firewallClass, compact: true)
+                            FirewallBadgeView(firewallClass: entry.trustedFirewallClass(), compact: true)
 
                             Text("@\(entry.citeKey)")
                                 .font(CambridgeTypography.monoSmall)

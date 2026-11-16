@@ -641,9 +641,10 @@ public enum ScholarCommandPaletteCatalog {
 
         // 5. Bibliography & Citation Firewall Entries
         for bib in bibliographyEntries {
+            let effectiveClass = bib.trustedFirewallClass()
             let yearStr = bib.year.map(String.init) ?? "n.d."
             let authorYear = "\(bib.firstAuthorFamily) (\(yearStr))"
-            let action: ScholarPaletteCommandAction = bib.firewallClass.allowsManuscriptInsertion
+            let action: ScholarPaletteCommandAction = effectiveClass.allowsManuscriptInsertion
                 ? .insertVerifiedCitation(citeKey: bib.citeKey)
                 : .focusCitation(citeKey: bib.citeKey)
 
@@ -655,8 +656,8 @@ public enum ScholarCommandPaletteCatalog {
                     monospacedTag: "@\(bib.citeKey)",
                     category: .citations,
                     sfSymbolName: "quote.bubble",
-                    firewallClass: bib.firewallClass,
-                    baseWeight: bib.firewallClass.allowsManuscriptInsertion ? 13.0 : 9.0,
+                    firewallClass: effectiveClass,
+                    baseWeight: effectiveClass.allowsManuscriptInsertion ? 13.0 : 9.0,
                     action: action
                 )
             )

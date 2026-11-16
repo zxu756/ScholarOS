@@ -75,7 +75,16 @@ public enum CitationFirewallClass: String, Sendable, Codable, Hashable, CaseIter
     }
 }
 
+public enum StoredFirewallVerdictFreshness: Sendable, Equatable {
+    case valid(firewallClass: CitationFirewallClass, source: String, fetchedAtUTC: String)
+    case expired(previousClass: CitationFirewallClass, source: String, fetchedAtUTC: String)
+    case missingProvenance
+}
+
 public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
+    public static let validVerdictTTLSeconds: TimeInterval = 30 * 86_400
+    public static let notFoundVerdictTTLSeconds: TimeInterval = 86_400
+
     public var id: String { citeKey }
     public let citeKey: String
     public var kind: BibEntryKind
@@ -94,6 +103,8 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
     public var abstractText: String?
     public var firewallClass: CitationFirewallClass
     public var firewallAuditNote: String
+    public var firewallVerifiedSource: String?
+    public var firewallVerifiedAtUTC: String?
     public var untrustedDeclaredFirewallClass: String?
     public var untrustedDeclaredFirewallNote: String?
     public var ignoredNonArXivEprint: String?
@@ -119,6 +130,8 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         abstractText: String? = nil,
         firewallClass: CitationFirewallClass = .unverified,
         firewallAuditNote: String = "",
+        firewallVerifiedSource: String? = nil,
+        firewallVerifiedAtUTC: String? = nil,
         untrustedDeclaredFirewallClass: String? = nil,
         untrustedDeclaredFirewallNote: String? = nil,
         ignoredNonArXivEprint: String? = nil,
@@ -143,6 +156,8 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         self.abstractText = abstractText
         self.firewallClass = firewallClass
         self.firewallAuditNote = firewallAuditNote
+        self.firewallVerifiedSource = firewallVerifiedSource
+        self.firewallVerifiedAtUTC = firewallVerifiedAtUTC
         self.untrustedDeclaredFirewallClass = untrustedDeclaredFirewallClass
         self.untrustedDeclaredFirewallNote = untrustedDeclaredFirewallNote
         self.ignoredNonArXivEprint = ignoredNonArXivEprint
@@ -153,6 +168,93 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
 
     public var firstAuthorFamily: String {
         authors.first?.familyName ?? "Unknown"
+    }
+
+    public static func formatUTCDay(_ date: Date) -> String {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            c.year ?? 1970,
+            c.month ?? 1,
+            c.day ?? 1
+        )
+    }
+
+    public static func parseUTCDayStart(_ rawDay: String) -> Date? {
+        let trimmed = rawDay.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chars = Array(trimmed)
+        guard chars.count == 10,
+              chars[4] == "-",
+              chars[7] == "-",
+              chars[0...3].allSatisfy(\.isNumber),
+              chars[5...6].allSatisfy(\.isNumber),
+              chars[8...9].allSatisfy(\.isNumber),
+              let year = Int(String(chars[0...3])),
+              let month = Int(String(chars[5...6])),
+              let day = Int(String(chars[8...9]))
+        else {
+            return nil
+        }
+        let utc = TimeZone(secondsFromGMT: 0)!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = utc
+        let comps = DateComponents(
+            calendar: cal,
+            timeZone: utc,
+            year: year,
+            month: month,
+            day: day,
+            hour: 0,
+            minute: 0,
+            second: 0
+        )
+        guard comps.isValidDate(in: cal) else { return nil }
+        return cal.date(from: comps)
+    }
+
+    public static func expiredVerdictNotice(fetchedAtUTC: String, language: ScholarLanguage) -> String {
+        switch language {
+        case .en:
+            return "Verdict was fetched on \(fetchedAtUTC) and has expired; re-verification is required."
+        case .zhHans:
+            return "结论是 \(fetchedAtUTC) 取得的，已过期，需要重新核查。"
+        }
+    }
+
+    public func evaluateFirewallFreshness(at referenceDate: Date) -> StoredFirewallVerdictFreshness {
+        guard firewallClass != .unverified else {
+            return .missingProvenance
+        }
+        guard let source = firewallVerifiedSource?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !source.isEmpty,
+              let dayStr = firewallVerifiedAtUTC?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let dayStart = Self.parseUTCDayStart(dayStr)
+        else {
+            return .missingProvenance
+        }
+        let ttl = (firewallClass == .notFound) ? Self.notFoundVerdictTTLSeconds : Self.validVerdictTTLSeconds
+        let age = referenceDate.timeIntervalSince(dayStart)
+        if age > ttl {
+            return .expired(previousClass: firewallClass, source: source, fetchedAtUTC: dayStr)
+        }
+        return .valid(firewallClass: firewallClass, source: source, fetchedAtUTC: dayStr)
+    }
+
+    /// Returns a display/UI firewall class that never treats expired or sourceless `VERIFIED` (or expired verdicts) as verified/current.
+    public func trustedFirewallClass(at referenceDate: Date = Date()) -> CitationFirewallClass {
+        switch evaluateFirewallFreshness(at: referenceDate) {
+        case .valid(let cls, _, _):
+            return cls
+        case .expired:
+            return .unverified
+        case .missingProvenance:
+            if firewallClass == .verified {
+                return .unverified
+            }
+            return firewallClass
+        }
     }
 }
 

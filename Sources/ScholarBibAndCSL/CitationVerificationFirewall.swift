@@ -734,6 +734,7 @@ public struct CitationVerificationFirewall: Sendable {
     public let openAlexBudgetScope: OpenAlexSearchBudgetScope?
     public let cache: RegistryResponseCache?
     public let requestObserver: RegistryRequestObserver?
+    public let clock: any RegistryClock
 
     public init(
         includeBuiltInRetractedDOIs: Bool = true,
@@ -744,7 +745,8 @@ public struct CitationVerificationFirewall: Sendable {
         rateLimiter: RegistryRateLimiter? = nil,
         openAlexBudgetScope: OpenAlexSearchBudgetScope? = nil,
         cache: RegistryResponseCache? = nil,
-        requestObserver: RegistryRequestObserver? = nil
+        requestObserver: RegistryRequestObserver? = nil,
+        clock: any RegistryClock = SystemRegistryClock()
     ) {
         let baseRetracted = includeBuiltInRetractedDOIs ? Self.defaultRetractedDOIs : []
         self.retractedDOIs = baseRetracted.union(additionalRetractedDOIs.map { $0.lowercased() })
@@ -755,6 +757,7 @@ public struct CitationVerificationFirewall: Sendable {
         self.openAlexBudgetScope = openAlexBudgetScope
         self.cache = cache
         self.requestObserver = requestObserver
+        self.clock = clock
     }
 
     // MARK: - Offline Deterministic Structural & Built-in Retraction Hint Evaluation
@@ -770,7 +773,7 @@ public struct CitationVerificationFirewall: Sendable {
         var hasSyntacticallyValidPID = false
         var hasSyntacticallyValidDOI = false
 
-        // 0. Record untrusted embedded x-firewall-class from .bib if present (M1 item 8 / S42)
+        // 0. Record untrusted embedded x-firewall-class / x-firewall-note from .bib if present (M1 item 8 / S42)
         if let declared = nonEmpty(entry.untrustedDeclaredFirewallClass) {
             findings.append(
                 FirewallFinding(
@@ -778,6 +781,16 @@ public struct CitationVerificationFirewall: Sendable {
                     severity: .warning,
                     field: "x-firewall-class",
                     detail: "File declared x-firewall-class '\(declared)', \(CitationAuditWording.untrustedFileClassMarker)."
+                )
+            )
+        }
+        if let declaredNote = nonEmpty(entry.untrustedDeclaredFirewallNote) {
+            findings.append(
+                FirewallFinding(
+                    code: .untrustedEmbeddedFirewallTag,
+                    severity: .warning,
+                    field: "x-firewall-note",
+                    detail: "File declared x-firewall-note '\(declaredNote)', \(CitationAuditWording.untrustedFileClassMarker)."
                 )
             )
         }
@@ -1115,6 +1128,8 @@ public struct CitationVerificationFirewall: Sendable {
         var updatedEntry = entry
         updatedEntry.firewallClass = finalClass
         updatedEntry.firewallAuditNote = summaryNote
+        updatedEntry.firewallVerifiedSource = nil
+        updatedEntry.firewallVerifiedAtUTC = nil
 
         return CitationFirewallEntryVerdict(
             citeKey: entry.citeKey,
@@ -1215,7 +1230,7 @@ public struct CitationVerificationFirewall: Sendable {
     ) async throws -> BibliographyVerificationResult {
         switch mode {
         case .offline:
-            let firewall = CitationVerificationFirewall()
+            let firewall = CitationVerificationFirewall(clock: clock)
             let rawReport = firewall.auditLibrary(entries)
             let localized = localizingUntrustedFileTagFindings(in: rawReport, firewall: firewall, language: language)
             return BibliographyVerificationResult(
@@ -1248,7 +1263,8 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: limiter,
                 openAlexBudgetScope: budgetScope,
                 cache: cache,
-                requestObserver: requestObserver
+                requestObserver: requestObserver,
+                clock: clock
             )
             var verdicts: [CitationFirewallEntryVerdict] = []
             verdicts.reserveCapacity(entries.count)
@@ -1298,7 +1314,8 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: RegistryRateLimiter(clock: replayLimiterClock),
                 openAlexBudgetScope: OpenAlexSearchBudgetScope(),
                 cache: replayCache,
-                requestObserver: requestObserver
+                requestObserver: requestObserver,
+                clock: clock
             )
             let replaySession = snapshot.makeSession()
             var verdicts: [CitationFirewallEntryVerdict] = []
@@ -1337,7 +1354,8 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: limiter,
                 openAlexBudgetScope: budgetScope,
                 cache: cache,
-                requestObserver: requestObserver
+                requestObserver: requestObserver,
+                clock: clock
             )
             let recordingSession = try RegistryRecordingSession(
                 directoryURL: directoryURL,
@@ -1371,17 +1389,26 @@ public struct CitationVerificationFirewall: Sendable {
         var changed = false
         let updatedVerdicts = report.verdicts.map { verdict -> CitationFirewallEntryVerdict in
             let declared = firewall.nonEmpty(verdict.auditedEntry.untrustedDeclaredFirewallClass)
+            let declaredNote = firewall.nonEmpty(verdict.auditedEntry.untrustedDeclaredFirewallNote)
             let ignoredEprint = firewall.nonEmpty(verdict.auditedEntry.ignoredNonArXivEprint)
             let hasInvalidArXivDiscrepancy = verdict.fields.contains {
                 $0.field == "arxivID" && $0.remoteValue == "invalid format"
             }
-            guard declared != nil || ignoredEprint != nil || hasInvalidArXivDiscrepancy else {
+            guard declared != nil || declaredNote != nil || ignoredEprint != nil || hasInvalidArXivDiscrepancy else {
                 return verdict
             }
             changed = true
             let updatedFindings = verdict.findings.map { finding -> FirewallFinding in
                 switch finding.code {
                 case .untrustedEmbeddedFirewallTag:
+                    if finding.field == "x-firewall-note", let declaredNote {
+                        return FirewallFinding(
+                            code: finding.code,
+                            severity: finding.severity,
+                            field: finding.field,
+                            detail: "文件里写着 \(declaredNote)，未采信。"
+                        )
+                    }
                     if let declared {
                         return FirewallFinding(
                             code: finding.code,
@@ -1433,66 +1460,223 @@ public struct CitationVerificationFirewall: Sendable {
         return changed ? firewall.summarizeVerdicts(updatedVerdicts) : report
     }
 
+    // MARK: - Stored Provenance & Effective Firewall Status Resolution (S42 / S48)
+
+    /// Resolves effective firewall class and audit note for completion, hover, and diagnostics.
+    /// Treats expired stored verdicts (>30d for VERIFIED/DRIFT/RETRACTED, >1d for NOT_FOUND)
+    /// and legacy/bare stored verdicts lacking source or UTC date as unchecked (`UNVERIFIED`).
+    public func resolveEffectiveStatus(
+        for entry: BibliographyEntry,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
+        language: ScholarLanguage = .en
+    ) -> (firewallClass: CitationFirewallClass, auditNote: String) {
+        let now = clock.currentDate()
+        let offline = evaluate(entry)
+
+        if let inRun = inRunVerdictsByKey[entry.citeKey] {
+            if case .expired(_, _, let dayStr) = inRun.auditedEntry.evaluateFirewallFreshness(at: now) {
+                if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
+                    return (offline.firewallClass, offline.auditNote)
+                }
+                return (.unverified, BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language))
+            }
+            if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
+                if !inRun.sources.isEmpty {
+                    return (inRun.firewallClass, inRun.auditNote)
+                }
+                return (offline.firewallClass, offline.auditNote)
+            }
+            if inRun.firewallClass == .verified {
+                if inRun.insertable && !inRun.sources.isEmpty {
+                    return (.verified, inRun.auditNote)
+                }
+                return (offline.firewallClass, offline.auditNote)
+            }
+            return (inRun.firewallClass, inRun.auditNote)
+        }
+
+        switch entry.evaluateFirewallFreshness(at: now) {
+        case .valid(let storedClass, let source, let dayStr):
+            if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
+                return (offline.firewallClass, offline.auditNote)
+            }
+            let note = nonEmpty(entry.firewallAuditNote) ?? "[\(storedClass.rawValue)] Verified via \(source) on \(dayStr)."
+            return (storedClass, note)
+
+        case .expired(_, _, let dayStr):
+            if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
+                return (offline.firewallClass, offline.auditNote)
+            }
+            return (.unverified, BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language))
+
+        case .missingProvenance:
+            return (offline.firewallClass, offline.auditNote)
+        }
+    }
+
     // MARK: - Citation Insertion Assertion (`ERR_UNVERIFIED_CITATION`)
 
-    /// Enforces ScholarOS's citation firewall policy for CLI, MCP, and manuscript exporters.
-    /// Per M1 item 8 (S42, S48), stored `entry.firewallClass` is NEVER trusted; only an in-run
-    /// `CitationFirewallEntryVerdict` with `firewallClass == .verified`, `insertable == true`,
-    /// and non-empty `sources` allows manuscript insertion.
+    /// Enforces ScholarOS's citation firewall policy for CLI, MCP, and project insertion checks.
+    /// Per M1 item 8 (S42, S48), ONLY two grounds allow manuscript insertion:
+    ///   1. A `VERIFIED` verdict computed in the current run (`insertable == true`, non-empty `sources`, unexpired);
+    ///   2. A stored `VERIFIED` verdict on `entry` carrying non-empty source + UTC date within its 30-day TTL.
+    /// Bare `firewallClass` values (from `.bib`, legacy DBs, or in-memory mutation) are never trusted.
     @discardableResult
     public func assertCitationAllowed(
         citeKey: String,
         in library: [String: BibliographyEntry],
-        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:]
+        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:],
+        language: ScholarLanguage = .en
     ) throws -> BibliographyEntry {
         let trimmedKey = citeKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let entry = library[trimmedKey] else {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: trimmedKey,
                 statusCode: CitationFirewallClass.unverified.rawValue,
-                reason: "Citation key '\(trimmedKey)' is missing from the project bibliography."
+                reason: language.L(
+                    "Citation key '\(trimmedKey)' is missing from the bibliography.",
+                    "参考文献库中不存在引文键 '\(trimmedKey)'。"
+                )
             )
         }
 
+        let now = clock.currentDate()
         let offlineCheck = evaluate(entry)
+
+        // 1. Verdict computed in the current run (e.g. `cite`, `scholar_cite_key`, or `verifyCitationsOnline`)
+        if let inRunVerdict = verifiedVerdicts[trimmedKey] {
+            if case .expired(_, _, let fetchedAtUTC) = inRunVerdict.auditedEntry.evaluateFirewallFreshness(at: now) {
+                if offlineCheck.firewallClass == .notFound || offlineCheck.firewallClass == .retracted {
+                    throw ScholarOSError.unverifiedCitationBlocked(
+                        citeKey: entry.citeKey,
+                        statusCode: offlineCheck.firewallClass.rawValue,
+                        reason: formatInRunRejectionReason(for: offlineCheck, language: language)
+                    )
+                }
+                throw ScholarOSError.unverifiedCitationBlocked(
+                    citeKey: entry.citeKey,
+                    statusCode: CitationFirewallClass.unverified.rawValue,
+                    reason: BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: fetchedAtUTC, language: language)
+                )
+            }
+
+            if inRunVerdict.citeKey == entry.citeKey,
+               inRunVerdict.firewallClass == .verified,
+               inRunVerdict.insertable,
+               !inRunVerdict.sources.isEmpty
+            {
+                return inRunVerdict.auditedEntry
+            }
+
+            throw ScholarOSError.unverifiedCitationBlocked(
+                citeKey: entry.citeKey,
+                statusCode: inRunVerdict.firewallClass.rawValue,
+                reason: formatInRunRejectionReason(for: inRunVerdict, language: language)
+            )
+        }
+
+        // 2. Deterministic offline structural / built-in retraction failure always blocks
         if offlineCheck.firewallClass == .notFound || offlineCheck.firewallClass == .retracted {
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
                 statusCode: offlineCheck.firewallClass.rawValue,
-                reason: offlineCheck.auditNote
+                reason: formatInRunRejectionReason(for: offlineCheck, language: language)
             )
         }
 
-        guard let inRunVerdict = verifiedVerdicts[trimmedKey] else {
+        // 3. Stored verdict on `entry` with provenance & clock TTL check (S48)
+        switch entry.evaluateFirewallFreshness(at: now) {
+        case .valid(let storedClass, let source, let dayStr):
+            if storedClass == .verified {
+                return entry
+            }
+            let detail = nonEmpty(entry.firewallAuditNote).map(CitationAuditWording.strippingLeadingClassTag)
+                ?? "\(storedClass.rawValue) recorded from \(source) on \(dayStr)."
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
-                statusCode: offlineCheck.firewallClass.rawValue,
-                reason: "Entry '\(entry.citeKey)' has not been verified in this run (\(offlineCheck.firewallClass.rawValue)); stored firewall status is not trusted."
+                statusCode: storedClass.rawValue,
+                reason: language.L(
+                    "Verification failed [\(storedClass.rawValue), source: \(source), fetched: \(dayStr)]: \(detail)",
+                    "已完成核查但发现问题 [\(storedClass.rawValue)，数据源：\(source)，取得日期：\(dayStr)]：\(detail)"
+                )
             )
-        }
 
-        guard inRunVerdict.citeKey == entry.citeKey,
-              inRunVerdict.firewallClass == .verified,
-              inRunVerdict.insertable,
-              !inRunVerdict.sources.isEmpty else {
+        case .expired(_, _, let fetchedAtUTC):
             throw ScholarOSError.unverifiedCitationBlocked(
                 citeKey: entry.citeKey,
-                statusCode: inRunVerdict.firewallClass.rawValue,
-                reason: inRunVerdict.auditNote
+                statusCode: CitationFirewallClass.unverified.rawValue,
+                reason: BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: fetchedAtUTC, language: language)
+            )
+
+        case .missingProvenance:
+            throw ScholarOSError.unverifiedCitationBlocked(
+                citeKey: entry.citeKey,
+                statusCode: CitationFirewallClass.unverified.rawValue,
+                reason: language.L(
+                    "Lookup not performed [UNVERIFIED]: entry '\(entry.citeKey)' has no verified conclusion with source and date (bare stored status is ignored); re-verification is required.",
+                    "尚未完成外部核查 [UNVERIFIED]：条目 '\(entry.citeKey)' 没有带数据源与取得日期的有效核查结论（不采信裸存的状态），需要重新核查。"
+                )
             )
         }
+    }
 
-        return inRunVerdict.auditedEntry
+    private func formatInRunRejectionReason(
+        for verdict: CitationFirewallEntryVerdict,
+        language: ScholarLanguage
+    ) -> String {
+        switch verdict.firewallClass {
+        case .unverified:
+            let codes = verdict.reasons.isEmpty
+                ? [CitationUnverifiedReasonCode.offline.rawValue]
+                : verdict.reasons
+            let codeText = codes.joined(separator: ", ")
+            if codes.contains(CitationUnverifiedReasonCode.offline.rawValue) {
+                return language.L(
+                    "Lookup not performed [UNVERIFIED, reason: \(codeText)]: online registry verification was skipped because --offline was requested, not because any problem was found with this reference.",
+                    "尚未完成外部核查 [UNVERIFIED，原因码：\(codeText)]：因指定离线而未向外部注册库核查，并非该文献本身有问题。"
+                )
+            }
+            let cleanNote = CitationAuditWording.strippingLeadingClassTag(verdict.auditNote)
+            return language.L(
+                "Lookup could not complete [UNVERIFIED, reason: \(codeText)]: \(cleanNote)",
+                "尚未完成外部核查 [UNVERIFIED，原因码：\(codeText)]：未能完成外部注册库查询，并非已证实该文献有问题。"
+            )
+
+        case .notFound, .drift, .retracted:
+            let fallbackCode: String
+            switch verdict.firewallClass {
+            case .notFound: fallbackCode = "not_found"
+            case .drift: fallbackCode = "metadata_drift"
+            case .retracted: fallbackCode = "retracted"
+            case .verified, .unverified: fallbackCode = "rejected"
+            }
+            let codes = verdict.reasons.isEmpty ? [fallbackCode] : verdict.reasons
+            let codeText = codes.joined(separator: ", ")
+            let cleanNote = CitationAuditWording.strippingLeadingClassTag(verdict.auditNote)
+            return language.L(
+                "Checked and rejected [\(verdict.firewallClass.rawValue), reason: \(codeText)]: \(cleanNote)",
+                "已核查并发现问题 [\(verdict.firewallClass.rawValue)，原因码：\(codeText)]：\(cleanNote)"
+            )
+
+        case .verified:
+            return CitationAuditWording.strippingLeadingClassTag(verdict.auditNote)
+        }
     }
 
     /// Validates a list of cited keys in manuscript order, throwing `ERR_UNVERIFIED_CITATION` on the first disallowed key.
     public func assertAllCitationsAllowed(
         citeKeys: [String],
         in library: [String: BibliographyEntry],
-        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:]
+        verifiedVerdicts: [String: CitationFirewallEntryVerdict] = [:],
+        language: ScholarLanguage = .en
     ) throws -> [BibliographyEntry] {
         try citeKeys.map { key in
-            try assertCitationAllowed(citeKey: key, in: library, verifiedVerdicts: verifiedVerdicts)
+            try assertCitationAllowed(
+                citeKey: key,
+                in: library,
+                verifiedVerdicts: verifiedVerdicts,
+                language: language
+            )
         }
     }
 
@@ -5417,6 +5601,28 @@ public struct CitationVerificationFirewall: Sendable {
         var updated = entry
         updated.firewallClass = assignedClass
         updated.firewallAuditNote = summary
+        let respondedSources = sources.filter { $0.status != nil }
+        if assignedClass != .unverified && !respondedSources.isEmpty {
+            var uniqueNames: [String] = []
+            for rec in respondedSources {
+                let name = rec.source.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !name.isEmpty && !uniqueNames.contains(name) {
+                    uniqueNames.append(name)
+                }
+            }
+            updated.firewallVerifiedSource = uniqueNames.joined(separator: ", ")
+            if let cacheRec = respondedSources.first(where: { $0.origin == .cache }),
+               let cachedDay = Optional(Self.shortDateLabel(from: cacheRec.fetchedAt)),
+               BibliographyEntry.parseUTCDayStart(cachedDay) != nil
+            {
+                updated.firewallVerifiedAtUTC = cachedDay
+            } else {
+                updated.firewallVerifiedAtUTC = BibliographyEntry.formatUTCDay(clock.currentDate())
+            }
+        } else {
+            updated.firewallVerifiedSource = nil
+            updated.firewallVerifiedAtUTC = nil
+        }
         let canInsert = (assignedClass == .verified)
         return CitationFirewallEntryVerdict(
             citeKey: entry.citeKey,

@@ -96,6 +96,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
     public let bibCodec: BibTeXCodec
     public let cslFormatter: CSLCitationFormatterEngine
     public let citationFirewall: CitationVerificationFirewall
+    public let clock: any RegistryClock
 
     private struct InternalState {
         var rootFilePath: String
@@ -107,6 +108,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
         var cachedWorkspaceAST: MergedManuscriptWorkspaceAST?
         var cachedDiagnosticsReport: WorkspaceDiagnosticsReport?
+        var cachedDiagnosticsUTCDay: String?
         var externalSyncTeXSolver: SyncTeXCoordinateSolver?
         var cachedSyntheticSyncTeXSolver: SyncTeXCoordinateSolver?
     }
@@ -120,14 +122,15 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         bibliography: [BibliographyEntry] = [],
         bibliographyFiles: [String: String] = [:],
         syncTeXData: Data? = nil,
-        citationStyle: CitationFormatStyle = .apa7
+        citationStyle: CitationFormatStyle = .apa7,
+        clock: any RegistryClock = SystemRegistryClock()
     ) {
         let sharedLexer = IncrementalMarkupLexer(configuration: .losslessCST)
         let sharedParser = HandwrittenMarkupCSTParser(lexer: sharedLexer)
         let sharedMacro = MacroExpansionEngine(lexer: sharedLexer)
         let sharedResolver = MultiFileIncludeGraphResolver(lexer: sharedLexer, parser: sharedParser, macroEngine: sharedMacro)
         let sharedCSL = CSLCitationFormatterEngine()
-        let sharedFirewall = CitationVerificationFirewall()
+        let sharedFirewall = CitationVerificationFirewall(clock: clock)
 
         self.lexer = sharedLexer
         self.parser = sharedParser
@@ -142,6 +145,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         self.bibCodec = BibTeXCodec()
         self.cslFormatter = sharedCSL
         self.citationFirewall = sharedFirewall
+        self.clock = clock
 
         let normRoot = Self.normalizeWorkspacePath(rootFilePath)
         var initialDocs: [String: DocumentBufferSnapshot] = [:]
@@ -202,6 +206,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             inRunVerdictsByKey: [:],
             cachedWorkspaceAST: nil,
             cachedDiagnosticsReport: nil,
+            cachedDiagnosticsUTCDay: nil,
             externalSyncTeXSolver: extSolver,
             cachedSyntheticSyncTeXSolver: nil
         )
@@ -640,7 +645,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         if let verified = try? await CitationVerificationFirewall.verifyBibliography(
             entries: snapshotEntries,
             mode: .online(transport: session),
-            noCache: true
+            noCache: true,
+            clock: clock
         ) {
             applyVerificationReport(verified.report)
             return verified.report
@@ -898,6 +904,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         abstractText: entry.abstractText,
                         firewallClass: entry.firewallClass,
                         firewallAuditNote: entry.firewallAuditNote,
+                        firewallVerifiedSource: entry.firewallVerifiedSource,
+                        firewallVerifiedAtUTC: entry.firewallVerifiedAtUTC,
                         untrustedDeclaredFirewallClass: entry.untrustedDeclaredFirewallClass,
                         untrustedDeclaredFirewallNote: entry.untrustedDeclaredFirewallNote,
                         ignoredNonArXivEprint: entry.ignoredNonArXivEprint,
@@ -1061,7 +1069,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         _ st: inout InternalState,
         workspace: MergedManuscriptWorkspaceAST
     ) -> WorkspaceDiagnosticsReport {
-        if let cached = st.cachedDiagnosticsReport {
+        let currentUTCDay = BibliographyEntry.formatUTCDay(clock.currentDate())
+        if let cached = st.cachedDiagnosticsReport, st.cachedDiagnosticsUTCDay == currentUTCDay {
             return cached
         }
         var sources: [String: String] = [:]
@@ -1075,6 +1084,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             inRunVerdictsByKey: st.inRunVerdictsByKey
         )
         st.cachedDiagnosticsReport = report
+        st.cachedDiagnosticsUTCDay = currentUTCDay
         return report
     }
 

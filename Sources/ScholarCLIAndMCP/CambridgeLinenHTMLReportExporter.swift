@@ -66,7 +66,7 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
 
         let cslFormatter = CSLCitationFormatterEngine()
         let formattedBib = cslFormatter.formatBibliography(
-            entries: entries.filter { $0.firewallClass.allowsManuscriptInsertion },
+            entries: entries.filter { $0.trustedFirewallClass().allowsManuscriptInsertion },
             style: .apa7
         )
         let rawPrismaSVG = PRISMA2020DiagramExporter().exportVectorSVG(metrics: prismaMetrics)
@@ -87,8 +87,9 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
         }.joined(separator: "\n")
 
         let bibRows = entries.map { entry in
+            let effectiveClass = entry.trustedFirewallClass()
             let badgeClass: String
-            switch entry.firewallClass {
+            switch effectiveClass {
             case .verified:
                 badgeClass = "pill-ok"
             case .drift, .unverified:
@@ -111,8 +112,8 @@ public struct CambridgeLinenHTMLReportExporter: Sendable {
                 pidText = "none"
                 pidZh = "无标识符"
             }
-            let badgeEn = entry.firewallClass.localizedBadgeTitle(.en)
-            let badgeZh = entry.firewallClass.localizedBadgeTitle(.zhHans)
+            let badgeEn = effectiveClass.localizedBadgeTitle(.en)
+            let badgeZh = effectiveClass.localizedBadgeTitle(.zhHans)
             let apaLine = sanitizeCopy(cslFormatter.formatEntry(entry, style: .apa7).bibliographyUnnumberedPlainText)
             return """
             <tr>

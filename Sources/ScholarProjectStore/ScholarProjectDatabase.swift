@@ -313,14 +313,15 @@ public enum ScholarWordCounter: Sendable {
     }
 }
 
-// MARK: - ScholarProjectDatabase (Schema v1 -> v2 -> v3 -> v4)
+// MARK: - ScholarProjectDatabase (Schema v1 -> v2 -> v3 -> v4 -> v5)
 
 public final class ScholarProjectDatabase: @unchecked Sendable {
-    public static let latestSchemaVersion: Int = 4
+    public static let latestSchemaVersion: Int = 5
 
     public let projectRootURL: URL?
     public let sqliteFilePath: String
     public let connection: ScholarSQLiteWALConnection
+    public let clock: any RegistryClock
 
     private let lock = NSRecursiveLock()
     private var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
@@ -328,23 +329,27 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
     public convenience init(
         bundleURL: URL,
         configuration: SQLiteConnectionConfiguration = .standard,
-        seedDemoIfEmpty: Bool = false
+        seedDemoIfEmpty: Bool = false,
+        clock: any RegistryClock = SystemRegistryClock()
     ) throws {
         try self.init(
             path: bundleURL.path,
             configuration: configuration,
-            seedDemoIfEmpty: seedDemoIfEmpty
+            seedDemoIfEmpty: seedDemoIfEmpty,
+            clock: clock
         )
     }
 
     public init(
         path: String,
         configuration: SQLiteConnectionConfiguration = .standard,
-        seedDemoIfEmpty: Bool = false
+        seedDemoIfEmpty: Bool = false,
+        clock: any RegistryClock = SystemRegistryClock()
     ) throws {
         let resolved = try Self.resolveProjectPaths(from: path)
         self.projectRootURL = resolved.bundleDirectory
         self.sqliteFilePath = resolved.sqlitePath
+        self.clock = clock
         self.connection = try ScholarSQLiteWALConnection(
             databasePath: resolved.sqlitePath,
             configuration: configuration
@@ -365,11 +370,15 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         }
     }
 
-    public static func inMemory(seedDemo: Bool = false) throws -> ScholarProjectDatabase {
+    public static func inMemory(
+        seedDemo: Bool = false,
+        clock: any RegistryClock = SystemRegistryClock()
+    ) throws -> ScholarProjectDatabase {
         try ScholarProjectDatabase(
             path: ":memory:",
             configuration: .standard,
-            seedDemoIfEmpty: seedDemo
+            seedDemoIfEmpty: seedDemo,
+            clock: clock
         )
     }
 
@@ -714,6 +723,14 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                     ON audit_events(category, created_at DESC);
                 """
             )
+        case 5:
+            return (
+                summary: "v5: Bibliography firewall verdict source and UTC fetched date for TTL expiration",
+                ddl: """
+                ALTER TABLE bibliography_entries ADD COLUMN firewall_source TEXT;
+                ALTER TABLE bibliography_entries ADD COLUMN firewall_fetched_at TEXT;
+                """
+            )
         default:
             return (summary: "noop", ddl: "SELECT 1;")
         }
@@ -950,9 +967,9 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                 INSERT INTO bibliography_entries (
                     cite_key, kind, title, authors_json, year, venue, publisher,
                     volume, issue, pages, doi, arxiv_id, pmid, url, abstract_text,
-                    firewall_class, firewall_note, attached_pdf_path,
-                    cited_by_json, references_json, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    firewall_class, firewall_note, firewall_source, firewall_fetched_at,
+                    attached_pdf_path, cited_by_json, references_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(cite_key) DO UPDATE SET
                     kind = excluded.kind,
                     title = excluded.title,
@@ -970,6 +987,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                     abstract_text = excluded.abstract_text,
                     firewall_class = excluded.firewall_class,
                     firewall_note = excluded.firewall_note,
+                    firewall_source = excluded.firewall_source,
+                    firewall_fetched_at = excluded.firewall_fetched_at,
                     attached_pdf_path = excluded.attached_pdf_path,
                     cited_by_json = excluded.cited_by_json,
                     references_json = excluded.references_json,
@@ -993,6 +1012,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
                     entry.abstractText,
                     entry.firewallClass.rawValue,
                     entry.firewallAuditNote,
+                    entry.firewallVerifiedSource,
+                    entry.firewallVerifiedAtUTC,
                     entry.attachedPDFPath,
                     citedByJSON,
                     referencesJSON,
@@ -1073,6 +1094,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         citeKey: String,
         firewallClass: CitationFirewallClass,
         auditNote: String,
+        verifiedSource: String? = nil,
+        verifiedAtUTC: String? = nil,
         updatedAt: Date = Date()
     ) throws {
         try withLock {
@@ -1080,10 +1103,10 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
             let changes = try connection.execute(
                 """
                 UPDATE bibliography_entries
-                SET firewall_class = ?, firewall_note = ?, updated_at = ?
+                SET firewall_class = ?, firewall_note = ?, firewall_source = ?, firewall_fetched_at = ?, updated_at = ?
                 WHERE cite_key = ?;
                 """,
-                bindings: [firewallClass.rawValue, auditNote, updatedAt, citeKey]
+                bindings: [firewallClass.rawValue, auditNote, verifiedSource, verifiedAtUTC, updatedAt, citeKey]
             )
             guard changes > 0 else {
                 throw ScholarOSError.fileNotFound("Bibliography entry '\(citeKey)'")
@@ -1113,22 +1136,29 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
         }
     }
 
-    /// Citation Firewall check: only trusts verdicts computed in this run; stored `firewall_class` on disk is ignored.
+    /// Citation Firewall check: only accepts a current-run VERIFIED verdict or an unexpired stored VERIFIED verdict carrying source and UTC date.
     @discardableResult
-    public func validateCitationKeyForInsertion(_ citeKey: String) throws -> BibliographyEntry {
+    public func validateCitationKeyForInsertion(
+        _ citeKey: String,
+        language: ScholarLanguage = .en
+    ) throws -> BibliographyEntry {
         try withLock {
             let trimmed = citeKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let entry = try bibliographyEntry(citeKey: trimmed) else {
                 throw ScholarOSError.unverifiedCitationBlocked(
                     citeKey: trimmed,
                     statusCode: "MISSING_BIB_ENTRY",
-                    reason: "Cite key '\(trimmed)' is absent from the project bibliography."
+                    reason: language.L(
+                        "Cite key '\(trimmed)' is absent from the project bibliography.",
+                        "工程文献库中不存在引文键 '\(trimmed)'。"
+                    )
                 )
             }
-            return try CitationVerificationFirewall().assertCitationAllowed(
+            return try CitationVerificationFirewall(clock: clock).assertCitationAllowed(
                 citeKey: trimmed,
                 in: [entry.citeKey: entry],
-                verifiedVerdicts: inRunVerdictsByKey
+                verifiedVerdicts: inRunVerdictsByKey,
+                language: language
             )
         }
     }
@@ -1204,6 +1234,8 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
             abstractText: row.optionalString("abstract_text"),
             firewallClass: firewall,
             firewallAuditNote: row.optionalString("firewall_note") ?? "",
+            firewallVerifiedSource: row.optionalString("firewall_source"),
+            firewallVerifiedAtUTC: row.optionalString("firewall_fetched_at"),
             attachedPDFPath: row.optionalString("attached_pdf_path"),
             citedByKeys: citedBy,
             referencesKeys: refs
@@ -2328,13 +2360,15 @@ public final class ScholarProjectDatabase: @unchecked Sendable {
             let accounting = connection.storageAccounting()
 
             let wordCount = try totalManuscriptWordCount()
-            let bibCount = try connection.scalarInt("SELECT COUNT(*) FROM bibliography_entries;")
-            let verifiedCount = try connection.scalarInt(
-                """
-                SELECT COUNT(*) FROM bibliography_entries
-                WHERE firewall_class = 'VERIFIED';
-                """
-            )
+            let allBibEntries = try listBibliographyEntries()
+            let bibCount = allBibEntries.count
+            let firewall = CitationVerificationFirewall(clock: clock)
+            let verifiedCount = allBibEntries.filter { entry in
+                firewall.resolveEffectiveStatus(
+                    for: entry,
+                    inRunVerdictsByKey: inRunVerdictsByKey
+                ).firewallClass == .verified
+            }.count
             let blockedCount = try connection.scalarInt(
                 """
                 SELECT COUNT(*) FROM bibliography_entries

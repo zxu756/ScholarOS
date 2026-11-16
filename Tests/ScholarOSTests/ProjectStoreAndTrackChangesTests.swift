@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ScholarModels
 import ScholarBibAndCSL
+import ScholarLSPEngine
 import ScholarProjectStore
 
 @Suite("SQLite WAL Project Store, Myers Track Changes, Undo Journal & Archive Bundle")
@@ -142,12 +143,12 @@ struct ProjectStoreAndTrackChangesTests {
         #expect(try conn.tableExists("audit_events"))
         conn.close()
 
-        // Re-opening via ScholarProjectDatabase preserves schema v4 idempotently
+        // Re-opening via ScholarProjectDatabase upgrades v4 -> v5 idempotently
         let db = try ScholarProjectDatabase(path: dbPath)
         defer { db.close() }
         #expect(try db.currentSchemaVersion() == ScholarProjectDatabase.latestSchemaVersion)
         let migrations = try db.appliedMigrations()
-        #expect(migrations.map(\.version) == [1, 2, 3, 4])
+        #expect(migrations.map(\.version) == [1, 2, 3, 4, 5])
         #expect(migrations.allSatisfy { $0.ddlSHA256.count == 64 })
     }
 
@@ -163,7 +164,7 @@ struct ProjectStoreAndTrackChangesTests {
         defer { db.close() }
 
         let stats = try db.computeProjectStats()
-        #expect(stats.schemaVersion == 4)
+        #expect(stats.schemaVersion == 5)
         #expect(stats.manuscriptWordCount > 150)
         #expect(stats.bibliographyCount >= 8)
         #expect(stats.verifiedCitationCount == 0)
@@ -798,5 +799,153 @@ struct ProjectStoreAndTrackChangesTests {
         #expect(ScholarWordCounter.countAcademicWords(latex, format: .latex) == 5)
         #expect(ScholarWordCounter.countAcademicWords(typst, format: .typst) == 4)
         #expect(ScholarWordCounter.countAcademicWords(md, format: .markdown) == 6)
+    }
+
+    // MARK: - M1 Stage 09: S48 Schema v4 -> v5 Migration, Legacy Untrusted VERIFIED & Persisted Provenance TTL
+
+    private final class StoreDialableClock: RegistryClock, @unchecked Sendable {
+        private let lock = NSLock()
+        private var date: Date
+        private var uptime: TimeInterval = 200.0
+
+        init(initialUTCDate: Date) {
+            self.date = initialUTCDate
+        }
+
+        func advance(by seconds: TimeInterval) {
+            lock.lock()
+            date = date.addingTimeInterval(seconds)
+            uptime += seconds
+            lock.unlock()
+        }
+
+        func now() -> TimeInterval {
+            lock.lock()
+            defer { lock.unlock() }
+            return uptime
+        }
+
+        func currentDate() -> Date {
+            lock.lock()
+            defer { lock.unlock() }
+            return date
+        }
+
+        func sleep(_ seconds: TimeInterval) async throws {
+            advance(by: seconds)
+        }
+    }
+
+    @Test("M1 Stage 09 (S48 item 4): synthetic v4 DB with legacy VERIFIED migrates cleanly to v5 and treats legacy rows as unchecked; v5 persisted provenance expires via clock")
+    func m1Stage09SchemaV4ToV5MigrationLegacyUntrustedAndPostMigrationClockTTL() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m1-s48-mig")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dbPath = tempDir.appendingPathComponent("legacy_v4.sqlite").path
+
+        // 1. Pre-migration: construct synthetic v4 SQLite database directly and insert a legacy VERIFIED row (no source/date columns)
+        do {
+            let conn = try ScholarSQLiteWALConnection(databasePath: dbPath)
+            defer { conn.close() }
+            try ScholarProjectDatabase.migrate(connection: conn, upTo: 4)
+            #expect(try conn.userVersion() == 4)
+            let authorsJSON = "[{\"familyName\":\"LeCun\",\"givenName\":\"Yann\"}]"
+            _ = try conn.execute(
+                """
+                INSERT INTO bibliography_entries (
+                    cite_key, kind, title, authors_json, year, venue, doi,
+                    firewall_class, firewall_note, cited_by_json, references_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?);
+                """,
+                bindings: [
+                    "legacy_v4_lecun", "article", "Deep learning", authorsJSON, 2015,
+                    "Nature", "10.1038/nature14539", "VERIFIED", "Legacy v4 stored verified", 1_700_000_000.0
+                ]
+            )
+        }
+
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(8 * 3600)
+        let clock = StoreDialableClock(initialUTCDate: initialUTC)
+
+        // 2. Open legacy v4 DB via ScholarProjectDatabase -> migrates cleanly to v5 without error; legacy VERIFIED is treated as unchecked!
+        do {
+            let db = try ScholarProjectDatabase(path: dbPath, clock: clock)
+            defer { db.close() }
+            #expect(try db.currentSchemaVersion() == 5)
+            let migrations = try db.appliedMigrations()
+            #expect(migrations.map(\.version) == [1, 2, 3, 4, 5])
+
+            let stats = try db.computeProjectStats()
+            #expect(stats.schemaVersion == 5)
+            #expect(stats.bibliographyCount == 1)
+            #expect(stats.verifiedCitationCount == 0, "Legacy v4 VERIFIED without source/date must NOT count as verified")
+
+            let legacyEntry = try #require(try db.bibliographyEntry(citeKey: "legacy_v4_lecun"))
+            #expect(legacyEntry.firewallVerifiedSource == nil)
+            #expect(legacyEntry.firewallVerifiedAtUTC == nil)
+            #expect(legacyEntry.trustedFirewallClass(at: clock.currentDate()) == .unverified)
+
+            do {
+                _ = try db.validateCitationKeyForInsertion("legacy_v4_lecun")
+                Issue.record("Expected legacy v4 VERIFIED row without provenance to be rejected on insertion")
+            } catch let err as ScholarOSError {
+                #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
+            }
+
+            // Completion and hover on legacy v4 entry must NOT show Verified
+            let lsp = ScholarLSPWorkspaceService(
+                rootFilePath: "main.tex",
+                files: ["main.tex": "\\documentclass{article}\\begin{document}\\cite{legacy_v4_lecun}\n\\cite{legacy_}\\end{document}"],
+                bibliography: [legacyEntry],
+                clock: clock
+            )
+            let hover = try #require(lsp.hover(atLine: 1, column: 48, in: "main.tex"))
+            #expect(hover.firewallClass == .unverified)
+            let comp = try #require(lsp.completions(atLine: 2, column: 13, in: "main.tex").first { $0.insertText == "legacy_v4_lecun" })
+            #expect(!comp.subtitle.contains("• Verified"))
+
+            // 3. Post-migration v5: verify via replay, persist auditedEntry (carrying source + 2026-11-16) to SQLite
+            let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+            let freshLecun = BibliographyEntry(
+                citeKey: "real_lecun",
+                kind: .article,
+                title: "Deep learning",
+                authors: [
+                    BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                    BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                    BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+                ],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            )
+            let verdict = await CitationVerificationFirewall(clock: clock).verifyAgainstPublicRegistries(
+                entry: freshLecun,
+                session: replay
+            )
+            #expect(verdict.firewallClass == .verified)
+            try db.upsertBibliographyEntry(verdict.auditedEntry)
+        }
+
+        // 4. Reopen v5 DB from disk in a brand-new process handle (zero inRunVerdicts): valid at +29d, expired past +30d!
+        let reopened = try ScholarProjectDatabase(path: dbPath, clock: clock)
+        defer { reopened.close() }
+        #expect(reopened.inRunVerdicts().isEmpty)
+
+        clock.advance(by: 29 * 86_400)
+        let allowedAt29d = try reopened.validateCitationKeyForInsertion("real_lecun")
+        #expect(allowedAt29d.firewallClass == .verified)
+        #expect(allowedAt29d.firewallVerifiedAtUTC == "2026-11-16")
+        #expect(try reopened.computeProjectStats().verifiedCitationCount == 1)
+
+        clock.advance(by: 2 * 86_400) // +31d total -> expired!
+        #expect(try reopened.computeProjectStats().verifiedCitationCount == 0)
+        do {
+            _ = try reopened.validateCitationKeyForInsertion("real_lecun", language: .zhHans)
+            Issue.record("Expected persisted v5 VERIFIED row to expire past 30 days")
+        } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
+            #expect(status == "UNVERIFIED")
+            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+        }
     }
 }

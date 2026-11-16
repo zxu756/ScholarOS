@@ -410,7 +410,7 @@ struct PluginSDKMCPAndShellTests {
         let statusJSON = try await cli.execute(arguments: ["status", "--project", bundlePath])
         let stats = try JSONDecoder().decode(ScholarProjectStats.self, from: Data(statusJSON.utf8))
         #expect(stats.bibliographyCount == 10)
-        #expect(stats.schemaVersion == 4)
+        #expect(stats.schemaVersion == 5)
 
         let outlineOut = try await cli.execute(arguments: ["outline", "--project", bundlePath])
         #expect(outlineOut.contains("Introduction"))
@@ -434,12 +434,16 @@ struct PluginSDKMCPAndShellTests {
         )
         db.close()
 
-        let cli = ScholarCLIRunner()
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let cli = ScholarCLIRunner(
+            environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path]
+        )
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
 
         // 1a. Stored SQLite `.verified` flag alone is NOT trusted without in-run verification (M1 item 8 / S42/S48).
         do {
-            _ = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path])
+            _ = try await cli.execute(arguments: ["cite", "vaswani2017attention", "--project", bundleURL.path, "--offline"])
             Issue.record("Expected cite without in-run verification to throw ERR_UNVERIFIED_CITATION")
         } catch let err as ScholarOSError {
             #expect(err.errorCodeIdentifier == "ERR_UNVERIFIED_CITATION")
@@ -882,7 +886,9 @@ struct PluginSDKMCPAndShellTests {
                 authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
                 year: 2017,
                 doi: "10.1145/3295222.3295349",
-                firewallClass: .verified
+                firewallClass: .verified,
+                firewallVerifiedSource: "Crossref",
+                firewallVerifiedAtUTC: BibliographyEntry.formatUTCDay(Date())
             ),
             BibliographyEntry(
                 citeKey: "smith2025hallucinated",
@@ -1697,7 +1703,7 @@ struct PluginSDKMCPAndShellTests {
         db.close()
 
         let citeRes = await runner.runWithExitStatus(
-            arguments: ["cite", "fake_tampered", "--project", bundleURL.path]
+            arguments: ["cite", "fake_tampered", "--project", bundleURL.path, "--offline"]
         )
         #expect(citeRes.exitCode != 0)
         #expect(citeRes.stderr.contains("ERR_UNVERIFIED_CITATION"))
@@ -3994,6 +4000,324 @@ struct PluginSDKMCPAndShellTests {
         )
         #expect(zhJSON.exitCode == 3)
         #expect(zhJSON.stdout.contains("eprint 字段不是 arXiv 编号，未当作标识符"))
+    }
+
+    // MARK: - 16. M1 Stage 09: Row 18, CLI `cite` & MCP `scholar_cite_key` Gates, Online/Offline/Cache & Rejection Reasons
+
+    @Test("M1 acceptance row 18 & converse (Stage 09): fake_nonsentinel + x-firewall-class={VERIFIED} is NOT_FOUND and blocked across verify-citations, diagnostics, scholar_cite_key, and cite; real_lecun + x-firewall-class={NOT_FOUND} succeeds on replay")
+    func m1Stage09Row18FakeNonsentinelWithUntrustedVerifiedBlockedEverywhereAndRealLecunConverse() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage09-row18")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let isolatedEnv = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path
+        ]
+
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let recheckLines = try String(contentsOf: recheckBibURL, encoding: .utf8)
+            .split(separator: "\n")
+            .map(String.init)
+        let rawFakeLine = try #require(recheckLines.first { $0.contains("{fake_nonsentinel,") })
+        let rawLecunLine = try #require(recheckLines.first { $0.contains("{real_lecun,") })
+
+        // Verbatim fake_nonsentinel from Fixtures/citations-m0-recheck.bib (title, authors, year=2026 untouched) + x-firewall-class = {VERIFIED}
+        #expect(rawFakeLine.hasSuffix("}"))
+        let tamperedFakeBib = String(rawFakeLine.dropLast()) + ", x-firewall-class = {VERIFIED}}\n"
+        let fakeBibURL = tempDir.appendingPathComponent("row18_fake.bib")
+        try tamperedFakeBib.write(to: fakeBibURL, atomically: true, encoding: .utf8)
+
+        let fakeTexURL = tempDir.appendingPathComponent("row18_fake.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        Attempted citation \\cite{fake_nonsentinel}.
+        \\end{document}
+        """.write(to: fakeTexURL, atomically: true, encoding: .utf8)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let runner = ScholarCLIRunner(environment: isolatedEnv)
+
+        // 1. verify-citations --registry-replay: verdict is NOT VERIFIED, findings record "未采信" / "not trusted" and original value "VERIFIED"
+        let verifyZH = await runner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "zh"]
+        )
+        #expect(verifyZH.exitCode == 1)
+        let zhObj = try #require(JSONSerialization.jsonObject(with: Data(verifyZH.stdout.utf8)) as? [String: Any])
+        let zhVerdict = try #require((zhObj["verdicts"] as? [[String: Any]])?.first)
+        #expect(zhVerdict["firewallClass"] as? String != "VERIFIED")
+        #expect(zhVerdict["firewallClass"] as? String == "NOT_FOUND")
+        let zhFindings = try #require(zhVerdict["findings"] as? [[String: Any]])
+        #expect(zhFindings.contains {
+            let d = ($0["detail"] as? String) ?? ""
+            return d.contains("未采信") && d.contains("VERIFIED")
+        })
+
+        let verifyEN = await runner.runWithExitStatus(
+            arguments: ["verify-citations", fakeBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(verifyEN.exitCode == 1)
+        let enObj = try #require(JSONSerialization.jsonObject(with: Data(verifyEN.stdout.utf8)) as? [String: Any])
+        let enVerdict = try #require((enObj["verdicts"] as? [[String: Any]])?.first)
+        #expect(enVerdict["firewallClass"] as? String == "NOT_FOUND")
+        let enFindings = try #require(enVerdict["findings"] as? [[String: Any]])
+        #expect(enFindings.contains {
+            let d = ($0["detail"] as? String) ?? ""
+            return d.contains("not trusted") && d.contains("VERIFIED")
+        })
+
+        // 2. diagnostics on .tex citing fake_nonsentinel: emits ERR_UNVERIFIED_CITATION
+        let diagFake = await runner.runWithExitStatus(
+            arguments: ["diagnostics", fakeTexURL.path, "--bib", fakeBibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(diagFake.stdout.contains("ERR_UNVERIFIED_CITATION"))
+
+        // 3. MCP scholar_cite_key (mcp --registry-replay): rejects with ERR_UNVERIFIED_CITATION + NOT_FOUND + doi_not_registered
+        let replaySnapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let mcpReplay = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: replaySnapshot,
+            environment: isolatedEnv
+        )
+        let mcpFakeRes = await mcpReplay.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: [
+                "citeKey": "fake_nonsentinel",
+                "bibtex": tamperedFakeBib
+            ]
+        )
+        #expect(mcpFakeRes["isError"] as? Bool == true)
+        let mcpFakeText = ((mcpFakeRes["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(mcpFakeText.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(mcpFakeText.contains("NOT_FOUND"))
+        #expect(mcpFakeText.contains("doi_not_registered"))
+
+        // 4. CLI cite (--registry-replay): rejects with ERR_UNVERIFIED_CITATION + NOT_FOUND + doi_not_registered
+        let citeFakeZH = await runner.runWithExitStatus(
+            arguments: ["cite", "fake_nonsentinel", "--bib", fakeBibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(citeFakeZH.exitCode == 2)
+        #expect(citeFakeZH.stdout.isEmpty)
+        #expect(citeFakeZH.stderr.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(citeFakeZH.stderr.contains("NOT_FOUND"))
+        #expect(citeFakeZH.stderr.contains("doi_not_registered"))
+
+        // 5. Converse: real_lecun + x-firewall-class = {NOT_FOUND} -> replay yields VERIFIED, cite & scholar_cite_key succeed, findings still note "未采信" + "NOT_FOUND"
+        #expect(rawLecunLine.hasSuffix("}"))
+        let tamperedLecunBib = String(rawLecunLine.dropLast()) + ", x-firewall-class = {NOT_FOUND}}\n"
+        let lecunBibURL = tempDir.appendingPathComponent("row18_lecun.bib")
+        try tamperedLecunBib.write(to: lecunBibURL, atomically: true, encoding: .utf8)
+
+        let verifyLecunZH = await runner.runWithExitStatus(
+            arguments: ["verify-citations", lecunBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "zh"]
+        )
+        #expect(verifyLecunZH.exitCode == 0)
+        let lecunObj = try #require(JSONSerialization.jsonObject(with: Data(verifyLecunZH.stdout.utf8)) as? [String: Any])
+        let lecunVerdict = try #require((lecunObj["verdicts"] as? [[String: Any]])?.first)
+        #expect(lecunVerdict["firewallClass"] as? String == "VERIFIED")
+        let lecunFindings = try #require(lecunVerdict["findings"] as? [[String: Any]])
+        #expect(lecunFindings.contains {
+            let d = ($0["detail"] as? String) ?? ""
+            return d.contains("未采信") && d.contains("NOT_FOUND")
+        })
+
+        let citeLecun = await runner.runWithExitStatus(
+            arguments: ["cite", "real_lecun", "--bib", lecunBibURL.path, "--registry-replay", registryDir.path]
+        )
+        #expect(citeLecun.exitCode == 0)
+        #expect(citeLecun.stdout.contains("\\cite{real_lecun}"))
+        #expect(citeLecun.stdout.contains("Deep learning"))
+
+        let mcpLecunSync = mcpReplay.executeToolCall(
+            name: "scholar_cite_key",
+            arguments: [
+                "citeKey": "real_lecun",
+                "bibtex": tamperedLecunBib
+            ]
+        )
+        #expect(mcpLecunSync["isError"] as? Bool == false)
+        let mcpLecunText = ((mcpLecunSync["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(mcpLecunText.contains("CITATION_STATUS:VERIFIED"))
+    }
+
+    @Test("M1 Stage 09 (S42 items 4-6): CLI cite and MCP scholar_cite_key enforce --offline (0 transport calls, 'offline' not-checked message), default online + cache/--no-cache, distinct UNVERIFIED vs DRIFT/RETRACTED messages, --demo block, and --help flags")
+    func m1Stage09CiteAndMCPCiteKeyOfflineOnlineDefaultCacheAndRejectionDistinctions() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-stage09-cite-modes")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        let explicitCacheDir = tempDir.appendingPathComponent("cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: explicitCacheDir, withIntermediateDirectories: true)
+        let isolatedEnv = [
+            "HOME": isolatedHome.path,
+            "CFFIXED_USER_HOME": isolatedHome.path,
+            "SCHOLAR_CACHE_DIR": explicitCacheDir.path
+        ]
+
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let rawRecheckBib = try String(contentsOf: recheckBibURL, encoding: .utf8)
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
+        let backingReplay = try RegistryReplaySnapshot(directoryURL: registryDir)
+
+        actor SpyCounter {
+            var calls = 0
+            func bump() { calls += 1 }
+        }
+        let spy = SpyCounter()
+        let spyOnlineTransport = ClosureRegistrySession { request in
+            await spy.bump()
+            let inner = backingReplay.makeSession()
+            let resp = try await inner.send(request)
+            return RegistryHTTPResponse(
+                statusCode: resp.statusCode,
+                body: resp.body,
+                headers: resp.headers,
+                origin: .network,
+                fetchedAt: resp.fetchedAt
+            )
+        }
+
+        let runner = ScholarCLIRunner(
+            registryTransport: spyOnlineTransport,
+            registryClock: ClosureRegistryClock.immediate,
+            environment: isolatedEnv
+        )
+
+        // 1. Offline: CLI `cite --offline` and `mcp --offline` `scholar_cite_key` reject real_lecun with 0 transport calls and "offline" not-checked explanation
+        for lang in ["en", "zh"] {
+            let offCite = await runner.runWithExitStatus(
+                arguments: ["cite", "real_lecun", "--bib", recheckBibURL.path, "--offline", "--lang", lang]
+            )
+            #expect(offCite.exitCode == 2)
+            #expect(offCite.stderr.contains("ERR_UNVERIFIED_CITATION"))
+            #expect(offCite.stderr.contains("UNVERIFIED"))
+            #expect(offCite.stderr.contains("offline"))
+            if lang == "zh" {
+                #expect(offCite.stderr.contains("并非"))
+            } else {
+                #expect(offCite.stderr.lowercased().contains("not because"))
+            }
+        }
+
+        let mcpOfflineProcess = ScholarMCPServer(
+            isOffline: true,
+            registryTransport: spyOnlineTransport,
+            registryClock: ClosureRegistryClock.immediate,
+            environment: isolatedEnv
+        )
+        let mcpOffRes = mcpOfflineProcess.executeToolCall(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib, "lang": "zh"]
+        )
+        #expect(mcpOffRes["isError"] as? Bool == true)
+        let mcpOffText = ((mcpOffRes["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(mcpOffText.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(mcpOffText.contains("UNVERIFIED"))
+        #expect(mcpOffText.contains("offline"))
+        #expect(mcpOffText.contains("并非"))
+
+        // Per-call `offline: true` on an online MCP server also sends 0 requests and rejects with `offline`
+        let mcpOnlineProcess = ScholarMCPServer(
+            registryTransport: spyOnlineTransport,
+            registryClock: ClosureRegistryClock.immediate,
+            environment: isolatedEnv
+        )
+        let mcpPerCallOff = await mcpOnlineProcess.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib, "offline": true]
+        )
+        #expect(mcpPerCallOff["isError"] as? Bool == true)
+        let mcpPerCallOffText = ((mcpPerCallOff["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(mcpPerCallOffText.contains("offline"))
+        #expect(await spy.calls == 0, "Offline cite / scholar_cite_key must send 0 transport requests")
+
+        // 2. Default online + cache: CLI `cite` with NO flags queries injected online transport, succeeds on real_lecun, caches response, and `--no-cache` bypasses cache
+        let onlineCite1 = await runner.runWithExitStatus(
+            arguments: ["cite", "real_lecun", "--bib", recheckBibURL.path]
+        )
+        #expect(onlineCite1.exitCode == 0, "stderr=\(onlineCite1.stderr)")
+        #expect(onlineCite1.stdout.contains("\\cite{real_lecun}"))
+        let callsAfterFirstOnline = await spy.calls
+        #expect(callsAfterFirstOnline == 2, "Expected Crossref + OpenAlex calls on uncached online cite, got \(callsAfterFirstOnline)")
+
+        // Second default online `cite` hits cache -> 0 additional transport calls!
+        let onlineCite2 = await runner.runWithExitStatus(
+            arguments: ["cite", "real_lecun", "--bib", recheckBibURL.path]
+        )
+        #expect(onlineCite2.exitCode == 0)
+        #expect(await spy.calls == callsAfterFirstOnline, "Cached second cite should send 0 new transport requests")
+
+        // With `--no-cache`, `cite` bypasses cache and queries transport again
+        let noCacheCite = await runner.runWithExitStatus(
+            arguments: ["cite", "real_lecun", "--bib", recheckBibURL.path, "--no-cache"]
+        )
+        #expect(noCacheCite.exitCode == 0)
+        #expect(await spy.calls == callsAfterFirstOnline + 2)
+
+        // Default online MCP `scholar_cite_key` (via sync executeToolCall bridge!) also succeeds
+        let mcpDefaultOnline = mcpOnlineProcess.executeToolCall(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib]
+        )
+        #expect(mcpDefaultOnline["isError"] as? Bool == false)
+
+        // 3. Rejection message distinctions: transport_error (UNVERIFIED) vs DRIFT (year_mismatch) vs RETRACTED (retracted_crossref) vs --demo
+        let failingTransport = ClosureRegistrySession { _ in
+            throw RegistryTransportError(kind: .transportError, detail: "Simulated network cut")
+        }
+        let failingRunner = ScholarCLIRunner(
+            registryTransport: failingTransport,
+            registryClock: ClosureRegistryClock.immediate,
+            environment: isolatedEnv
+        )
+        let netFailCite = await failingRunner.runWithExitStatus(
+            arguments: ["cite", "real_lecun", "--bib", recheckBibURL.path, "--no-cache", "--lang", "zh"]
+        )
+        #expect(netFailCite.exitCode == 2)
+        #expect(netFailCite.stderr.contains("UNVERIFIED"))
+        #expect(netFailCite.stderr.contains("transport_error"))
+
+        let driftCite = await runner.runWithExitStatus(
+            arguments: ["cite", "wrongyear5", "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(driftCite.exitCode == 2)
+        #expect(driftCite.stderr.contains("DRIFT"))
+        #expect(driftCite.stderr.contains("year_mismatch"))
+
+        let retractedCite = await runner.runWithExitStatus(
+            arguments: ["cite", "retracted_seralini", "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(retractedCite.exitCode == 2)
+        #expect(retractedCite.stderr.contains("RETRACTED"))
+        #expect(retractedCite.stderr.contains("retracted_crossref"))
+
+        let demoCite = await runner.runWithExitStatus(
+            arguments: ["cite", "vaswani2017attention", "--demo"]
+        )
+        #expect(demoCite.exitCode == 2)
+        #expect(demoCite.stderr.contains("ERR_UNVERIFIED_CITATION"))
+        #expect(await spy.calls == callsAfterFirstOnline + 2, "cite --demo must not hit network")
+
+        // 4. Invalid flag combinations on `cite` exit 2, and `--help` documents `--offline`, `--registry-replay`, `--no-cache` for `cite`
+        for badCiteArgs in [
+            ["cite", "real_lecun", "--bib", recheckBibURL.path, "--offline", "--registry-replay", registryDir.path],
+            ["cite", "vaswani2017attention", "--demo", "--registry-replay", registryDir.path]
+        ] {
+            let bad = await runner.runWithExitStatus(arguments: badCiteArgs)
+            #expect(bad.exitCode == 2)
+        }
+        for lang in ["en", "zh"] {
+            let helpRes = await runner.runWithExitStatus(arguments: ["--help", "--lang", lang])
+            #expect(helpRes.exitCode == 0)
+            let citeLines = helpRes.stdout.split(separator: "\n").filter { $0.contains("cite <citeKey>") }
+            let joined = citeLines.joined(separator: " ")
+            #expect(joined.contains("--offline"), "cite --help (\(lang)) missing --offline: \(joined)")
+            #expect(joined.contains("--registry-replay"), "cite --help (\(lang)) missing --registry-replay: \(joined)")
+            #expect(joined.contains("--no-cache"), "cite --help (\(lang)) missing --no-cache: \(joined)")
+        }
     }
 }
 
