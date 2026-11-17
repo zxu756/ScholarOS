@@ -33,7 +33,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-M2_START_EPOCH="$(python3 -I -c 'import time; print(f"{time.monotonic():.6f}")')"
+M2_START_EPOCH="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
 
 RECORD=0
 ONLY_ROW=""
@@ -144,6 +144,7 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+PARENT_EXIT_TRAP="$(trap -p EXIT)"
 
 if [[ -n "${SCHOLAR_REPORT_DIR:-}" ]]; then
     REPORT_DIR="$SCHOLAR_REPORT_DIR"
@@ -2226,17 +2227,18 @@ if p_bench.returncode != 0:
     failures.append(f"m1-citation-bench.py --replay exited {p_bench.returncode}: {p_bench.stderr.strip()}")
 else:
     bench_obj = json.loads(open(bench_out, encoding="utf-8").read())
-    evaluated = (bench_obj.get("overall_metrics") or {}).get("evaluated_count")
+    evaluated = (bench_obj.get("overall_metrics") or {}).get("total_entries")
     non_ins_ver = (bench_obj.get("hard_requirements") or {}).get("non_insertable_verified_count")
+    hr_passed = (bench_obj.get("hard_requirements") or {}).get("passed")
     miss_cnt = bench_obj.get("replay_miss_count")
-    if bench_obj.get("complete") is not True or evaluated != 480 or non_ins_ver != 0 or miss_cnt != 0:
+    if bench_obj.get("complete") is not True or evaluated != 480 or non_ins_ver != 0 or hr_passed is not True or miss_cnt != 0:
         failures.append(
             f"m1-citation-bench.py --replay metrics unexpected: complete={bench_obj.get('complete')}, "
-            f"evaluated={evaluated}, non_insertable_verified={non_ins_ver}, replay_miss={miss_cnt}"
+            f"total_entries={evaluated}, non_insertable_verified={non_ins_ver}, hr_passed={hr_passed}, replay_miss={miss_cnt}"
         )
     else:
         print(
-            f"  [m1-citation-bench --replay] PASS: exit=0, complete=True, evaluated={evaluated}, "
+            f"  [m1-citation-bench --replay] PASS: exit=0, complete=True, total_entries={evaluated}, "
             f"replay_miss={miss_cnt}, non_insertable_verified={non_ins_ver}"
         )
 
@@ -2403,7 +2405,7 @@ env.pop("SCHOLAR_CACHE_DIR", None)
 t0 = time.monotonic()
 p_hard = subprocess.run([hard_script], env=env, capture_output=True, text=True)
 hard_elapsed = time.monotonic() - t0
-m2_elapsed = time.monotonic() - m2_start
+m2_elapsed = time.time() - m2_start
 
 print(f"  hard_inputs_exit={p_hard.returncode} hard_inputs_elapsed={hard_elapsed:.3f}s (budget <= 1.000s)")
 print(f"  m2_acceptance_elapsed={m2_elapsed:.3f}s (budget <= 60.000s)")
@@ -2499,14 +2501,13 @@ PY
         TMP_SNAP_AFTER="$(snapshot_tmpdir_m2)"
         BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
         REPORTS_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
-        EXIT_TRAP_DEF="$(trap -p EXIT)"
         set +e
         git -C "$REPO_ROOT" diff --exit-code -- Benchmarks >/dev/null 2>&1
         BENCH_DIFF_EXIT=$?
         set -e
 
         R20_OK=1
-        if [[ -e "$WORK_SCRATCH" || -z "$EXIT_TRAP_DEF" ]]; then
+        if [[ -e "$WORK_SCRATCH" || -z "$PARENT_EXIT_TRAP" ]]; then
             echo "  FAIL: WORK_SCRATCH was not removed or EXIT cleanup trap is missing"
             R20_OK=0
         fi
