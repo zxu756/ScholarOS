@@ -2,14 +2,16 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01–05 scope:
+# Stage 01–06 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
 #   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
+#   - Row 4: `2506.06594v1` (`thebibliography`, 32 `\bibitem` entries) vs `bibitems.gold.tsv`, DOI extraction, and M1 `UNVERIFIED` (`offline`) verdicts
+#   - Row 5: `2405.13682v5` (`\input{main.bbl}`, 46 entries, `kind == "bbl"`, `0` `CITE404`, `0` `INC002`)
 #   - Row 6: 9 `.bib` manuscripts unique entry counts vs `bibtex-entry-counts.tsv` (0 `BIB001`) + `2410.04196v2` `\citep{bayestune}` `CITE_KEY_CASE`
 #   - Row 7: Hard inputs (`hard-inputs/hard.tex` vs `expected/hard-inputs.json` + all per-syntax `verbatim-skip` fixtures)
 #   - Row 8: Multi-file include graph (`\include`, `\input`, unbraced `\input`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`, child `\bibliography`, commented/verbatim skip)
-#   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `.bbl` entry parsing deferred to Stage 06)
+#   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `0` `INC002`, and `.bbl` entries marked `defined == true` with `0` `CITE404`)
 #   - Row 10: Broken `.bib` single-entry error recovery (`bib-recovery/ten.bib`: `e3`, startLine 15, line 22, remaining 9 entries vs `.bbl`, exit codes per Settled #3)
 #   - Row 11: BibTeX field normalization & inheritance (`bib-fields/refs.bib`: `and others` / `authorsTruncated`, `crossref` inheritance & parent uncited suppression, `howpublished` `\url`/`\href`, `BIB003`)
 #   - Row 12: S64 citation/cross-ref command tables, S65 optional arguments, S66 normalized keys & `CITE_KEY_CASE`, S67 parser constructs (`parser-commands`), and Latin-1 / Windows-1252 root/child files (`ENC001`)
@@ -492,21 +494,265 @@ PY
     fi
 
     # ==================================================================
-    # Rows 4..5: Deferred to Stage 06; Row 6: CITE_KEY_CASE verified now, .bib entry counts deferred to Stage 05
+    # Row 4: 2506.06594v1 (`thebibliography`, 32 `\bibitem`) vs `bibitems.gold.tsv`
     # ==================================================================
-    declare -a DEFERRED_ROWS_4_5=(
-        "4:2506.06594v1 (thebibliography, 32 \\bibitem) 解析与 gold 对照 — 留给第 6 段"
-        "5:2405.13682v5 (\\input{main.bbl}, 46 条) — 留给第 6 段"
+    if should_run_row 4; then
+        echo "== [Row 4] 2506.06594v1 (thebibliography, 32 \\bibitem) 解析、bibitems.gold.tsv 对照与 M1 UNVERIFIED (offline) 核验 =="
+        set +e
+        ROW4_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
+import csv, json, os, subprocess, sys, unicodedata
+
+repo_root, cli_bin, sandbox_home, run1_dir = sys.argv[1:5]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def normalize_for_comparison(raw: str) -> str:
+    if not raw:
+        return ""
+    expanded = (
+        raw.replace("ß", "ss")
+        .replace("ẞ", "ss")
+        .replace("æ", "ae")
+        .replace("Æ", "ae")
+        .replace("œ", "oe")
+        .replace("Œ", "oe")
+        .replace("ø", "o")
+        .replace("Ø", "o")
+        .replace("ł", "l")
+        .replace("Ł", "l")
+        .replace("đ", "d")
+        .replace("Đ", "d")
+        .replace("ı", "i")
     )
-    for entry in "${DEFERRED_ROWS_4_5[@]}"; do
-        r_num="${entry%%:*}"
-        r_desc="${entry#*:}"
-        if should_run_row "$r_num"; then
-            echo "== [Row $r_num] $r_desc =="
-            echo "没跑 — $r_desc"
-            record_skip "$r_num" "$r_desc"
+    decomposed = unicodedata.normalize("NFKD", expanded)
+    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower()
+    words = []
+    current = []
+    for ch in stripped:
+        if ch.isalnum():
+            current.append(ch)
+        elif current:
+            words.append("".join(current))
+            current = []
+    if current:
+        words.append("".join(current))
+    return " ".join(words)
+
+pid = "2506.06594v1"
+main_rel = "From_Adaptive_Control_Evolving_Control.tex"
+cached = os.path.join(run1_dir, f"{pid}.json")
+if os.path.isfile(cached):
+    obj = json.load(open(cached, encoding="utf-8"))
+else:
+    main_tex = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", main_rel)
+    proc = subprocess.run([cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if proc.returncode == 2:
+        print(f"  FAIL [Row 4]: CLI exited 2 on {pid}: {proc.stderr.decode('utf-8', 'replace')}")
+        sys.exit(1)
+    obj = json.loads(proc.stdout.decode("utf-8"))
+
+failures = []
+
+bib_srcs = obj.get("bibliographySources", [])
+if len(bib_srcs) != 1:
+    failures.append(f"expected 1 bibliographySources entry, got {bib_srcs}")
+else:
+    src0 = bib_srcs[0]
+    if (
+        src0.get("kind") != "thebibliography"
+        or src0.get("path") != main_rel
+        or src0.get("entries") != 32
+        or (src0.get("errors") or []) != []
+    ):
+        failures.append(f"unexpected bibliographySources[0]: {src0}")
+
+diags = obj.get("diagnostics", [])
+cite404 = [d for d in diags if d.get("code") == "CITE404"]
+if cite404:
+    failures.append(f"expected 0 CITE404 on {pid}, got {len(cite404)}")
+
+citations = obj.get("citations", [])
+cites_by_key = {c["key"]: c for c in citations}
+if len(citations) != 32:
+    failures.append(f"expected 32 citations on {pid}, got {len(citations)}")
+
+gold_tsv = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "bibitems.gold.tsv")
+with open(gold_tsv, encoding="utf-8") as gf:
+    gold_rows = list(csv.DictReader(gf, delimiter="\t"))
+
+if len(gold_rows) != 32:
+    failures.append(f"expected 32 gold rows in bibitems.gold.tsv, found {len(gold_rows)}")
+
+year_ok = 0
+surname_ok = 0
+title_ok = 0
+verified_offline_ok = 0
+
+for row in gold_rows:
+    key = row["key"]
+    exp_fam = row["first_author_family"]
+    exp_year = int(row["year"])
+    exp_title = row["title"]
+    exp_id = row.get("identifier", "") or ""
+
+    c_rec = cites_by_key.get(key)
+    if not c_rec:
+        failures.append(f"missing key '{key}' in citations[]")
+        continue
+    if c_rec.get("defined") is not True or c_rec.get("source") != main_rel:
+        failures.append(f"key '{key}' expected defined=True, source='{main_rel}', got defined={c_rec.get('defined')}, source={c_rec.get('source')}")
+
+    ver = c_rec.get("verification")
+    if isinstance(ver, dict) and ver.get("verdict") == "UNVERIFIED" and ver.get("reasons") == ["offline"]:
+        verified_offline_ok += 1
+    else:
+        failures.append(f"key '{key}' expected verification UNVERIFIED/['offline'], got {ver}")
+
+    ent = c_rec.get("entry") or {}
+    authors = ent.get("authors") or []
+    act_fam = authors[0].get("familyName", "") if authors else ""
+    act_year = ent.get("year")
+    act_title = ent.get("title") or ""
+    act_doi = ent.get("doi")
+
+    if act_year == exp_year:
+        year_ok += 1
+    if act_fam and normalize_for_comparison(act_fam) == normalize_for_comparison(exp_fam):
+        surname_ok += 1
+    if act_title and normalize_for_comparison(act_title) == normalize_for_comparison(exp_title):
+        title_ok += 1
+
+    if key == "annaswamy2022" or exp_id == "doi:10.48550/arXiv.2108.11336":
+        if act_doi != "10.48550/arXiv.2108.11336":
+            failures.append(f"annaswamy2022 expected doi='10.48550/arXiv.2108.11336', got {act_doi!r}")
+
+if year_ok != 32:
+    failures.append(f"year matches {year_ok}/32 != 32/32")
+if surname_ok < 30:
+    failures.append(f"first-author surname matches {surname_ok}/32 < 30/32")
+if title_ok < 26:
+    failures.append(f"title matches {title_ok}/32 < 26/32")
+
+annaswamy_doi = ((cites_by_key.get("annaswamy2022") or {}).get("entry") or {}).get("doi")
+print(
+    f"  [2506.06594v1] bibliographySources={bib_srcs} | CITE404={len(cite404)} | "
+    f"UNVERIFIED(offline)={verified_offline_ok}/32 | year={year_ok}/32 | "
+    f"first_author_family={surname_ok}/32 (>=30) | title={title_ok}/32 (>=26) | "
+    f"annaswamy2022_doi={annaswamy_doi}"
+)
+
+if failures:
+    for f in failures:
+        print(f"  FAIL [Row 4]: {f}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW4_RC=$?
+        set -e
+        echo "$ROW4_OUT"
+        if [[ "$ROW4_RC" -eq 0 ]]; then
+            record_pass 4 "2506.06594v1 parses 1 thebibliography source (32 entries), 0 CITE404, 32/32 UNVERIFIED (offline), matches bibitems.gold.tsv (year 32/32, surname >=30/32, title >=26/32), and extracts annaswamy2022 DOI"
+        else
+            record_fail 4 "Row 4 2506.06594v1 thebibliography parsing, gold comparison, or M1 offline verification failed"
         fi
-    done
+    fi
+
+    # ==================================================================
+    # Row 5: 2405.13682v5 (`\input{main.bbl}`, 46 entries)
+    # ==================================================================
+    if should_run_row 5; then
+        echo "== [Row 5] 2405.13682v5 (\\input{main.bbl}, 46 条) 解析、files 包含 main.bbl、0 条 CITE404 与 0 条 INC002 =="
+        set +e
+        ROW5_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, run1_dir = sys.argv[1:5]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+pid = "2405.13682v5"
+cached = os.path.join(run1_dir, f"{pid}.json")
+if os.path.isfile(cached):
+    obj = json.load(open(cached, encoding="utf-8"))
+else:
+    main_tex = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", "main.tex")
+    proc = subprocess.run([cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if proc.returncode == 2:
+        print(f"  FAIL [Row 5]: CLI exited 2 on {pid}: {proc.stderr.decode('utf-8', 'replace')}")
+        sys.exit(1)
+    obj = json.loads(proc.stdout.decode("utf-8"))
+
+failures = []
+
+file_paths = [f.get("path") for f in obj.get("files", [])]
+if "main.bbl" not in file_paths:
+    failures.append(f"expected 'main.bbl' in files[], got {file_paths}")
+
+bib_srcs = obj.get("bibliographySources", [])
+if len(bib_srcs) != 1:
+    failures.append(f"expected 1 bibliographySources entry on {pid}, got {bib_srcs}")
+else:
+    src0 = bib_srcs[0]
+    if (
+        src0.get("kind") != "bbl"
+        or src0.get("path") != "main.bbl"
+        or src0.get("entries") != 46
+        or (src0.get("errors") or []) != []
+    ):
+        failures.append(f"unexpected bibliographySources[0] on {pid}: {src0}")
+
+citations = obj.get("citations", [])
+if len(citations) != 46:
+    failures.append(f"expected 46 citations on {pid}, got {len(citations)}")
+
+defined_count = 0
+verified_offline_count = 0
+for c in citations:
+    if c.get("defined") is True and c.get("source") == "main.bbl":
+        defined_count += 1
+    else:
+        failures.append(f"citation '{c.get('key')}' expected defined=True and source='main.bbl', got {c}")
+    ver = c.get("verification")
+    if isinstance(ver, dict) and ver.get("verdict") == "UNVERIFIED" and ver.get("reasons") == ["offline"]:
+        verified_offline_count += 1
+    else:
+        failures.append(f"citation '{c.get('key')}' expected UNVERIFIED/['offline'], got {ver}")
+
+diags = obj.get("diagnostics", [])
+cite404 = [d for d in diags if d.get("code") == "CITE404"]
+inc002 = [d for d in diags if d.get("code") == "INC002"]
+if cite404:
+    failures.append(f"expected 0 CITE404 on {pid}, got {len(cite404)}")
+if inc002:
+    failures.append(f"expected 0 INC002 on {pid}, got {len(inc002)}")
+
+print(
+    f"  [2405.13682v5] main.bbl_in_files={'main.bbl' in file_paths} (total_files={len(file_paths)}) | "
+    f"bibliographySources={bib_srcs} | defined={defined_count}/46 | "
+    f"UNVERIFIED(offline)={verified_offline_count}/46 | CITE404={len(cite404)} | INC002={len(inc002)}"
+)
+
+if failures:
+    for f in failures:
+        print(f"  FAIL [Row 5]: {f}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW5_RC=$?
+        set -e
+        echo "$ROW5_OUT"
+        if [[ "$ROW5_RC" -eq 0 ]]; then
+            record_pass 5 "2405.13682v5 includes main.bbl in files, parses 1 bbl source (46 entries), marks all 46 keys defined & UNVERIFIED (offline), with 0 CITE404 and 0 INC002"
+        else
+            record_fail 5 "Row 5 2405.13682v5 \\input{main.bbl} check failed"
+        fi
+    fi
 
     if should_run_row 6; then
         echo "== [Row 6] 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv（0 条 BIB001）与 2410.04196v2 \\citep{bayestune} CITE_KEY_CASE =="
@@ -903,10 +1149,10 @@ PY
     fi
 
     # ==================================================================
-    # Row 9: Missing file / missing .bib INC002 & main .bbl fallback (BIB_FROM_BBL)
+    # Row 9: Missing file / missing .bib INC002 & main .bbl fallback (BIB_FROM_BBL + defined entries)
     # ==================================================================
     if should_run_row 9; then
-        echo "== [Row 9] 缺失文件与缺失 .bib (INC002 带文件与行号) 及同名 .bbl 回退 (BIB_FROM_BBL；.bbl 条目解析留给第 6 段) =="
+        echo "== [Row 9] 缺失文件与缺失 .bib (INC002 带文件与行号) 及同名 .bbl 回退 (BIB_FROM_BBL 且 .bbl 条目均算已定义、0 条 CITE404) =="
         set +e
         ROW9_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
 import json, os, subprocess, sys
@@ -947,22 +1193,60 @@ print(f"  [missing-bib-no-bbl] INC002={[(d['severity'], d['file'], d['line']) fo
 if len(inc_bib) != 1 or inc_bib[0].get("severity") != "ERROR" or inc_bib[0].get("file") != "main.tex" or inc_bib[0].get("line") != 5:
     failures.append(f"missing-bib expected 1 ERROR INC002 at main.tex:5, got {inc_bib}")
 
-# 9D. Missing `\bibliography{custom}` with matching `acl_latex.bbl` -> 0 INC002, 1 INFO BIB_FROM_BBL, bibliographySources has bbl
+# 9D. Missing `\bibliography{custom}` with matching `acl_latex.bbl` -> 0 INC002, 1 INFO BIB_FROM_BBL, bbl entries=2, all defined=True, 0 CITE404
 obj_bbl = run_diag(os.path.join(base, "bbl-fallback", "acl_latex.tex"))
 inc_bbl = [d for d in obj_bbl.get("diagnostics", []) if d.get("code") == "INC002"]
 info_bbl = [d for d in obj_bbl.get("diagnostics", []) if d.get("code") == "BIB_FROM_BBL"]
+cite404_bbl = [d for d in obj_bbl.get("diagnostics", []) if d.get("code") == "CITE404"]
 bib_srcs = obj_bbl.get("bibliographySources", [])
+cites_bbl = obj_bbl.get("citations", [])
+defined_keys_bbl = [c["key"] for c in cites_bbl if c.get("defined") is True and c.get("source") == "acl_latex.bbl"]
 print(
-    f"  [bbl-fallback] INC002={len(inc_bbl)} BIB_FROM_BBL={[(d['severity'], d['file'], d['line']) for d in info_bbl]} "
-    f"bibliographySources={[(s['kind'], s['path']) for s in bib_srcs]} "
-    "(note: .bbl \\bibitem entry definition check deferred to Stage 06)"
+    f"  [bbl-fallback acl_latex] INC002={len(inc_bbl)} BIB_FROM_BBL={[(d['severity'], d['file'], d['line']) for d in info_bbl]} "
+    f"bibliographySources={bib_srcs} defined_keys={defined_keys_bbl} CITE404={len(cite404_bbl)}"
 )
 if inc_bbl:
     failures.append(f"bbl-fallback emitted unexpected INC002: {inc_bbl}")
+if cite404_bbl:
+    failures.append(f"bbl-fallback emitted unexpected CITE404: {cite404_bbl}")
 if len(info_bbl) != 1 or info_bbl[0].get("severity") != "INFO" or info_bbl[0].get("file") != "acl_latex.tex" or info_bbl[0].get("line") != 6:
     failures.append(f"bbl-fallback expected 1 INFO BIB_FROM_BBL at acl_latex.tex:6, got {info_bbl}")
-if len(bib_srcs) != 1 or bib_srcs[0].get("kind") != "bbl" or bib_srcs[0].get("path") != "acl_latex.bbl":
-    failures.append(f"bbl-fallback expected bibliographySources=[{{kind:'bbl', path:'acl_latex.bbl'}}], got {bib_srcs}")
+if (
+    len(bib_srcs) != 1
+    or bib_srcs[0].get("kind") != "bbl"
+    or bib_srcs[0].get("path") != "acl_latex.bbl"
+    or bib_srcs[0].get("entries") != 2
+    or (bib_srcs[0].get("errors") or []) != []
+):
+    failures.append(f"bbl-fallback expected bibliographySources=[{{kind:'bbl', path:'acl_latex.bbl', entries:2, errors:[]}}], got {bib_srcs}")
+if sorted(defined_keys_bbl) != ["lecun2015", "vaswani2017"] or len(cites_bbl) != 2:
+    failures.append(f"bbl-fallback expected ['lecun2015', 'vaswani2017'] defined from acl_latex.bbl, got {cites_bbl}")
+for c in cites_bbl:
+    ver = c.get("verification")
+    if not (isinstance(ver, dict) and ver.get("verdict") == "UNVERIFIED" and ver.get("reasons") == ["offline"]):
+        failures.append(f"bbl-fallback key '{c.get('key')}' expected UNVERIFIED/['offline'], got {ver}")
+
+# 9E. Tectonic-verified fallback `.bbl` fixture `thebibliography-bbl/03-fallback-bbl/paper.tex`
+paper_tex = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "thebibliography-bbl", "03-fallback-bbl", "paper.tex")
+obj_p = run_diag(paper_tex)
+inc_p = [d for d in obj_p.get("diagnostics", []) if d.get("code") == "INC002"]
+info_p = [d for d in obj_p.get("diagnostics", []) if d.get("code") == "BIB_FROM_BBL"]
+cite404_p = [d for d in obj_p.get("diagnostics", []) if d.get("code") == "CITE404"]
+srcs_p = obj_p.get("bibliographySources", [])
+cites_p = obj_p.get("citations", [])
+defined_keys_p = [c["key"] for c in cites_p if c.get("defined") is True and c.get("source") == "paper.bbl"]
+print(
+    f"  [03-fallback-bbl paper] INC002={len(inc_p)} BIB_FROM_BBL={[(d['severity'], d['file'], d['line']) for d in info_p]} "
+    f"bibliographySources={srcs_p} defined_keys={defined_keys_p} CITE404={len(cite404_p)}"
+)
+if inc_p or cite404_p:
+    failures.append(f"03-fallback-bbl unexpected INC002={inc_p} CITE404={cite404_p}")
+if len(info_p) != 1 or info_p[0].get("severity") != "INFO":
+    failures.append(f"03-fallback-bbl expected 1 INFO BIB_FROM_BBL, got {info_p}")
+if len(srcs_p) != 1 or srcs_p[0].get("kind") != "bbl" or srcs_p[0].get("path") != "paper.bbl" or srcs_p[0].get("entries") != 3:
+    failures.append(f"03-fallback-bbl unexpected bibliographySources: {srcs_p}")
+if sorted(defined_keys_p) != ["hochreiter1997", "lecun2015", "who2021"] or len(cites_p) != 3:
+    failures.append(f"03-fallback-bbl expected all 3 keys defined from paper.bbl, got {cites_p}")
 
 if failures:
     for msg in failures:
@@ -975,9 +1259,9 @@ PY
         set -e
         echo "$ROW9_OUT"
         if [[ "$ROW9_RC" -eq 0 ]]; then
-            record_pass 9 "Missing include/bib emit exact ERROR INC002 (file & line), and matching <main>.bbl emits INFO BIB_FROM_BBL with 0 INC002"
+            record_pass 9 "Missing include/bib emit exact ERROR INC002 (file & line), and matching <main>.bbl emits INFO BIB_FROM_BBL with 0 INC002 and all .bbl entries marked defined (0 CITE404)"
         else
-            record_fail 9 "Missing-file INC002 or BIB_FROM_BBL fallback check failed"
+            record_fail 9 "Missing-file INC002 or BIB_FROM_BBL fallback (.bbl defined entries) check failed"
         fi
     fi
 
