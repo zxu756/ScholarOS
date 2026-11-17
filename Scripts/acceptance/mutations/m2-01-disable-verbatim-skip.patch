@@ -1,0 +1,12 @@
+diff --git a/Sources/ScholarMarkupAST/IncrementalMarkupLexer.swift b/Sources/ScholarMarkupAST/IncrementalMarkupLexer.swift
+--- a/Sources/ScholarMarkupAST/IncrementalMarkupLexer.swift
++++ b/Sources/ScholarMarkupAST/IncrementalMarkupLexer.swift
+@@ -1826,6 +1826,8 @@
+         cursor: inout UTF8Cursor,
+         into output: inout [MarkupToken]
+     ) {
++        // MUTATION (M2 acceptance row 17a): disable opaque verbatim skipping.
++        if !command.isEmpty { return }
+         switch command {
+         case "\\verb", "\\verb*":
+             emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)

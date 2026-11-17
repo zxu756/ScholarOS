@@ -1,0 +1,13 @@
+diff --git a/Sources/ScholarMarkupAST/MacroExpansionAndSymbolEngine.swift b/Sources/ScholarMarkupAST/MacroExpansionAndSymbolEngine.swift
+--- a/Sources/ScholarMarkupAST/MacroExpansionAndSymbolEngine.swift
++++ b/Sources/ScholarMarkupAST/MacroExpansionAndSymbolEngine.swift
+@@ -366,7 +366,8 @@
+         }
+ 
+         // 3. Duplicate `\label{...}` declarations
+-        for dup in duplicateLabels {
++        // MUTATION (M2 acceptance row 17e): suppress SYM003 duplicate label diagnostics.
++        for dup in duplicateLabels where false {
+             let firstLoc = labelsByKey[dup.key].map { "\($0.filePath):\($0.span.start.line)" } ?? "earlier location"
+             diagnostics.append(
+                 LSPDiagnostic(

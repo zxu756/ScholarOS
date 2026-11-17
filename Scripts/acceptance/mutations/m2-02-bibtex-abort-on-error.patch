@@ -1,0 +1,22 @@
+diff --git a/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift b/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
+--- a/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
++++ b/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
+@@ -1405,7 +1405,8 @@
+                         )
+                     )
+                 }
+-                scanner.skipToNextAtSign()
++                // MUTATION (M2 acceptance row 17b): stop reading BibTeX on first error.
++                while !scanner.isAtEnd { scanner.advance() }
+             } catch {
+                 errors.append(
+                     BibTeXEntryParseError(
+@@ -1415,7 +1416,7 @@
+                         message: error.localizedDescription
+                     )
+                 )
+-                scanner.skipToNextAtSign()
++                while !scanner.isAtEnd { scanner.advance() }
+             }
+         }
+ 

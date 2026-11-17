@@ -1,0 +1,32 @@
+diff --git a/Sources/ScholarLSPEngine/TheBibliographyWorkspaceExtractor.swift b/Sources/ScholarLSPEngine/TheBibliographyWorkspaceExtractor.swift
+--- a/Sources/ScholarLSPEngine/TheBibliographyWorkspaceExtractor.swift
++++ b/Sources/ScholarLSPEngine/TheBibliographyWorkspaceExtractor.swift
+@@ -68,6 +68,15 @@
+         filePath: String
+     ) -> TheBibliographyExtractionResult {
+         let sourceKind = filePath.lowercased().hasSuffix(".bbl") ? "bbl" : "thebibliography"
++        // MUTATION (M2 acceptance row 17d): drop thebibliography and .bbl extraction.
++        if !filePath.isEmpty {
++            return TheBibliographyExtractionResult(
++                filePath: filePath,
++                sourceKind: sourceKind,
++                hasTheBibliographyEnvironment: false,
++                items: []
++            )
++        }
+         let entryParser = TheBibliographyEntryParser()
+         let count = tokens.count
+         var idx = 0
+diff --git a/Sources/ScholarLSPEngine/ManuscriptWorkspaceLoader.swift b/Sources/ScholarLSPEngine/ManuscriptWorkspaceLoader.swift
+--- a/Sources/ScholarLSPEngine/ManuscriptWorkspaceLoader.swift
++++ b/Sources/ScholarLSPEngine/ManuscriptWorkspaceLoader.swift
+@@ -200,7 +200,8 @@
+         } else {
+             let rootStem = (rootRelPath as NSString).deletingPathExtension
+             let mainBblRelPath = (rootStem.isEmpty ? rootRelPath : rootStem) + ".bbl"
+-            let mainBblExists = recordingProvider.fileExists(at: mainBblRelPath)
++            // MUTATION (M2 acceptance row 17d): disable <main>.bbl fallback source.
++            let mainBblExists = false && recordingProvider.fileExists(at: mainBblRelPath)
+ 
+             var seenBibPaths: Set<String> = []
+             var seenTheBibOrBBLPaths: Set<String> = []

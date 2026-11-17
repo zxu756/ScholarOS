@@ -1,0 +1,13 @@
+diff --git a/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift b/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
+--- a/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
++++ b/Sources/ScholarBibAndCSL/BibTeXAndLaTeXCodec.swift
+@@ -2507,7 +2507,8 @@
+ 
+     mutating func readFieldOrMacroName() -> String {
+         var out = ""
+-        while let ch = peek(), Self.isBibTeXIdentifierCharacter(ch) {
++        // MUTATION (M2 acceptance row 17c): restrict field names to ASCII letters, digits, and -_:.
++        while let ch = peek(), (ch.isASCII && (ch.isLetter || ch.isNumber)) || ch == "-" || ch == "_" || ch == ":" {
+             out.append(ch)
+             advance()
+         }
