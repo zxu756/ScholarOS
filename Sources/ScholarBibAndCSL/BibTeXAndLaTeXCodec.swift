@@ -728,20 +728,29 @@ public struct BibTeXAuthorParser: Sendable {
         orcidField: String? = nil,
         codec: LaTeXTextCodec = LaTeXTextCodec()
     ) -> [BibAuthor] {
+        parseAuthorsWithTruncation(rawAuthorField, orcidField: orcidField, codec: codec).authors
+    }
+
+    public static func parseAuthorsWithTruncation(
+        _ rawAuthorField: String,
+        orcidField: String? = nil,
+        codec: LaTeXTextCodec = LaTeXTextCodec()
+    ) -> (authors: [BibAuthor], authorsTruncated: Bool) {
         let normalizedAuthorField = normalizeLineEndingsToLF(rawAuthorField)
         let normalizedORCIDField = orcidField.map(normalizeLineEndingsToLF)
         let segments = splitTopLevelAnd(normalizedAuthorField)
-        if segments.isEmpty { return [] }
+        if segments.isEmpty { return ([], false) }
 
         let orcids: [String?] = parseORCIDList(normalizedORCIDField)
         var parsedAuthors: [BibAuthor] = []
         parsedAuthors.reserveCapacity(segments.count)
+        var authorsTruncated = false
 
         for (index, rawSegment) in segments.enumerated() {
             let trimmed = rawSegment.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             if trimmed.lowercased() == "others" {
-                parsedAuthors.append(BibAuthor(givenName: "", familyName: "et al."))
+                authorsTruncated = true
                 continue
             }
 
@@ -804,15 +813,16 @@ public struct BibTeXAuthorParser: Sendable {
             }
         }
 
-        return parsedAuthors
+        return (parsedAuthors, authorsTruncated)
     }
 
     public static func serializeAuthors(
         _ authors: [BibAuthor],
+        authorsTruncated: Bool = false,
         codec: LaTeXTextCodec = LaTeXTextCodec(),
         escapeUnicodeToLaTeX: Bool = false
     ) -> String {
-        authors.map { author in
+        var parts = authors.map { author -> String in
             let fam = codec.encode(author.familyName, escapeUnicodeToLaTeX: escapeUnicodeToLaTeX)
             let giv = codec.encode(author.givenName, escapeUnicodeToLaTeX: escapeUnicodeToLaTeX)
             if giv.isEmpty {
@@ -822,7 +832,11 @@ public struct BibTeXAuthorParser: Sendable {
                 return "{\(fam)}"
             }
             return "\(fam), \(giv)"
-        }.joined(separator: " and ")
+        }
+        if authorsTruncated && parts.last != "others" {
+            parts.append("others")
+        }
+        return parts.joined(separator: " and ")
     }
 
     // MARK: - Top-Level Splitting Helpers
@@ -1069,10 +1083,18 @@ public struct BibTeXCodec: Sendable {
 
     private static let standardAuxiliaryBibFieldNames: Set<String> = [
         "address", "location", "edition", "chapter", "series", "type", "note", "annote",
-        "key", "crossref", "isbn", "issn", "keywords", "language", "langid", "primaryclass",
+        "key", "crossref", "editor", "isbn", "issn", "keywords", "language", "langid", "primaryclass",
         "urldate", "timestamp", "biburl", "bibsource", "copyright", "lccn", "mrnumber",
         "coden", "numpages", "subtitle", "booksubtitle", "journalsubtitle", "abstractnote"
     ]
+
+    private struct RawParsedBibRecord {
+        let citeKey: String
+        let lowerType: String
+        let rawFields: [String: String]
+        let entryLine: Int
+        let parseErrorInfo: BibEntryParseError?
+    }
 
     public func parse(_ source: String) throws -> [BibliographyEntry] {
         try parseDocument(source).entries
@@ -1104,9 +1126,8 @@ public struct BibTeXCodec: Sendable {
         return doc
     }
 
-    /// Parses a BibTeX document with BibTeX 0.99d single-entry error recovery:
-    /// when a syntax error occurs inside an entry, records `(key, startLine, line, message)` in `errors`,
-    /// retains any already-parsed fields on that entry with `parseError = true`, and skips to the next `@`.
+    /// Parses a BibTeX document with BibTeX 0.99d single-entry error recovery, case-insensitive
+    /// first-entry-wins duplicate key handling (`BIB002`), and two-pass `crossref` inheritance (`BIB003`).
     public func parseDocumentRecovering(_ source: String) -> BibTeXDocument {
         var scanner = BibTeXScanner(source: source)
         var macros = Self.defaultMacros
@@ -1116,11 +1137,34 @@ public struct BibTeXCodec: Sendable {
         var userMacros: [String: String] = [:]
         var preambles: [String] = []
         var comments: [String] = []
+        var rawRecords: [RawParsedBibRecord] = []
+        var seenFirstByLowerKey: [String: (citeKey: String, line: Int)] = [:]
+        var rawByLowerKey: [String: RawParsedBibRecord] = [:]
         var entries: [BibliographyEntry] = []
         var unmappedByKey: [String: [String: String]] = [:]
         var diagnostics: [BibTeXParseDiagnostic] = []
         var errors: [BibTeXEntryParseError] = []
         var reportedUnknownFieldNames: Set<String> = []
+
+        func appendRawRecordIfUnique(_ record: RawParsedBibRecord) {
+            let lowerKey = record.citeKey.lowercased()
+            if let existing = seenFirstByLowerKey[lowerKey] {
+                diagnostics.append(
+                    BibTeXParseDiagnostic(
+                        code: "BIB002",
+                        line: record.entryLine,
+                        column: 1,
+                        severity: .warning,
+                        citeKey: record.citeKey,
+                        message: "Duplicate BibTeX entry key '\(record.citeKey)' (first defined as '\(existing.citeKey)' at line \(existing.line)); keeping first entry."
+                    )
+                )
+                return
+            }
+            seenFirstByLowerKey[lowerKey] = (record.citeKey, record.entryLine)
+            rawByLowerKey[lowerKey] = record
+            rawRecords.append(record)
+        }
 
         while !scanner.isAtEnd {
             scanner.skipInterEntryTrivia(commentsSink: &comments)
@@ -1253,7 +1297,6 @@ public struct BibTeXCodec: Sendable {
                 currentCiteKey = citeKey
 
                 scanner.skipWhitespaceAndLineComments()
-                var fieldOrder: [String] = []
 
                 if scanner.consumeIf(closeDelim) {
                     // Empty entry body `@misc{key}`
@@ -1312,9 +1355,6 @@ public struct BibTeXCodec: Sendable {
                         )
 
                         let normalizedField = fieldName.lowercased()
-                        if currentRawFields[normalizedField] == nil {
-                            fieldOrder.append(normalizedField)
-                        }
                         currentRawFields[normalizedField] = fieldValue
 
                         scanner.skipWhitespaceAndLineComments()
@@ -1332,32 +1372,15 @@ public struct BibTeXCodec: Sendable {
                     }
                 }
 
-                let (entry, unmapped) = buildBibliographyEntry(
-                    citeKey: citeKey,
-                    rawEntryType: lowerType,
-                    rawFields: currentRawFields,
-                    line: entryLine,
-                    diagnostics: &diagnostics
-                )
-                for unmappedKey in unmapped.keys.sorted()
-                where !Self.standardAuxiliaryBibFieldNames.contains(unmappedKey)
-                    && reportedUnknownFieldNames.insert(unmappedKey).inserted
-                {
-                    diagnostics.append(
-                        BibTeXParseDiagnostic(
-                            code: "BIB_UNKNOWN_FIELD",
-                            line: entryLine,
-                            column: 1,
-                            severity: .info,
-                            citeKey: citeKey,
-                            message: "Ignored unrecognized BibTeX field '\(unmappedKey)'."
-                        )
+                appendRawRecordIfUnique(
+                    RawParsedBibRecord(
+                        citeKey: citeKey,
+                        lowerType: lowerType,
+                        rawFields: currentRawFields,
+                        entryLine: entryLine,
+                        parseErrorInfo: nil
                     )
-                }
-                entries.append(entry)
-                if !unmapped.isEmpty {
-                    unmappedByKey[citeKey] = unmapped
-                }
+                )
             } catch let ScholarOSError.bibliographyParseFailure(_, errLine, detail) {
                 errors.append(
                     BibTeXEntryParseError(
@@ -1368,23 +1391,19 @@ public struct BibTeXCodec: Sendable {
                     )
                 )
                 if let partialKey = currentCiteKey, !partialKey.isEmpty {
-                    var (partialEntry, partialUnmapped) = buildBibliographyEntry(
-                        citeKey: partialKey,
-                        rawEntryType: currentLowerType,
-                        rawFields: currentRawFields,
-                        line: entryLine,
-                        diagnostics: &diagnostics
+                    appendRawRecordIfUnique(
+                        RawParsedBibRecord(
+                            citeKey: partialKey,
+                            lowerType: currentLowerType,
+                            rawFields: currentRawFields,
+                            entryLine: entryLine,
+                            parseErrorInfo: BibEntryParseError(
+                                startLine: entryLine,
+                                line: errLine,
+                                message: detail
+                            )
+                        )
                     )
-                    partialEntry.parseError = true
-                    partialEntry.parseErrorInfo = BibEntryParseError(
-                        startLine: entryLine,
-                        line: errLine,
-                        message: detail
-                    )
-                    entries.append(partialEntry)
-                    if !partialUnmapped.isEmpty {
-                        unmappedByKey[partialKey] = partialUnmapped
-                    }
                 }
                 scanner.skipToNextAtSign()
             } catch {
@@ -1397,6 +1416,78 @@ public struct BibTeXCodec: Sendable {
                     )
                 )
                 scanner.skipToNextAtSign()
+            }
+        }
+
+        // Second pass: resolve `crossref` inheritance across non-duplicate entries and build BibliographyEntry records.
+        for record in rawRecords {
+            var effectiveFields = record.rawFields
+            let rawCrossrefKey: String? = {
+                guard let rawCR = record.rawFields["crossref"] else { return nil }
+                let collapsed = rawCR.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+                return collapsed.isEmpty ? nil : collapsed
+            }()
+
+            if let crKey = rawCrossrefKey {
+                let crLower = crKey.lowercased()
+                if crLower != record.citeKey.lowercased(), let parent = rawByLowerKey[crLower] {
+                    for (pk, pv) in parent.rawFields {
+                        if pk == "crossref" || pk.hasPrefix("x-firewall-") {
+                            continue
+                        }
+                        if pv.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            continue
+                        }
+                        let childVal = effectiveFields[pk]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        if childVal.isEmpty {
+                            effectiveFields[pk] = pv
+                        }
+                    }
+                } else if crLower != record.citeKey.lowercased() {
+                    diagnostics.append(
+                        BibTeXParseDiagnostic(
+                            code: "BIB003",
+                            line: record.entryLine,
+                            column: 1,
+                            severity: .warning,
+                            citeKey: record.citeKey,
+                            message: "BibTeX crossref parent '\(crKey)' referenced by entry '\(record.citeKey)' does not exist."
+                        )
+                    )
+                }
+            }
+
+            var (entry, unmapped) = buildBibliographyEntry(
+                citeKey: record.citeKey,
+                rawEntryType: record.lowerType,
+                rawFields: effectiveFields,
+                crossrefKey: rawCrossrefKey,
+                line: record.entryLine,
+                diagnostics: &diagnostics
+            )
+            if let parseErr = record.parseErrorInfo {
+                entry.parseError = true
+                entry.parseErrorInfo = parseErr
+            } else {
+                for unmappedKey in unmapped.keys.sorted()
+                where !Self.standardAuxiliaryBibFieldNames.contains(unmappedKey)
+                    && reportedUnknownFieldNames.insert(unmappedKey).inserted
+                {
+                    diagnostics.append(
+                        BibTeXParseDiagnostic(
+                            code: "BIB_UNKNOWN_FIELD",
+                            line: record.entryLine,
+                            column: 1,
+                            severity: .info,
+                            citeKey: record.citeKey,
+                            message: "Ignored unrecognized BibTeX field '\(unmappedKey)'."
+                        )
+                    )
+                }
+            }
+            entries.append(entry)
+            if !unmapped.isEmpty {
+                unmappedByKey[record.citeKey] = unmapped
             }
         }
 
@@ -1483,11 +1574,12 @@ public struct BibTeXCodec: Sendable {
             )
         ))
 
-        if !entry.authors.isEmpty {
+        if !entry.authors.isEmpty || entry.authorsTruncated {
             fields.append((
                 "author",
                 BibTeXAuthorParser.serializeAuthors(
                     entry.authors,
+                    authorsTruncated: entry.authorsTruncated,
                     codec: latexCodec,
                     escapeUnicodeToLaTeX: options.escapeUnicodeToLaTeX
                 )
@@ -1696,13 +1788,18 @@ public struct BibTeXCodec: Sendable {
         citeKey: String,
         rawEntryType: String,
         rawFields: [String: String],
+        crossrefKey: String? = nil,
         line: Int,
         diagnostics: inout [BibTeXParseDiagnostic]
     ) -> (BibliographyEntry, [String: String]) {
-        var consumedKeys: Set<String> = []
+        _ = line
+        _ = diagnostics
+        var consumedKeys: Set<String> = ["crossref"]
         func take(_ keys: String...) -> String? {
             for k in keys {
                 consumedKeys.insert(k)
+            }
+            for k in keys {
                 if let v = rawFields[k], !v.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     return v.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
@@ -1715,7 +1812,13 @@ public struct BibTeXCodec: Sendable {
 
         let rawAuthor = take("author", "editor") ?? ""
         let rawORCID = take("orcid", "x-orcid")
-        let authors = BibTeXAuthorParser.parseAuthors(rawAuthor, orcidField: rawORCID, codec: latexCodec)
+        let parsedAuthorResult = BibTeXAuthorParser.parseAuthorsWithTruncation(
+            rawAuthor,
+            orcidField: rawORCID,
+            codec: latexCodec
+        )
+        let authors = parsedAuthorResult.authors
+        let authorsTruncated = parsedAuthorResult.authorsTruncated
 
         let yearInt: Int? = {
             if let yStr = take("year") {
@@ -1731,9 +1834,34 @@ public struct BibTeXCodec: Sendable {
 
         let rawJournal = take("journal", "journaltitle", "fjournal")
         let rawBooktitle = rawFields["title"] != nil ? take("booktitle", "maintitle", "eventtitle") : take("maintitle", "eventtitle")
-        let rawSchool = take("school", "institution", "organization", "howpublished")
-        let rawVenue = rawJournal ?? rawBooktitle ?? rawSchool ?? ""
-        let decodedVenue = latexCodec.decode(rawVenue)
+        let rawSchoolOnly = take("school", "institution", "organization")
+        let rawHowpublished = take("howpublished")
+        let rawNote = take("note")
+
+        let howpubURLScan = rawHowpublished.map(Self.extractAndStripURLMacros)
+        let noteURLScan = rawNote.map(Self.extractAndStripURLMacros)
+
+        let cleanedHowpublishedVenue: String? = {
+            guard let stripped = howpubURLScan?.strippedText else { return nil }
+            var decoded = latexCodec.decode(stripped)
+            if !(howpubURLScan?.extractedURLs.isEmpty ?? true) {
+                while let last = decoded.last, (last == "," || last == ";" || last == ":" || last.isWhitespace) {
+                    decoded.removeLast()
+                }
+                while let first = decoded.first, (first == "," || first == ";" || first == ":" || first.isWhitespace) {
+                    decoded.removeFirst()
+                }
+            }
+            let trimmed = decoded.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }()
+
+        let decodedVenue: String
+        if let rawPrimaryVenue = rawJournal ?? rawBooktitle ?? rawSchoolOnly {
+            decodedVenue = latexCodec.decode(rawPrimaryVenue)
+        } else {
+            decodedVenue = cleanedHowpublishedVenue ?? ""
+        }
 
         let publisher = take("publisher").map { latexCodec.decode($0) }
         let volume = take("volume").map { latexCodec.decode($0) }
@@ -1749,7 +1877,8 @@ public struct BibTeXCodec: Sendable {
             .flatMap { $0.isEmpty ? nil : $0 }
         let explicitArxiv = take("arxivid", "arxiv")
         let explicitPMID = take("pmid")
-        let rawURL = take("url")
+        let explicitURL = take("url")
+        let resolvedURL = explicitURL ?? howpubURLScan?.extractedURLs.first ?? noteURLScan?.extractedURLs.first
 
         var resolvedArxiv: String? = cleanArXivField(explicitArxiv)
         var ignoredNonArXivEprint: String? = nil
@@ -1766,11 +1895,11 @@ public struct BibTeXCodec: Sendable {
                 ignoredNonArXivEprint = eprint
             }
         }
-        if let rawURL {
-            if resolvedArxiv == nil, let urlArxiv = Self.extractFirstArXivIDFromURLField(rawURL) {
+        if let resolvedURL {
+            if resolvedArxiv == nil, let urlArxiv = Self.extractFirstArXivIDFromURLField(resolvedURL) {
                 resolvedArxiv = urlArxiv
             }
-            if cleanedDOI == nil, let urlDOI = Self.extractFirstDOIFromURLField(rawURL) {
+            if cleanedDOI == nil, let urlDOI = Self.extractFirstDOIFromURLField(resolvedURL) {
                 cleanedDOI = urlDOI
             }
         }
@@ -1795,8 +1924,8 @@ public struct BibTeXCodec: Sendable {
             return decoded.isEmpty ? nil : decoded
         }()
         let untrustedFWNote: String? = {
-            guard let rawNote = take("x-firewall-note") else { return nil }
-            let decoded = latexCodec.decode(rawNote).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let rawNoteFW = take("x-firewall-note") else { return nil }
+            let decoded = latexCodec.decode(rawNoteFW).trimmingCharacters(in: .whitespacesAndNewlines)
             return decoded.isEmpty ? nil : decoded
         }()
         let firewallClass: CitationFirewallClass = .unverified
@@ -1815,6 +1944,7 @@ public struct BibTeXCodec: Sendable {
             kind: kind,
             title: decodedTitle,
             authors: authors,
+            authorsTruncated: authorsTruncated,
             year: yearInt,
             venue: decodedVenue,
             publisher: publisher,
@@ -1824,8 +1954,9 @@ public struct BibTeXCodec: Sendable {
             doi: cleanedDOI,
             arxivID: resolvedArxiv,
             pmid: resolvedPMID,
-            url: rawURL,
+            url: resolvedURL,
             abstractText: abstractText,
+            crossref: crossrefKey,
             firewallClass: firewallClass,
             firewallAuditNote: firewallNote,
             untrustedDeclaredFirewallClass: untrustedFWClass,
@@ -1836,6 +1967,122 @@ public struct BibTeXCodec: Sendable {
             referencesKeys: referencesKeys
         )
         return (entry, unmapped)
+    }
+
+    private static func extractAndStripURLMacros(from rawText: String) -> (extractedURLs: [String], strippedText: String) {
+        let chars = Array(rawText)
+        var urls: [String] = []
+        var out = ""
+        out.reserveCapacity(chars.count)
+        var i = 0
+
+        func skipInlineWS(_ idx: inout Int) {
+            while idx < chars.count && (chars[idx] == " " || chars[idx] == "\t" || chars[idx] == "\r" || chars[idx] == "\n") {
+                idx += 1
+            }
+        }
+
+        func readBalancedBraces(_ idx: inout Int) -> String? {
+            guard idx < chars.count, chars[idx] == "{" else { return nil }
+            let innerStart = idx + 1
+            var depth = 1
+            var cursor = innerStart
+            while cursor < chars.count {
+                let c = chars[cursor]
+                if c == "\\" {
+                    cursor += 2
+                    continue
+                }
+                if c == "{" {
+                    depth += 1
+                } else if c == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        let inner = String(chars[innerStart..<cursor])
+                        idx = cursor + 1
+                        return inner
+                    }
+                }
+                cursor += 1
+            }
+            return nil
+        }
+
+        func skipOptionalBrackets(_ idx: inout Int) {
+            guard idx < chars.count, chars[idx] == "[" else { return }
+            var depth = 1
+            var cursor = idx + 1
+            while cursor < chars.count {
+                let c = chars[cursor]
+                if c == "\\" {
+                    cursor += 2
+                    continue
+                }
+                if c == "[" {
+                    depth += 1
+                } else if c == "]" {
+                    depth -= 1
+                    if depth == 0 {
+                        idx = cursor + 1
+                        return
+                    }
+                }
+                cursor += 1
+            }
+        }
+
+        func cleanMacroURL(_ rawURL: String) -> String {
+            rawURL
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\%", with: "%")
+                .replacingOccurrences(of: "\\_", with: "_")
+                .replacingOccurrences(of: "\\#", with: "#")
+                .replacingOccurrences(of: "\\&", with: "&")
+                .replacingOccurrences(of: "\\~", with: "~")
+        }
+
+        while i < chars.count {
+            if chars[i] == "\\" {
+                var cmdCursor = i + 1
+                while cmdCursor < chars.count && chars[cmdCursor].isLetter {
+                    cmdCursor += 1
+                }
+                let cmdName = String(chars[(i + 1)..<cmdCursor])
+                if cmdName == "url" || cmdName == "nolinkurl" {
+                    var argCursor = cmdCursor
+                    skipInlineWS(&argCursor)
+                    if let rawU = readBalancedBraces(&argCursor) {
+                        let cleaned = cleanMacroURL(rawU)
+                        if !cleaned.isEmpty {
+                            urls.append(cleaned)
+                        }
+                        i = argCursor
+                        continue
+                    }
+                } else if cmdName == "href" {
+                    var argCursor = cmdCursor
+                    skipInlineWS(&argCursor)
+                    skipOptionalBrackets(&argCursor)
+                    skipInlineWS(&argCursor)
+                    if let rawU = readBalancedBraces(&argCursor) {
+                        var labelCursor = argCursor
+                        skipInlineWS(&labelCursor)
+                        if readBalancedBraces(&labelCursor) != nil {
+                            argCursor = labelCursor
+                        }
+                        let cleaned = cleanMacroURL(rawU)
+                        if !cleaned.isEmpty {
+                            urls.append(cleaned)
+                        }
+                        i = argCursor
+                        continue
+                    }
+                }
+            }
+            out.append(chars[i])
+            i += 1
+        }
+        return (urls, out)
     }
 
     private func mapEntryKind(

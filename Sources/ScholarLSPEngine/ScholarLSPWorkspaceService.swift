@@ -179,8 +179,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         for entry in bibliography {
             if bibMap[entry.citeKey] == nil {
                 bibOrder.append(entry.citeKey)
+                bibMap[entry.citeKey] = entry
             }
-            bibMap[entry.citeKey] = entry
         }
 
         var rawBibs: [String: String] = [:]
@@ -979,9 +979,18 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
 
             let citedKeySet = Set(sortedCitedKeys)
             let citedLowerSet = Set(sortedCitedKeys.map { $0.lowercased() })
+            var citedCrossrefParentLowerSet = Set<String>()
+            for key in st.orderedBibliographyKeys where citedKeySet.contains(key) || citedLowerSet.contains(key.lowercased()) {
+                if let cr = st.bibliographyByKey[key]?.crossref?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !cr.isEmpty {
+                    citedCrossrefParentLowerSet.insert(cr.lowercased())
+                }
+            }
             let uncitedEntries = Set(
                 st.orderedBibliographyKeys.filter {
-                    !citedKeySet.contains($0) && !citedLowerSet.contains($0.lowercased())
+                    !citedKeySet.contains($0)
+                        && !citedLowerSet.contains($0.lowercased())
+                        && !citedCrossrefParentLowerSet.contains($0.lowercased())
                 }
             ).sorted()
 

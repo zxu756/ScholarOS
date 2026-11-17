@@ -2317,7 +2317,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(byReason == [CitationUnverifiedReasonCode.noMatchInSearch.rawValue: 3])
 
         let allowedUnverifiedCodes = Set(CitationUnverifiedReasonCode.allCases.map(\.rawValue))
-        #expect(allowedUnverifiedCodes.count == 10)
+        #expect(allowedUnverifiedCodes.count == 11)
 
         let verdicts = try #require(topDict["verdicts"] as? [[String: Any]])
         #expect(verdicts.count == 22)
@@ -5396,6 +5396,380 @@ struct PluginSDKMCPAndShellTests {
         #expect(cite404.isEmpty)
         #expect(structErrors.count == 2, "Expected only 2 SYM003 structure ERRORs on 2503.18124v1, got \(structErrors)")
         #expect(structErrors.allSatisfy { ($0["code"] as? String) == "SYM003" })
+    }
+
+    @Test("M2 Stage 05 item 3 (S10): 'and others' sets authorsTruncated=true without fake 'et al.' author, preserves M1 verification behavior, and format-bib never emits 'and et al.'")
+    func m2Stage05Item3AuthorsTruncatedAndEtAlFormatting() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item3")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let bibFieldsDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/bib-fields", isDirectory: true)
+        let refsBibURL = bibFieldsDir.appendingPathComponent("refs.bib")
+        let refsRaw = try String(contentsOf: refsBibURL, encoding: .utf8)
+
+        let doc = try BibTeXCodec().parseDocument(refsRaw)
+        let byKey = Dictionary(uniqueKeysWithValues: doc.entries.map { ($0.citeKey, $0) })
+
+        let paper1 = try #require(byKey["paper1"])
+        #expect(paper1.authors == [
+            BibAuthor(givenName: "Alice", familyName: "Smith"),
+            BibAuthor(givenName: "Bob", familyName: "Jones")
+        ])
+        #expect(paper1.authorsTruncated == true)
+        #expect(!paper1.authors.contains { $0.familyName.lowercased().contains("et al") })
+
+        let paper2 = try #require(byKey["paper2"])
+        #expect(paper2.authorsTruncated == false)
+
+        // BibTeX round-trip preserves `and others`
+        let serializedPaper1 = BibTeXCodec().serializeEntry(paper1)
+        #expect(serializedPaper1.contains("and others"))
+        let reparsedPaper1 = try #require(try BibTeXCodec().parse(serializedPaper1).first)
+        #expect(reparsedPaper1.authors.count == 2)
+        #expect(reparsedPaper1.authorsTruncated == true)
+
+        // CLI format-bib in IEEE and APA styles must output "et al." without "and" / "&" before it
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        let ieeeRun = await runner.runWithExitStatus(
+            arguments: ["format-bib", refsBibURL.path, "--style", "ieee", "--lang", "en"]
+        )
+        #expect(ieeeRun.exitCode == 0)
+        #expect(ieeeRun.stdout.contains("A. Smith, B. Jones, et al."))
+        #expect(!ieeeRun.stdout.contains("and et al."))
+        #expect(!ieeeRun.stdout.contains("& et al."))
+
+        let apaRun = await runner.runWithExitStatus(
+            arguments: ["format-bib", refsBibURL.path, "--style", "apa", "--lang", "en"]
+        )
+        #expect(apaRun.exitCode == 0)
+        #expect(apaRun.stdout.contains("et al."))
+        #expect(!apaRun.stdout.contains("and et al."))
+        #expect(!apaRun.stdout.contains("& et al."))
+
+        let csl = CSLCitationFormatterEngine()
+        for style in CitationFormatStyle.allCases {
+            let formatted = csl.formatEntry(paper1, style: style)
+            #expect(!formatted.bibliographyPlainText.contains("and et al."), "Style \(style) emitted 'and et al.': \(formatted.bibliographyPlainText)")
+            #expect(!formatted.bibliographyPlainText.contains("& et al."), "Style \(style) emitted '& et al.': \(formatted.bibliographyPlainText)")
+            #expect(formatted.inTextParenthetical.contains("Smith et al.") || style == .ieee || style == .nature || style == .vancouver)
+            #expect(formatted.inTextNarrative.contains("Smith et al."))
+        }
+
+        // M1 firewall check reads `authorsTruncated` with identical behavior
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let replay = try RegistryReplaySession(directoryURL: registryDir)
+        let firewall = CitationVerificationFirewall()
+        let daoBib = """
+        @inproceedings{dao2022_etal,
+          author        = {Dao, Tri and others},
+          title         = {FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness},
+          booktitle     = {NeurIPS},
+          year          = {2022},
+          eprint        = {2205.14135},
+          archivePrefix = {arXiv}
+        }
+        """
+        let daoEntry = try #require(try BibTeXCodec().parse(daoBib).first)
+        #expect(daoEntry.authors == [BibAuthor(givenName: "Tri", familyName: "Dao")])
+        #expect(daoEntry.authorsTruncated == true)
+        let vDao = await firewall.verifyAgainstPublicRegistries(entry: daoEntry, session: replay)
+        #expect(vDao.firewallClass == .verified)
+        #expect(vDao.insertable == true)
+    }
+
+    @Test("M2 Stage 05 item 4 (S10): crossref inherits missing parent fields without overwriting child fields, warns BIB003 when parent is missing, and suppresses uncited diagnostic on cited entry's parent")
+    func m2Stage05Item4CrossrefInheritanceMissingParentWarningAndUncitedSuppression() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item4")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let bibFieldsDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/bib-fields", isDirectory: true)
+        let refsBibURL = bibFieldsDir.appendingPathComponent("refs.bib")
+        let mainTexURL = bibFieldsDir.appendingPathComponent("main.tex")
+        let refsRaw = try String(contentsOf: refsBibURL, encoding: .utf8)
+
+        let doc = try BibTeXCodec().parseDocument(refsRaw)
+        let byKey = Dictionary(uniqueKeysWithValues: doc.entries.map { ($0.citeKey, $0) })
+
+        let paper1 = try #require(byKey["paper1"])
+        #expect(paper1.crossref == "conf2020")
+        #expect(paper1.venue == "Child Booktitle Wins")
+        #expect(paper1.year == 2020)
+        #expect(paper1.publisher == "ACM")
+        #expect(paper1.pages == "1–10")
+        #expect(paper1.authors.map(\.familyName) == ["Smith", "Jones"])
+
+        let paper2 = try #require(byKey["paper2"])
+        #expect(paper2.crossref == "conf2020")
+        #expect(paper2.venue == "Proceedings of the 10th Conference on Things")
+        #expect(paper2.year == 2020)
+        #expect(paper2.publisher == "ACM")
+        #expect(paper2.authors == [BibAuthor(givenName: "Carol", familyName: "White")])
+
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        let diagRun = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTexURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(diagRun.exitCode != 2)
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(diagRun.stdout.utf8)) as? [String: Any])
+        let uncited = try #require(obj["uncitedEntries"] as? [String])
+        #expect(!uncited.contains("conf2020"), "Cited child's crossref parent conf2020 must not be reported uncited; got \(uncited)")
+        #expect(uncited.isEmpty)
+
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        let uncitedLint = diags.filter { ($0["code"] as? String) == "LINT_UNCITED_BIB_ENTRY" }
+        let bib003OnValid = diags.filter { ($0["code"] as? String) == "BIB003" }
+        #expect(uncitedLint.isEmpty)
+        #expect(bib003OnValid.isEmpty)
+
+        // Missing crossref parent emits WARNING BIB003, and uncited child's uncited parent IS still reported uncited
+        let synTexURL = tempDir.appendingPathComponent("main.tex")
+        let synBibURL = tempDir.appendingPathComponent("refs.bib")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\cite{orphan_child}
+        \\bibliography{refs}
+        \\end{document}
+        """.write(to: synTexURL, atomically: true, encoding: .utf8)
+        try """
+        @inproceedings{orphan_child,
+          author   = {Jane Roe},
+          title    = {Orphan Paper},
+          crossref = {nonexistent_parent}
+        }
+        @inproceedings{uncited_child,
+          author   = {John Doe},
+          title    = {Uncited Child},
+          crossref = {uncited_parent}
+        }
+        @proceedings{uncited_parent,
+          title     = {Unused Proceedings},
+          booktitle = {Unused Proceedings},
+          year      = {2021}
+        }
+        """.write(to: synBibURL, atomically: true, encoding: .utf8)
+
+        let synRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", synTexURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        let synObj = try #require(try JSONSerialization.jsonObject(with: Data(synRes.stdout.utf8)) as? [String: Any])
+        let synUncited = try #require(synObj["uncitedEntries"] as? [String])
+        #expect(synUncited == ["uncited_child", "uncited_parent"])
+        let synDiags = try #require(synObj["diagnostics"] as? [[String: Any]])
+        let bib003 = synDiags.filter { ($0["code"] as? String) == "BIB003" }
+        #expect(bib003.count == 1)
+        if let w = bib003.first {
+            #expect(w["severity"] as? String == "WARNING")
+            #expect(w["category"] as? String == "structure")
+            #expect((w["message"] as? String ?? "").contains("nonexistent_parent"))
+        }
+    }
+
+    @Test("M2 Stage 05 item 5 (S10): \\url{u} and \\href{u}{...} in howpublished and note populate url when absent and are stripped from venue")
+    func m2Stage05Item5HowpublishedAndNoteURLExtractionAndVenueCleanup() throws {
+        let refsBibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/bib-fields/refs.bib")
+        let refsRaw = try String(contentsOf: refsBibURL, encoding: .utf8)
+        let doc = try BibTeXCodec().parseDocument(refsRaw)
+        let byKey = Dictionary(uniqueKeysWithValues: doc.entries.map { ($0.citeKey, $0) })
+
+        let web1 = try #require(byKey["web1"])
+        #expect(web1.url == "https://www.who.int/report%20one")
+        #expect(web1.venue.isEmpty)
+        #expect(!web1.venue.contains("who.int"))
+
+        let web2 = try #require(byKey["web2"])
+        #expect(web2.url == "https://example.org/x")
+        #expect(web2.venue.isEmpty)
+        #expect(!web2.venue.contains("example.org"))
+
+        let extraBib = """
+        @misc{note_url,
+          author = {Ada Lovelace},
+          title  = {Analytical Notes},
+          note   = {Available online at \\url{https://example.edu/~ada/notes%20v1.pdf}},
+          year   = {2022}
+        }
+        @misc{note_href,
+          author = {Alan Turing},
+          title  = {Computing Machinery},
+          note   = {See \\href{https://arxiv.org/abs/2205.14135}{preprint}},
+          year   = {2022}
+        }
+        @misc{explicit_url_wins,
+          author       = {Grace Hopper},
+          title        = {Compiler Manual},
+          url          = {https://canonical.example.com/manual},
+          howpublished = {Technical Report, \\url{https://mirror.example.com/manual}},
+          year         = {1952}
+        }
+        """
+        let extraEntries = Dictionary(uniqueKeysWithValues: try BibTeXCodec().parse(extraBib).map { ($0.citeKey, $0) })
+        let noteURL = try #require(extraEntries["note_url"])
+        #expect(noteURL.url == "https://example.edu/~ada/notes%20v1.pdf")
+        #expect(noteURL.venue.isEmpty)
+
+        let noteHref = try #require(extraEntries["note_href"])
+        #expect(noteHref.url == "https://arxiv.org/abs/2205.14135")
+        #expect(noteHref.arxivID == "2205.14135")
+
+        let explicitWins = try #require(extraEntries["explicit_url_wins"])
+        #expect(explicitWins.url == "https://canonical.example.com/manual")
+        #expect(!explicitWins.venue.contains("mirror.example.com"))
+        #expect(explicitWins.venue == "Technical Report")
+    }
+
+    @Test("M2 Stage 05 item 6: duplicate keys within the same .bib keep the first entry and emit WARNING BIB002")
+    func m2Stage05Item6DuplicateBibKeysKeepFirstAndEmitWarningBIB002() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item6")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let dupBib = """
+        @article{dupKey,
+          author  = {First Author},
+          title   = {First Title Wins},
+          journal = {First Journal},
+          year    = {2020}
+        }
+        @article{dupKey,
+          author  = {Second Author},
+          title   = {Second Title Ignored},
+          journal = {Second Journal},
+          year    = {2024}
+        }
+        @article{DUPKEY,
+          author  = {Third Author},
+          title   = {Case Variant Duplicate Ignored},
+          journal = {Third Journal},
+          year    = {2025}
+        }
+        """
+        let doc = try BibTeXCodec().parseDocument(dupBib)
+        #expect(doc.entries.count == 1)
+        let kept = try #require(doc.entries.first)
+        #expect(kept.citeKey == "dupKey")
+        #expect(kept.title == "First Title Wins")
+        #expect(kept.year == 2020)
+        let bib002 = doc.diagnostics.filter { $0.code == "BIB002" && $0.severity == .warning }
+        #expect(bib002.count == 2)
+
+        // Real benchmark .bib files with repeated entries match BibTeX unique entry counts
+        let bib2410 = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2410.04196v2/src/fhbi.bib"),
+            encoding: .utf8
+        )
+        let doc2410 = try BibTeXCodec().parseDocument(bib2410)
+        #expect(doc2410.entries.count == 374)
+        #expect(doc2410.errors.isEmpty)
+        #expect(doc2410.diagnostics.filter { $0.code == "BIB002" }.count == 67)
+
+        let bib2409 = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2409.19431v3/src/Refs.bib"),
+            encoding: .utf8
+        )
+        let doc2409 = try BibTeXCodec().parseDocument(bib2409)
+        #expect(doc2409.entries.count == 488)
+        #expect(doc2409.errors.isEmpty)
+        #expect(doc2409.diagnostics.filter { $0.code == "BIB002" }.count == 181)
+
+        // Diagnostics CLI surfaces WARNING BIB002
+        let texURL = tempDir.appendingPathComponent("main.tex")
+        let bibURL = tempDir.appendingPathComponent("refs.bib")
+        try "\\documentclass{article}\\begin{document}\\cite{dupKey}\\bibliography{refs}\\end{document}"
+            .write(to: texURL, atomically: true, encoding: .utf8)
+        try dupBib.write(to: bibURL, atomically: true, encoding: .utf8)
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        let res = await runner.runWithExitStatus(
+            arguments: ["diagnostics", texURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        let diagBib002 = diags.filter { ($0["code"] as? String) == "BIB002" }
+        #expect(diagBib002.count == 2)
+        #expect(diagBib002.allSatisfy { ($0["severity"] as? String) == "WARNING" && ($0["category"] as? String) == "structure" })
+    }
+
+    @Test("M2 Stage 05 item 7 (Settled #3): verify-citations and format-bib exit 2 only when 0 clean entries read; partial-error .bib marks broken entry UNVERIFIED (parse_error, insertable=false) and exits >= 1")
+    func m2Stage05Item7PartialBibRecoveryExitCodesAndParseErrorReason() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item7")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+
+        // 1. Zero clean entries (broken-only or non-BibTeX) -> exit 2 on both verify-citations and format-bib
+        let brokenOnlyURL = tempDir.appendingPathComponent("broken_only.bib")
+        try "@article{only_bad,\n  title = {Unclosed\n".write(to: brokenOnlyURL, atomically: true, encoding: .utf8)
+        let vcBrokenOnly = await runner.runWithExitStatus(arguments: ["verify-citations", brokenOnlyURL.path, "--offline"])
+        let fbBrokenOnly = await runner.runWithExitStatus(arguments: ["format-bib", brokenOnlyURL.path])
+        #expect(vcBrokenOnly.exitCode == 2)
+        #expect(fbBrokenOnly.exitCode == 2)
+
+        let notBibURL = tempDir.appendingPathComponent("not_bib.txt")
+        try "plain prose without bibtex entries\n".write(to: notBibURL, atomically: true, encoding: .utf8)
+        let vcNotBib = await runner.runWithExitStatus(arguments: ["verify-citations", notBibURL.path, "--offline"])
+        let fbNotBib = await runner.runWithExitStatus(arguments: ["format-bib", notBibURL.path])
+        #expect(vcNotBib.exitCode == 2)
+        #expect(fbNotBib.exitCode == 2)
+
+        // 2. Partial recovery on Tests/Fixtures/manuscripts/bib-recovery/ten.bib
+        let tenBibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/bib-recovery/ten.bib")
+        let vcTen = await runner.runWithExitStatus(
+            arguments: ["verify-citations", tenBibURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(vcTen.exitCode == 1, "Expected exit 1 (not 2 or 3) on partial-error ten.bib, got \(vcTen.exitCode); stderr=\(vcTen.stderr)")
+        #expect(vcTen.stderr.contains("e3") && vcTen.stderr.contains("15") && vcTen.stderr.contains("22"))
+
+        let vcObj = try #require(try JSONSerialization.jsonObject(with: Data(vcTen.stdout.utf8)) as? [String: Any])
+        #expect(vcObj["complete"] as? Bool == false)
+        let unvByReason = try #require(vcObj["unverifiedByReason"] as? [String: Int])
+        #expect(unvByReason["parse_error"] == 1)
+        #expect(unvByReason["offline"] == 9)
+
+        let verdicts = try #require(vcObj["verdicts"] as? [[String: Any]])
+        #expect(verdicts.count == 10)
+        let e3Verdict = try #require(verdicts.first { ($0["citeKey"] as? String) == "e3" })
+        #expect(e3Verdict["firewallClass"] as? String == "UNVERIFIED")
+        #expect(e3Verdict["reasons"] as? [String] == ["parse_error"])
+        #expect(e3Verdict["insertable"] as? Bool == false)
+
+        // Even when all clean entries are VERIFIED via registry replay, a parse_error entry forces exit 1 (not 3 or 0)
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let realBibLines = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        ).components(separatedBy: "\n")
+        let verifiedPlusBrokenURL = tempDir.appendingPathComponent("verified_plus_broken.bib")
+        let verifiedPlusBrokenText = realBibLines.prefix(2).joined(separator: "\n") + "\n@article{broken_tail,\n  author = {Zed Last},\n  title = {Unclosed {brace},\n  year = {2024}\n}\n"
+        try verifiedPlusBrokenText.write(to: verifiedPlusBrokenURL, atomically: true, encoding: .utf8)
+
+        let vcMixedReplay = await runner.runWithExitStatus(
+            arguments: ["verify-citations", verifiedPlusBrokenURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(vcMixedReplay.exitCode == 1)
+        let mixedObj = try #require(try JSONSerialization.jsonObject(with: Data(vcMixedReplay.stdout.utf8)) as? [String: Any])
+        #expect(mixedObj["verifiedCount"] as? Int == 2)
+        #expect(mixedObj["unverifiedCount"] as? Int == 1)
+        #expect((mixedObj["unverifiedByReason"] as? [String: Int]) == ["parse_error": 1])
+        #expect(mixedObj["complete"] as? Bool == false)
+
+        // 3. format-bib on ten.bib exits 1, reports e3 / startLine 15 / line 22 on stderr, and formats the 9 clean entries
+        let fbTen = await runner.runWithExitStatus(
+            arguments: ["format-bib", tenBibURL.path, "--style", "ieee", "--lang", "en"]
+        )
+        #expect(fbTen.exitCode == 1)
+        #expect(fbTen.stderr.contains("e3") && fbTen.stderr.contains("15") && fbTen.stderr.contains("22"))
+        for idx in [1, 2, 4, 5, 6, 7, 8, 9, 10] {
+            #expect(fbTen.stdout.contains("A. Author\(idx)"), "Missing formatted author for e\(idx)")
+            #expect(fbTen.stdout.contains("Title \(idx)"), "Missing formatted title for e\(idx)")
+            #expect(fbTen.stdout.contains("\(2000 + idx)"), "Missing formatted year for e\(idx)")
+        }
     }
 }
 

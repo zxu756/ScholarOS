@@ -1334,6 +1334,7 @@ bib_files = sorted(glob.glob(os.path.join(entries_dir, "*.bib")))
 allowed_reasons = {
     "offline", "transport_error", "timeout", "rate_limited", "server_error",
     "budget_exhausted", "unparseable", "ambiguous", "registered_no_metadata", "no_match_in_search",
+    "parse_error",
 }
 
 env = dict(os.environ)

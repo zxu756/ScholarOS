@@ -614,11 +614,21 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         // 5C. Uncited bibliography entries (`LINT_UNCITED_BIB_ENTRY`)
         if enableUncitedBibLint && !bibliography.isEmpty && !workspace.symbolTable.allCitationOccurrences.isEmpty {
             let citedLowerBibKeys = Set(citedBibKeys.map { $0.lowercased() })
+            var citedCrossrefParentLowerKeys = Set<String>()
+            for entry in bibliography where citedBibKeys.contains(entry.citeKey) || citedLowerBibKeys.contains(entry.citeKey.lowercased()) {
+                if let cr = entry.crossref?.trimmingCharacters(in: .whitespacesAndNewlines), !cr.isEmpty {
+                    citedCrossrefParentLowerKeys.insert(cr.lowercased())
+                }
+            }
             let hoverEngine = HoverDefinitionAndReferencesEngine(firewall: firewall)
             let fallbackBibEdge = workspace.includeGraph.edges.first(where: \.isBibliographyResource)
             let rootSpan = TextSpan(filePath: workspace.includeGraph.rootFilePath, start: .startOfFile, end: .startOfFile)
 
-            for entry in bibliography where !citedBibKeys.contains(entry.citeKey) && !citedLowerBibKeys.contains(entry.citeKey.lowercased()) {
+            for entry in bibliography
+            where !citedBibKeys.contains(entry.citeKey)
+                && !citedLowerBibKeys.contains(entry.citeKey.lowercased())
+                && !citedCrossrefParentLowerKeys.contains(entry.citeKey.lowercased())
+            {
                 let targetSpan = hoverEngine.locateBibTeXEntryDefinition(
                     citeKey: entry.citeKey,
                     originSpan: nil,

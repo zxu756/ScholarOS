@@ -113,11 +113,18 @@ public struct ManuscriptWorkspaceLoader: Sendable {
         var fallbackBBLFiles: [String: String] = [:]
         var explicitDecodedByPath: [String: DecodedTextFile] = [:]
 
+        var pendingBib003: [(displayPath: String, diag: BibTeXParseDiagnostic, targetKey: String)] = []
+
         func appendBibDocument(
             _ bibDoc: BibTeXDocument,
             displayPath: String
         ) {
-            entries.append(contentsOf: bibDoc.entries)
+            for entry in bibDoc.entries {
+                entries.append(entry)
+                if entrySourceByKey[entry.citeKey] == nil {
+                    entrySourceByKey[entry.citeKey] = displayPath
+                }
+            }
             let parseErrs = bibDoc.errors.map { err in
                 DiagnosticsBibliographyParseError(
                     key: err.key,
@@ -130,13 +137,10 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                 DiagnosticsBibliographySource(
                     kind: "bib",
                     path: displayPath,
-                    entries: Set(bibDoc.entries.map(\.citeKey)).count,
+                    entries: Set(bibDoc.entries.map { $0.citeKey.lowercased() }).count,
                     errors: parseErrs
                 )
             )
-            for entry in bibDoc.entries where entrySourceByKey[entry.citeKey] == nil {
-                entrySourceByKey[entry.citeKey] = displayPath
-            }
             for err in bibDoc.errors {
                 let errLine = max(1, err.line)
                 let keyClause = err.key.map { "entry '\($0)' " } ?? ""
@@ -153,6 +157,35 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                         )
                     )
                 )
+            }
+            for diag in bibDoc.diagnostics {
+                let diagLine = max(1, diag.line)
+                let diagCol = max(1, diag.column)
+                let span = TextSpan(
+                    filePath: displayPath,
+                    start: TextPosition(line: diagLine, column: diagCol),
+                    end: TextPosition(line: diagLine, column: diagCol)
+                )
+                if diag.code == "BIB002" {
+                    loaderDiagnostics.append(
+                        LSPDiagnostic(
+                            code: "BIB002",
+                            category: .structure,
+                            severity: .warning,
+                            message: diag.message,
+                            span: span
+                        )
+                    )
+                } else if diag.code == "BIB003" {
+                    let targetKey: String = {
+                        if let r = diag.message.range(of: "crossref parent '"),
+                           let end = diag.message[r.upperBound...].firstIndex(of: "'") {
+                            return String(diag.message[r.upperBound..<end])
+                        }
+                        return ""
+                    }()
+                    pendingBib003.append((displayPath: displayPath, diag: diag, targetKey: targetKey))
+                }
             }
         }
 
@@ -209,6 +242,52 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                         )
                     )
                 }
+            }
+        }
+
+        // Resolve cross-file `crossref` parents across multiple `.bib` files and emit `BIB003` only when absent everywhere.
+        if !pendingBib003.isEmpty {
+            var firstEntryByLowerKey: [String: BibliographyEntry] = [:]
+            for entry in entries where firstEntryByLowerKey[entry.citeKey.lowercased()] == nil {
+                firstEntryByLowerKey[entry.citeKey.lowercased()] = entry
+            }
+            entries = entries.map { child in
+                guard let crKey = child.crossref?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !crKey.isEmpty,
+                      crKey.lowercased() != child.citeKey.lowercased(),
+                      let parent = firstEntryByLowerKey[crKey.lowercased()]
+                else {
+                    return child
+                }
+                var updated = child
+                if updated.year == nil { updated.year = parent.year }
+                if updated.venue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { updated.venue = parent.venue }
+                if (updated.publisher ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { updated.publisher = parent.publisher }
+                if (updated.volume ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { updated.volume = parent.volume }
+                if (updated.issue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { updated.issue = parent.issue }
+                if (updated.pages ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { updated.pages = parent.pages }
+                if updated.authors.isEmpty && !updated.authorsTruncated {
+                    updated.authors = parent.authors
+                    updated.authorsTruncated = parent.authorsTruncated
+                }
+                return updated
+            }
+            for item in pendingBib003 where firstEntryByLowerKey[item.targetKey.lowercased()] == nil {
+                let diagLine = max(1, item.diag.line)
+                let diagCol = max(1, item.diag.column)
+                loaderDiagnostics.append(
+                    LSPDiagnostic(
+                        code: "BIB003",
+                        category: .structure,
+                        severity: .warning,
+                        message: item.diag.message,
+                        span: TextSpan(
+                            filePath: item.displayPath,
+                            start: TextPosition(line: diagLine, column: diagCol),
+                            end: TextPosition(line: diagLine, column: diagCol)
+                        )
+                    )
+                )
             }
         }
 

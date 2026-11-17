@@ -519,7 +519,7 @@ public struct CSLCitationFormatterEngine: Sendable {
         var runs: [CSLTextRun] = []
 
         // Authors (up to 20 listed; >= 21 lists first 19 + `, ... ` + final author)
-        let authorText = formatAPA7BibliographyAuthors(entry.authors)
+        let authorText = formatAPA7BibliographyAuthors(entry.authors, authorsTruncated: entry.authorsTruncated)
         if !authorText.isEmpty {
             runs.append(CSLTextRun(text: ensureTrailingPeriod(authorText) + " "))
         }
@@ -615,9 +615,15 @@ public struct CSLCitationFormatterEngine: Sendable {
         return runs
     }
 
-    private func formatAPA7BibliographyAuthors(_ authors: [BibAuthor]) -> String {
-        guard !authors.isEmpty else { return "" }
+    private func formatAPA7BibliographyAuthors(_ authors: [BibAuthor], authorsTruncated: Bool = false) -> String {
+        guard !authors.isEmpty else { return authorsTruncated ? "et al." : "" }
         let formatted = authors.map(\.apaShortForm)
+        if authorsTruncated {
+            if formatted.count <= 20 {
+                return "\(formatted.joined(separator: ", ")), et al."
+            }
+            return "\(formatted.prefix(19).joined(separator: ", ")), ... et al."
+        }
         if formatted.count == 1 {
             return formatted[0]
         }
@@ -636,7 +642,7 @@ public struct CSLCitationFormatterEngine: Sendable {
     private func buildIEEEBibliographyRuns(for entry: BibliographyEntry) -> [CSLTextRun] {
         var runs: [CSLTextRun] = []
 
-        let authorsStr = formatIEEEAuthors(entry.authors)
+        let authorsStr = formatIEEEAuthors(entry.authors, authorsTruncated: entry.authorsTruncated)
         if !authorsStr.isEmpty {
             runs.append(CSLTextRun(text: "\(authorsStr), "))
         }
@@ -735,9 +741,18 @@ public struct CSLCitationFormatterEngine: Sendable {
         return runs
     }
 
-    private func formatIEEEAuthors(_ authors: [BibAuthor]) -> String {
-        guard !authors.isEmpty else { return "" }
+    private func formatIEEEAuthors(_ authors: [BibAuthor], authorsTruncated: Bool = false) -> String {
+        guard !authors.isEmpty else { return authorsTruncated ? "et al." : "" }
         let names = authors.map(\.ieeeForm)
+        if authorsTruncated {
+            if names.count == 1 {
+                return "\(names[0]) et al."
+            }
+            if names.count <= 6 {
+                return "\(names.joined(separator: ", ")), et al."
+            }
+            return "\(names[0]) et al."
+        }
         if names.count == 1 {
             return names[0]
         }
@@ -756,7 +771,7 @@ public struct CSLCitationFormatterEngine: Sendable {
     private func buildACMBibliographyRuns(for entry: BibliographyEntry, yearSuffix: String) -> [CSLTextRun] {
         var runs: [CSLTextRun] = []
 
-        let authorsStr = formatACMAuthors(entry.authors)
+        let authorsStr = formatACMAuthors(entry.authors, authorsTruncated: entry.authorsTruncated)
         if !authorsStr.isEmpty {
             runs.append(CSLTextRun(text: ensureTrailingPeriod(authorsStr) + " "))
         }
@@ -814,9 +829,13 @@ public struct CSLCitationFormatterEngine: Sendable {
         return runs
     }
 
-    private func formatACMAuthors(_ authors: [BibAuthor]) -> String {
-        guard !authors.isEmpty else { return "" }
+    private func formatACMAuthors(_ authors: [BibAuthor], authorsTruncated: Bool = false) -> String {
+        guard !authors.isEmpty else { return authorsTruncated ? "et al." : "" }
         let names = authors.map(\.description)
+        if authorsTruncated {
+            if names.count == 1 { return "\(names[0]) et al." }
+            return "\(names.joined(separator: ", ")), et al."
+        }
         if names.count == 1 { return names[0] }
         if names.count == 2 { return "\(names[0]) and \(names[1])" }
         return "\(names.dropLast().joined(separator: ", ")), and \(names[names.count - 1])"
@@ -827,7 +846,7 @@ public struct CSLCitationFormatterEngine: Sendable {
     private func buildNatureBibliographyRuns(for entry: BibliographyEntry) -> [CSLTextRun] {
         var runs: [CSLTextRun] = []
 
-        let authorsStr = formatNatureAuthors(entry.authors)
+        let authorsStr = formatNatureAuthors(entry.authors, authorsTruncated: entry.authorsTruncated)
         if !authorsStr.isEmpty {
             runs.append(CSLTextRun(text: ensureTrailingPeriod(authorsStr) + " "))
         }
@@ -863,9 +882,16 @@ public struct CSLCitationFormatterEngine: Sendable {
         return runs
     }
 
-    private func formatNatureAuthors(_ authors: [BibAuthor]) -> String {
-        guard !authors.isEmpty else { return "" }
+    private func formatNatureAuthors(_ authors: [BibAuthor], authorsTruncated: Bool = false) -> String {
+        guard !authors.isEmpty else { return authorsTruncated ? "et al." : "" }
         let formatted = authors.map(\.apaShortForm)
+        if authorsTruncated {
+            if formatted.count == 1 { return "\(formatted[0]) et al." }
+            if formatted.count <= 5 {
+                return "\(formatted.joined(separator: ", ")), et al."
+            }
+            return "\(formatted[0]) et al."
+        }
         if formatted.count == 1 { return formatted[0] }
         if formatted.count <= 5 {
             return "\(formatted.dropLast().joined(separator: ", ")) & \(formatted[formatted.count - 1])"
@@ -879,7 +905,7 @@ public struct CSLCitationFormatterEngine: Sendable {
     private func buildVancouverBibliographyRuns(for entry: BibliographyEntry) -> [CSLTextRun] {
         var runs: [CSLTextRun] = []
 
-        let authorsStr = formatVancouverAuthors(entry.authors)
+        let authorsStr = formatVancouverAuthors(entry.authors, authorsTruncated: entry.authorsTruncated)
         if !authorsStr.isEmpty {
             runs.append(CSLTextRun(text: ensureTrailingPeriod(authorsStr) + " "))
         }
@@ -922,8 +948,8 @@ public struct CSLCitationFormatterEngine: Sendable {
         return runs
     }
 
-    private func formatVancouverAuthors(_ authors: [BibAuthor]) -> String {
-        guard !authors.isEmpty else { return "" }
+    private func formatVancouverAuthors(_ authors: [BibAuthor], authorsTruncated: Bool = false) -> String {
+        guard !authors.isEmpty else { return authorsTruncated ? "et al." : "" }
         let formatted = authors.map { author -> String in
             let compactInitials = author.givenName
                 .split(whereSeparator: { $0 == " " || $0 == "-" || $0 == "." })
@@ -931,6 +957,9 @@ public struct CSLCitationFormatterEngine: Sendable {
                 .map(String.init)
                 .joined()
             return compactInitials.isEmpty ? author.familyName : "\(author.familyName) \(compactInitials)"
+        }
+        if authorsTruncated {
+            return "\(formatted.prefix(6).joined(separator: ", ")), et al."
         }
         if formatted.count <= 6 {
             return formatted.joined(separator: ", ")
@@ -1007,6 +1036,9 @@ public struct CSLCitationFormatterEngine: Sendable {
             return shortTitle.isEmpty ? "Anonymous" : "\"\(shortTitle)\""
         }
         let f0 = entry.authors[0].familyName
+        if entry.authorsTruncated {
+            return "\(f0) et al."
+        }
         if entry.authors.count == 1 {
             return f0
         }

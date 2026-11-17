@@ -512,6 +512,7 @@ public struct ScholarCLIRunner: Sendable {
 
             let entries: [BibliographyEntry]
             let isDemo: Bool
+            var bibParseErrorLines: [String] = []
 
             if let bibPath = parsed.positionals.first {
                 if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
@@ -524,16 +525,21 @@ public struct ScholarCLIRunner: Sendable {
                 }
                 let rawBib = try readRequiredRegularFile(atPath: bibPath)
                 let bibDoc = try BibTeXCodec().parseDocument(rawBib)
-                if bibDoc.entries.isEmpty
-                    && bibDoc.preambles.isEmpty
-                    && bibDoc.macros.isEmpty
-                    && !rawBib.contains("@")
-                    && Self.hasNonCommentContent(rawBib)
-                {
+                let validEntryCount = bibDoc.entries.filter { !$0.parseError }.count
+                if validEntryCount == 0 {
                     throw ScholarOSError.bibliographyParseFailure(
                         format: "BibTeX",
-                        line: 1,
-                        detail: "No valid BibTeX entries found in '\(bibPath)'."
+                        line: bibDoc.errors.first?.line ?? 1,
+                        detail: bibDoc.errors.first?.message ?? "No valid BibTeX entries found in '\(bibPath)'."
+                    )
+                }
+                for err in bibDoc.errors {
+                    let keyLabel = err.key ?? "<unknown>"
+                    bibParseErrorLines.append(
+                        lang.L(
+                            "[BIB001] \(bibPath):\(err.line): BibTeX parse error in entry '\(keyLabel)' (started at line \(err.startLine), error at line \(err.line)): \(err.message)",
+                            "[BIB001] \(bibPath):\(err.line): BibTeX 条目 '\(keyLabel)' 解析错误（始于第 \(err.startLine) 行，出错于第 \(err.line) 行）：\(err.message)"
+                        )
                     )
                 }
                 entries = bibDoc.entries
@@ -596,8 +602,10 @@ public struct ScholarCLIRunner: Sendable {
             let replayUsesCache = verificationResult.replayUsesCache
             let performedRegistryLookup = verificationResult.performedRegistryLookup
 
+            let hasParseErrorEntries = !bibParseErrorLines.isEmpty
+                || (audit.unverifiedByReason[CitationUnverifiedReasonCode.parseError.rawValue] ?? 0) > 0
             let exitCode: Int32
-            if audit.driftCount > 0 || audit.notFoundCount > 0 || audit.retractedCount > 0 {
+            if audit.driftCount > 0 || audit.notFoundCount > 0 || audit.retractedCount > 0 || hasParseErrorEntries {
                 exitCode = 1
             } else if audit.unverifiedCount > 0 {
                 exitCode = 3
@@ -605,7 +613,7 @@ public struct ScholarCLIRunner: Sendable {
                 exitCode = 0
             }
 
-            var stderrParts = cacheWarningCollector.allLines()
+            var stderrParts = bibParseErrorLines + cacheWarningCollector.allLines()
             if let verboseText = verboseCollector?.joinedStderr(), !verboseText.isEmpty {
                 stderrParts.append(verboseText)
             }
@@ -852,6 +860,8 @@ public struct ScholarCLIRunner: Sendable {
 
             let entries: [BibliographyEntry]
             let isDemo: Bool
+            var formatExitCode: Int32 = 0
+            var formatStderrLines: [String] = []
             if let bibPath = parsed.positionals.first {
                 if parsed.values["--project"] != nil || parsed.bools.contains("--demo") {
                     throw ScholarOSError.invalidCLIArguments(
@@ -859,7 +869,28 @@ public struct ScholarCLIRunner: Sendable {
                     )
                 }
                 let rawBib = try readRequiredRegularFile(atPath: bibPath)
-                entries = try BibTeXCodec().parse(rawBib)
+                let bibDoc = try BibTeXCodec().parseDocument(rawBib)
+                let cleanEntries = bibDoc.entries.filter { !$0.parseError }
+                if cleanEntries.isEmpty {
+                    throw ScholarOSError.bibliographyParseFailure(
+                        format: "BibTeX",
+                        line: bibDoc.errors.first?.line ?? 1,
+                        detail: bibDoc.errors.first?.message ?? "No valid BibTeX entries found in '\(bibPath)'."
+                    )
+                }
+                if !bibDoc.errors.isEmpty {
+                    formatExitCode = 1
+                    for err in bibDoc.errors {
+                        let keyLabel = err.key ?? "<unknown>"
+                        formatStderrLines.append(
+                            lang.L(
+                                "[BIB001] \(bibPath):\(err.line): BibTeX parse error in entry '\(keyLabel)' (started at line \(err.startLine), error at line \(err.line)): \(err.message)",
+                                "[BIB001] \(bibPath):\(err.line): BibTeX 条目 '\(keyLabel)' 解析错误（始于第 \(err.startLine) 行，出错于第 \(err.line) 行）：\(err.message)"
+                            )
+                        )
+                    }
+                }
+                entries = cleanEntries
                 isDemo = false
             } else {
             let opened = try openReadDatabase(
@@ -878,6 +909,7 @@ public struct ScholarCLIRunner: Sendable {
             }
 
             let formatted = CSLCitationFormatterEngine().formatBibliography(entries: entries, style: style)
+            let formatStderr = formatStderrLines.joined(separator: "\n")
             if parsed.bools.contains("--json") {
                 if isDemo {
                     fputs(
@@ -891,11 +923,19 @@ public struct ScholarCLIRunner: Sendable {
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.sortedKeys]
                 let data = try encoder.encode(formatted)
-                return CLIExecutionOutput(stdout: String(decoding: data, as: UTF8.self), exitCode: 0)
+                return CLIExecutionOutput(
+                    stdout: String(decoding: data, as: UTF8.self),
+                    stderr: formatStderr,
+                    exitCode: formatExitCode
+                )
             }
 
             let header = isDemo ? lang.L("[DEMO] Sample unverified dataset\n", "[DEMO / 演示数据] 示例未核查数据集\n") : ""
-            return CLIExecutionOutput(stdout: header + formatted.plainText, exitCode: 0)
+            return CLIExecutionOutput(
+                stdout: header + formatted.plainText,
+                stderr: formatStderr,
+                exitCode: formatExitCode
+            )
 
         case "prisma-stats":
             let parsed = try parseArgs(
@@ -1530,6 +1570,11 @@ public struct ScholarCLIRunner: Sendable {
                 case CitationUnverifiedReasonCode.ambiguous.rawValue: return "检索结果存在歧义"
                 case CitationUnverifiedReasonCode.registeredNoMetadata.rawValue: return "doi.org 表明该 DOI 已注册，但两个元数据源里都没有"
                 case CitationUnverifiedReasonCode.noMatchInSearch.rawValue: return "两个数据源均未找到匹配记录"
+                case CitationUnverifiedReasonCode.parseError.rawValue:
+                    if let info = verdict.auditedEntry.parseErrorInfo {
+                        return "BibTeX 条目解析失败（始于第 \(info.startLine) 行，出错于第 \(info.line) 行）"
+                    }
+                    return "BibTeX 条目解析失败"
                 default: return code
                 }
             }

@@ -26,9 +26,10 @@ public enum FirewallFindingCode: String, Sendable, Codable, Hashable, CaseIterab
     case registryTransportUnavailable = "FW_REGISTRY_OFFLINE"
     case untrustedEmbeddedFirewallTag = "FW_UNTRUSTED_FILE_TAG"
     case ignoredNonArXivEprint = "FW_IGNORED_EPRINT"
+    case bibtexParseError = "FW_BIB_PARSE_ERROR"
 }
 
-/// Closed set of allowed `UNVERIFIED` reason codes defined in M1 item 1.
+/// Closed set of allowed `UNVERIFIED` reason codes defined in M1 item 1 and M2 Settled #3 (`parse_error`).
 public enum CitationUnverifiedReasonCode: String, Sendable, Codable, Hashable, CaseIterable {
     case offline = "offline"
     case transportError = "transport_error"
@@ -40,6 +41,7 @@ public enum CitationUnverifiedReasonCode: String, Sendable, Codable, Hashable, C
     case ambiguous = "ambiguous"
     case registeredNoMetadata = "registered_no_metadata"
     case noMatchInSearch = "no_match_in_search"
+    case parseError = "parse_error"
 }
 
 /// Per-request provenance record stored in `CitationFirewallEntryVerdict.sources`.
@@ -766,7 +768,57 @@ public struct CitationVerificationFirewall: Sendable {
     /// Per M1 item 4 (S41), offline evaluation ONLY returns `.notFound` (`invalid_identifier`),
     /// `.retracted` (`retracted_builtin_list`), or `.unverified` (`offline`).
     /// Sentinel prefixes, placeholder authors, ORCID checksum failures, and year bounds emit `findings` only.
+    private func buildParseErrorVerdict(for entry: BibliographyEntry) -> CitationFirewallEntryVerdict {
+        var findings: [FirewallFinding] = []
+        if let declared = nonEmpty(entry.untrustedDeclaredFirewallClass) {
+            findings.append(
+                FirewallFinding(
+                    code: .untrustedEmbeddedFirewallTag,
+                    severity: .warning,
+                    field: "x-firewall-class",
+                    detail: "File declared x-firewall-class '\(declared)', \(CitationAuditWording.untrustedFileClassMarker)."
+                )
+            )
+        }
+        if let declaredNote = nonEmpty(entry.untrustedDeclaredFirewallNote) {
+            findings.append(
+                FirewallFinding(
+                    code: .untrustedEmbeddedFirewallTag,
+                    severity: .warning,
+                    field: "x-firewall-note",
+                    detail: "File declared x-firewall-note '\(declaredNote)', \(CitationAuditWording.untrustedFileClassMarker)."
+                )
+            )
+        }
+        let detail: String
+        if let info = entry.parseErrorInfo {
+            detail = "BibTeX entry '\(entry.citeKey)' failed to parse (started at line \(info.startLine), error at line \(info.line)): \(info.message)"
+        } else {
+            detail = "BibTeX entry '\(entry.citeKey)' failed to parse."
+        }
+        findings.append(
+            FirewallFinding(
+                code: .bibtexParseError,
+                severity: .criticalBlock,
+                field: "bibtex",
+                detail: detail
+            )
+        )
+        return buildUpdatedVerdict(
+            for: entry,
+            assignedClass: .unverified,
+            reasons: [CitationUnverifiedReasonCode.parseError.rawValue],
+            sources: [],
+            fields: [],
+            findings: findings,
+            overrideNote: "[UNVERIFIED] \(detail)"
+        )
+    }
+
     public func evaluate(_ entry: BibliographyEntry) -> CitationFirewallEntryVerdict {
+        if entry.parseError {
+            return buildParseErrorVerdict(for: entry)
+        }
         var findings: [FirewallFinding] = []
         var hasBuiltInRetractedDOI = false
         var hasInvalidIdentifierSyntax = false
@@ -1719,6 +1771,9 @@ public struct CitationVerificationFirewall: Sendable {
         entry: BibliographyEntry,
         session: any CitationRegistrySession = LiveURLSessionRegistryClient()
     ) async -> CitationFirewallEntryVerdict {
+        if entry.parseError {
+            return buildParseErrorVerdict(for: entry)
+        }
         let offlineVerdict = evaluate(entry)
         if offlineVerdict.firewallClass == .notFound {
             return offlineVerdict
@@ -2914,7 +2969,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         let scored: [(record: RemoteWorkRecord, secondaryMismatches: Int)] = uniqueMatches.map { cand in
             var mismatches = 0
-            if compareAuthorCount(localAuthors: entry.authors, remote: cand).discrepancy != nil {
+            if compareAuthorCount(localAuthors: entry.authors, authorsTruncated: entry.authorsTruncated, remote: cand).discrepancy != nil {
                 mismatches += 1
             }
             if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: sourceName).discrepancy != nil {
@@ -3899,7 +3954,7 @@ public struct CitationVerificationFirewall: Sendable {
             // Disambiguate using remaining local fields (authorCount, exact year, venue); if tied, report `ambiguous`.
             let scored: [(record: RemoteWorkRecord, secondaryMismatches: Int)] = uniqueMatches.map { cand in
                 var mismatches = 0
-                if compareAuthorCount(localAuthors: entry.authors, remote: cand).discrepancy != nil {
+                if compareAuthorCount(localAuthors: entry.authors, authorsTruncated: entry.authorsTruncated, remote: cand).discrepancy != nil {
                     mismatches += 1
                 }
                 if comparePublicationYear(localYear: entry.year, remoteYears: cand.publicationYears, sourceName: "Crossref").discrepancy != nil {
@@ -3990,7 +4045,7 @@ public struct CitationVerificationFirewall: Sendable {
         var driftReasons: [String] = ["doi_mismatch"]
 
         let secondaryChecks: [(CitationFieldDiscrepancy?, String?)] = [
-            compareAuthorCount(localAuthors: entry.authors, remote: matchedCandidate),
+            compareAuthorCount(localAuthors: entry.authors, authorsTruncated: entry.authorsTruncated, remote: matchedCandidate),
             comparePublicationYear(localYear: entry.year, remoteYears: matchedCandidate.publicationYears, sourceName: "Crossref"),
             compareVenue(
                 localVenue: entry.venue,
@@ -4418,10 +4473,11 @@ public struct CitationVerificationFirewall: Sendable {
     /// Author count and `and others` (`et al.`) prefix check.
     func compareAuthorCount(
         localAuthors: [BibAuthor],
+        authorsTruncated: Bool = false,
         remote: RemoteWorkRecord
     ) -> (discrepancy: CitationFieldDiscrepancy?, reason: String?) {
         let namedLocalAuthors = localAuthors.filter { !Self.isEtAlTruncationAuthor($0) }
-        let hasEtAlTruncation = localAuthors.contains(where: Self.isEtAlTruncationAuthor)
+        let hasEtAlTruncation = authorsTruncated || localAuthors.contains(where: Self.isEtAlTruncationAuthor)
 
         // Missing local author list is already reported by `compareFirstAuthor`.
         guard !namedLocalAuthors.isEmpty, !remote.authorSurnames.isEmpty else {
@@ -4709,7 +4765,7 @@ public struct CitationVerificationFirewall: Sendable {
                 sourceName: remote.sourceName
             ),
             compareFirstAuthor(localAuthors: entry.authors, remote: remote),
-            compareAuthorCount(localAuthors: entry.authors, remote: remote),
+            compareAuthorCount(localAuthors: entry.authors, authorsTruncated: entry.authorsTruncated, remote: remote),
             comparePublicationYear(localYear: entry.year, remoteYears: remote.publicationYears, sourceName: remote.sourceName)
         ]
 
