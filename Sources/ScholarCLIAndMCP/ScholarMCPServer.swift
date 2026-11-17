@@ -18,6 +18,7 @@ public struct ScholarMCPServer: Sendable {
     public let defaultRegistryReplaySnapshot: RegistryReplaySnapshot?
     public let isOffline: Bool
     public let noCache: Bool
+    public let defaultLanguage: ScholarLanguage?
     public let inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     public let registryTransport: any CitationRegistrySession
     public let registryClock: any RegistryClock
@@ -38,6 +39,7 @@ public struct ScholarMCPServer: Sendable {
         defaultRegistryReplaySnapshot: RegistryReplaySnapshot? = nil,
         isOffline: Bool = false,
         noCache: Bool = false,
+        defaultLanguage: ScholarLanguage? = nil,
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         registryTransport: any CitationRegistrySession = LiveURLSessionRegistryClient(
             capturedHeaderNames: LiveURLSessionRegistryClient.recordingCapturedHeaderNames
@@ -51,13 +53,14 @@ public struct ScholarMCPServer: Sendable {
         self.defaultRegistryReplaySnapshot = defaultRegistryReplaySnapshot
         self.isOffline = isOffline
         self.noCache = noCache
+        self.defaultLanguage = defaultLanguage
         self.inRunVerdictsByKey = inRunVerdictsByKey
         self.registryTransport = registryTransport
         self.registryClock = registryClock
         self.environment = environment
 
         let env = environment ?? ProcessInfo.processInfo.environment
-        let defaultLang = env["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse) ?? .en
+        let defaultLang = defaultLanguage ?? env["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse) ?? .en
         self.sharedRateLimiter = RegistryRateLimiter(clock: registryClock)
 
         if isOffline || noCache {
@@ -263,6 +266,9 @@ public struct ScholarMCPServer: Sendable {
         if let rawLang = arguments["lang"] as? String,
            let parsed = ScholarLanguage.parse(rawLang) {
             return parsed
+        }
+        if let defaultLanguage {
+            return defaultLanguage
         }
         if let envLang = effectiveEnvironment["SCHOLAROS_LANG"].flatMap(ScholarLanguage.parse) {
             return envLang

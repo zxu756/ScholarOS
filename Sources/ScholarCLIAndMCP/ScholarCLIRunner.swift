@@ -1227,6 +1227,7 @@ public struct ScholarCLIRunner: Sendable {
                 defaultRegistryReplaySnapshot: validatedReplaySnapshot,
                 isOffline: isOffline,
                 noCache: noCache,
+                defaultLanguage: lang,
                 registryTransport: registryTransport,
                 registryClock: registryClock,
                 environment: effectiveEnvironment
