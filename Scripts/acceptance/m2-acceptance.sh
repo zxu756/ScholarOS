@@ -2,10 +2,10 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01–06 scope:
+# Stage 01–07 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
-#   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
+#   - Row 3: 11 manuscripts exit codes (`2503.18124v1` -> `1`, remaining 10 -> `3`) and repeated runs (`--offline --json` and `--offline` text) — byte-for-byte identical
 #   - Row 4: `2506.06594v1` (`thebibliography`, 32 `\bibitem` entries) vs `bibitems.gold.tsv`, DOI extraction, and M1 `UNVERIFIED` (`offline`) verdicts
 #   - Row 5: `2405.13682v5` (`\input{main.bbl}`, 46 entries, `kind == "bbl"`, `0` `CITE404`, `0` `INC002`)
 #   - Row 6: 9 `.bib` manuscripts unique entry counts vs `bibtex-entry-counts.tsv` (0 `BIB001`) + `2410.04196v2` `\citep{bayestune}` `CITE_KEY_CASE`
@@ -15,7 +15,10 @@
 #   - Row 10: Broken `.bib` single-entry error recovery (`bib-recovery/ten.bib`: `e3`, startLine 15, line 22, remaining 9 entries vs `.bbl`, exit codes per Settled #3)
 #   - Row 11: BibTeX field normalization & inheritance (`bib-fields/refs.bib`: `and others` / `authorsTruncated`, `crossref` inheritance & parent uncited suppression, `howpublished` `\url`/`\href`, `BIB003`)
 #   - Row 12: S64 citation/cross-ref command tables, S65 optional arguments, S66 normalized keys & `CITE_KEY_CASE`, S67 parser constructs (`parser-commands`), and Latin-1 / Windows-1252 root/child files (`ENC001`)
-#   - Remaining rows: marked `SKIP (没跑)` for subsequent M2 stages
+#   - Row 13: Unique-key `ERR_UNVERIFIED_CITATION` (`3` keys cited twice each under `--offline` -> `3` diagnostics, `category == "citation"`, `0` structure ERRORs, exit `3`)
+#   - Row 14: Fabricated DOI with `x-firewall-class = {VERIFIED}` under `diagnostics --registry-replay` (`ERR_UNVERIFIED_CITATION`, `未采信` / `not trusted` in `findings`, exit `1`, and `m1-acceptance.sh --row 18` passes)
+#   - Row 15: MCP `scholar_lsp_diagnostics` with `path` across all 11 benchmark manuscripts — byte-for-byte identical JSON to CLI `--json`
+#   - Rows 16–20: marked `SKIP (没跑)` for Stage 08 / dispatcher
 #
 # All runs are strictly `--offline` under an isolated `HOME` / `CFFIXED_USER_HOME` (`lib-cli-guard.sh`).
 # Tectonic and `m2-regen-expected.sh` are never invoked here.
@@ -143,7 +146,7 @@ RUN1_DIR="$WORK_SCRATCH/run1"
 mkdir -p "$RUN1_DIR"
 
 need_run1=0
-for r in 1 2 3; do
+for r in 1 2 3 15; do
     if should_run_row "$r"; then
         need_run1=1
     fi
@@ -421,10 +424,10 @@ PY
     fi
 
     # ==================================================================
-    # Row 3 (Stage 01 determinism part): Run all 11 twice (JSON & text) — byte-for-byte identical
+    # Row 3: 11 manuscripts exit codes (2503.18124 -> 1, remaining 10 -> 3) & repeated runs byte-for-byte identical
     # ==================================================================
     if should_run_row 3; then
-        echo "== [Row 3] 11 篇重复运行（JSON 与文本各两次）：标准输出逐字节相同（退出码规则留给第 7 段） =="
+        echo "== [Row 3] 11 篇退出码（2503.18124 为 1，其余 10 篇为 3）与重复运行（JSON 及文本各两次）逐字节相同 =="
         set +e
         ROW3_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
 import json, os, subprocess, sys
@@ -441,6 +444,7 @@ env.pop("SCHOLAR_CACHE_DIR", None)
 ok_count = 0
 for item in papers:
     pid = item["paper"]
+    exp_rc = 1 if pid.startswith("2503.18124") else 3
     main_tex = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", item["main_file"])
     run1_bytes = open(os.path.join(run1_dir, f"{pid}.json"), "rb").read()
     run1_rc = item["exit_code"]
@@ -463,23 +467,29 @@ for item in papers:
 
     json_obj = json.loads(run1_bytes.decode("utf-8"))
     has_random_id = any("id" in d for d in json_obj.get("diagnostics", []))
-    json_same = (run1_bytes == p_json2.stdout) and (run1_rc == p_json2.returncode) and (run1_rc != 2) and (not has_random_id)
-    txt_same = (p_txt1.stdout == p_txt2.stdout) and (p_txt1.returncode == p_txt2.returncode) and (p_txt1.returncode != 2)
+    json_same = (run1_bytes == p_json2.stdout) and (not has_random_id)
+    txt_same = (p_txt1.stdout == p_txt2.stdout)
+    rc_ok = (
+        run1_rc == exp_rc
+        and p_json2.returncode == exp_rc
+        and p_txt1.returncode == exp_rc
+        and p_txt2.returncode == exp_rc
+    )
 
-    if json_same and txt_same:
+    if json_same and txt_same and rc_ok:
         ok_count += 1
         print(
-            f"  [{pid}] 两次相同 (json_bytes={len(run1_bytes)}, text_bytes={len(p_txt1.stdout)}, "
-            f"observed_exit={run1_rc})"
+            f"  [{pid}] 两次相同且退出码符合期望 (exit={run1_rc}=={exp_rc}, "
+            f"json_bytes={len(run1_bytes)}, text_bytes={len(p_txt1.stdout)})"
         )
     else:
         print(
-            f"  [{pid}] 差异 (json_same={json_same} [{len(run1_bytes)} vs {len(p_json2.stdout)}], "
-            f"text_same={txt_same} [{len(p_txt1.stdout)} vs {len(p_txt2.stdout)}], "
-            f"has_id={has_random_id}, exits={run1_rc}/{p_json2.returncode}/{p_txt1.returncode}/{p_txt2.returncode})"
+            f"  [{pid}] 差异 (expected_exit={exp_rc}, exits={run1_rc}/{p_json2.returncode}/{p_txt1.returncode}/{p_txt2.returncode}, "
+            f"json_same={json_same} [{len(run1_bytes)} vs {len(p_json2.stdout)}], "
+            f"text_same={txt_same} [{len(p_txt1.stdout)} vs {len(p_txt2.stdout)}], has_id={has_random_id})"
         )
 
-print(f"row3_deterministic_papers={ok_count}/11 (note: exit code 0/1/3/2 assertion deferred to Stage 07)")
+print(f"row3_passed_papers={ok_count}/11 (2503.18124v1 exit=1, remaining 10 exit=3)")
 sys.exit(0 if ok_count == 11 else 1)
 PY
 )"
@@ -487,9 +497,9 @@ PY
         set -e
         echo "$ROW3_OUT"
         if [[ "$ROW3_RC" -eq 0 ]]; then
-            record_pass 3 "All 11 manuscripts produce byte-identical JSON and text stdout across repeated --offline runs"
+            record_pass 3 "All 11 manuscripts exit with expected code (2503.18124v1 -> 1, remaining 10 -> 3) and produce byte-identical JSON and text stdout across repeated --offline runs"
         else
-            record_fail 3 "Non-deterministic output or CLI error detected across repeated runs"
+            record_fail 3 "Exit code mismatch or non-deterministic output detected across the 11 manuscripts"
         fi
     fi
 
@@ -1679,12 +1689,436 @@ PY
     fi
 
     # ==================================================================
-    # Rows 13..20: Deferred to subsequent M2 stages (marked 没跑 / SKIPPED)
+    # Row 13: Citation verification separated from structure — 3 keys cited twice each (--offline) -> 3 ERR_UNVERIFIED_CITATION (not 6), category=citation, 0 structure ERRORs
     # ==================================================================
-    declare -a DEFERRED_ROWS_13_20=(
-        "13:引用核查按唯一键汇总 (ERR_UNVERIFIED_CITATION) 与结构诊断分离 — 留给第 7 段"
-        "14:带 x-firewall-class={VERIFIED} 的编造 DOI 在 diagnostics --registry-replay 下拦截与新退出码 — 留给第 7 段"
-        "15:MCP scholar_lsp_diagnostics 支持 path 参数并与 CLI --json 逐字节相同 — 留给第 7 段"
+    if should_run_row 13; then
+        echo "== [Row 13] 引用核查与结构分离：3 个键各引用 2 次（--offline）-> 3 条 ERR_UNVERIFIED_CITATION（非 6 条），category=citation，结构类 ERROR=0 =="
+        set +e
+        ROW13_OUT="$(python3 -I - "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, subprocess, sys
+
+cli_bin, sandbox_home, scratch = sys.argv[1:4]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+r13_dir = os.path.join(scratch, "row13")
+os.makedirs(r13_dir, exist_ok=True)
+
+bib_path = os.path.join(r13_dir, "refs.bib")
+tex_path = os.path.join(r13_dir, "main.tex")
+
+with open(bib_path, "w", encoding="utf-8") as bf:
+    bf.write("""@article{key_alpha,
+  author  = {Alpha, Alice and Beta, Bob},
+  title   = {First Study on Modular Parsing},
+  journal = {Journal of Symbolic Systems},
+  year    = {2021},
+  doi     = {10.1145/3442188.3445922}
+}
+@inproceedings{key_beta,
+  author    = {Gamma, Grace},
+  title     = {Second Study on Cross References},
+  booktitle = {Proceedings of Formal Verification},
+  year      = {2022},
+  doi       = {10.1109/ICSE43902.2021.00042}
+}
+@book{key_gamma,
+  author    = {Delta, Donald},
+  title     = {Third Monograph on Structured Documents},
+  publisher = {Academic Press},
+  year      = {2020}
+}
+""")
+
+with open(tex_path, "w", encoding="utf-8") as tf:
+    tf.write("""\\documentclass{article}
+\\begin{document}
+\\section{Introduction}\\label{sec:intro}
+First citations~\\cite{key_alpha, key_beta, key_gamma}.
+\\section{Follow-up}
+As shown in Section~\\ref{sec:intro}, we revisit~\\cite{key_alpha}, ~\\cite{key_beta}, and~\\cite{key_gamma}.
+\\bibliography{refs}
+\\end{document}
+""")
+
+p_json = subprocess.run(
+    [cli_bin, "diagnostics", tex_path, "--offline", "--json", "--lang", "en"],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+p_zh = subprocess.run(
+    [cli_bin, "diagnostics", tex_path, "--offline", "--lang", "zh"],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+
+failures = []
+
+if p_json.returncode != 3:
+    failures.append(f"expected JSON exit code 3 under --offline (0 structure ERRORs, 3 UNVERIFIED), got {p_json.returncode} (stderr={p_json.stderr!r})")
+if p_zh.returncode != 3:
+    failures.append(f"expected ZH text exit code 3 under --offline, got {p_zh.returncode} (stderr={p_zh.stderr!r})")
+
+try:
+    obj = json.loads(p_json.stdout)
+except Exception as exc:
+    print(f"  FAIL [Row 13]: invalid JSON ({exc}): {p_json.stdout[:200]!r}")
+    sys.exit(1)
+
+if obj.get("mode") != "offline" or obj.get("complete") is not False:
+    failures.append(f"expected mode='offline' and complete=False, got mode={obj.get('mode')!r}, complete={obj.get('complete')!r}")
+
+citations = obj.get("citations", [])
+if [c.get("key") for c in citations] != ["key_alpha", "key_beta", "key_gamma"]:
+    failures.append(f"expected 3 citations [key_alpha, key_beta, key_gamma], got {[c.get('key') for c in citations]}")
+for c in citations:
+    occs = c.get("occurrences", [])
+    ver = c.get("verification") or {}
+    if len(occs) != 2:
+        failures.append(f"key {c.get('key')!r} expected 2 occurrences, got {len(occs)}")
+    if ver.get("verdict") != "UNVERIFIED" or ver.get("reasons") != ["offline"]:
+        failures.append(f"key {c.get('key')!r} expected UNVERIFIED/['offline'], got {ver}")
+
+diags = obj.get("diagnostics", [])
+cite_diags = [d for d in diags if d.get("code") == "ERR_UNVERIFIED_CITATION"]
+struct_errs = [d for d in diags if d.get("category") == "structure" and d.get("severity") == "ERROR"]
+any_errs = [d for d in diags if d.get("severity") == "ERROR"]
+
+if len(cite_diags) != 3:
+    failures.append(f"expected 3 ERR_UNVERIFIED_CITATION (1 per unique key, not 6), got {len(cite_diags)}: {cite_diags}")
+for d in cite_diags:
+    if d.get("category") != "citation":
+        failures.append(f"expected category='citation', got {d}")
+    if d.get("severity") != "WARNING":
+        failures.append(f"expected severity='WARNING' for offline UNVERIFIED, got {d}")
+    if "offline" not in d.get("message", ""):
+        failures.append(f"expected reason 'offline' in message, got {d}")
+for key in ("key_alpha", "key_beta", "key_gamma"):
+    hits = [d for d in cite_diags if f"'{key}'" in d.get("message", "")]
+    if len(hits) != 1:
+        failures.append(f"expected 1 ERR_UNVERIFIED_CITATION for {key}, got {len(hits)}")
+
+if len(struct_errs) != 0:
+    failures.append(f"expected 0 structure ERROR diagnostics, got {struct_errs}")
+if len(any_errs) != 0:
+    failures.append(f"expected 0 ERROR diagnostics overall under offline UNVERIFIED, got {any_errs}")
+
+exp_zh_summary = "引用核查：3 个键，VERIFIED 0，DRIFT 0，NOT_FOUND 0，RETRACTED 0，UNVERIFIED 3（原因：offline 3）；结果不完整"
+if exp_zh_summary not in p_zh.stdout.splitlines():
+    failures.append(f"missing expected ZH summary line {exp_zh_summary!r} in:\n{p_zh.stdout}")
+zh_cite_lines = [ln for ln in p_zh.stdout.splitlines() if "ERR_UNVERIFIED_CITATION" in ln]
+if len(zh_cite_lines) != 3:
+    failures.append(f"expected 3 ERR_UNVERIFIED_CITATION lines in ZH text output, got {len(zh_cite_lines)}")
+
+print(
+    f"  [Row 13] exit={p_json.returncode} | cited_keys=3 (occurrences=2 each, total=6) | "
+    f"ERR_UNVERIFIED_CITATION={len(cite_diags)} (all category=citation, severity=WARNING) | "
+    f"structure_ERROR={len(struct_errs)}"
+)
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL [Row 13]: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW13_RC=$?
+        set -e
+        echo "$ROW13_OUT"
+        if [[ "$ROW13_RC" -eq 0 ]]; then
+            record_pass 13 "3 keys cited twice each under --offline emit 3 unique-key ERR_UNVERIFIED_CITATION diagnostics (category=citation, WARNING), 0 structure ERRORs, and exit code 3"
+        else
+            record_fail 13 "Row 13 unique-key ERR_UNVERIFIED_CITATION or structure ERROR separation check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 14: Fabricated DOI with x-firewall-class={VERIFIED} under diagnostics --registry-replay + m1-acceptance.sh Row 18
+    # ==================================================================
+    if should_run_row 14; then
+        echo "== [Row 14] 带 x-firewall-class={VERIFIED} 的编造 DOI：diagnostics --registry-replay 拦截、findings 含“未采信”、退出码为 1 且 m1-acceptance.sh 第 18 行通过 =="
+        set +e
+        ROW14_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, scratch = sys.argv[1:5]
+reg_dir = os.path.join(repo_root, "Tests", "Fixtures", "registry")
+
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+r14_dir = os.path.join(scratch, "row14")
+os.makedirs(r14_dir, exist_ok=True)
+bib_path = os.path.join(r14_dir, "row14.bib")
+tex_path = os.path.join(r14_dir, "row14.tex")
+
+with open(bib_path, "w", encoding="utf-8") as bf:
+    bf.write("""@article{fake_tampered,
+  author           = {Whitfield, Eleanor and Patel, Raj},
+  title            = {Quantum Gradient Descent in Biological Neural Networks},
+  journal          = {Nature Machine Intelligence},
+  year             = {2026},
+  doi              = {10.1038/fake.2026.99999},
+  x-firewall-class = {VERIFIED}
+}
+""")
+
+with open(tex_path, "w", encoding="utf-8") as tf:
+    tf.write("\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nSee~\\cite{fake_tampered}.\n\\end{document}\n")
+
+failures = []
+
+p_zh = subprocess.run(
+    [cli_bin, "diagnostics", tex_path, "--bib", bib_path, "--registry-replay", reg_dir, "--json", "--lang", "zh"],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+p_en = subprocess.run(
+    [cli_bin, "diagnostics", tex_path, "--bib", bib_path, "--registry-replay", reg_dir, "--json", "--lang", "en"],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+p_txt_zh = subprocess.run(
+    [cli_bin, "diagnostics", tex_path, "--bib", bib_path, "--registry-replay", reg_dir, "--lang", "zh"],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+
+if p_zh.returncode != 1:
+    failures.append(f"expected ZH JSON exit code 1 on NOT_FOUND cited DOI, got {p_zh.returncode} (stderr={p_zh.stderr!r})")
+if p_en.returncode != 1:
+    failures.append(f"expected EN JSON exit code 1 on NOT_FOUND cited DOI, got {p_en.returncode} (stderr={p_en.stderr!r})")
+if p_txt_zh.returncode != 1:
+    failures.append(f"expected ZH text exit code 1 on NOT_FOUND cited DOI, got {p_txt_zh.returncode}")
+if "ERR_UNVERIFIED_CITATION" not in p_txt_zh.stdout:
+    failures.append(f"expected ERR_UNVERIFIED_CITATION in ZH text stdout: {p_txt_zh.stdout}")
+
+zh_obj = json.loads(p_zh.stdout)
+en_obj = json.loads(p_en.stdout)
+
+if zh_obj.get("mode") != "REPLAY" or zh_obj.get("complete") is not True:
+    failures.append(f"expected mode='REPLAY' and complete=True, got mode={zh_obj.get('mode')!r}, complete={zh_obj.get('complete')!r}")
+
+zh_cite_diags = [d for d in zh_obj.get("diagnostics", []) if d.get("code") == "ERR_UNVERIFIED_CITATION"]
+if len(zh_cite_diags) != 1 or zh_cite_diags[0].get("category") != "citation" or zh_cite_diags[0].get("severity") != "ERROR":
+    failures.append(f"expected 1 ERROR ERR_UNVERIFIED_CITATION (category=citation), got {zh_cite_diags}")
+
+zh_ver = ((zh_obj.get("citations") or [{}])[0]).get("verification") or {}
+en_ver = ((en_obj.get("citations") or [{}])[0]).get("verification") or {}
+zh_findings = zh_ver.get("findings") or []
+en_findings = en_ver.get("findings") or []
+
+if zh_ver.get("verdict") != "NOT_FOUND" or zh_ver.get("insertable") is not False:
+    failures.append(f"expected verdict='NOT_FOUND' and insertable=False, got {zh_ver}")
+if not any("未采信" in (f.get("detail") or "") for f in zh_findings):
+    failures.append(f"expected '未采信' in ZH findings, got {zh_findings}")
+if not any("not trusted" in (f.get("detail") or "").lower() for f in en_findings):
+    failures.append(f"expected 'not trusted' in EN findings, got {en_findings}")
+
+# Verify Scripts/acceptance/m1-acceptance.sh --row 18 passes with updated exit-code assertion
+m1_env = dict(env)
+m1_env["SCHOLAR_CLI_BIN"] = cli_bin
+m1_env.pop("SCHOLAR_REPORT_DIR", None)
+m1_script = os.path.join(repo_root, "Scripts", "acceptance", "m1-acceptance.sh")
+p_m1 = subprocess.run(
+    [m1_script, "--row", "18"],
+    env=m1_env,
+    capture_output=True,
+    text=True,
+)
+if p_m1.returncode != 0 or "RESULT [Row 18]: PASS" not in p_m1.stdout:
+    failures.append(f"m1-acceptance.sh --row 18 failed (exit={p_m1.returncode}):\n{p_m1.stdout}\n{p_m1.stderr}")
+
+untrusted_detail_zh = next((f.get("detail") for f in zh_findings if "未采信" in (f.get("detail") or "")), None)
+print(
+    f"  [Row 14] diagnostics_exit={p_zh.returncode} | verdict={zh_ver.get('verdict')} | "
+    f"ERR_UNVERIFIED_CITATION={len(zh_cite_diags)} (ERROR) | finding_zh={untrusted_detail_zh!r} | "
+    f"m1_row18_exit={p_m1.returncode} (PASS)"
+)
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL [Row 14]: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW14_RC=$?
+        set -e
+        echo "$ROW14_OUT"
+        if [[ "$ROW14_RC" -eq 0 ]]; then
+            record_pass 14 "x-firewall-class={VERIFIED} fabricated DOI emits ERROR ERR_UNVERIFIED_CITATION with '未采信' in findings, exits 1, and m1-acceptance.sh Row 18 passes"
+        else
+            record_fail 14 "Row 14 untrusted x-firewall-class={VERIFIED} diagnostics --registry-replay or m1-acceptance.sh Row 18 check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 15: MCP scholar_lsp_diagnostics(path:) across all 11 manuscripts — byte-for-byte identical to CLI --json
+    # ==================================================================
+    if should_run_row 15; then
+        echo "== [Row 15] MCP scholar_lsp_diagnostics(path:) 对 11 篇基准论文：返回对象与 CLI --json 逐字节相同 =="
+        set +e
+        ROW15_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
+import csv, json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, run1_dir = sys.argv[1:5]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+papers_tsv = os.path.join(repo_root, "Benchmarks", "manuscripts", "papers.tsv")
+with open(papers_tsv, encoding="utf-8") as f:
+    rows = list(csv.DictReader(f, delimiter="\t"))
+
+if len(rows) != 11:
+    print(f"  FAIL [Row 15]: expected 11 rows in papers.tsv, got {len(rows)}")
+    sys.exit(1)
+
+failures = []
+cli_json_by_id = {}
+rpc_lines = []
+
+for idx, row in enumerate(rows, start=1):
+    pid = f"{row['arxiv_id']}{row['version']}"
+    main_tex = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", row["main_file"])
+    cached_path = os.path.join(run1_dir, f"{pid}.json")
+    if os.path.isfile(cached_path):
+        raw_cli = open(cached_path, "rb").read()
+    else:
+        p_cli = subprocess.run(
+            [cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"],
+            env=env,
+            capture_output=True,
+        )
+        if p_cli.returncode == 2:
+            failures.append(f"[{pid}] CLI exited 2: {p_cli.stderr.decode('utf-8', 'replace')}")
+            continue
+        raw_cli = p_cli.stdout
+
+    # ScholarOSMain prints result.stdout via Swift print(), appending a single trailing LF on OS stdout.
+    if not raw_cli.endswith(b"\n"):
+        failures.append(f"[{pid}] expected CLI stdout to end with single trailing LF")
+        cli_json_bytes = raw_cli
+    else:
+        cli_json_bytes = raw_cli[:-1]
+
+    cli_json_by_id[idx] = (pid, main_tex, cli_json_bytes)
+    rpc_lines.append(
+        json.dumps({
+            "jsonrpc": "2.0",
+            "id": idx,
+            "method": "tools/call",
+            "params": {
+                "name": "scholar_lsp_diagnostics",
+                "arguments": {"path": main_tex},
+            },
+        })
+    )
+
+p_mcp = subprocess.run(
+    [cli_bin, "mcp", "--offline", "--lang", "en"],
+    input=("\n".join(rpc_lines) + "\n").encode("utf-8"),
+    env=env,
+    capture_output=True,
+)
+if p_mcp.returncode != 0:
+    print(f"  FAIL [Row 15]: MCP server exited {p_mcp.returncode}: {p_mcp.stderr.decode('utf-8', 'replace')}")
+    sys.exit(1)
+
+resp_by_id = {}
+for raw_line in p_mcp.stdout.decode("utf-8").splitlines():
+    line = raw_line.strip()
+    if not line:
+        continue
+    env_obj = json.loads(line)
+    resp_by_id[env_obj.get("id")] = env_obj
+
+matched = 0
+for idx in sorted(cli_json_by_id):
+    pid, main_tex, cli_bytes = cli_json_by_id[idx]
+    env_obj = resp_by_id.get(idx)
+    if not env_obj:
+        failures.append(f"[{pid}] missing JSON-RPC response for id={idx}")
+        continue
+    res_obj = env_obj.get("result") or {}
+    if res_obj.get("isError") is not False:
+        failures.append(f"[{pid}] MCP returned isError != False: {res_obj}")
+        continue
+    content = res_obj.get("content") or []
+    if not content or not isinstance(content[0].get("text"), str):
+        failures.append(f"[{pid}] missing text content in MCP response: {res_obj}")
+        continue
+    mcp_bytes = content[0]["text"].encode("utf-8")
+    if mcp_bytes == cli_bytes:
+        matched += 1
+        print(f"  [{pid}] 逐字节相同 (bytes={len(mcp_bytes)})")
+    else:
+        first_diff = next((i for i, (a, b) in enumerate(zip(cli_bytes, mcp_bytes)) if a != b), min(len(cli_bytes), len(mcp_bytes)))
+        failures.append(
+            f"[{pid}] byte mismatch at offset {first_diff}: cli_bytes={len(cli_bytes)} vs mcp_bytes={len(mcp_bytes)}"
+        )
+
+# Also check --lang zh byte-for-byte parity between CLI --json --lang zh and MCP mcp --lang zh
+zh_pid, zh_tex, _ = cli_json_by_id[6]  # 2503.18124v1
+p_cli_zh = subprocess.run(
+    [cli_bin, "diagnostics", zh_tex, "--offline", "--json", "--lang", "zh"],
+    env=env,
+    capture_output=True,
+)
+cli_zh_bytes = p_cli_zh.stdout[:-1] if p_cli_zh.stdout.endswith(b"\n") else p_cli_zh.stdout
+zh_req = json.dumps({
+    "jsonrpc": "2.0",
+    "id": 101,
+    "method": "tools/call",
+    "params": {"name": "scholar_lsp_diagnostics", "arguments": {"path": zh_tex}},
+}) + "\n"
+p_mcp_zh = subprocess.run(
+    [cli_bin, "mcp", "--offline", "--lang", "zh"],
+    input=zh_req.encode("utf-8"),
+    env=env,
+    capture_output=True,
+)
+mcp_zh_env = json.loads(p_mcp_zh.stdout.decode("utf-8").strip().splitlines()[-1])
+mcp_zh_bytes = mcp_zh_env["result"]["content"][0]["text"].encode("utf-8")
+if mcp_zh_bytes != cli_zh_bytes:
+    failures.append(f"[{zh_pid} --lang zh] byte mismatch: cli_bytes={len(cli_zh_bytes)} vs mcp_bytes={len(mcp_zh_bytes)}")
+else:
+    print(f"  [{zh_pid} --lang zh] 逐字节相同 (bytes={len(mcp_zh_bytes)})")
+
+print(f"row15_mcp_byte_identical_papers={matched}/11")
+if failures or matched != 11:
+    for msg in failures:
+        print(f"  FAIL [Row 15]: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW15_RC=$?
+        set -e
+        echo "$ROW15_OUT"
+        if [[ "$ROW15_RC" -eq 0 ]]; then
+            record_pass 15 "MCP scholar_lsp_diagnostics(path:) returns JSON byte-for-byte identical to CLI --json across all 11 benchmark manuscripts (EN & ZH)"
+        else
+            record_fail 15 "Row 15 MCP scholar_lsp_diagnostics(path:) vs CLI --json byte-for-byte parity check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Rows 16..20: Deferred to Stage 08 / dispatcher (marked 没跑 / SKIPPED)
+    # ==================================================================
+    declare -a DEFERRED_ROWS_16_20=(
         "16:M1 全量回放不退步、禁网单元测试与 milestone 1 — 留给第 5、8 段"
         "17:源码变异检查 (a)-(e) — 留给第 8 段"
         "18:禁网沙箱 milestone 2 与 m2-acceptance.sh / hard-inputs.sh 耗时 — 留给第 8 段"
@@ -1692,7 +2126,7 @@ PY
         "20:跑后环境与工作区洁净检查 — 留给第 8 段"
     )
 
-    for entry in "${DEFERRED_ROWS_13_20[@]}"; do
+    for entry in "${DEFERRED_ROWS_16_20[@]}"; do
         r_num="${entry%%:*}"
         r_desc="${entry#*:}"
         if should_run_row "$r_num"; then
