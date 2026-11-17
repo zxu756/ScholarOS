@@ -2,10 +2,11 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01–02 scope:
+# Stage 01–03 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
 #   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
+#   - Row 7: Hard inputs (`hard-inputs/hard.tex` vs `expected/hard-inputs.json` + all per-syntax `verbatim-skip` fixtures)
 #   - Row 8: Multi-file include graph (`\include`, `\input`, unbraced `\input`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`, child `\bibliography`, commented/verbatim skip)
 #   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `.bbl` entry parsing deferred to Stage 06)
 #   - Row 12 (encoding part): Latin-1 / Windows-1252 root and child files (`ENC001`, content extracted, exit != 2; command/parser checks deferred to Stage 04)
@@ -488,15 +489,14 @@ PY
     fi
 
     # ==================================================================
-    # Rows 4..7: Deferred to subsequent M2 stages
+    # Rows 4..6: Deferred to subsequent M2 stages
     # ==================================================================
-    declare -a DEFERRED_ROWS_4_7=(
+    declare -a DEFERRED_ROWS_4_6=(
         "4:2506.06594v1 (thebibliography, 32 \\bibitem) 解析与 gold 对照 — 留给第 6 段"
         "5:2405.13682v5 (\\input{main.bbl}, 46 条) — 留给第 6 段"
         "6:9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 与 CITE_KEY_CASE — 留给第 4、5 段"
-        "7:难例 hard-inputs/hard.tex 与逐写法无损用例 — 留给第 3 段"
     )
-    for entry in "${DEFERRED_ROWS_4_7[@]}"; do
+    for entry in "${DEFERRED_ROWS_4_6[@]}"; do
         r_num="${entry%%:*}"
         r_desc="${entry#*:}"
         if should_run_row "$r_num"; then
@@ -505,6 +505,117 @@ PY
             record_skip "$r_num" "$r_desc"
         fi
     done
+
+    # ==================================================================
+    # Row 7: Hard inputs (`hard-inputs/hard.tex`) & all per-syntax `verbatim-skip` fixtures
+    # ==================================================================
+    if should_run_row 7; then
+        echo "== [Row 7] 难例 hard-inputs/hard.tex 对照 expected/hard-inputs.json 及逐写法小用例 (verbatim-skip) =="
+        set +e
+        ROW7_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
+import collections, glob, json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home = sys.argv[1:4]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+failures = []
+
+def run_diag(tex_path):
+    proc = subprocess.run([cli_bin, "diagnostics", tex_path, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if proc.returncode == 2:
+        raise RuntimeError(f"CLI exited 2 on {tex_path}: {proc.stderr.decode('utf-8', 'replace')}")
+    return json.loads(proc.stdout.decode("utf-8"))
+
+# 7A. Tectonic-verified hard-inputs/hard.tex vs expected/hard-inputs.json
+hard_tex = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "hard-inputs", "hard.tex")
+hard_exp = json.load(open(os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "expected", "hard-inputs.json"), encoding="utf-8"))
+
+try:
+    hard_obj = run_diag(hard_tex)
+    act_cites = set(c["key"] for c in hard_obj.get("citations", []))
+    exp_cites = set(hard_exp.get("cite_keys", []))
+    act_labels = set(l["key"] for l in hard_obj.get("labels", []))
+    exp_labels = set(hard_exp.get("labels", []))
+    fake_cites = sorted(k for k in act_cites if k.startswith("fake"))
+    fake_labels = sorted(k for k in act_labels if k.startswith("fake"))
+    struct_errs = [
+        d for d in hard_obj.get("diagnostics", [])
+        if d.get("category") == "structure" and d.get("severity") == "ERROR"
+    ]
+    by_code = collections.Counter(d["code"] for d in struct_errs)
+    code_desc = ", ".join(f"{k}={by_code[k]}" for k in sorted(by_code)) if by_code else "0"
+    print(
+        f"  [hard.tex] cite_keys={sorted(act_cites)} (expected={sorted(exp_cites)}) | "
+        f"labels={sorted(act_labels)} (expected={sorted(exp_labels)}) | "
+        f"fake*={(fake_cites + fake_labels) or '无'} | structure_ERROR={len(struct_errs)} ({code_desc})"
+    )
+    if act_cites != exp_cites:
+        failures.append(f"hard.tex cite_keys mismatch: actual={sorted(act_cites)} vs expected={sorted(exp_cites)}")
+    if act_labels != exp_labels:
+        failures.append(f"hard.tex labels mismatch: actual={sorted(act_labels)} vs expected={sorted(exp_labels)}")
+    if fake_cites or fake_labels:
+        failures.append(f"hard.tex leaked fake* keys: cites={fake_cites}, labels={fake_labels}")
+    if len(struct_errs) != 0:
+        failures.append(f"hard.tex expected 0 structure ERRORs, got {len(struct_errs)} ({code_desc})")
+except Exception as exc:
+    failures.append(str(exc))
+
+# 7B. All per-syntax small fixtures in Tests/Fixtures/manuscripts/verbatim-skip/*.expected.json
+skip_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "verbatim-skip")
+exp_files = sorted(glob.glob(os.path.join(skip_dir, "*.expected.json")))
+if len(exp_files) < 19:
+    failures.append(f"Expected at least 19 per-syntax expected files in {skip_dir}, found {len(exp_files)}")
+
+passed_small = 0
+for exp_path in exp_files:
+    spec = json.load(open(exp_path, encoding="utf-8"))
+    slug = spec["case"]
+    tex_path = os.path.join(skip_dir, f"{slug}.tex")
+    exp_c = set(spec["cite_keys"])
+    exp_l = set(spec["labels"])
+    exp_se = int(spec["structure_errors"])
+    try:
+        obj = run_diag(tex_path)
+        act_c = set(c["key"] for c in obj.get("citations", []))
+        act_l = set(l["key"] for l in obj.get("labels", []))
+        fakes = sorted([k for k in act_c if k.startswith("fake")] + [k for k in act_l if k.startswith("fake")])
+        se = [
+            d for d in obj.get("diagnostics", [])
+            if d.get("category") == "structure" and d.get("severity") == "ERROR"
+        ]
+        case_ok = (act_c == exp_c) and (act_l == exp_l) and (not fakes) and (len(se) == exp_se)
+        if case_ok:
+            passed_small += 1
+            print(f"  [{slug}] PASS (cites={sorted(act_c)}, labels={sorted(act_l)}, structure_ERROR={len(se)})")
+        else:
+            failures.append(
+                f"{slug} mismatch: cites={sorted(act_c)}/{sorted(exp_c)}, "
+                f"labels={sorted(act_l)}/{sorted(exp_l)}, fakes={fakes}, structure_ERROR={len(se)}/{exp_se}"
+            )
+            print(f"  [{slug}] FAIL (cites={sorted(act_c)}, labels={sorted(act_l)}, fakes={fakes}, structure_ERROR={len(se)})")
+    except Exception as exc:
+        failures.append(f"{slug}: {exc}")
+
+print(f"row7_per_syntax_fixtures={passed_small}/{len(exp_files)}")
+if failures:
+    for msg in failures:
+        print(f"  FAIL: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW7_RC=$?
+        set -e
+        echo "$ROW7_OUT"
+        if [[ "$ROW7_RC" -eq 0 ]]; then
+            record_pass 7 "hard-inputs/hard.tex and all per-syntax verbatim-skip fixtures match expected sets with 0 fake* leaks and 0 structure ERRORs"
+        else
+            record_fail 7 "hard-inputs/hard.tex or per-syntax verbatim-skip fixtures diverged from expected sets or structure ERROR count"
+        fi
+    fi
 
     # ==================================================================
     # Row 8: Multi-file include graph & child bibliography discovery
