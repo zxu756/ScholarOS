@@ -1453,7 +1453,7 @@ assert any("not trusted" in f.get("detail", "").lower() for f in v_en.get("findi
 
 # 2. diagnostics paper.tex --bib row18.bib
 p_diag = subprocess.run([cli_bin, "diagnostics", tex_path, "--bib", bib_path, "--registry-replay", reg_dir, "--lang", "en"], env=env, capture_output=True, text=True)
-assert p_diag.returncode == 0, p_diag.stderr
+assert p_diag.returncode == 1, (p_diag.returncode, p_diag.stderr)
 assert "ERR_UNVERIFIED_CITATION" in p_diag.stdout, p_diag.stdout
 
 # 3. MCP scholar_cite_key (import into a fresh .scholarproj via scholar_import_bibtex, then call scholar_cite_key)

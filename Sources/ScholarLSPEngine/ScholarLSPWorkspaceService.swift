@@ -113,6 +113,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         var satisfiedMissingBibliographyPaths: Set<String>
         var fallbackBBLFiles: [String: String]
         var inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
+        var skipCitationVerification: Bool
         var cachedWorkspaceAST: MergedManuscriptWorkspaceAST?
         var cachedDiagnosticsReport: WorkspaceDiagnosticsReport?
         var cachedDiagnosticsUTCDay: String?
@@ -240,6 +241,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             satisfiedMissingBibliographyPaths: [],
             fallbackBBLFiles: [:],
             inRunVerdictsByKey: [:],
+            skipCitationVerification: false,
             cachedWorkspaceAST: nil,
             cachedDiagnosticsReport: nil,
             cachedDiagnosticsUTCDay: nil,
@@ -882,6 +884,19 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         withLock { $0.fallbackBBLFiles }
     }
 
+    public var skipCitationVerification: Bool {
+        withLock { $0.skipCitationVerification }
+    }
+
+    public func setSkipCitationVerification(_ flag: Bool) {
+        withLock { st in
+            if st.skipCitationVerification != flag {
+                st.skipCitationVerification = flag
+                st.cachedDiagnosticsReport = nil
+            }
+        }
+    }
+
     public func configureSourceMetadata(
         fileEncodingsByPath: [String: String] = [:],
         bibliographySources: [DiagnosticsBibliographySource]? = [],
@@ -913,7 +928,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
 
     public func buildDiagnosticsJSONReport(
         mode: String,
-        verificationReport: CitationFirewallAuditReport
+        verificationReport: CitationFirewallAuditReport? = nil
     ) -> ScholarDiagnosticsJSONReport {
         withLock { st in
             let ws = ensureWorkspaceAST(&st)
@@ -942,14 +957,22 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             } else if !st.bibliographyRawFiles.isEmpty {
                 effectiveBibSources = st.bibliographyRawFiles.keys.sorted().map { bibPath in
                     let count: Int
-                    if let raw = st.bibliographyRawFiles[bibPath],
-                       let parsed = try? bibCodec.parse(raw)
-                    {
-                        count = Set(parsed.map(\.citeKey)).count
+                    var parseErrs: [DiagnosticsBibliographyParseError] = []
+                    if let raw = st.bibliographyRawFiles[bibPath] {
+                        let parsedDoc = bibCodec.parseDocumentRecovering(raw)
+                        count = Set(parsedDoc.entries.map { $0.citeKey.lowercased() }).count
+                        parseErrs = parsedDoc.errors.map { err in
+                            DiagnosticsBibliographyParseError(
+                                key: err.key,
+                                startLine: err.startLine,
+                                line: err.line,
+                                message: err.message
+                            )
+                        }
                     } else {
                         count = 0
                     }
-                    return DiagnosticsBibliographySource(kind: "bib", path: bibPath, entries: count)
+                    return DiagnosticsBibliographySource(kind: "bib", path: bibPath, entries: count, errors: parseErrs)
                 }
             } else {
                 var docTheBibSources: [DiagnosticsBibliographySource] = []
@@ -983,9 +1006,12 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 }
             }
 
+            let skipVerification = st.skipCitationVerification || verificationReport == nil
             var verdictsByKey = st.inRunVerdictsByKey
-            for verdict in verificationReport.verdicts {
-                verdictsByKey[verdict.citeKey] = verdict
+            if let verificationReport {
+                for verdict in verificationReport.verdicts {
+                    verdictsByKey[verdict.citeKey] = verdict
+                }
             }
 
             let sortedCitedKeys = ws.symbolTable.citationsByKey.keys.sorted()
@@ -1003,7 +1029,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         command: occ.command
                     )
                 }
-                let verif: DiagnosticsCitationVerification? = isDefined
+                let verif: DiagnosticsCitationVerification? = (isDefined && !skipVerification)
                     ? (verdictsByKey[key] ?? verdictsByKey[canonicalKey]).map(DiagnosticsCitationVerification.init(from:))
                     : nil
                 return DiagnosticsCitationEntry(
@@ -1016,22 +1042,27 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 )
             }
 
-            let citedKeySet = Set(sortedCitedKeys)
-            let citedLowerSet = Set(sortedCitedKeys.map { $0.lowercased() })
-            var citedCrossrefParentLowerSet = Set<String>()
-            for key in st.orderedBibliographyKeys where citedKeySet.contains(key) || citedLowerSet.contains(key.lowercased()) {
-                if let cr = st.bibliographyByKey[key]?.crossref?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !cr.isEmpty {
-                    citedCrossrefParentLowerSet.insert(cr.lowercased())
+            let uncitedEntries: [String]
+            if ws.symbolTable.hasNociteAll {
+                uncitedEntries = []
+            } else {
+                let citedKeySet = Set(sortedCitedKeys)
+                let citedLowerSet = Set(sortedCitedKeys.map { $0.lowercased() })
+                var citedCrossrefParentLowerSet = Set<String>()
+                for key in st.orderedBibliographyKeys where citedKeySet.contains(key) || citedLowerSet.contains(key.lowercased()) {
+                    if let cr = st.bibliographyByKey[key]?.crossref?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !cr.isEmpty {
+                        citedCrossrefParentLowerSet.insert(cr.lowercased())
+                    }
                 }
+                uncitedEntries = Set(
+                    st.orderedBibliographyKeys.filter {
+                        !citedKeySet.contains($0)
+                            && !citedLowerSet.contains($0.lowercased())
+                            && !citedCrossrefParentLowerSet.contains($0.lowercased())
+                    }
+                ).sorted()
             }
-            let uncitedEntries = Set(
-                st.orderedBibliographyKeys.filter {
-                    !citedKeySet.contains($0)
-                        && !citedLowerSet.contains($0.lowercased())
-                        && !citedCrossrefParentLowerSet.contains($0.lowercased())
-                }
-            ).sorted()
 
             let labelRecords = ws.symbolTable.allLabelDeclarations
                 .map { decl in
@@ -1068,12 +1099,13 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             }
 
             let verdictCounts: [String: Int] = [
-                CitationFirewallClass.verified.rawValue: verificationReport.verifiedCount,
-                CitationFirewallClass.drift.rawValue: verificationReport.driftCount,
-                CitationFirewallClass.notFound.rawValue: verificationReport.notFoundCount,
-                CitationFirewallClass.retracted.rawValue: verificationReport.retractedCount,
-                CitationFirewallClass.unverified.rawValue: verificationReport.unverifiedCount
+                CitationFirewallClass.verified.rawValue: verificationReport?.verifiedCount ?? 0,
+                CitationFirewallClass.drift.rawValue: verificationReport?.driftCount ?? 0,
+                CitationFirewallClass.notFound.rawValue: verificationReport?.notFoundCount ?? 0,
+                CitationFirewallClass.retracted.rawValue: verificationReport?.retractedCount ?? 0,
+                CitationFirewallClass.unverified.rawValue: verificationReport?.unverifiedCount ?? 0
             ]
+            let isComplete = (!skipVerification) && (verificationReport?.complete == true)
 
             return ScholarDiagnosticsJSONReport(
                 mode: mode,
@@ -1085,7 +1117,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 labels: labelRecords,
                 references: referenceRecords,
                 diagnostics: itemRecords,
-                complete: verificationReport.complete,
+                complete: isComplete,
                 counts: DiagnosticsCountsSummary(
                     byCode: byCode,
                     bySeverity: bySeverity,
@@ -1365,7 +1397,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             sourcesByFile: sources,
             bibliographyFiles: st.bibliographyRawFiles,
             inRunVerdictsByKey: st.inRunVerdictsByKey,
-            extraDiagnostics: st.loaderDiagnostics
+            extraDiagnostics: st.loaderDiagnostics,
+            skipCitationVerification: st.skipCitationVerification
         )
         st.cachedDiagnosticsReport = report
         st.cachedDiagnosticsUTCDay = currentUTCDay

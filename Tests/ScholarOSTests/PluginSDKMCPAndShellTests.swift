@@ -3860,7 +3860,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(citedOnlyDiag.exitCode == 0, "diagnostics must only verify cited entries and skip uncited_unrecorded: stderr=\(citedOnlyDiag.stderr)")
         #expect(!citedOnlyDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
 
-        // 2. Manuscript citing `fake_nonsentinel` (NOT_FOUND) and `wrongyear5` (DRIFT) -> reports ERR_UNVERIFIED_CITATION, exitCode == 0
+        // 2. Manuscript citing `fake_nonsentinel` (NOT_FOUND) and `wrongyear5` (DRIFT) -> reports ERR_UNVERIFIED_CITATION, exitCode == 1
         let fakeTexURL = tempDir.appendingPathComponent("fake-cited.tex")
         try """
         \\documentclass{article}
@@ -3881,13 +3881,13 @@ struct PluginSDKMCPAndShellTests {
                 "en"
             ]
         )
-        #expect(fakeDiag.exitCode == 0)
+        #expect(fakeDiag.exitCode == 1)
         #expect(fakeDiag.stdout.contains("REPLAY"))
         #expect(fakeDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
         #expect(fakeDiag.stdout.contains("fake_nonsentinel"))
         #expect(fakeDiag.stdout.contains("wrongyear5"))
 
-        // 3. `diagnostics --offline`: 0 transport requests, cache untouched, reports ERR_UNVERIFIED_CITATION
+        // 3. `diagnostics --offline`: 0 transport requests, cache untouched, reports ERR_UNVERIFIED_CITATION, exitCode == 3
         final class OfflineSpy: @unchecked Sendable {
             private let lock = NSLock()
             private(set) var count = 0
@@ -3909,7 +3909,7 @@ struct PluginSDKMCPAndShellTests {
         let offlineDiag = await offlineRunner.runWithExitStatus(
             arguments: ["diagnostics", realTexURL.path, "--bib", recheckBibURL.path, "--offline", "--lang", "en"]
         )
-        #expect(offlineDiag.exitCode == 0)
+        #expect(offlineDiag.exitCode == 3)
         #expect(offlineSpy.count == 0)
         #expect(!FileManager.default.fileExists(atPath: offlineCacheDir.appendingPathComponent("registry.sqlite").path))
         #expect(offlineDiag.stdout.contains("ERR_UNVERIFIED_CITATION"))
@@ -4633,11 +4633,11 @@ struct PluginSDKMCPAndShellTests {
 
         let runner = ScholarCLIRunner(environment: env)
 
-        // 1. Offline JSON output structure
+        // 1. Offline JSON output structure (has structure ERRORs CITE404/SYM003/SYM004 -> exit 1 per Settled #2)
         let offlineRes = await runner.runWithExitStatus(
             arguments: ["diagnostics", mainTexURL.path, "--offline", "--json", "--lang", "en"]
         )
-        #expect(offlineRes.exitCode == 0, "stderr=\(offlineRes.stderr)")
+        #expect(offlineRes.exitCode == 1, "stderr=\(offlineRes.stderr)")
 
         let topObj = try #require(
             try JSONSerialization.jsonObject(with: Data(offlineRes.stdout.utf8)) as? [String: Any],
@@ -4792,8 +4792,8 @@ struct PluginSDKMCPAndShellTests {
 
         let run1 = await runner1.runWithExitStatus(arguments: ["diagnostics", benchmarkTex.path, "--offline", "--json", "--lang", "en"])
         let run2 = await runner2.runWithExitStatus(arguments: ["diagnostics", benchmarkTex.path, "--offline", "--json", "--lang", "en"])
-        #expect(run1.exitCode == 0)
-        #expect(run2.exitCode == 0)
+        #expect(run1.exitCode == 1)
+        #expect(run2.exitCode == 1)
         #expect(!run1.stdout.isEmpty)
         #expect(!run1.stdout.contains("\"id\""), "diagnostics --json must not contain random id fields")
         #expect(Data(run1.stdout.utf8) == Data(run2.stdout.utf8), "Two runs of diagnostics --offline --json must be byte-for-byte identical")
@@ -6147,6 +6147,285 @@ struct PluginSDKMCPAndShellTests {
         #expect(empty.arxivID == nil)
         #expect(empty.pmid == nil)
         #expect(empty.url == nil)
+    }
+
+    // MARK: - 23. M2 Stage 07: Diagnostic Categories/Severities, Exit Codes, `--no-verify`, JSON/Text Output & MCP `path`
+
+    @Test("M2 Stage 07 item 1 (S62, S68): diagnostic categories & severity table (SYM004 ERROR, LINT_LABEL_BEFORE_CAPTION WARNING, LINT_* INFO/HINT), \\nocite{*} & crossref uncited suppression, and unique-key ERR_UNVERIFIED_CITATION (DRIFT/NOT_FOUND/RETRACTED ERROR, UNVERIFIED WARNING with reason code)")
+    func m2Stage07Item1DiagnosticCategoriesSeveritiesNociteStarAndUniqueCitationPerKey() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item1")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        // 1A. SYM004 is structure ERROR; LINT_LABEL_BEFORE_CAPTION is lint WARNING; unreferenced float/equation & missing tie are lint INFO/HINT
+        let structLintTex = tempDir.appendingPathComponent("struct_lint.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}\\label{sec:intro}
+        See Figure \\ref{fig:missing_target}.
+        \\begin{figure}
+        \\label{fig:before_cap}
+        \\caption{Early label float}
+        \\end{figure}
+        \\begin{table}
+        \\caption{Caption without label}
+        \\end{table}
+        \\begin{equation}\\label{eq:unused}
+        x = 1
+        \\end{equation}
+        \\end{document}
+        """.write(to: structLintTex, atomically: true, encoding: .utf8)
+
+        let slRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", structLintTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let slObj = try #require(try JSONSerialization.jsonObject(with: Data(slRes.stdout.utf8)) as? [String: Any])
+        let slDiags = try #require(slObj["diagnostics"] as? [[String: Any]])
+
+        let sym004 = slDiags.filter { ($0["code"] as? String) == "SYM004" }
+        #expect(sym004.count == 1)
+        #expect(sym004.first?["category"] as? String == "structure")
+        #expect(sym004.first?["severity"] as? String == "ERROR")
+
+        let lbc = slDiags.filter { ($0["code"] as? String) == "LINT_LABEL_BEFORE_CAPTION" }
+        #expect(lbc.count == 1)
+        #expect(lbc.first?["category"] as? String == "lint")
+        #expect(lbc.first?["severity"] as? String == "WARNING")
+
+        let unrefFloats = slDiags.filter {
+            let code = ($0["code"] as? String) ?? ""
+            return code == "LINT_UNREFERENCED_FLOAT" || code == "LINT_FLOAT_MISSING_LABEL"
+        }
+        #expect(!unrefFloats.isEmpty)
+        for d in unrefFloats {
+            let sev = (d["severity"] as? String) ?? ""
+            #expect(d["category"] as? String == "lint")
+            #expect(sev == "INFO" || sev == "HINT", "Expected INFO or HINT for float lint, got \(d)")
+        }
+
+        // 1B. LINT_UNCITED_BIB_ENTRY: reported even when 0 citations exist; suppressed on crossref parent; suppressed completely when \nocite{*} is present
+        let bibURL = tempDir.appendingPathComponent("nocite_refs.bib")
+        try """
+        @inproceedings{child1,
+          author   = {Alice Smith},
+          title    = {Child Work},
+          crossref = {proc2024}
+        }
+        @proceedings{proc2024,
+          title     = {Proceedings of TestConf},
+          booktitle = {Proceedings of TestConf},
+          year      = {2024}
+        }
+        @article{unused_extra,
+          author  = {Bob Jones},
+          title   = {Unused Paper},
+          journal = {J},
+          year    = {2023}
+        }
+        """.write(to: bibURL, atomically: true, encoding: .utf8)
+
+        let zeroCiteTex = tempDir.appendingPathComponent("zero_cite.tex")
+        try "\\documentclass{article}\\begin{document}\\section{Only Text}\\bibliography{nocite_refs}\\end{document}\n"
+            .write(to: zeroCiteTex, atomically: true, encoding: .utf8)
+        let zeroCiteRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", zeroCiteTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let zeroCiteObj = try #require(try JSONSerialization.jsonObject(with: Data(zeroCiteRes.stdout.utf8)) as? [String: Any])
+        let zeroCiteUncitedDiags = (zeroCiteObj["diagnostics"] as? [[String: Any]] ?? []).filter {
+            ($0["code"] as? String) == "LINT_UNCITED_BIB_ENTRY"
+        }
+        #expect(zeroCiteUncitedDiags.count == 3, "Manuscript with .bib and 0 citations (no \\nocite{*}) must report all 3 uncited entries")
+
+        let nociteStarOnlyTex = tempDir.appendingPathComponent("nocite_star_only.tex")
+        try "\\documentclass{article}\\begin{document}\\nocite{*}\\bibliography{nocite_refs}\\end{document}\n"
+            .write(to: nociteStarOnlyTex, atomically: true, encoding: .utf8)
+        let nociteOnlyRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", nociteStarOnlyTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let nociteOnlyObj = try #require(try JSONSerialization.jsonObject(with: Data(nociteOnlyRes.stdout.utf8)) as? [String: Any])
+        #expect((nociteOnlyObj["uncitedEntries"] as? [String]) == [])
+        #expect(
+            (nociteOnlyObj["diagnostics"] as? [[String: Any]] ?? []).filter {
+                ($0["code"] as? String) == "LINT_UNCITED_BIB_ENTRY"
+            }.isEmpty,
+            "\\nocite{*} must suppress LINT_UNCITED_BIB_ENTRY"
+        )
+
+        let nocitePlusCiteTex = tempDir.appendingPathComponent("nocite_plus_cite.tex")
+        try "\\documentclass{article}\\begin{document}See~\\cite{child1}.\\nocite{*}\\bibliography{nocite_refs}\\end{document}\n"
+            .write(to: nocitePlusCiteTex, atomically: true, encoding: .utf8)
+        let nocitePlusRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", nocitePlusCiteTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let nocitePlusObj = try #require(try JSONSerialization.jsonObject(with: Data(nocitePlusRes.stdout.utf8)) as? [String: Any])
+        #expect((nocitePlusObj["uncitedEntries"] as? [String]) == [])
+        #expect(
+            (nocitePlusObj["diagnostics"] as? [[String: Any]] ?? []).filter {
+                ($0["code"] as? String) == "LINT_UNCITED_BIB_ENTRY"
+            }.isEmpty,
+            "\\cite{child1} + \\nocite{*} must also suppress LINT_UNCITED_BIB_ENTRY"
+        )
+
+        // 1C. ERR_UNVERIFIED_CITATION: 1 per unique key (3 keys x 2 occurrences = 3 diagnostics, NOT 6), UNVERIFIED is WARNING with reason code, DRIFT/NOT_FOUND/RETRACTED are ERROR
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+
+        let threeKeysTwiceTex = tempDir.appendingPathComponent("three_keys_twice.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{One}
+        First mentions~\\cite{real_lecun, wrongyear5, real_nodoi}.
+        \\section{Two}
+        Second mentions~\\cite{real_lecun} and~\\cite{wrongyear5} and~\\cite{real_nodoi}.
+        \\end{document}
+        """.write(to: threeKeysTwiceTex, atomically: true, encoding: .utf8)
+
+        let offThreeRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", threeKeysTwiceTex.path, "--bib", recheckBibURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        let offThreeObj = try #require(try JSONSerialization.jsonObject(with: Data(offThreeRes.stdout.utf8)) as? [String: Any])
+        let offThreeDiags = try #require(offThreeObj["diagnostics"] as? [[String: Any]])
+        let offCiteDiags = offThreeDiags.filter { ($0["code"] as? String) == "ERR_UNVERIFIED_CITATION" }
+        #expect(offCiteDiags.count == 3, "3 keys cited twice each must emit 3 ERR_UNVERIFIED_CITATION diagnostics (1 per key), got \(offCiteDiags.count)")
+        for d in offCiteDiags {
+            #expect(d["category"] as? String == "citation")
+            #expect(d["severity"] as? String == "WARNING", "Offline UNVERIFIED must be WARNING, got \(d)")
+            #expect(((d["message"] as? String) ?? "").contains("offline"), "UNVERIFIED diagnostic must include reason code 'offline': \(d)")
+        }
+
+        // Replay check across VERIFIED, DRIFT, NOT_FOUND, RETRACTED, and UNVERIFIED (no_match_in_search)
+        let allFiveTex = tempDir.appendingPathComponent("all_five.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        A~\\cite{real_lecun} and again~\\cite{real_lecun}.
+        B~\\cite{wrongyear5} and again~\\cite{wrongyear5}.
+        C~\\cite{fake_nonsentinel} and again~\\cite{fake_nonsentinel}.
+        D~\\cite{retracted_wakefield} and again~\\cite{retracted_wakefield}.
+        E~\\cite{real_nodoi} and again~\\cite{real_nodoi}.
+        \\end{document}
+        """.write(to: allFiveTex, atomically: true, encoding: .utf8)
+
+        let replayFiveRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", allFiveTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        let replayFiveObj = try #require(try JSONSerialization.jsonObject(with: Data(replayFiveRes.stdout.utf8)) as? [String: Any])
+        let replayCiteDiags = (replayFiveObj["diagnostics"] as? [[String: Any]] ?? []).filter {
+            ($0["code"] as? String) == "ERR_UNVERIFIED_CITATION"
+        }
+        // 5 keys total, 1 VERIFIED (real_lecun) -> 4 diagnostics total (not 8)
+        #expect(replayCiteDiags.count == 4, "Expected 4 unique-key ERR_UNVERIFIED_CITATION diagnostics, got \(replayCiteDiags.count)")
+        for key in ["wrongyear5", "fake_nonsentinel", "retracted_wakefield"] {
+            let matching = replayCiteDiags.filter { (($0["message"] as? String) ?? "").contains("'\(key)'") }
+            #expect(matching.count == 1, "Expected 1 diagnostic for \(key), got \(matching)")
+            #expect(matching.first?["category"] as? String == "citation")
+            #expect(matching.first?["severity"] as? String == "ERROR", "\(key) must be ERROR")
+        }
+        let nodoiMatching = replayCiteDiags.filter { (($0["message"] as? String) ?? "").contains("'real_nodoi'") }
+        #expect(nodoiMatching.count == 1)
+        #expect(nodoiMatching.first?["category"] as? String == "citation")
+        #expect(nodoiMatching.first?["severity"] as? String == "WARNING")
+        let nodoiMsg = (nodoiMatching.first?["message"] as? String) ?? ""
+        #expect(nodoiMsg.contains("no_match_in_search"))
+    }
+
+    @Test("M2 Stage 07 item 2 (S58, Settled #2): diagnostics exit codes 0/1/3/2 and --no-verify structure-only mode (0 registry lookups, exit 0/1/2 only, states citations not verified in EN & ZH)")
+    func m2Stage07Item2DiagnosticsExitCodesAndNoVerifyMode() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item2")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        final class LookupCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            private(set) var count = 0
+            func bump() { lock.lock(); count += 1; lock.unlock() }
+        }
+        let counter = LookupCounter()
+        let bombTransport = ClosureRegistrySession { _ in
+            counter.bump()
+            throw RegistryTransportError(kind: .transportError, detail: "Must not be called under --no-verify or --offline")
+        }
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let runner = ScholarCLIRunner(registryTransport: bombTransport, registryClock: .immediate, environment: env)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+
+        // 1. Exit 0: 0 structure ERRORs + all cited entries VERIFIED
+        let cleanTex = tempDir.appendingPathComponent("clean.tex")
+        try "\\documentclass{article}\\begin{document}\\section{S}\\label{s}See~\\ref{s} and~\\cite{real_lecun}.\\end{document}\n"
+            .write(to: cleanTex, atomically: true, encoding: .utf8)
+        let r0 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", cleanTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(r0.exitCode == 0)
+
+        // 2. Exit 1: structure ERROR (SYM004) even when cited entry is VERIFIED
+        let structErrTex = tempDir.appendingPathComponent("struct_err.tex")
+        try "\\documentclass{article}\\begin{document}Broken~\\ref{missing_lbl} with verified~\\cite{real_lecun}.\\end{document}\n"
+            .write(to: structErrTex, atomically: true, encoding: .utf8)
+        let r1Struct = await runner.runWithExitStatus(
+            arguments: ["diagnostics", structErrTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(r1Struct.exitCode == 1)
+
+        // Exit 1: cited entry is DRIFT / NOT_FOUND / RETRACTED (0 structure ERRORs)
+        for badKey in ["wrongyear5", "fake_nonsentinel", "retracted_wakefield"] {
+            let badCiteTex = tempDir.appendingPathComponent("bad_\(badKey).tex")
+            try "\\documentclass{article}\\begin{document}See~\\cite{\(badKey)}.\\end{document}\n"
+                .write(to: badCiteTex, atomically: true, encoding: .utf8)
+            let r1Cite = await runner.runWithExitStatus(
+                arguments: ["diagnostics", badCiteTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+            )
+            #expect(r1Cite.exitCode == 1, "Expected exit 1 for cited \(badKey), got \(r1Cite.exitCode)")
+        }
+
+        // 3. Exit 3: 0 structure ERRORs, 0 DRIFT/NOT_FOUND/RETRACTED, but has UNVERIFIED (--offline and replay no_match_in_search)
+        let r3Offline = await runner.runWithExitStatus(
+            arguments: ["diagnostics", cleanTex.path, "--bib", recheckBibURL.path, "--offline", "--lang", "en"]
+        )
+        #expect(r3Offline.exitCode == 3)
+
+        let nodoiTex = tempDir.appendingPathComponent("nodoi.tex")
+        try "\\documentclass{article}\\begin{document}See~\\cite{real_nodoi}.\\end{document}\n"
+            .write(to: nodoiTex, atomically: true, encoding: .utf8)
+        let r3ReplayUnv = await runner.runWithExitStatus(
+            arguments: ["diagnostics", nodoiTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(r3ReplayUnv.exitCode == 3)
+
+        // 4. Exit 2: usage error / missing file / mutually exclusive flags
+        for badArgs in [
+            ["diagnostics"],
+            ["diagnostics", tempDir.appendingPathComponent("nonexistent.tex").path, "--offline"],
+            ["diagnostics", cleanTex.path, "--no-verify", "--offline"],
+            ["diagnostics", cleanTex.path, "--no-verify", "--registry-replay", registryDir.path]
+        ] {
+            let r2 = await runner.runWithExitStatus(arguments: badArgs)
+            #expect(r2.exitCode == 2, "Expected exit 2 for \(badArgs), got \(r2.exitCode)")
+        }
+
+        // 5. --no-verify: 0 lookups, 0 ERR_UNVERIFIED_CITATION, exits 0 on clean structure, exits 1 on structure ERROR, states 未核查引用 / not verified
+        let noVerifyCleanZH = await runner.runWithExitStatus(
+            arguments: ["diagnostics", cleanTex.path, "--bib", recheckBibURL.path, "--no-verify", "--lang", "zh"]
+        )
+        #expect(noVerifyCleanZH.exitCode == 0, "stderr=\(noVerifyCleanZH.stderr)")
+        #expect(counter.count == 0, "--no-verify must not perform any registry lookup")
+        #expect(noVerifyCleanZH.stdout.contains("未核查引用"), "ZH --no-verify output must state '未核查引用': \(noVerifyCleanZH.stdout)")
+        #expect(!noVerifyCleanZH.stdout.contains("ERR_UNVERIFIED_CITATION"))
+
+        let noVerifyCleanEN = await runner.runWithExitStatus(
+            arguments: ["diagnostics", cleanTex.path, "--bib", recheckBibURL.path, "--no-verify", "--lang", "en"]
+        )
+        #expect(noVerifyCleanEN.exitCode == 0)
+        #expect(noVerifyCleanEN.stdout.lowercased().contains("not verified") || noVerifyCleanEN.stdout.contains("--no-verify"))
+        #expect(!noVerifyCleanEN.stdout.contains("ERR_UNVERIFIED_CITATION"))
+
+        let noVerifyErr = await runner.runWithExitStatus(
+            arguments: ["diagnostics", structErrTex.path, "--bib", recheckBibURL.path, "--no-verify", "--lang", "en"]
+        )
+        #expect(noVerifyErr.exitCode == 1, "--no-verify must still exit 1 on structure ERROR")
     }
 }
 

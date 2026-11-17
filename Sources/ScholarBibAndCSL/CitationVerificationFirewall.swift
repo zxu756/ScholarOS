@@ -1552,47 +1552,81 @@ public struct CitationVerificationFirewall: Sendable {
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         language: ScholarLanguage = .en
     ) -> (firewallClass: CitationFirewallClass, auditNote: String) {
+        let resolved = resolveEffectiveStatusWithReasons(
+            for: entry,
+            inRunVerdictsByKey: inRunVerdictsByKey,
+            language: language
+        )
+        return (resolved.firewallClass, resolved.auditNote)
+    }
+
+    /// Resolves effective firewall class, audit note, and reason codes (especially for `UNVERIFIED` diagnostics).
+    public func resolveEffectiveStatusWithReasons(
+        for entry: BibliographyEntry,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
+        language: ScholarLanguage = .en
+    ) -> (firewallClass: CitationFirewallClass, auditNote: String, reasons: [String]) {
         let now = clock.currentDate()
         let offline = evaluate(entry)
+        let defaultUnverifiedReasons = offline.reasons.isEmpty
+            ? [CitationUnverifiedReasonCode.offline.rawValue]
+            : offline.reasons
 
         if let inRun = inRunVerdictsByKey[entry.citeKey] {
             if case .expired(_, _, let dayStr) = inRun.auditedEntry.evaluateFirewallFreshness(at: now) {
                 if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
-                    return (offline.firewallClass, offline.auditNote)
+                    return (offline.firewallClass, offline.auditNote, offline.reasons)
                 }
-                return (.unverified, BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language))
+                return (
+                    .unverified,
+                    BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language),
+                    defaultUnverifiedReasons
+                )
             }
             if offline.firewallClass == .retracted || offline.firewallClass == .notFound {
                 if !inRun.sources.isEmpty {
-                    return (inRun.firewallClass, inRun.auditNote)
+                    let reasons = (inRun.firewallClass == .unverified && inRun.reasons.isEmpty)
+                        ? defaultUnverifiedReasons
+                        : inRun.reasons
+                    return (inRun.firewallClass, inRun.auditNote, reasons)
                 }
-                return (offline.firewallClass, offline.auditNote)
+                return (offline.firewallClass, offline.auditNote, offline.reasons)
             }
             if inRun.firewallClass == .verified {
                 if inRun.insertable && !inRun.sources.isEmpty {
-                    return (.verified, inRun.auditNote)
+                    return (.verified, inRun.auditNote, inRun.reasons)
                 }
-                return (offline.firewallClass, offline.auditNote)
+                return (offline.firewallClass, offline.auditNote, defaultUnverifiedReasons)
             }
-            return (inRun.firewallClass, inRun.auditNote)
+            let reasons = (inRun.firewallClass == .unverified && inRun.reasons.isEmpty)
+                ? defaultUnverifiedReasons
+                : inRun.reasons
+            return (inRun.firewallClass, inRun.auditNote, reasons)
         }
 
         switch entry.evaluateFirewallFreshness(at: now) {
         case .valid(let storedClass, let source, let dayStr):
             if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
-                return (offline.firewallClass, offline.auditNote)
+                return (offline.firewallClass, offline.auditNote, offline.reasons)
             }
             let note = nonEmpty(entry.firewallAuditNote) ?? "[\(storedClass.rawValue)] Verified via \(source) on \(dayStr)."
-            return (storedClass, note)
+            return (storedClass, note, [])
 
         case .expired(_, _, let dayStr):
             if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
-                return (offline.firewallClass, offline.auditNote)
+                return (offline.firewallClass, offline.auditNote, offline.reasons)
             }
-            return (.unverified, BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language))
+            return (
+                .unverified,
+                BibliographyEntry.expiredVerdictNotice(fetchedAtUTC: dayStr, language: language),
+                defaultUnverifiedReasons
+            )
 
         case .missingProvenance:
-            return (offline.firewallClass, offline.auditNote)
+            let reasons = (offline.firewallClass == .unverified && offline.reasons.isEmpty)
+                ? defaultUnverifiedReasons
+                : offline.reasons
+            return (offline.firewallClass, offline.auditNote, reasons)
         }
     }
 

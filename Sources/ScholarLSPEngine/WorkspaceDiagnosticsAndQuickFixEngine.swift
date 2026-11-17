@@ -149,7 +149,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         sourcesByFile: [String: String] = [:],
         bibliographyFiles: [String: String] = [:],
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
-        extraDiagnostics: [LSPDiagnostic] = []
+        extraDiagnostics: [LSPDiagnostic] = [],
+        skipCitationVerification: Bool = false
     ) -> WorkspaceDiagnosticsReport {
         var diagnostics: [LSPDiagnostic] = []
         var actions: [LSPCodeAction] = []
@@ -170,7 +171,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             workspace: workspace,
             bibliography: bibliography,
             sourcesByFile: resolvedSources,
-            inRunVerdictsByKey: inRunVerdictsByKey
+            inRunVerdictsByKey: inRunVerdictsByKey,
+            skipCitationVerification: skipCitationVerification
         )
         diagnostics.append(contentsOf: fwDiags)
         actions.append(contentsOf: fwActions)
@@ -185,7 +187,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         diagnostics.append(contentsOf: lintDiags)
         actions.append(contentsOf: lintActions)
 
-        // Deduplicate & deterministically order diagnostics (errors first, then file/line/column)
+        // Deduplicate & deterministically order diagnostics
         let dedupedDiagnostics = deduplicateAndSortDiagnostics(diagnostics)
         return WorkspaceDiagnosticsReport(diagnostics: dedupedDiagnostics, codeActions: actions)
     }
@@ -194,12 +196,14 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         in workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry] = [],
         filePathFilter: String? = nil,
-        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:]
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
+        skipCitationVerification: Bool = false
     ) -> [LSPDiagnostic] {
         let all = analyze(
             workspace: workspace,
             bibliography: bibliography,
-            inRunVerdictsByKey: inRunVerdictsByKey
+            inRunVerdictsByKey: inRunVerdictsByKey,
+            skipCitationVerification: skipCitationVerification
         ).diagnostics
         guard let filter = filePathFilter else { return all }
         return all.filter { $0.span.filePath == filter }
@@ -335,7 +339,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         workspace: MergedManuscriptWorkspaceAST,
         bibliography: [BibliographyEntry],
         sourcesByFile: [String: String],
-        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict],
+        skipCitationVerification: Bool
     ) -> ([LSPDiagnostic], [LSPCodeAction]) {
         var diagnostics: [LSPDiagnostic] = []
         var actions: [LSPCodeAction] = []
@@ -350,6 +355,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             .map(\.citeKey)
         let allCiteKeys = bibByKey.keys.sorted()
         var reportedCaseMismatchKeys = Set<String>()
+        var reportedCitationKeys = Set<String>()
 
         for occ in workspace.symbolTable.allCitationOccurrences {
             let entry: BibliographyEntry
@@ -400,6 +406,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "CITE404",
+                        category: .structure,
                         severity: .error,
                         message: "Cited key '\(occ.citeKey)' does not exist in workspace bibliography.",
                         span: occ.span,
@@ -436,36 +443,50 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                 continue
             }
 
-            let (effectiveClass, verdictNote) = resolveEffectiveFirewall(
+            if skipCitationVerification {
+                continue
+            }
+
+            let (effectiveClass, verdictNote, effectiveReasons) = resolveEffectiveFirewallWithReasons(
                 for: entry,
+                citedKey: occ.citeKey,
                 inRunVerdictsByKey: inRunVerdictsByKey
             )
+            let isFirstForKey = reportedCitationKeys.insert(entry.citeKey.lowercased()).inserted
 
             switch effectiveClass {
             case .verified:
                 break
 
             case .drift:
-                diagnostics.append(
-                    LSPDiagnostic(
-                        code: "ERR_UNVERIFIED_CITATION",
-                        severity: .error,
-                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is DRIFT (\(verdictNote)).",
-                        span: occ.span,
-                        suggestedFix: "Reconcile title/year/author fields against registry metadata or remove citation '\(occ.citeKey)'."
+                if isFirstForKey {
+                    diagnostics.append(
+                        LSPDiagnostic(
+                            code: "ERR_UNVERIFIED_CITATION",
+                            category: .citation,
+                            severity: .error,
+                            message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is DRIFT (\(verdictNote)).",
+                            span: occ.span,
+                            suggestedFix: "Reconcile title/year/author fields against registry metadata or remove citation '\(occ.citeKey)'."
+                        )
                     )
-                )
+                }
 
             case .unverified:
-                diagnostics.append(
-                    LSPDiagnostic(
-                        code: "ERR_UNVERIFIED_CITATION",
-                        severity: .error,
-                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is UNVERIFIED (\(verdictNote)). Citation Firewall blocks manuscript export until verified.",
-                        span: occ.span,
-                        suggestedFix: "Verify citation against external registries or remove unverified citation."
+                if isFirstForKey {
+                    let reasonCodes = effectiveReasons.isEmpty ? ["offline"] : effectiveReasons
+                    let reasonTag = reasonCodes.joined(separator: ", ")
+                    diagnostics.append(
+                        LSPDiagnostic(
+                            code: "ERR_UNVERIFIED_CITATION",
+                            category: .citation,
+                            severity: .warning,
+                            message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is UNVERIFIED [reason=\(reasonTag)] (\(verdictNote)).",
+                            span: occ.span,
+                            suggestedFix: "Verify citation against external registries or remove unverified citation."
+                        )
                     )
-                )
+                }
                 if let removeAction = buildRemoveCitedKeyCodeAction(
                     occurrence: occ,
                     reasonLabel: "unverified citation",
@@ -477,15 +498,18 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
 
             case .notFound, .retracted:
                 let statusLabel = effectiveClass.rawValue
-                diagnostics.append(
-                    LSPDiagnostic(
-                        code: "ERR_UNVERIFIED_CITATION",
-                        severity: .error,
-                        message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is \(statusLabel) (\(verdictNote)).",
-                        span: occ.span,
-                        suggestedFix: "Remove \(statusLabel.lowercased()) citation '\(occ.citeKey)' immediately."
+                if isFirstForKey {
+                    diagnostics.append(
+                        LSPDiagnostic(
+                            code: "ERR_UNVERIFIED_CITATION",
+                            category: .citation,
+                            severity: .error,
+                            message: "[ERR_UNVERIFIED_CITATION] Citation '\(occ.citeKey)' is \(statusLabel) (\(verdictNote)).",
+                            span: occ.span,
+                            suggestedFix: "Remove \(statusLabel.lowercased()) citation '\(occ.citeKey)' immediately."
+                        )
                     )
-                )
+                }
                 if let removeAction = buildRemoveCitedKeyCodeAction(
                     occurrence: occ,
                     reasonLabel: "\(statusLabel.lowercased()) citation",
@@ -505,6 +529,18 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     ) -> (CitationFirewallClass, String) {
         firewall.resolveEffectiveStatus(for: entry, inRunVerdictsByKey: inRunVerdictsByKey)
+    }
+
+    private func resolveEffectiveFirewallWithReasons(
+        for entry: BibliographyEntry,
+        citedKey: String,
+        inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
+    ) -> (CitationFirewallClass, String, [String]) {
+        var merged = inRunVerdictsByKey
+        if merged[entry.citeKey] == nil, let alt = inRunVerdictsByKey[citedKey] {
+            merged[entry.citeKey] = alt
+        }
+        return firewall.resolveEffectiveStatusWithReasons(for: entry, inRunVerdictsByKey: merged)
     }
 
     // MARK: - Layer 5: Structural Academic Lint Rules & Quick-Fixes
@@ -566,7 +602,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "LINT_UNREFERENCED_FLOAT",
-                        severity: .warning,
+                        category: .lint,
+                        severity: .info,
                         message: "Float '\(env.name)' with label '\(lbl)' is never referenced in the manuscript text.",
                         span: env.span,
                         suggestedFix: "Reference it in prose via '\\cref{\(lbl)}' or '\\ref{\(lbl)}'."
@@ -582,6 +619,7 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                 diagnostics.append(
                     LSPDiagnostic(
                         code: "LINT_UNREFERENCED_EQUATION",
+                        category: .lint,
                         severity: .info,
                         message: "Numbered equation label '\(lblRecord.key)' is never referenced via \\eqref or \\cref.",
                         span: lblRecord.span,
@@ -611,8 +649,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             }
         }
 
-        // 5C. Uncited bibliography entries (`LINT_UNCITED_BIB_ENTRY`)
-        if enableUncitedBibLint && !bibliography.isEmpty && !workspace.symbolTable.allCitationOccurrences.isEmpty {
+        // 5C. Uncited bibliography entries (`LINT_UNCITED_BIB_ENTRY`) — suppressed when `\nocite{*}` is present or for `crossref` parents of cited entries
+        if enableUncitedBibLint && !bibliography.isEmpty && !workspace.symbolTable.hasNociteAll {
             let citedLowerBibKeys = Set(citedBibKeys.map { $0.lowercased() })
             var citedCrossrefParentLowerKeys = Set<String>()
             for entry in bibliography where citedBibKeys.contains(entry.citeKey) || citedLowerBibKeys.contains(entry.citeKey.lowercased()) {
@@ -697,11 +735,12 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                         // Evaluate closed float!
                         if let cap = closed.firstCaption, let lbl = closed.firstLabel {
                             if lbl.byteRange.lowerBound < cap.byteRange.lowerBound {
-                                // CRITICAL LaTeX bug: `\label` placed BEFORE `\caption`!
+                                // `\label` placed BEFORE `\caption`: WARNING (per M2 item 6 table)
                                 diags.append(
                                     LSPDiagnostic(
                                         code: "LINT_LABEL_BEFORE_CAPTION",
-                                        severity: .error,
+                                        category: .lint,
+                                        severity: .warning,
                                         message: "'\\label{\(lbl.argumentText)}' appears before '\\caption' inside '\(closed.envName)'; in LaTeX this binds \\ref to the section counter instead of the float number!",
                                         span: lbl.span,
                                         suggestedFix: "Move '\\label{\(lbl.argumentText)}' immediately after '\\caption{...}'."
@@ -746,7 +785,8 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
                             diags.append(
                                 LSPDiagnostic(
                                     code: "LINT_FLOAT_MISSING_LABEL",
-                                    severity: .warning,
+                                    category: .lint,
+                                    severity: .info,
                                     message: "Float '\(closed.envName)' has a \\caption but no \\label{...} for cross-referencing.",
                                     span: cap.span,
                                     suggestedFix: "Insert '\\label{\(slug)}' after '\\caption'."

@@ -486,8 +486,18 @@ extension LSPDiagnostic {
         }
         if code == "ERR_UNVERIFIED_CITATION" {
             let key = Self.extractCiteKey(from: message) ?? "该条目"
+            let reasonSuffix: String = {
+                if let r = message.range(of: "[reason="),
+                   let end = message[r.upperBound...].firstIndex(of: "]") {
+                    let raw = String(message[r.upperBound..<end]).trimmingCharacters(in: .whitespaces)
+                    if !raw.isEmpty {
+                        return "（原因：\(raw)）"
+                    }
+                }
+                return ""
+            }()
             if let expiredDay = Self.extractExpiredFetchedDay(from: message) {
-                return "引文防火墙提醒：\(key) 结论是 \(expiredDay) 取得的，已过期，需要重新核查 (ERR_UNVERIFIED_CITATION)。"
+                return "引文防火墙提醒：\(key) 结论是 \(expiredDay) 取得的，已过期，需要重新核查\(reasonSuffix) (ERR_UNVERIFIED_CITATION)。"
             }
             if message.contains("RETRACTED") {
                 if message.contains("built-in list") {
@@ -501,7 +511,13 @@ extension LSPDiagnostic {
             if message.contains("DRIFT") {
                 return "引文防火墙拦截：\(key) 本地元数据与注册库记录不符 (DRIFT)。"
             }
-            return "引文防火墙提醒：\(key) 尚未通过外部注册库核查 (ERR_UNVERIFIED_CITATION)。"
+            return "引文防火墙提醒：\(key) 尚未通过外部注册库核查\(reasonSuffix) (ERR_UNVERIFIED_CITATION)。"
+        }
+        if code == "LINT_LABEL_BEFORE_CAPTION" {
+            return "图表环境中 \\label 出现在 \\caption 之前 (LINT_LABEL_BEFORE_CAPTION)。"
+        }
+        if code == "LINT_FLOAT_MISSING_LABEL" {
+            return "图表环境包含 \\caption 但缺少 \\label 标签 (LINT_FLOAT_MISSING_LABEL)。"
         }
         if code.hasPrefix("CITE") && message.localizedCaseInsensitiveContains("drift") {
             return "引文元数据漂移提醒：建议核对会议录或期刊字段。"

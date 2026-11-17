@@ -283,12 +283,13 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--bib", "--registry-replay"],
-                boolFlags: ["--demo", "--offline", "--no-cache", "--json"],
+                boolFlags: ["--demo", "--offline", "--no-verify", "--no-cache", "--json"],
                 maxPositionals: 1,
                 lang: lang
             )
             let emitJSON = parsed.bools.contains("--json")
             let isOffline = parsed.bools.contains("--offline")
+            let noVerify = parsed.bools.contains("--no-verify")
             let noCache = parsed.bools.contains("--no-cache")
             let replayDir = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let replayDir, replayDir.isEmpty {
@@ -304,6 +305,14 @@ public struct ScholarCLIRunner: Sendable {
                     lang.L(
                         "Cannot combine --offline with --registry-replay.",
                         "不能将 --offline 与 --registry-replay 同时使用。"
+                    )
+                )
+            }
+            if noVerify && (isOffline || replayDir != nil) {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Cannot combine --no-verify with --offline or --registry-replay.",
+                        "不能将 --no-verify 与 --offline 或 --registry-replay 同时使用。"
                     )
                 )
             }
@@ -345,8 +354,8 @@ public struct ScholarCLIRunner: Sendable {
                 let opened = try openReadDatabase(
                     parsed: parsed,
                     usage: lang.L(
-                        "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir>] [--no-cache] [--json] | --project <dir.scholarproj> | --demo",
-                        "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录>] [--no-cache] [--json] | --project <dir.scholarproj> | --demo"
+                        "Usage: scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir> | --no-verify] [--no-cache] [--json] | --project <dir.scholarproj> | --demo",
+                        "用法：scholaros diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录> | --no-verify] [--no-cache] [--json] | --project <dir.scholarproj> | --demo"
                     ),
                     lang: lang
                 )
@@ -356,6 +365,46 @@ public struct ScholarCLIRunner: Sendable {
                     : URL(fileURLWithPath: parsed.values["--project"] ?? "project.scholarproj").lastPathComponent
                 lsp = try makeLSPService(from: opened.db, bibliographySourcePath: sourceLabel)
                 isDemo = opened.isDemo
+            }
+
+            if noVerify {
+                lsp.setSkipCitationVerification(true)
+                let diagReport = lsp.diagnosticsReport()
+                let hasStructureError = diagReport.diagnostics.contains {
+                    $0.category == .structure && $0.severity == .error
+                }
+                let exitCode: Int32 = hasStructureError ? 1 : 0
+                if emitJSON {
+                    if isDemo {
+                        fputs(
+                            lang.L(
+                                "[DEMO] Using built-in sample unverified dataset\n",
+                                "[DEMO / 演示数据] 当前使用内置未核查示例数据集\n"
+                            ),
+                            stderr
+                        )
+                    }
+                    let jsonReport = lsp.buildDiagnosticsJSONReport(mode: "no-verify", verificationReport: nil)
+                    let data = try jsonReport.encodeJSONData(sortedKeys: true)
+                    return CLIExecutionOutput(
+                        stdout: String(decoding: data, as: UTF8.self),
+                        stderr: "",
+                        exitCode: exitCode
+                    )
+                }
+                let citedCount = lsp.symbolTable.citationsByKey.count
+                return CLIExecutionOutput(
+                    stdout: try formatDiagnostics(
+                        diagReport,
+                        asJSON: false,
+                        isDemo: isDemo,
+                        noVerify: true,
+                        noVerifyCitedKeyCount: citedCount,
+                        lang: lang
+                    ),
+                    stderr: "",
+                    exitCode: exitCode
+                )
             }
 
             let cacheWarningCollector = CacheWarningCollector()
@@ -385,6 +434,19 @@ public struct ScholarCLIRunner: Sendable {
                 }
             )
             lsp.applyVerificationReport(verificationResult.report)
+            let diagReport = lsp.diagnosticsReport()
+            let audit = verificationResult.report
+            let hasStructureError = diagReport.diagnostics.contains {
+                $0.category == .structure && $0.severity == .error
+            }
+            let exitCode: Int32
+            if hasStructureError || audit.driftCount > 0 || audit.notFoundCount > 0 || audit.retractedCount > 0 {
+                exitCode = 1
+            } else if audit.unverifiedCount > 0 {
+                exitCode = 3
+            } else {
+                exitCode = 0
+            }
 
             var stderrLines = cacheWarningCollector.allLines()
             if emitJSON && verificationResult.isReplay {
@@ -410,12 +472,12 @@ public struct ScholarCLIRunner: Sendable {
                 return CLIExecutionOutput(
                     stdout: String(decoding: data, as: UTF8.self),
                     stderr: stderrLines.joined(separator: "\n"),
-                    exitCode: 0
+                    exitCode: exitCode
                 )
             }
             return CLIExecutionOutput(
                 stdout: try formatDiagnostics(
-                    lsp.diagnosticsReport(),
+                    diagReport,
                     asJSON: false,
                     isDemo: isDemo,
                     isReplay: verificationResult.isReplay,
@@ -423,7 +485,7 @@ public struct ScholarCLIRunner: Sendable {
                     lang: lang
                 ),
                 stderr: stderrLines.joined(separator: "\n"),
-                exitCode: 0
+                exitCode: exitCode
             )
 
         case "verify-citations":
@@ -1631,6 +1693,8 @@ public struct ScholarCLIRunner: Sendable {
         isDemo: Bool,
         isReplay: Bool = false,
         replayUsesCache: Bool = false,
+        noVerify: Bool = false,
+        noVerifyCitedKeyCount: Int = 0,
         lang: ScholarLanguage = .en
     ) throws -> String {
         if asJSON {
@@ -1663,7 +1727,17 @@ public struct ScholarCLIRunner: Sendable {
                 "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
             }.joined(separator: "\n")
         }
-        return (headerLines + [body]).joined(separator: "\n")
+        var outLines = headerLines + [body]
+        if noVerify {
+            let keyNoun = noVerifyCitedKeyCount == 1 ? "key" : "keys"
+            outLines.append(
+                lang.L(
+                    "Citation verification: skipped (--no-verify; citations not verified, \(noVerifyCitedKeyCount) cited \(keyNoun))",
+                    "引用核查：未核查引用（已指定 --no-verify，共 \(noVerifyCitedKeyCount) 个引用键）"
+                )
+            )
+        }
+        return outLines.joined(separator: "\n")
     }
 
     private func makeLSPService(
@@ -1717,8 +1791,8 @@ public struct ScholarCLIRunner: Sendable {
 
             Direct File Commands:
               outline <paper.tex> [--json]                           Print numbered section/subsection outline
-              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir>] [--no-cache] [--json]
-                                                                     Run LaTeX CST, cross-reference & online cited-entry checks
+              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <dir> | --no-verify] [--no-cache] [--json]
+                                                                     Run LaTeX CST, cross-reference & online cited-entry checks (exit 0/1/3/2; --no-verify structure only, exit 0/1/2)
               verify-citations <refs.bib> [options]                  Verify citations online (exit 0 all VERIFIED, 1 DRIFT/NOT_FOUND/RETRACTED, 3 UNVERIFIED, 2 error)
                 --offline                                            Check identifier syntax & built-in retraction hints without network or cache access
                 --no-cache                                           Skip reading and writing the SQLite response cache for this run
@@ -1755,8 +1829,8 @@ public struct ScholarCLIRunner: Sendable {
 
             单文件直读命令：
               outline <paper.tex> [--json]                           提取 LaTeX 章节与子章节编号大纲
-              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录>] [--no-cache] [--json]
-                                                                     执行 LaTeX 语法树、交叉引用与被引用条目核查诊断
+              diagnostics <paper.tex> [--bib <refs.bib>] [--offline | --registry-replay <目录> | --no-verify] [--no-cache] [--json]
+                                                                     执行 LaTeX 语法树、交叉引用与被引用条目核查诊断（退出码 0/1/3/2；--no-verify 仅做结构检查，退出码 0/1/2）
               verify-citations <refs.bib> [选项]                     默认联网核查参考文献（退出码：全 VERIFIED 为 0，含 DRIFT/NOT_FOUND/RETRACTED 为 1，仅余 UNVERIFIED 为 3，错误为 2）
                 --offline                                            仅检查标识符语法与内置撤稿名单，不发任何网络请求且不读写缓存
                 --no-cache                                           本次运行不读取也不写入 SQLite 响应缓存

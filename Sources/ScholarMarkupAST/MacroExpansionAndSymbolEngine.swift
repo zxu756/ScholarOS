@@ -280,6 +280,7 @@ public struct ManuscriptSymbolTable: Sendable, Codable, Hashable {
     public let unresolvedCrossReferences: [CrossReferenceOccurrenceRecord]
     public let environments: [EnvironmentSymbolRecord]
     public let customCommandsUsed: Set<String>
+    public let hasNociteAll: Bool
 
     public init(
         macrosByName: [String: MacroDefinitionRecord],
@@ -293,7 +294,8 @@ public struct ManuscriptSymbolTable: Sendable, Codable, Hashable {
         crossReferences: [CrossReferenceOccurrenceRecord],
         unresolvedCrossReferences: [CrossReferenceOccurrenceRecord],
         environments: [EnvironmentSymbolRecord],
-        customCommandsUsed: Set<String>
+        customCommandsUsed: Set<String>,
+        hasNociteAll: Bool = false
     ) {
         self.macrosByName = macrosByName
         self.allMacroDeclarations = allMacroDeclarations
@@ -307,6 +309,7 @@ public struct ManuscriptSymbolTable: Sendable, Codable, Hashable {
         self.unresolvedCrossReferences = unresolvedCrossReferences
         self.environments = environments
         self.customCommandsUsed = customCommandsUsed
+        self.hasNociteAll = hasNociteAll
     }
 
     public static let empty = ManuscriptSymbolTable(
@@ -382,7 +385,8 @@ public struct ManuscriptSymbolTable: Sendable, Codable, Hashable {
             diagnostics.append(
                 LSPDiagnostic(
                     code: "SYM004",
-                    severity: .warning,
+                    category: .structure,
+                    severity: .error,
                     message: "Unresolved cross-reference '\(unresolved.targetKey)' in '\(unresolved.command)'.",
                     span: unresolved.span,
                     suggestedFix: suggestion.map { "Did you mean '\($0)'?" }
@@ -673,6 +677,7 @@ public struct MacroExpansionEngine: Sendable {
         var environments: [EnvironmentSymbolRecord] = []
         var environmentCounters: [String: Int] = [:]
         var customCommandsUsed: Set<String> = []
+        var hasNociteAll = false
 
         // Pass 1: Extract macros in file order respecting `\newcommand` / `\renewcommand` / `\providecommand` semantics!
         for result in parseResults {
@@ -707,7 +712,8 @@ public struct MacroExpansionEngine: Sendable {
                 allCitationOccurrences: &allCitationOccurrences,
                 crossReferences: &rawCrossReferences,
                 environments: &environments,
-                environmentCounters: &environmentCounters
+                environmentCounters: &environmentCounters,
+                hasNociteAll: &hasNociteAll
             )
 
             // Also track custom commands referenced in tokens.
@@ -762,7 +768,8 @@ public struct MacroExpansionEngine: Sendable {
             crossReferences: finalCrossReferences,
             unresolvedCrossReferences: unresolvedCrossRefs,
             environments: environments,
-            customCommandsUsed: customCommandsUsed
+            customCommandsUsed: customCommandsUsed,
+            hasNociteAll: hasNociteAll
         )
     }
 
@@ -1316,7 +1323,8 @@ public struct MacroExpansionEngine: Sendable {
         allCitationOccurrences: inout [CitationOccurrenceRecord],
         crossReferences: inout [CrossReferenceOccurrenceRecord],
         environments: inout [EnvironmentSymbolRecord],
-        environmentCounters: inout [String: Int]
+        environmentCounters: inout [String: Int],
+        hasNociteAll: inout Bool
     ) {
         var nextSectionTitle = enclosingSectionTitle
         var nextEnvironment = enclosingEnvironment
@@ -1376,7 +1384,11 @@ public struct MacroExpansionEngine: Sendable {
         case .citation(let command, let citeKeys, let prenote, let postnote):
             for rawKey in citeKeys {
                 let key = LaTeXKeyNormalizer.normalize(rawKey)
-                guard key != "*" && !key.isEmpty else { continue }
+                if key == "*" {
+                    hasNociteAll = true
+                    continue
+                }
+                guard !key.isEmpty else { continue }
                 let occ = CitationOccurrenceRecord(
                     citeKey: key,
                     command: command,
@@ -1420,7 +1432,8 @@ public struct MacroExpansionEngine: Sendable {
                 allCitationOccurrences: &allCitationOccurrences,
                 crossReferences: &crossReferences,
                 environments: &environments,
-                environmentCounters: &environmentCounters
+                environmentCounters: &environmentCounters,
+                hasNociteAll: &hasNociteAll
             )
         }
     }
