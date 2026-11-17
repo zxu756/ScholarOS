@@ -2,14 +2,15 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01–03 scope:
+# Stage 01–04 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
 #   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
+#   - Row 6 (CITE_KEY_CASE part): `2410.04196v2` `\citep{bayestune}` vs `Bayestune` (`.bib` entry-count half deferred to Stage 05 -> overall marked `SKIP (没跑)` unless CITE_KEY_CASE fails)
 #   - Row 7: Hard inputs (`hard-inputs/hard.tex` vs `expected/hard-inputs.json` + all per-syntax `verbatim-skip` fixtures)
 #   - Row 8: Multi-file include graph (`\include`, `\input`, unbraced `\input`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`, child `\bibliography`, commented/verbatim skip)
 #   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `.bbl` entry parsing deferred to Stage 06)
-#   - Row 12 (encoding part): Latin-1 / Windows-1252 root and child files (`ENC001`, content extracted, exit != 2; command/parser checks deferred to Stage 04)
+#   - Row 12: S64 citation/cross-ref command tables, S65 optional arguments, S66 normalized keys & `CITE_KEY_CASE`, S67 parser constructs (`parser-commands`), and Latin-1 / Windows-1252 root/child files (`ENC001`)
 #   - Remaining rows: marked `SKIP (没跑)` for subsequent M2 stages
 #
 # All runs are strictly `--offline` under an isolated `HOME` / `CFFIXED_USER_HOME` (`lib-cli-guard.sh`).
@@ -489,14 +490,13 @@ PY
     fi
 
     # ==================================================================
-    # Rows 4..6: Deferred to subsequent M2 stages
+    # Rows 4..5: Deferred to Stage 06; Row 6: CITE_KEY_CASE verified now, .bib entry counts deferred to Stage 05
     # ==================================================================
-    declare -a DEFERRED_ROWS_4_6=(
+    declare -a DEFERRED_ROWS_4_5=(
         "4:2506.06594v1 (thebibliography, 32 \\bibitem) 解析与 gold 对照 — 留给第 6 段"
         "5:2405.13682v5 (\\input{main.bbl}, 46 条) — 留给第 6 段"
-        "6:9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 与 CITE_KEY_CASE — 留给第 4、5 段"
     )
-    for entry in "${DEFERRED_ROWS_4_6[@]}"; do
+    for entry in "${DEFERRED_ROWS_4_5[@]}"; do
         r_num="${entry%%:*}"
         r_desc="${entry#*:}"
         if should_run_row "$r_num"; then
@@ -505,6 +505,84 @@ PY
             record_skip "$r_num" "$r_desc"
         fi
     done
+
+    if should_run_row 6; then
+        echo "== [Row 6] 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv（留给第 5 段）与 2410.04196v2 \\citep{bayestune} CITE_KEY_CASE =="
+        set +e
+        ROW6_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, run1_dir = sys.argv[1:5]
+cached_2410 = os.path.join(run1_dir, "2410.04196v2.json")
+
+if os.path.isfile(cached_2410):
+    obj = json.load(open(cached_2410, encoding="utf-8"))
+else:
+    env = dict(os.environ)
+    env["HOME"] = sandbox_home
+    env["CFFIXED_USER_HOME"] = sandbox_home
+    env.pop("SCHOLAR_CACHE_DIR", None)
+    main_2410 = os.path.join(repo_root, "Benchmarks", "manuscripts", "2410.04196v2", "src", "main.tex")
+    proc = subprocess.run([cli_bin, "diagnostics", main_2410, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if proc.returncode == 2:
+        print(f"  FAIL: CLI exited 2 on 2410.04196v2: {proc.stderr.decode('utf-8', 'replace')}")
+        sys.exit(1)
+    obj = json.loads(proc.stdout.decode("utf-8"))
+
+failures = []
+cites = {c["key"]: c for c in obj.get("citations", [])}
+bt = cites.get("bayestune")
+if not bt:
+    failures.append("missing 'bayestune' in 2410.04196v2 citations")
+else:
+    if bt.get("defined") is not True:
+        failures.append(f"expected bayestune.defined == True, got {bt.get('defined')}")
+    if bt.get("source") != "fhbi.bib":
+        failures.append(f"expected bayestune.source == 'fhbi.bib', got {bt.get('source')}")
+    if not isinstance(bt.get("verification"), dict):
+        failures.append(f"expected bayestune.verification dict, got {bt.get('verification')}")
+
+uncited = set(obj.get("uncitedEntries", []))
+if "Bayestune" in uncited:
+    failures.append("'Bayestune' should not appear in uncitedEntries when cited as 'bayestune'")
+
+diags = obj.get("diagnostics", [])
+cite404 = [d for d in diags if d.get("code") == "CITE404"]
+case_warns = [d for d in diags if d.get("code") == "CITE_KEY_CASE"]
+if cite404:
+    failures.append(f"expected 0 CITE404 on 2410.04196v2, got {cite404}")
+if len(case_warns) != 1:
+    failures.append(f"expected 1 CITE_KEY_CASE warning on 2410.04196v2, got {case_warns}")
+else:
+    w = case_warns[0]
+    msg = w.get("message", "")
+    if w.get("severity") != "WARNING" or w.get("category") != "structure":
+        failures.append(f"expected WARNING/structure on CITE_KEY_CASE, got {w}")
+    if "bayestune" not in msg or "Bayestune" not in msg:
+        failures.append(f"CITE_KEY_CASE message must name both 'bayestune' and 'Bayestune': {msg}")
+
+if failures:
+    for f in failures:
+        print(f"  FAIL [CITE_KEY_CASE]: {f}")
+    sys.exit(1)
+
+print(
+    f"  [2410.04196v2 CITE_KEY_CASE] PASS: bayestune defined={bt.get('defined')}, "
+    f"source={bt.get('source')}, CITE404=0, CITE_KEY_CASE=1 ({case_warns[0].get('severity')}: {case_warns[0].get('message')})"
+)
+print("  没跑 — 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 与 BIB001 检查留给第 5 段")
+sys.exit(0)
+PY
+)"
+        ROW6_RC=$?
+        set -e
+        echo "$ROW6_OUT"
+        if [[ "$ROW6_RC" -ne 0 ]]; then
+            record_fail 6 "2410.04196v2 \\citep{bayestune} CITE_KEY_CASE check failed"
+        else
+            record_skip 6 "2410.04196v2 CITE_KEY_CASE 已核验通过；9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 留给第 5 段"
+        fi
+    fi
 
     # ==================================================================
     # Row 7: Hard inputs (`hard-inputs/hard.tex`) & all per-syntax `verbatim-skip` fixtures
@@ -835,13 +913,13 @@ PY
     done
 
     # ==================================================================
-    # Row 12 (Stage 02 encoding part): Latin-1 / Windows-1252 root & child files (ENC001)
+    # Row 12: S64–S67 command tables & parser constructs + Latin-1 / Windows-1252 encoding fallback
     # ==================================================================
     if should_run_row 12; then
-        echo "== [Row 12] Latin-1 / Windows-1252 主文件与子文件读取及 ENC001 警告（S64/S65/S66/S67 命令表与解析器部分留给第 4 段） =="
+        echo "== [Row 12] S64 引用与交叉引用命令表、S65 可选参数、S66 键规范化与 CITE_KEY_CASE、S67 三类解析写法及 Latin-1/Windows-1252 文件读取 (ENC001) =="
         set +e
         ROW12_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
-import json, os, subprocess, sys
+import glob, json, os, subprocess, sys
 
 repo_root, cli_bin, sandbox_home = sys.argv[1:4]
 env = dict(os.environ)
@@ -849,10 +927,69 @@ env["HOME"] = sandbox_home
 env["CFFIXED_USER_HOME"] = sandbox_home
 env.pop("SCHOLAR_CACHE_DIR", None)
 
+failures = []
+
+# 12A. S64–S67 per-command and per-construct fixtures (`Tests/Fixtures/manuscripts/parser-commands`)
+cmd_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "parser-commands")
+exp_files = sorted(glob.glob(os.path.join(cmd_dir, "*.expected.json")))
+if len(exp_files) < 63:
+    failures.append(f"Expected at least 63 expected files in {cmd_dir}, found {len(exp_files)}")
+
+passed_cmd_cases = 0
+for exp_path in exp_files:
+    spec = json.load(open(exp_path, encoding="utf-8"))
+    slug = spec["case"]
+    tex_path = os.path.join(cmd_dir, f"{slug}.tex")
+    exp_cites = set(spec["cite_keys"])
+    exp_labels = set(spec["labels"])
+    exp_refs = set(spec.get("references", []))
+    exp_struct_errs = int(spec["structure_errors"])
+    exp_warns = set(spec.get("expected_warnings", []))
+
+    p = subprocess.run([cli_bin, "diagnostics", tex_path, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+    if p.returncode == 2:
+        failures.append(f"[{slug}] CLI exited 2: {p.stderr.decode('utf-8', 'replace')}")
+        continue
+    obj = json.loads(p.stdout.decode("utf-8"))
+    act_cites = set(c["key"] for c in obj.get("citations", []))
+    act_labels = set(l["key"] for l in obj.get("labels", []))
+    act_refs = set(r["key"] for r in obj.get("references", []))
+    diags = obj.get("diagnostics", [])
+    struct_errs = [d for d in diags if d.get("category") == "structure" and d.get("severity") == "ERROR"]
+    ast_diags = [d for d in diags if d.get("code", "").startswith("AST")]
+    inc002_diags = [d for d in diags if d.get("code") == "INC002"]
+    warn_codes = set(d.get("code", "") for d in diags if d.get("severity") == "WARNING")
+
+    case_ok = (
+        act_cites == exp_cites
+        and act_labels == exp_labels
+        and act_refs == exp_refs
+        and len(struct_errs) == exp_struct_errs
+        and not ast_diags
+        and not inc002_diags
+        and exp_warns.issubset(warn_codes)
+    )
+    if slug == "s66-cite-key-case":
+        ck_diags = [d for d in diags if d.get("code") == "CITE_KEY_CASE"]
+        if len(ck_diags) != 1 or "bayestune" not in ck_diags[0].get("message", "") or "Bayestune" not in ck_diags[0].get("message", ""):
+            case_ok = False
+            failures.append(f"[{slug}] CITE_KEY_CASE must name both bayestune and Bayestune: {ck_diags}")
+
+    if case_ok:
+        passed_cmd_cases += 1
+    else:
+        failures.append(
+            f"[{slug}] mismatch: cites={sorted(act_cites)}/{sorted(exp_cites)}, "
+            f"labels={sorted(act_labels)}/{sorted(exp_labels)}, refs={sorted(act_refs)}/{sorted(exp_refs)}, "
+            f"struct_ERR={len(struct_errs)}/{exp_struct_errs}, AST={len(ast_diags)}, INC002={len(inc002_diags)}, warns={sorted(warn_codes)}"
+        )
+
+print(f"  [parser-commands (S64/S65/S66/S67)] passed={passed_cmd_cases}/{len(exp_files)} (0 AST*, 0 INC002)")
+
+# 12B. Latin-1 / Windows-1252 root and child files (`Tests/Fixtures/manuscripts/loader-encoding`)
 enc_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "loader-encoding")
 main_tex = os.path.join(enc_dir, "main.tex")
 sub_tex = os.path.join(enc_dir, "sub.tex")
-failures = []
 
 for label, fpath in [("main.tex", main_tex), ("sub.tex", sub_tex)]:
     raw = open(fpath, "rb").read()
@@ -873,26 +1010,26 @@ else:
     obj = json.loads(p_diag.stdout.decode("utf-8"))
     outline = json.loads(p_out.stdout.decode("utf-8"))
     files = [(f.get("path"), f.get("encoding"), f.get("includedFrom")) for f in obj.get("files", [])]
-    exp_files = [("main.tex", "windows-1252", None), ("sub.tex", "windows-1252", "main.tex:5")]
+    exp_files_enc = [("main.tex", "windows-1252", None), ("sub.tex", "windows-1252", "main.tex:5")]
     labels = sorted(l.get("key") for l in obj.get("labels", []))
     cites = sorted(c.get("key") for c in obj.get("citations", []))
     enc001 = [d for d in obj.get("diagnostics", []) if d.get("code") == "ENC001"]
     inc002 = [d for d in obj.get("diagnostics", []) if d.get("code") == "INC002"]
+    ast_enc = [d for d in obj.get("diagnostics", []) if d.get("code", "").startswith("AST")]
     titles = [e.get("title", "") for e in outline]
 
     print(
         f"  [loader-encoding] exit={p_diag.returncode} files={files} labels={labels} cites={cites} "
-        f"ENC001={[(d['severity'], d['file']) for d in enc001]} titles={titles} "
-        "(note: S64/S65/S66/S67 command & parser checks deferred to Stage 04)"
+        f"ENC001={[(d['severity'], d['file']) for d in enc001]} titles={titles}"
     )
-    if files != exp_files:
-        failures.append(f"files mismatch: {files} != {exp_files}")
+    if files != exp_files_enc:
+        failures.append(f"files mismatch: {files} != {exp_files_enc}")
     if labels != ["sec:gauss", "sec:poincare"]:
         failures.append(f"labels mismatch: {labels}")
     if cites != ["knuth1968", "lecun2015"]:
         failures.append(f"citations mismatch: {cites}")
-    if inc002:
-        failures.append(f"unexpected INC002: {inc002}")
+    if inc002 or ast_enc:
+        failures.append(f"unexpected INC002={inc002} AST={ast_enc}")
     if len(enc001) != 2 or {d.get("file") for d in enc001} != {"main.tex", "sub.tex"}:
         failures.append(f"expected 2 ENC001 warnings for main.tex & sub.tex, got {enc001}")
     for d in enc001:
@@ -912,9 +1049,9 @@ PY
         set -e
         echo "$ROW12_OUT"
         if [[ "$ROW12_RC" -eq 0 ]]; then
-            record_pass 12 "Latin-1 / Windows-1252 root and child files decode cleanly, extract symbols/outline, emit WARNING ENC001, and do not exit 2 (S64-S67 deferred to Stage 04)"
+            record_pass 12 "All 63 S64-S67 command/parser fixtures extract expected keys/labels/refs with 0 AST*/INC002, and Windows-1252 root/child files emit ENC001 without exiting 2"
         else
-            record_fail 12 "Latin-1 / Windows-1252 encoding fallback or ENC001 check failed"
+            record_fail 12 "S64-S67 command/parser check or Windows-1252 encoding fallback check failed"
         fi
     fi
 
