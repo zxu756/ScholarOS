@@ -2,7 +2,7 @@
 
 **[English](README.md)** | **简体中文**
 
-面向 macOS 的 Swift 包（`1.3.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
+面向 macOS 的 Swift 包（`1.4.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
 
 > **编造的参考文献进不了你的 `.bib`。** 在一份 480 条真假混合的文献集上，没有一条编造的文献被判为已验证（`fabricated_model` 组 `0/80`；全集 `truth=fabricated` 条目 `0/86`；全部不可写入条目 `0/254`）；真实三组中的真实文献被误判为不存在或已撤稿（`NOT_FOUND` 或 `RETRACTED`）的比例是 **0%（`0/215`）**（真实三组合计 220 条亦为 `0/220`；全集 `truth=real` 条目为 `0/225`）。
 
