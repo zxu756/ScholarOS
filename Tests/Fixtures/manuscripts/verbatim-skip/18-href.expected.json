@@ -10,5 +10,5 @@
     "sec:in_href_text"
   ],
   "structure_errors": 0,
-  "basis": "hyperref package (\\href{URL}{text}): only the first {URL} argument is scanned verbatim (allowing '%', '\\', and balanced '{id}'), while the second {text} argument is normal LaTeX prose where \\cite{k2} and \\label{sec:in_href_text} take effect."
+  "basis": "hyperref package (\\href{URL}{text}): only the first {URL} argument is scanned verbatim (allowing '%7E', balanced '{id}', and trailing '%' without starting a comment), while the second {text} argument is normal LaTeX prose where '\\cite{k2}' and '\\label{sec:in_href_text}' take effect alongside trailing '\\cite{k1}' and '\\label{sec:after_href}'."
 }

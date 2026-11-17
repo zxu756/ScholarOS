@@ -698,7 +698,7 @@ struct MarkupASTAndMacroTests {
             ("\\verb<c>...<c>", "Text \\verb+\\cite{fake} { %+ \\cite{k1}", "k1"),
             ("\\verb*<c>...<c>", "Text \\verb*|\\cite{fake} } %| \\cite{k1}", "k1"),
             ("\\lstinline<c>...<c>", "Text \\lstinline[language=C]|\\cite{fake} { %| \\cite{k1}", "k1"),
-            ("\\lstinline{...}", "Text \\lstinline{if (a) { \\cite{fake}; } % } \\cite{k1}", "k1"),
+            ("\\lstinline{...}", "Text \\lstinline{if (a) { % \\cite{fake} \\cite{k1}", "k1"),
             ("\\mintinline{lang}{...}", "Text \\mintinline[breaklines]{python}{d = {\"k\": 1} # \\cite{fake} %} \\cite{k1}", "k1"),
             ("\\mintinline{lang}<c>...<c>", "Text \\mintinline{c}|\\cite{fake} { %| \\cite{k1}", "k1"),
             ("verbatim env", "\\begin{verbatim}\n\\cite{fake} { %\n\\end{verbatim}\n\\cite{k1}", "k1"),
@@ -866,7 +866,7 @@ struct MarkupASTAndMacroTests {
             \\input{ghost_iffalse}
             \\bibliography{ghost_bib_iffalse}
             \\fi
-            \\lstinline{\\input{ghost_lstbrace} %} \\input{real_one}
+            \\lstinline{% \\input{ghost_lstbrace} \\input{real_one}
             \\mintinline{python}{\\input{ghost_mintbrace} %}
             \\url{https://example.org/\\input{ghost_url}%} \\input{real_two}
             \\href{https://example.org/\\bibliography{ghost_href}%}{See \\input{real_three}}
@@ -919,5 +919,58 @@ struct MarkupASTAndMacroTests {
         )
         let full = lexer.tokenize(source: updated, format: .latex, filePath: "doc.tex")
         #expect(relexed.tokens == full)
+    }
+
+    @Test("M2 Stage 03b: \\lstinline{...} stops at first '}' without brace nesting while keeping '%' literal, lossless round-trip, \\lstinline<c>...<c> and \\mintinline{lang}{...} unchanged")
+    func m2Stage03bLstinlineBracedStopsAtFirstClosingBraceWithoutNesting() {
+        // 1. Exact prompt case: `\lstinline{a{b}c} \cite{k}`
+        //    Opaque braced construct is `\lstinline{a{b}` (`.verbatim` payload `"a{b"`),
+        //    followed by `c}` entering normal prose and `\cite{k}` extracted; lossless holds.
+        let src1 = "\\lstinline{a{b}c} \\cite{k}"
+        let tokens1 = assertOpaqueLosslessRoundTrip(src1, filePath: "lstbrace1.tex", expectOpaqueToken: true)
+        let core1 = tokens1.filter { $0.kind != .eof }
+
+        #expect(core1.count >= 6, "Expected separate tokens after first '}', got \(core1)")
+        if core1.count >= 6 {
+            #expect(core1[0].kind == .command && core1[0].lexeme == "\\lstinline")
+            #expect(core1[1].kind == .leftBrace && core1[1].lexeme == "{")
+            #expect(core1[2].kind == .verbatim && core1[2].lexeme == "a{b")
+            #expect(core1[3].kind == .rightBrace && core1[3].lexeme == "}")
+            #expect(core1[0...3].map(\.lexeme).joined() == "\\lstinline{a{b}")
+            #expect(core1[4].kind == .textWord && core1[4].lexeme == "c")
+            #expect(core1[5].kind == .rightBrace && core1[5].lexeme == "}")
+        }
+
+        let parser = HandwrittenMarkupCSTParser()
+        let parsed1 = parser.parse(source: src1, filePath: "lstbrace1.tex", format: .latex)
+        let sym1 = MacroExpansionEngine().buildSymbolTable(from: parsed1)
+        #expect(Set(sym1.citationsByKey.keys) == ["k"])
+        #expect(parsed1.issues.contains { $0.code == .unexpectedClosingBrace }, "Trailing '}' in 'c}' must enter normal prose and report unexpectedClosingBrace")
+
+        // 2. Valid LaTeX `\lstinline[language=C]{if (ok) { % \cite{fake_lst} \cite{k1}`:
+        //    `{` and `%` and unclosed `\cite{fake_lst` inside stop at the first `}`,
+        //    0 comment tokens, 0 AST issues, and `\cite{k1}` after the first `}` is extracted.
+        let src2 = "Code \\lstinline[language=C]{if (ok) { % \\cite{fake_lst} \\cite{k1}."
+        let tokens2 = assertOpaqueLosslessRoundTrip(src2, filePath: "lstbrace2.tex", expectOpaqueToken: true)
+        #expect(!tokens2.contains { $0.kind == .comment })
+        let verbatimTok2 = tokens2.first { $0.kind == .verbatim }
+        #expect(verbatimTok2?.lexeme == "if (ok) { % \\cite{fake_lst")
+        let parsed2 = parser.parse(source: src2, filePath: "lstbrace2.tex", format: .latex)
+        let sym2 = MacroExpansionEngine().buildSymbolTable(from: parsed2)
+        #expect(Set(sym2.citationsByKey.keys) == ["k1"])
+        #expect(parsed2.issues.isEmpty, "Expected 0 AST issues on valid LaTeX \\lstinline{...}, got \(parsed2.issues)")
+
+        // 3. `\lstinline<c>...<c>` and `\mintinline{lang}{...}` remain unchanged.
+        let srcDelim = "\\lstinline|a{b}c % \\cite{fake}| \\cite{k}"
+        let tokDelim = assertOpaqueLosslessRoundTrip(srcDelim, filePath: "lstdelim.tex", expectOpaqueToken: true)
+        #expect(tokDelim.first { $0.kind == .verbatim }?.lexeme == "|a{b}c % \\cite{fake}|")
+
+        let srcMint = "\\mintinline{python}{d = {\"a\": 1} # % \\cite{fake}} \\cite{k}"
+        let tokMint = assertOpaqueLosslessRoundTrip(srcMint, filePath: "mintbrace.tex", expectOpaqueToken: true)
+        #expect(tokMint.first { $0.kind == .verbatim }?.lexeme == "d = {\"a\": 1} # % \\cite{fake}")
+        let parsedMint = parser.parse(source: srcMint, filePath: "mintbrace.tex", format: .latex)
+        let symMint = MacroExpansionEngine().buildSymbolTable(from: parsedMint)
+        #expect(Set(symMint.citationsByKey.keys) == ["k"])
+        #expect(parsedMint.issues.isEmpty)
     }
 }

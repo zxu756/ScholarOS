@@ -8,5 +8,5 @@
     "sec:lst_brace"
   ],
   "structure_errors": 0,
-  "basis": "listings package (listings.sty): \\lstinline[options]{...} balances '{' and '}' while treating '\\' and '%' as catcode-12 characters, so nested '{ ... }', \\cite, \\label, and '%' inside do not take effect."
+  "basis": "listings package (listings.sty): \\lstinline[options]{...} scans verbatim up to the first '}' without balancing inner '{', treating '\\' and '%' as ordinary characters, so inner '{', '%', and unclosed commands do not take effect while '\\cite{k1}' and '\\label{sec:after_lst_brace}' after the first '}' work normally."
 }

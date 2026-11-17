@@ -1662,7 +1662,7 @@ public struct IncrementalMarkupLexer: Sendable {
             }
             emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
             if cursor.peekByte() == 0x7B { // '{'
-                lexBracedVerbatimArgument(cursor: &cursor, into: &output)
+                lexBracedVerbatimArgument(allowNestedBraces: false, cursor: &cursor, into: &output)
             } else if let b = cursor.peekByte(), !UTF8ByteClassifier.isNewline(b) {
                 lexDelimitedInlineVerbatim(allowSingleNewlineIfClosed: true, cursor: &cursor, into: &output)
             }
@@ -1921,11 +1921,13 @@ public struct IncrementalMarkupLexer: Sendable {
         }
     }
 
-    /// Scans `{...}` braced verbatim content where `%` is NOT a comment, `\` does NOT start commands or escape braces,
-    /// and balanced inner `{...}` pairs are permitted (`\lstinline{...}`, `\mintinline{lang}{...}`, `\url{...}`,
-    /// `\path{...}`, `\nolinkurl{...}`, and the first `{...}` argument of `\href{...}{...}`).
+    /// Scans `{...}` braced verbatim content where `%` is NOT a comment and `\` does NOT start commands or escape braces.
+    /// - When `allowNestedBraces` is `false` (`\lstinline{...}`), scanning stops at the very first `}` without counting inner `{`.
+    /// - When `allowNestedBraces` is `true` (`\mintinline{lang}{...}`, `\url{...}`, `\path{...}`, `\nolinkurl{...}`, and the
+    ///   first `{...}` argument of `\href{...}{...}`), balanced inner `{...}` pairs are permitted.
     /// Emits `.leftBrace("{")`, `.verbatim("<inner>")` (when non-empty), and `.rightBrace("}")`.
     private func lexBracedVerbatimArgument(
+        allowNestedBraces: Bool = true,
         cursor: inout UTF8Cursor,
         into output: inout [MarkupToken]
     ) {
@@ -1934,7 +1936,7 @@ public struct IncrementalMarkupLexer: Sendable {
         cursor.advanceASCIIByte()
         emit(cursor.makeToken(kind: .leftBrace, from: openStart), into: &output)
 
-        // Probe forward for matching closing `}` with brace counting (stopping at `\par` blank line if unclosed).
+        // Probe forward for matching closing `}` (stopping at `\par` blank line if unclosed).
         var probe = cursor.offset
         var depth = 1
         var matchingCloseByte: Int? = nil
@@ -1942,7 +1944,9 @@ public struct IncrementalMarkupLexer: Sendable {
         while probe < cursor.endOffset {
             let b = cursor.bytes[probe]
             if b == 0x7B { // '{'
-                depth += 1
+                if allowNestedBraces {
+                    depth += 1
+                }
                 probe += 1
                 continue
             }

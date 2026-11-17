@@ -8,5 +8,5 @@
     "sec:nolinkurl_cmd"
   ],
   "structure_errors": 0,
-  "basis": "hyperref package (\\nolinkurl{...}): typesets a non-hyperlinked URL via url.sty's verbatim scanner; '%', '\\cite', and balanced '{2026}' inside are literal characters."
+  "basis": "hyperref package (\\nolinkurl{...}): typesets a non-hyperlinked URL via url.sty's verbatim scanner where balanced '{2026}', '%7E', and trailing '%' are literal URL characters rather than TeX comments, so '\\cite{k1}' and '\\label{sec:after_nolink}' on the same line take effect."
 }
