@@ -1,0 +1,11 @@
+{
+  "case": "11-env-lstlisting",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_lst"
+  ],
+  "structure_errors": 0,
+  "basis": "listings package lstlisting environment: after optional [key=val], body is read verbatim up to \\end{lstlisting}; TeX commands, '%', and unbalanced braces inside code are inert."
+}

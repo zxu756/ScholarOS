@@ -1,0 +1,12 @@
+\documentclass{article}
+\usepackage{comment}
+\begin{document}
+\section{Comment Env}\label{sec:env_comment}
+\begin{comment}
+\section{Fake Section}\label{fake_lbl_comment}
+\cite{fake_comment} \input{nonexistent_in_comment} {
+\end{comment}
+Kept prose \cite{k1} and \ref{sec:env_comment}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

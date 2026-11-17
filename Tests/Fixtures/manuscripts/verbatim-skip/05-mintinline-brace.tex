@@ -1,0 +1,9 @@
+\documentclass{article}
+\usepackage{minted}
+\begin{document}
+\section{Mintinline Braced}\label{sec:mint_brace}
+Python \mintinline[breaklines]{python}{d = {"x": 1} # \cite{fake_mint1} % \label{fake_lbl_mint1}} then \cite{k1} \label{sec:after_mint_brace}.
+See \ref{sec:mint_brace} and \ref{sec:after_mint_brace}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

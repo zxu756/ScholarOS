@@ -1,0 +1,11 @@
+{
+  "case": "08-env-verbatim-star",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_vstar"
+  ],
+  "structure_errors": 0,
+  "basis": "LaTeX2e kernel verbatim* environment (ltmiscen.dtx): scans literally up to \\end{verbatim*}; inner \\cite, \\label, unbalanced '}', and '%' are inert."
+}

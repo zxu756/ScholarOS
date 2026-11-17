@@ -1,0 +1,12 @@
+{
+  "case": "05-mintinline-brace",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_mint_brace",
+    "sec:mint_brace"
+  ],
+  "structure_errors": 0,
+  "basis": "minted / fvextra (\\mintinline[options]{lang}{...}): first brace group selects the lexer language and second brace group scans verbatim with balanced '{'/'}' and catcode-12 '\\' and '%' (hand-written expectation; minted requires -shell-escape)."
+}

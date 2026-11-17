@@ -1,0 +1,12 @@
+{
+  "case": "01-verb",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_verb",
+    "sec:verb_plain"
+  ],
+  "structure_errors": 0,
+  "basis": "LaTeX2e kernel (ltmiscen.dtx): \\verb<c>...<c> reads literal characters up to matching <c> on the same line with catcode 12; inner \\cite, \\label, unbalanced braces, '$', and '%' are inert."
+}

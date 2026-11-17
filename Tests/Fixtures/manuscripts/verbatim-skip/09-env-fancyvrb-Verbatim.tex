@@ -1,0 +1,11 @@
+\documentclass{article}
+\usepackage{fancyvrb}
+\begin{document}
+\section{Fancyvrb Verbatim}\label{sec:env_fv}
+\begin{Verbatim}[numbers=left]
+\cite{fake_fv} { \label{fake_lbl_fv} %
+\end{Verbatim}
+After Verbatim \cite{k1} and \ref{sec:env_fv}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

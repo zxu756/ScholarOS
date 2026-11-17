@@ -1,0 +1,12 @@
+\documentclass{article}
+\begin{document}
+\section{Verbatim Env}\label{sec:env_verbatim}
+\begin{verbatim}
+\cite{fake_env_v1} \label{fake_lbl_v1}
+\input{nonexistent_in_verbatim}
+\begin{unclosed} { %
+\end{verbatim}
+After block \cite{k1} and \ref{sec:env_verbatim}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

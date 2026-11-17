@@ -12,6 +12,7 @@ public enum MarkupTokenKind: String, Sendable, Codable, Hashable, CaseIterable {
     case mathInline         // $
     case mathDisplay        // $$ or \[ \]
     case comment            // % or //
+    case verbatim           // opaque verbatim / conditional-skip / raw URL content
     case headingMarker      // = in Typst
     case identifier
     case numeric

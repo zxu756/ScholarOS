@@ -836,7 +836,7 @@ private struct ParseStreamWorker {
                 paragraph.recordProseFragment(punctTok.lexeme, span: punctTok.span)
             }
 
-        case .whitespace, .comment, .eof:
+        case .whitespace, .comment, .verbatim, .eof:
             advance()
         }
     }
@@ -1086,13 +1086,13 @@ private struct ParseStreamWorker {
         // Optional placement/parameter brackets (`\begin{figure}[htbp]`, `\begin{tabular}{lcc}`).
         skipHorizontalWhitespaceAndComments()
         if peek().kind == .leftBracket {
-            let opt = consumeBracketGroup(allowMultiline: false)
+            let opt = consumeBracketGroup(allowMultiline: IncrementalMarkupLexer.verbatimEnvironmentNames.contains(envName))
             headerEndPos = opt.endPos
             if let rec = opt.recoveryNode {
                 envChildren.append(rec)
             }
         }
-        if envName == "tabular" || envName == "tabular*" || envName == "tabularx" || envName == "array" || envName == "minipage" || envName == "subfigure" {
+        if envName == "tabular" || envName == "tabular*" || envName == "tabularx" || envName == "array" || envName == "minipage" || envName == "subfigure" || envName == "minted" {
             skipHorizontalWhitespaceAndComments()
             while peek().kind == .leftBrace {
                 let colSpec = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: envName)
@@ -1156,7 +1156,7 @@ private struct ParseStreamWorker {
                 continue
             }
 
-            if tok.kind == .comment {
+            if tok.kind == .comment || tok.kind == .verbatim {
                 advance()
                 continue
             }
@@ -1436,7 +1436,7 @@ private struct ParseStreamWorker {
                     continue
                 }
             }
-            if tok.kind != .comment {
+            if tok.kind != .comment && tok.kind != .verbatim {
                 formulaTokens.append(tok.lexeme)
             }
             endPos = tok.span.end
@@ -1772,7 +1772,8 @@ private struct ParseStreamWorker {
             var endPos = cmdTok.span.end
             while !isAtEnd {
                 let t = peek()
-                if t.kind == .whitespace || t.kind == .comment || t.kind == .leftBrace || t.kind == .rightBrace
+                if t.kind == .whitespace || t.kind == .comment || t.kind == .verbatim
+                    || t.kind == .leftBrace || t.kind == .rightBrace
                     || t.kind == .command || t.kind == .mathInline || t.kind == .mathDisplay
                 {
                     break
@@ -2104,7 +2105,7 @@ private struct ParseStreamWorker {
                 }
             }
 
-            if tok.kind != .comment {
+            if tok.kind != .comment && tok.kind != .verbatim {
                 formulaParts.append(tok.lexeme)
             }
             endPos = tok.span.end
@@ -2358,7 +2359,7 @@ private struct ParseStreamWorker {
                 continue
             }
 
-            if tok.kind != .comment {
+            if tok.kind != .comment && tok.kind != .verbatim {
                 textFragments.append(tok.lexeme == "~" ? " " : tok.lexeme)
             }
             endPos = tok.span.end
@@ -2533,7 +2534,7 @@ private struct ParseStreamWorker {
             let t = advance()
             paragraph.recordProseFragment(t.lexeme, span: t.span)
 
-        case .whitespace, .comment, .eof:
+        case .whitespace, .comment, .verbatim, .eof:
             advance()
         }
     }
@@ -3005,6 +3006,9 @@ private struct ParseStreamWorker {
 
         case .command:
             parseNextLaTeXItem(paragraph: &paragraph, sectionStack: &sectionStack, topLevelNodes: &topLevelNodes)
+
+        case .verbatim:
+            advance()
 
         default:
             let t = advance()

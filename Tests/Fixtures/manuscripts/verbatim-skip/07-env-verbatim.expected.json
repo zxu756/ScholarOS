@@ -1,0 +1,11 @@
+{
+  "case": "07-env-verbatim",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_verbatim"
+  ],
+  "structure_errors": 0,
+  "basis": "LaTeX2e kernel verbatim environment (ltmiscen.dtx): \\@xverbatim scans literally with catcode-12 specials up to the first \\end{verbatim}; inner \\cite, \\label, \\input, \\begin{unclosed}, '{', and '%' are inert."
+}

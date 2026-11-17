@@ -582,11 +582,6 @@ private struct ExtractedIncludeDirective: Sendable, Hashable {
 }
 
 private enum LexerIncludeDirectiveScanner {
-    private static let verbatimEnvironments: Set<String> = [
-        "verbatim", "verbatim*", "Verbatim", "BVerbatim",
-        "lstlisting", "minted", "comment"
-    ]
-
     static func extractDirectives(from tokens: [MarkupToken], filePath: String) -> [ExtractedIncludeDirective] {
         var directives: [ExtractedIncludeDirective] = []
         let count = tokens.count
@@ -619,27 +614,6 @@ private enum LexerIncludeDirectiveScanner {
                     cursor = probe
                 }
             }
-        }
-
-        func peekSameLineEnvironmentName(at cmdIndex: Int) -> (name: String, nextIndex: Int)? {
-            var c = cmdIndex + 1
-            skipHorizontalWhitespaceAndComments(&c)
-            guard c < count && tokens[c].kind == .leftBrace else { return nil }
-            c += 1
-            var name = ""
-            while c < count && tokens[c].kind != .rightBrace && tokens[c].kind != .eof {
-                if isNewlineWhitespace(tokens[c]) {
-                    return nil
-                }
-                if tokens[c].kind != .comment {
-                    name.append(tokens[c].lexeme)
-                }
-                c += 1
-            }
-            guard c < count && tokens[c].kind == .rightBrace else { return nil }
-            let trimmed = name.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { return nil }
-            return (trimmed, c + 1)
         }
 
         func consumeBracketGroup(_ cursor: inout Int) {
@@ -716,33 +690,13 @@ private enum LexerIncludeDirectiveScanner {
             return (pieces.joined(), endPos)
         }
 
-        func skipDelimitedInlineVerbatim(_ cursor: inout Int) {
-            guard cursor < count && tokens[cursor].kind != .eof && !isNewlineWhitespace(tokens[cursor]) else {
-                return
-            }
-            let firstTok = tokens[cursor]
-            guard let delim = firstTok.lexeme.unicodeScalars.first else {
-                cursor += 1
-                return
-            }
-            if firstTok.lexeme.unicodeScalars.dropFirst().contains(delim) {
-                cursor += 1
-                return
-            }
-            cursor += 1
-            while cursor < count && tokens[cursor].kind != .eof && !isNewlineWhitespace(tokens[cursor]) {
-                if tokens[cursor].lexeme.unicodeScalars.contains(delim) {
-                    cursor += 1
-                    break
-                }
-                cursor += 1
-            }
-        }
-
         while idx < count {
             let tok = tokens[idx]
             if tok.kind == .eof { break }
-            if tok.kind == .comment {
+            // Verbatim environments, inline verbatim (`\verb`, `\lstinline`, `\mintinline`), `\iffalse...\fi`,
+            // and raw URL arguments (`\url`, `\path`, `\nolinkurl`, `\href` first arg) are emitted as `.verbatim`
+            // by `IncrementalMarkupLexer`, so no duplicate verbatim-skipping rules are needed here.
+            if tok.kind == .comment || tok.kind == .verbatim {
                 idx += 1
                 continue
             }
@@ -750,54 +704,7 @@ private enum LexerIncludeDirectiveScanner {
             if tok.kind == .command {
                 let cmd = tok.lexeme
 
-                // 1. Skip verbatim-like environments (`verbatim`, `lstlisting`, `minted`, `comment`, etc.)
-                if cmd == "\\begin",
-                   let opened = peekSameLineEnvironmentName(at: idx),
-                   verbatimEnvironments.contains(opened.name)
-                {
-                    idx = opened.nextIndex
-                    while idx < count && tokens[idx].kind != .eof {
-                        if tokens[idx].kind == .command && tokens[idx].lexeme == "\\end",
-                           let closed = peekSameLineEnvironmentName(at: idx),
-                           closed.name == opened.name
-                        {
-                            idx = closed.nextIndex
-                            break
-                        }
-                        idx += 1
-                    }
-                    continue
-                }
-
-                // 2. Skip inline verbatim commands (`\verb`, `\verb*`, `\lstinline`, `\mintinline`)
-                if cmd == "\\verb" || cmd == "\\verb*" {
-                    idx += 1
-                    if cmd == "\\verb" && idx < count && tokens[idx].lexeme == "*" && tokens[idx].span.start == tok.span.end {
-                        idx += 1
-                    }
-                    skipDelimitedInlineVerbatim(&idx)
-                    continue
-                }
-                if cmd == "\\lstinline" || cmd == "\\mintinline" {
-                    idx += 1
-                    skipHorizontalWhitespaceAndComments(&idx)
-                    if idx < count && tokens[idx].kind == .leftBracket {
-                        consumeBracketGroup(&idx)
-                        skipHorizontalWhitespaceAndComments(&idx)
-                    }
-                    if cmd == "\\mintinline" && idx < count && tokens[idx].kind == .leftBrace {
-                        _ = consumeBraceGroup(&idx)
-                        skipHorizontalWhitespaceAndComments(&idx)
-                    }
-                    if idx < count && tokens[idx].kind == .leftBrace {
-                        _ = consumeBraceGroup(&idx)
-                    } else {
-                        skipDelimitedInlineVerbatim(&idx)
-                    }
-                    continue
-                }
-
-                // 3. Skip macro definition replacement bodies so unexpanded `#1` helpers aren't treated as literal paths
+                // 1. Skip macro definition replacement bodies so unexpanded `#1` helpers aren't treated as literal paths
                 if LaTeXCommandRole.classify(cmd) == .macroDefinition {
                     idx += 1
                     skipHorizontalWhitespaceAndComments(&idx)
@@ -913,7 +820,7 @@ private enum LexerIncludeDirectiveScanner {
                         var endPos = tok.span.end
                         while idx < count {
                             let t = tokens[idx]
-                            if t.kind == .whitespace || t.kind == .comment
+                            if t.kind == .whitespace || t.kind == .comment || t.kind == .verbatim
                                 || t.kind == .leftBrace || t.kind == .rightBrace
                                 || t.kind == .command || t.kind == .mathInline
                                 || t.kind == .mathDisplay || t.kind == .eof

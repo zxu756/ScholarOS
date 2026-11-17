@@ -1,0 +1,12 @@
+{
+  "case": "02-verb-star",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_vstar",
+    "sec:verb_star"
+  ],
+  "structure_errors": 0,
+  "basis": "LaTeX2e kernel (ltmiscen.dtx): \\verb*<c>...<c> scans identically to \\verb<c>...<c> (rendering spaces visibly); inner \\cite, \\label, '{', and '%' do not take effect."
+}

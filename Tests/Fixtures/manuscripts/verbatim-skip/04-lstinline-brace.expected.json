@@ -1,0 +1,12 @@
+{
+  "case": "04-lstinline-brace",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_lst_brace",
+    "sec:lst_brace"
+  ],
+  "structure_errors": 0,
+  "basis": "listings package (listings.sty): \\lstinline[options]{...} balances '{' and '}' while treating '\\' and '%' as catcode-12 characters, so nested '{ ... }', \\cite, \\label, and '%' inside do not take effect."
+}

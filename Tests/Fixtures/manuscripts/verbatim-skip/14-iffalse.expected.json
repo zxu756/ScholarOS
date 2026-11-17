@@ -1,0 +1,12 @@
+{
+  "case": "14-iffalse",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "sec:iffalse"
+  ],
+  "structure_errors": 0,
+  "basis": "Knuth The TeXbook Ch. 20: \\iffalse fast-skips false tokens while counting nested \\if... / \\fi pairs (ignoring '%' line comments and nested \\else at depth >= 2); top-level \\else at depth 1 resumes normal TeX execution up to \\fi."
+}

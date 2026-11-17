@@ -1,0 +1,13 @@
+\documentclass{article}
+\usepackage{listings}
+\begin{document}
+\section{Lstlisting Env}\label{sec:env_lst}
+\begin{lstlisting}[language=Python]
+def f():
+    # \cite{fake_lst_env} \label{fake_lbl_lst_env}
+    return "{" % ()
+\end{lstlisting}
+After listing \cite{k1} and \ref{sec:env_lst}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

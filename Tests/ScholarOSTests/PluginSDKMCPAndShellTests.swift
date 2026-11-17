@@ -5082,6 +5082,58 @@ struct PluginSDKMCPAndShellTests {
         let diags2410 = try #require(obj2410["diagnostics"] as? [[String: Any]])
         #expect(diags2410.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
     }
+
+    // MARK: - 19. M2 Stage 03: Per-Syntax Verbatim/Opaque Skip Fixtures
+
+    @Test("M2 Stage 03 item 4: all 19 per-syntax fixtures in Tests/Fixtures/manuscripts/verbatim-skip match handwritten expected citation keys, labels, 0 fake* leaks, and 0 structure ERRORs")
+    func m2Stage03Item4AllPerSyntaxVerbatimSkipFixturesMatchHandwrittenExpected() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage03-item4")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        let fixtureDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/verbatim-skip", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: fixtureDir, includingPropertiesForKeys: nil)
+        let expectedFiles = contents
+            .filter { $0.lastPathComponent.hasSuffix(".expected.json") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        #expect(expectedFiles.count == 19, "Expected 19 per-syntax expected files, found \(expectedFiles.count)")
+
+        for expURL in expectedFiles {
+            let expData = try Data(contentsOf: expURL)
+            let expObj = try #require(try JSONSerialization.jsonObject(with: expData) as? [String: Any])
+            let caseSlug = try #require(expObj["case"] as? String)
+            let expectedCites = Set(try #require(expObj["cite_keys"] as? [String]))
+            let expectedLabels = Set(try #require(expObj["labels"] as? [String]))
+            let expectedStructErrs = try #require(expObj["structure_errors"] as? Int)
+
+            let texURL = fixtureDir.appendingPathComponent("\(caseSlug).tex")
+            #expect(FileManager.default.fileExists(atPath: texURL.path), "Missing \(texURL.path)")
+
+            let res = await runner.runWithExitStatus(
+                arguments: ["diagnostics", texURL.path, "--offline", "--json", "--lang", "en"]
+            )
+            #expect(res.exitCode != 2, "[\(caseSlug)] CLI exited 2: \(res.stderr)")
+            let actualObj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+
+            let citesArr = try #require(actualObj["citations"] as? [[String: Any]])
+            let actualCites = Set(citesArr.compactMap { $0["key"] as? String })
+            let labelsArr = try #require(actualObj["labels"] as? [[String: Any]])
+            let actualLabels = Set(labelsArr.compactMap { $0["key"] as? String })
+            let diagsArr = try #require(actualObj["diagnostics"] as? [[String: Any]])
+            let structErrors = diagsArr.filter {
+                ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+            }
+
+            #expect(actualCites == expectedCites, "[\(caseSlug)] cite_keys mismatch: actual=\(actualCites) expected=\(expectedCites)")
+            #expect(actualLabels == expectedLabels, "[\(caseSlug)] labels mismatch: actual=\(actualLabels) expected=\(expectedLabels)")
+            #expect(actualCites.filter { $0.hasPrefix("fake") }.isEmpty, "[\(caseSlug)] leaked fake cite keys: \(actualCites)")
+            #expect(actualLabels.filter { $0.hasPrefix("fake") }.isEmpty, "[\(caseSlug)] leaked fake labels: \(actualLabels)")
+            #expect(structErrors.count == expectedStructErrs, "[\(caseSlug)] expected \(expectedStructErrs) structure ERRORs, got \(structErrors)")
+        }
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

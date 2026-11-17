@@ -1,0 +1,12 @@
+{
+  "case": "06-mintinline-delim",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_mint_delim",
+    "sec:mint_delim"
+  ],
+  "structure_errors": 0,
+  "basis": "minted / fvextra (\\mintinline[options]{lang}<c>...<c>): delimited code argument scans literally up to matching <c>, allowing unbalanced '{' and literal '%' without starting a TeX comment (hand-written expectation; minted requires -shell-escape)."
+}

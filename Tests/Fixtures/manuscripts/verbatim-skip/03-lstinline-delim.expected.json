@@ -1,0 +1,12 @@
+{
+  "case": "03-lstinline-delim",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_lst_delim",
+    "sec:lst_delim"
+  ],
+  "structure_errors": 0,
+  "basis": "listings package (listings.sty): \\lstinline[options]<c>...<c> reads literal code up to matching <c>; inner \\cite, \\label, unbalanced braces, and '%' are inert."
+}

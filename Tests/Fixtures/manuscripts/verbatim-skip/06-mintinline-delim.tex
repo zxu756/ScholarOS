@@ -1,0 +1,9 @@
+\documentclass{article}
+\usepackage{minted}
+\begin{document}
+\section{Mintinline Delimited}\label{sec:mint_delim}
+C snippet \mintinline{c}|\cite{fake_mint2} { \label{fake_lbl_mint2} %| then \cite{k1} \label{sec:after_mint_delim}.
+See \ref{sec:mint_delim} and \ref{sec:after_mint_delim}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

@@ -1,0 +1,12 @@
+{
+  "case": "19-alltt",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:alltt_sec",
+    "sec:in_alltt"
+  ],
+  "structure_errors": 0,
+  "basis": "alltt package (alltt.sty): unlike verbatim, alltt preserves normal catcodes (0, 1, 2) for '\\', '{', and '}', so \\cite{k1} and \\label{sec:in_alltt} inside \\begin{alltt}...\\end{alltt} execute normally in LaTeX."
+}

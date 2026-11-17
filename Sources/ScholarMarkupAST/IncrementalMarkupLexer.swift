@@ -842,9 +842,12 @@ public struct IncrementalMarkupLexer: Sendable {
             updatedBytes: updatedBytes
         )
 
-        // Ensure prefix does not end immediately after a multi-line comment or fenced construct in Typst/Markdown.
+        // Ensure prefix does not end immediately after a multi-line comment, verbatim block, or fenced construct.
         while prefixCount > 0 && tokenMayAffectMultiLineState(previousTokens[prefixCount - 1], format: resolvedFormat) {
             prefixCount -= 1
+            if prefixCount > 0 && previousTokens[prefixCount].kind == .verbatim {
+                prefixCount -= 1
+            }
             while prefixCount > 0 && previousTokens[prefixCount].span.start.column != 1 {
                 prefixCount -= 1
             }
@@ -1144,6 +1147,15 @@ public struct IncrementalMarkupLexer: Sendable {
     private func tokenMayAffectMultiLineState(_ token: MarkupToken, format: ManuscriptFormat) -> Bool {
         switch format {
         case .latex:
+            if token.kind == .verbatim {
+                return true
+            }
+            if token.kind == .command && Self.latexMultiLineStateCommands.contains(token.lexeme) {
+                return true
+            }
+            if token.kind == .textWord && (Self.verbatimEnvironmentNames.contains(token.lexeme) || Self.verbatimEnvironmentNames.contains(token.lexeme + "*")) {
+                return true
+            }
             return false
         case .typst:
             if token.kind == .comment && token.lexeme.hasPrefix("/*") {
@@ -1166,6 +1178,39 @@ public struct IncrementalMarkupLexer: Sendable {
         guard !range.isEmpty else { return false }
         switch format {
         case .latex:
+            var i = range.lowerBound
+            while i < range.upperBound {
+                if bytes[i] == 0x5C { // '\'
+                    var j = i + 1
+                    while j < bytes.count && (UTF8ByteClassifier.isASCIILetter(bytes[j]) || bytes[j] == 0x40) {
+                        j += 1
+                    }
+                    if j > i + 1 {
+                        let cmd = String(decoding: bytes[i..<j], as: UTF8.self)
+                        if Self.latexMultiLineStateCommands.contains(cmd) || cmd.hasPrefix("\\if") {
+                            return true
+                        }
+                        if cmd == "\\begin" || cmd == "\\end" {
+                            var k = j
+                            while k < bytes.count && UTF8ByteClassifier.isHorizontalWhitespace(bytes[k]) { k += 1 }
+                            if k < bytes.count && bytes[k] == 0x7B {
+                                var close = k + 1
+                                while close < bytes.count && bytes[close] != 0x7D && !UTF8ByteClassifier.isNewline(bytes[close]) {
+                                    close += 1
+                                }
+                                if close < bytes.count && bytes[close] == 0x7D {
+                                    let env = String(decoding: bytes[(k + 1)..<close], as: UTF8.self)
+                                        .trimmingCharacters(in: .whitespaces)
+                                    if Self.verbatimEnvironmentNames.contains(env) {
+                                        return true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                i += 1
+            }
             return false
         case .typst:
             var i = range.lowerBound
@@ -1284,153 +1329,183 @@ public struct IncrementalMarkupLexer: Sendable {
 
     private func lexLaTeX(cursor: inout UTF8Cursor, into output: inout [MarkupToken]) {
         while !cursor.isAtEnd {
-            let startPos = cursor.currentPosition
-            guard let b = cursor.peekByte() else { break }
+            lexSingleLaTeXStep(cursor: &cursor, into: &output)
+        }
+    }
 
-            // 1. Linebreaks: emitted as a single-newline `.whitespace` token so every subsequent line
-            //    begins cleanly at `column == 1` for incremental line-window splicing.
-            if UTF8ByteClassifier.isNewline(b) {
+    private func lexSingleLaTeXStep(cursor: inout UTF8Cursor, into output: inout [MarkupToken]) {
+        let startPos = cursor.currentPosition
+        guard let b = cursor.peekByte() else { return }
+
+        // 1. Linebreaks: emitted as a single-newline `.whitespace` token so every subsequent line
+        //    begins cleanly at `column == 1` for incremental line-window splicing.
+        if UTF8ByteClassifier.isNewline(b) {
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .whitespace, from: startPos), into: &output)
+            return
+        }
+
+        // 2. Horizontal whitespace runs (' ', '\t', etc.) never cross a newline.
+        if UTF8ByteClassifier.isHorizontalWhitespace(b) {
+            cursor.advanceASCIIByte()
+            while let next = cursor.peekByte(), UTF8ByteClassifier.isHorizontalWhitespace(next) {
                 cursor.advanceASCIIByte()
-                emit(cursor.makeToken(kind: .whitespace, from: startPos), into: &output)
-                continue
             }
+            emit(cursor.makeToken(kind: .whitespace, from: startPos), into: &output)
+            return
+        }
 
-            // 2. Horizontal whitespace runs (' ', '\t', etc.) never cross a newline.
-            if UTF8ByteClassifier.isHorizontalWhitespace(b) {
-                cursor.advanceASCIIByte()
-                while let next = cursor.peekByte(), UTF8ByteClassifier.isHorizontalWhitespace(next) {
-                    cursor.advanceASCIIByte()
-                }
-                emit(cursor.makeToken(kind: .whitespace, from: startPos), into: &output)
-                continue
+        // 3. LaTeX `%` line comments (consumes up to, but NOT including, the newline so newline keeps its invariant).
+        if b == 0x25 { // '%'
+            cursor.advanceASCIIByte()
+            while let next = cursor.peekByte(), !UTF8ByteClassifier.isNewline(next) {
+                cursor.advanceOneScalar()
             }
+            emit(cursor.makeToken(kind: .comment, from: startPos), into: &output)
+            return
+        }
 
-            // 3. LaTeX `%` line comments (consumes up to, but NOT including, the newline so newline keeps its invariant).
-            if b == 0x25 { // '%'
-                cursor.advanceASCIIByte()
-                while let next = cursor.peekByte(), !UTF8ByteClassifier.isNewline(next) {
-                    cursor.advanceOneScalar()
-                }
-                emit(cursor.makeToken(kind: .comment, from: startPos), into: &output)
-                continue
-            }
-
-            // 4. Backslash commands, math delimiters (`\[`, `\]`, `\(`, `\)`), and control symbols (`\%`, `\{`, `\$`, etc.).
-            if b == 0x5C { // '\'
-                cursor.advanceASCIIByte()
-                guard let second = cursor.peekByte() else {
-                    emit(cursor.makeToken(kind: .command, from: startPos), into: &output)
-                    continue
-                }
-
-                // Display math delimiters `\[` and `\]`
-                if second == 0x5B || second == 0x5D { // '[' or ']'
-                    cursor.advanceASCIIByte()
-                    emit(cursor.makeToken(kind: .mathDisplay, from: startPos), into: &output)
-                    continue
-                }
-
-                // Inline math delimiters `\(` and `\)`
-                if second == 0x28 || second == 0x29 { // '(' or ')'
-                    cursor.advanceASCIIByte()
-                    emit(cursor.makeToken(kind: .mathInline, from: startPos), into: &output)
-                    continue
-                }
-
-                // Control words: `\` followed by ASCII letters (plus `@` inside internal macros like `\makeatletter`,
-                // and optional trailing `*` for starred forms like `\section*`, `\newcommand*`, `\DeclareMathOperator*`).
-                if UTF8ByteClassifier.isASCIILetter(second) || second == 0x40 { // '@'
-                    cursor.advanceASCIIByte()
-                    while let cont = cursor.peekByte(),
-                          UTF8ByteClassifier.isASCIILetter(cont) || cont == 0x40 {
-                        cursor.advanceASCIIByte()
-                    }
-                    // Attach trailing `*` for starred sectioning/citation/macro commands (`\section*`, `\parencite*`, etc.)
-                    if cursor.peekByte() == 0x2A { // '*'
-                        let wordSoFar = cursor.sliceString(from: startPos.utf8Offset, to: cursor.offset)
-                        if Self.starredCapableCommands.contains(wordSoFar) {
-                            cursor.advanceASCIIByte()
-                        }
-                    }
-                    emit(cursor.makeToken(kind: .command, from: startPos), into: &output)
-                    continue
-                }
-
-                // Control symbol: `\` followed by a single non-letter scalar (except newline!).
-                if !UTF8ByteClassifier.isNewline(second) {
-                    cursor.advanceOneScalar()
-                }
+        // 4. Backslash commands, math delimiters (`\[`, `\]`, `\(`, `\)`), and control symbols (`\%`, `\{`, `\$`, etc.).
+        if b == 0x5C { // '\'
+            cursor.advanceASCIIByte()
+            guard let second = cursor.peekByte() else {
                 emit(cursor.makeToken(kind: .command, from: startPos), into: &output)
-                continue
+                return
             }
 
-            // 5. Structural braces and brackets.
-            switch b {
-            case 0x7B: // '{'
+            // Display math delimiters `\[` and `\]`
+            if second == 0x5B || second == 0x5D { // '[' or ']'
                 cursor.advanceASCIIByte()
-                emit(cursor.makeToken(kind: .leftBrace, from: startPos), into: &output)
-                continue
-            case 0x7D: // '}'
+                emit(cursor.makeToken(kind: .mathDisplay, from: startPos), into: &output)
+                return
+            }
+
+            // Inline math delimiters `\(` and `\)`
+            if second == 0x28 || second == 0x29 { // '(' or ')'
                 cursor.advanceASCIIByte()
-                emit(cursor.makeToken(kind: .rightBrace, from: startPos), into: &output)
-                continue
-            case 0x5B: // '['
+                emit(cursor.makeToken(kind: .mathInline, from: startPos), into: &output)
+                return
+            }
+
+            // Control words: `\` followed by ASCII letters (plus `@` inside internal macros like `\makeatletter`,
+            // and optional trailing `*` for starred forms like `\section*`, `\newcommand*`, `\DeclareMathOperator*`).
+            if UTF8ByteClassifier.isASCIILetter(second) || second == 0x40 { // '@'
                 cursor.advanceASCIIByte()
-                emit(cursor.makeToken(kind: .leftBracket, from: startPos), into: &output)
-                continue
-            case 0x5D: // ']'
-                cursor.advanceASCIIByte()
-                emit(cursor.makeToken(kind: .rightBracket, from: startPos), into: &output)
-                continue
-            case 0x24: // '$' or '$$'
-                cursor.advanceASCIIByte()
-                if cursor.peekByte() == 0x24 {
+                while let cont = cursor.peekByte(),
+                      UTF8ByteClassifier.isASCIILetter(cont) || cont == 0x40 {
                     cursor.advanceASCIIByte()
-                    emit(cursor.makeToken(kind: .mathDisplay, from: startPos), into: &output)
-                } else {
-                    emit(cursor.makeToken(kind: .mathInline, from: startPos), into: &output)
                 }
-                continue
-            default:
-                break
-            }
-
-            // 6. TeX macro parameter token `#1`..`#9` or escaped `##`.
-            if b == 0x23 { // '#'
-                cursor.advanceASCIIByte()
-                if let digit = cursor.peekByte(), (digit >= 0x31 && digit <= 0x39) || digit == 0x23 {
-                    cursor.advanceASCIIByte()
-                    emit(cursor.makeToken(kind: .identifier, from: startPos), into: &output)
-                } else {
-                    emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
-                }
-                continue
-            }
-
-            // 7. Numeric literals (`42`, `3.14159`, `1,000` only if decimal dot).
-            if UTF8ByteClassifier.isASCIIDigit(b) {
-                lexNumericRun(cursor: &cursor)
-                // If immediately followed by letters (e.g. `2026a`, `3D`, `vaswani2017` suffix), upgrade to `.textWord`.
-                if let afterNum = cursor.peekByte(), UTF8ByteClassifier.isASCIILetter(afterNum) {
-                    while let cont = cursor.peekByte(), UTF8ByteClassifier.isASCIIAlphanumeric(cont) {
+                // Attach trailing `*` for starred sectioning/citation/macro/verb commands (`\section*`, `\verb*`, etc.)
+                if cursor.peekByte() == 0x2A { // '*'
+                    let wordSoFar = cursor.sliceString(from: startPos.utf8Offset, to: cursor.offset)
+                    if Self.starredCapableCommands.contains(wordSoFar) {
                         cursor.advanceASCIIByte()
                     }
-                    emit(cursor.makeToken(kind: .textWord, from: startPos), into: &output)
-                } else {
-                    emit(cursor.makeToken(kind: .numeric, from: startPos), into: &output)
                 }
-                continue
+                let isOperand = isCommandNameOperand(in: output)
+                let cmdTok = cursor.makeToken(kind: .command, from: startPos)
+                emit(cmdTok, into: &output)
+
+                if !isOperand {
+                    dispatchOpaqueLaTeXConstructIfNeeded(command: cmdTok.lexeme, cursor: &cursor, into: &output)
+                }
+                return
             }
 
-            // 8. ASCII or Unicode word / identifier runs (including internal hyphens/apostrophes when flanked by letters
-            //    or cite-key characters like `sec:intro` when appropriate — note: keeping `:` and `-` carefully handled!).
-            //    Wait: in `\label{sec:intro}` or `\cite{vaswani2017,dao2022}`, parser collects all tokens between `{` and `}`,
-            //    so keeping words clean (`vaswani2017` -> `.textWord`, `sec` + `:` + `intro` -> `.textWord`, `.punctuation`, `.textWord`)
-            //    works seamlessly for BOTH prose word counting AND `{...}` argument reconstruction!
-            if UTF8ByteClassifier.isASCIILetter(b) {
+            // Control symbol: `\` followed by a single non-letter scalar (except newline!).
+            if !UTF8ByteClassifier.isNewline(second) {
+                cursor.advanceOneScalar()
+            }
+            emit(cursor.makeToken(kind: .command, from: startPos), into: &output)
+            return
+        }
+
+        // 5. Structural braces and brackets.
+        switch b {
+        case 0x7B: // '{'
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .leftBrace, from: startPos), into: &output)
+            return
+        case 0x7D: // '}'
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .rightBrace, from: startPos), into: &output)
+            return
+        case 0x5B: // '['
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .leftBracket, from: startPos), into: &output)
+            return
+        case 0x5D: // ']'
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .rightBracket, from: startPos), into: &output)
+            return
+        case 0x24: // '$' or '$$'
+            cursor.advanceASCIIByte()
+            if cursor.peekByte() == 0x24 {
                 cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: .mathDisplay, from: startPos), into: &output)
+            } else {
+                emit(cursor.makeToken(kind: .mathInline, from: startPos), into: &output)
+            }
+            return
+        default:
+            break
+        }
+
+        // 6. TeX macro parameter token `#1`..`#9` or escaped `##`.
+        if b == 0x23 { // '#'
+            cursor.advanceASCIIByte()
+            if let digit = cursor.peekByte(), (digit >= 0x31 && digit <= 0x39) || digit == 0x23 {
+                cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: .identifier, from: startPos), into: &output)
+            } else {
+                emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
+            }
+            return
+        }
+
+        // 7. Numeric literals (`42`, `3.14159`, `1,000` only if decimal dot).
+        if UTF8ByteClassifier.isASCIIDigit(b) {
+            lexNumericRun(cursor: &cursor)
+            // If immediately followed by letters (e.g. `2026a`, `3D`, `vaswani2017` suffix), upgrade to `.textWord`.
+            if let afterNum = cursor.peekByte(), UTF8ByteClassifier.isASCIILetter(afterNum) {
+                while let cont = cursor.peekByte(), UTF8ByteClassifier.isASCIIAlphanumeric(cont) {
+                    cursor.advanceASCIIByte()
+                }
+                emit(cursor.makeToken(kind: .textWord, from: startPos), into: &output)
+            } else {
+                emit(cursor.makeToken(kind: .numeric, from: startPos), into: &output)
+            }
+            return
+        }
+
+        // 8. ASCII or Unicode word / identifier runs.
+        if UTF8ByteClassifier.isASCIILetter(b) {
+            cursor.advanceASCIIByte()
+            while let next = cursor.peekByte() {
+                if UTF8ByteClassifier.isASCIIAlphanumeric(next) || next == 0x5F {
+                    cursor.advanceASCIIByte()
+                } else if next >= 0x80 {
+                    let (scalar, _) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
+                    if UTF8ByteClassifier.isUnicodeWordScalar(scalar) {
+                        cursor.advanceOneScalar()
+                    } else {
+                        break
+                    }
+                } else {
+                    break
+                }
+            }
+            emit(cursor.makeToken(kind: .textWord, from: startPos), into: &output)
+            return
+        }
+
+        // 9. Multi-byte UTF-8 Unicode scalars (accented European scholars, Greek, CJK, mathematical Unicode).
+        if b >= 0x80 {
+            let (firstScalar, _) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
+            if UTF8ByteClassifier.isUnicodeWordScalar(firstScalar) {
+                cursor.advanceOneScalar()
                 while let next = cursor.peekByte() {
-                    if UTF8ByteClassifier.isASCIIAlphanumeric(next) || next == 0x5F {
+                    if UTF8ByteClassifier.isASCIIAlphanumeric(next) {
                         cursor.advanceASCIIByte()
                     } else if next >= 0x80 {
                         let (scalar, _) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
@@ -1444,53 +1519,44 @@ public struct IncrementalMarkupLexer: Sendable {
                     }
                 }
                 emit(cursor.makeToken(kind: .textWord, from: startPos), into: &output)
-                continue
+            } else {
+                cursor.advanceOneScalar()
+                emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
             }
+            return
+        }
 
-            // 9. Multi-byte UTF-8 Unicode scalars (accented European scholars, Greek, CJK, mathematical Unicode).
-            if b >= 0x80 {
-                let (firstScalar, _) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
-                if UTF8ByteClassifier.isUnicodeWordScalar(firstScalar) {
-                    cursor.advanceOneScalar()
-                    while let next = cursor.peekByte() {
-                        if UTF8ByteClassifier.isASCIIAlphanumeric(next) {
-                            cursor.advanceASCIIByte()
-                        } else if next >= 0x80 {
-                            let (scalar, _) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
-                            if UTF8ByteClassifier.isUnicodeWordScalar(scalar) {
-                                cursor.advanceOneScalar()
-                            } else {
-                                break
-                            }
-                        } else {
-                            break
-                        }
-                    }
-                    emit(cursor.makeToken(kind: .textWord, from: startPos), into: &output)
-                } else {
-                    cursor.advanceOneScalar()
-                    emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
-                }
-                continue
-            }
-
-            // 10. Multi-character LaTeX ligature punctuation (`---`, `--`, ``` `` ```, `''`) or single ASCII punctuation.
-            if b == 0x2D { // '-'
+        // 10. Multi-character LaTeX ligature punctuation (`---`, `--`, ``` `` ```, `''`) or single ASCII punctuation.
+        if b == 0x2D { // '-'
+            cursor.advanceASCIIByte()
+            if cursor.peekByte() == 0x2D {
                 cursor.advanceASCIIByte()
                 if cursor.peekByte() == 0x2D {
                     cursor.advanceASCIIByte()
-                    if cursor.peekByte() == 0x2D {
-                        cursor.advanceASCIIByte()
-                    }
                 }
-                emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
-                continue
             }
-
-            cursor.advanceASCIIByte()
             emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
+            return
         }
+
+        cursor.advanceASCIIByte()
+        emit(cursor.makeToken(kind: .punctuation, from: startPos), into: &output)
     }
+
+    // MARK: - LaTeX Verbatim, Conditional `\iffalse...\fi`, & Raw URL/Href Lexing
+
+    /// Exact list of LaTeX environments whose bodies are skipped verbatim up to `\end{<name>}`.
+    /// (`alltt` is intentionally excluded: commands inside `alltt` remain active in LaTeX.)
+    public static let verbatimEnvironmentNames: Set<String> = [
+        "verbatim", "verbatim*", "Verbatim", "BVerbatim",
+        "lstlisting", "minted", "comment"
+    ]
+
+    private static let latexMultiLineStateCommands: Set<String> = [
+        "\\iffalse", "\\else", "\\fi",
+        "\\verb", "\\verb*", "\\lstinline", "\\mintinline",
+        "\\url", "\\path", "\\nolinkurl", "\\href"
+    ]
 
     private static let starredCapableCommands: Set<String> = [
         "\\part", "\\chapter", "\\section", "\\subsection", "\\subsubsection",
@@ -1499,8 +1565,610 @@ public struct IncrementalMarkupLexer: Sendable {
         "\\DeclareMathOperator", "\\caption",
         "\\cite", "\\citep", "\\citet", "\\citealt", "\\citealp", "\\citeauthor",
         "\\parencite", "\\textcite", "\\autocite", "\\vspace", "\\hspace",
-        "\\import", "\\subimport"
+        "\\import", "\\subimport", "\\verb"
     ]
+
+    private static let commandNameTakingPrimitives: Set<String> = [
+        "\\def", "\\gdef", "\\edef", "\\xdef",
+        "\\let", "\\futurelet",
+        "\\newcommand", "\\newcommand*",
+        "\\renewcommand", "\\renewcommand*",
+        "\\providecommand", "\\providecommand*",
+        "\\DeclareRobustCommand", "\\DeclareRobustCommand*",
+        "\\NewDocumentCommand", "\\RenewDocumentCommand", "\\ProvideDocumentCommand",
+        "\\CheckCommand", "\\CheckCommand*",
+        "\\newif", "\\string", "\\meaning", "\\noexpand", "\\expandafter", "\\@ifundefined"
+    ]
+
+    private static let bracedMacroNameDefiningCommands: Set<String> = [
+        "\\newcommand", "\\newcommand*",
+        "\\renewcommand", "\\renewcommand*",
+        "\\providecommand", "\\providecommand*",
+        "\\DeclareRobustCommand", "\\DeclareRobustCommand*",
+        "\\NewDocumentCommand", "\\RenewDocumentCommand", "\\ProvideDocumentCommand",
+        "\\CheckCommand", "\\CheckCommand*"
+    ]
+
+    private static let nonFiIfPseudoConditionals: Set<String> = [
+        "\\ifthenelse", "\\ifdef", "\\ifundef", "\\ifcsdef", "\\ifcsundef",
+        "\\ifstrequal", "\\ifstrstart", "\\ifblank", "\\ifnotblank",
+        "\\ifbool", "\\ifnumcomp", "\\ifdimcomp", "\\ifpatchable", "\\ifvoidbox"
+    ]
+
+    private func previousSignificantToken(
+        in output: [MarkupToken],
+        before index: Int
+    ) -> (token: MarkupToken, index: Int)? {
+        var i = index - 1
+        while i >= 0 {
+            let t = output[i]
+            if t.kind != .whitespace && t.kind != .comment {
+                return (t, i)
+            }
+            i -= 1
+        }
+        return nil
+    }
+
+    /// Returns `true` when the control sequence about to be emitted is a macro-name operand
+    /// (e.g. `\providecommand{\url}[1]{#1}`, `\def\url#1{#1}`, `\let\myfalse\iffalse`, `\string\verb`),
+    /// rather than an invocation of that command.
+    private func isCommandNameOperand(in output: [MarkupToken]) -> Bool {
+        guard let prev1 = previousSignificantToken(in: output, before: output.count) else {
+            return false
+        }
+        if prev1.token.kind == .command {
+            if Self.commandNameTakingPrimitives.contains(prev1.token.lexeme) {
+                return true
+            }
+            if let prev2 = previousSignificantToken(in: output, before: prev1.index),
+               prev2.token.kind == .command,
+               (prev2.token.lexeme == "\\let" || prev2.token.lexeme == "\\futurelet") {
+                return true
+            }
+        } else if prev1.token.kind == .punctuation && prev1.token.lexeme == "=" {
+            if let prev2 = previousSignificantToken(in: output, before: prev1.index),
+               prev2.token.kind == .command,
+               let prev3 = previousSignificantToken(in: output, before: prev2.index),
+               prev3.token.kind == .command,
+               (prev3.token.lexeme == "\\let" || prev3.token.lexeme == "\\futurelet") {
+                return true
+            }
+        } else if prev1.token.kind == .leftBrace {
+            if let prev2 = previousSignificantToken(in: output, before: prev1.index),
+               prev2.token.kind == .command,
+               Self.bracedMacroNameDefiningCommands.contains(prev2.token.lexeme) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func dispatchOpaqueLaTeXConstructIfNeeded(
+        command: String,
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        switch command {
+        case "\\verb", "\\verb*":
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            lexDelimitedInlineVerbatim(allowSingleNewlineIfClosed: false, cursor: &cursor, into: &output)
+
+        case "\\lstinline":
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x5B { // '['
+                lexBalancedNormalLaTeXGroup(openByte: 0x5B, closeByte: 0x5D, cursor: &cursor, into: &output)
+                emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            }
+            emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x7B { // '{'
+                lexBracedVerbatimArgument(cursor: &cursor, into: &output)
+            } else if let b = cursor.peekByte(), !UTF8ByteClassifier.isNewline(b) {
+                lexDelimitedInlineVerbatim(allowSingleNewlineIfClosed: true, cursor: &cursor, into: &output)
+            }
+
+        case "\\mintinline":
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x5B { // '['
+                lexBalancedNormalLaTeXGroup(openByte: 0x5B, closeByte: 0x5D, cursor: &cursor, into: &output)
+                emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            }
+            emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            guard cursor.peekByte() == 0x7B else { return }
+            // Mandatory `{<language>}` argument is normal LaTeX tokens
+            lexBalancedNormalLaTeXGroup(openByte: 0x7B, closeByte: 0x7D, cursor: &cursor, into: &output)
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x7B { // '{'
+                lexBracedVerbatimArgument(cursor: &cursor, into: &output)
+            } else if let b = cursor.peekByte(), !UTF8ByteClassifier.isNewline(b) {
+                lexDelimitedInlineVerbatim(allowSingleNewlineIfClosed: true, cursor: &cursor, into: &output)
+            }
+
+        case "\\begin":
+            tryLexVerbatimEnvironmentAfterBegin(cursor: &cursor, into: &output)
+
+        case "\\iffalse":
+            lexIfFalseConditionalSkip(cursor: &cursor, into: &output)
+
+        case "\\url", "\\path", "\\nolinkurl":
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x7B { // '{'
+                lexBracedVerbatimArgument(cursor: &cursor, into: &output)
+            } else if let b = cursor.peekByte(),
+                      !UTF8ByteClassifier.isNewline(b),
+                      b != 0x7D, b != 0x5D, b != 0x5C,
+                      !UTF8ByteClassifier.isASCIIAlphanumeric(b) {
+                lexDelimitedInlineVerbatim(allowSingleNewlineIfClosed: true, cursor: &cursor, into: &output)
+            }
+
+        case "\\href":
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            emitSingleNewlineBeforeExpectedBytes([0x5B, 0x7B], cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x5B { // optional `[options]`
+                lexBalancedNormalLaTeXGroup(openByte: 0x5B, closeByte: 0x5D, cursor: &cursor, into: &output)
+                emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+                emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            }
+            if cursor.peekByte() == 0x7B { // first `{<URL>}` argument ONLY; second `{<text>}` stays normal!
+                lexBracedVerbatimArgument(cursor: &cursor, into: &output)
+            }
+
+        default:
+            break
+        }
+    }
+
+    private func emitHorizontalWhitespaceIfPresent(
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        guard let b = cursor.peekByte(), UTF8ByteClassifier.isHorizontalWhitespace(b) else { return }
+        let wsStart = cursor.currentPosition
+        cursor.advanceASCIIByte()
+        while let next = cursor.peekByte(), UTF8ByteClassifier.isHorizontalWhitespace(next) {
+            cursor.advanceASCIIByte()
+        }
+        emit(cursor.makeToken(kind: .whitespace, from: wsStart), into: &output)
+    }
+
+    /// Non-destructively checks if `[optional % comment][single newline][optional horizontal spaces]` is immediately
+    /// followed by one of `expectedBytes`, and if so emits those trivia tokens cleanly so `cursor` lands on the target byte.
+    private func emitSingleNewlineBeforeExpectedBytes(
+        _ expectedBytes: Set<UInt8>,
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        var probe = cursor.offset
+        if probe < cursor.endOffset && cursor.bytes[probe] == 0x25 { // '%'
+            while probe < cursor.endOffset && !UTF8ByteClassifier.isNewline(cursor.bytes[probe]) {
+                probe += 1
+            }
+        }
+        guard probe < cursor.endOffset, UTF8ByteClassifier.isNewline(cursor.bytes[probe]) else {
+            return
+        }
+        if cursor.bytes[probe] == 0x0D && probe + 1 < cursor.endOffset && cursor.bytes[probe + 1] == 0x0A {
+            probe += 2
+        } else {
+            probe += 1
+        }
+        while probe < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[probe]) {
+            probe += 1
+        }
+        guard probe < cursor.endOffset, expectedBytes.contains(cursor.bytes[probe]) else {
+            return
+        }
+
+        // Probe matched: emit the `%` comment (if any), single newline, and horizontal spaces.
+        if cursor.peekByte() == 0x25 {
+            let commentStart = cursor.currentPosition
+            cursor.advanceASCIIByte()
+            while let next = cursor.peekByte(), !UTF8ByteClassifier.isNewline(next) {
+                cursor.advanceOneScalar()
+            }
+            emit(cursor.makeToken(kind: .comment, from: commentStart), into: &output)
+        }
+        if let nl = cursor.peekByte(), UTF8ByteClassifier.isNewline(nl) {
+            let nlStart = cursor.currentPosition
+            cursor.advanceASCIIByte()
+            emit(cursor.makeToken(kind: .whitespace, from: nlStart), into: &output)
+        }
+        emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+    }
+
+    /// Lexes a balanced normal LaTeX `[options]` or `{language}` group using standard LaTeX token rules.
+    private func lexBalancedNormalLaTeXGroup(
+        openByte: UInt8,
+        closeByte: UInt8,
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        guard cursor.peekByte() == openByte else { return }
+        let openKind: MarkupTokenKind = (openByte == 0x5B) ? .leftBracket : .leftBrace
+        let closeKind: MarkupTokenKind = (closeByte == 0x5D) ? .rightBracket : .rightBrace
+
+        let openStart = cursor.currentPosition
+        cursor.advanceASCIIByte()
+        emit(cursor.makeToken(kind: openKind, from: openStart), into: &output)
+
+        var depth = 1
+        var braceGuard = 0
+
+        while !cursor.isAtEnd && depth > 0 {
+            guard let b = cursor.peekByte() else { break }
+
+            if openByte == 0x5B {
+                if b == 0x7B { // '{' inside `[...]`
+                    let s = cursor.currentPosition
+                    cursor.advanceASCIIByte()
+                    emit(cursor.makeToken(kind: .leftBrace, from: s), into: &output)
+                    braceGuard += 1
+                    continue
+                }
+                if b == 0x7D && braceGuard > 0 { // '}' inside `[...]`
+                    let s = cursor.currentPosition
+                    cursor.advanceASCIIByte()
+                    emit(cursor.makeToken(kind: .rightBrace, from: s), into: &output)
+                    braceGuard -= 1
+                    continue
+                }
+            }
+
+            if braceGuard == 0 && b == openByte {
+                let s = cursor.currentPosition
+                cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: openKind, from: s), into: &output)
+                depth += 1
+                continue
+            }
+
+            if braceGuard == 0 && b == closeByte {
+                let s = cursor.currentPosition
+                cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: closeKind, from: s), into: &output)
+                depth -= 1
+                continue
+            }
+
+            if UTF8ByteClassifier.isNewline(b) {
+                // Recover at blank line (`\n[ \t]*\n`) if group was left unclosed
+                if isAtBlankLineBoundary(cursor: cursor) {
+                    break
+                }
+                let s = cursor.currentPosition
+                cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: .whitespace, from: s), into: &output)
+                continue
+            }
+
+            lexSingleLaTeXStep(cursor: &cursor, into: &output)
+        }
+    }
+
+    private func isAtBlankLineBoundary(cursor: UTF8Cursor) -> Bool {
+        var idx = cursor.offset
+        guard idx < cursor.endOffset, UTF8ByteClassifier.isNewline(cursor.bytes[idx]) else { return false }
+        if cursor.bytes[idx] == 0x0D && idx + 1 < cursor.endOffset && cursor.bytes[idx + 1] == 0x0A {
+            idx += 2
+        } else {
+            idx += 1
+        }
+        while idx < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[idx]) {
+            idx += 1
+        }
+        return idx < cursor.endOffset && UTF8ByteClassifier.isNewline(cursor.bytes[idx])
+    }
+
+    /// Scans `<c>...<c>` inline verbatim (used by `\verb`, `\verb*`, `\lstinline<c>...<c>`, `\mintinline{lang}<c>...<c>`).
+    /// Emits a single `.verbatim` token covering the opening delimiter `<c>`, body, and closing delimiter `<c>`.
+    private func lexDelimitedInlineVerbatim(
+        allowSingleNewlineIfClosed: Bool,
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        guard let first = cursor.peekByte(), !UTF8ByteClassifier.isNewline(first) else { return }
+        let verbStart = cursor.currentPosition
+        let (delimScalar, delimLen) = UTF8ByteClassifier.decodeScalar(at: cursor.offset, in: cursor.bytes)
+
+        // Probe for the matching closing delimiter scalar.
+        var probe = cursor.offset + max(1, delimLen)
+        var foundCloseEndByte: Int? = nil
+        var sawNewline = false
+
+        while probe < cursor.endOffset {
+            let b = cursor.bytes[probe]
+            if UTF8ByteClassifier.isNewline(b) {
+                if !allowSingleNewlineIfClosed {
+                    break
+                }
+                // Check for blank line (`\n[ \t]*\n`): inline verbatim never crosses `\par`.
+                var nlNext = probe + ((b == 0x0D && probe + 1 < cursor.endOffset && cursor.bytes[probe + 1] == 0x0A) ? 2 : 1)
+                while nlNext < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[nlNext]) {
+                    nlNext += 1
+                }
+                if nlNext < cursor.endOffset && UTF8ByteClassifier.isNewline(cursor.bytes[nlNext]) {
+                    break
+                }
+                sawNewline = true
+                probe = (b == 0x0D && probe + 1 < cursor.endOffset && cursor.bytes[probe + 1] == 0x0A) ? (probe + 2) : (probe + 1)
+                continue
+            }
+            let (sc, len) = UTF8ByteClassifier.decodeScalar(at: probe, in: cursor.bytes)
+            let step = max(1, len)
+            if sc == delimScalar {
+                foundCloseEndByte = probe + step
+                break
+            }
+            probe += step
+        }
+        _ = sawNewline
+
+        if let closeEndByte = foundCloseEndByte {
+            while cursor.offset < closeEndByte && !cursor.isAtEnd {
+                cursor.advanceOneScalar()
+            }
+        } else {
+            // Unclosed delimiter: consume only up to the end of the current line so downstream lines stay intact.
+            while let b = cursor.peekByte(), !UTF8ByteClassifier.isNewline(b) {
+                cursor.advanceOneScalar()
+            }
+        }
+
+        if cursor.offset > verbStart.utf8Offset {
+            emit(cursor.makeToken(kind: .verbatim, from: verbStart), into: &output)
+        }
+    }
+
+    /// Scans `{...}` braced verbatim content where `%` is NOT a comment, `\` does NOT start commands or escape braces,
+    /// and balanced inner `{...}` pairs are permitted (`\lstinline{...}`, `\mintinline{lang}{...}`, `\url{...}`,
+    /// `\path{...}`, `\nolinkurl{...}`, and the first `{...}` argument of `\href{...}{...}`).
+    /// Emits `.leftBrace("{")`, `.verbatim("<inner>")` (when non-empty), and `.rightBrace("}")`.
+    private func lexBracedVerbatimArgument(
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        guard cursor.peekByte() == 0x7B else { return } // '{'
+        let openStart = cursor.currentPosition
+        cursor.advanceASCIIByte()
+        emit(cursor.makeToken(kind: .leftBrace, from: openStart), into: &output)
+
+        // Probe forward for matching closing `}` with brace counting (stopping at `\par` blank line if unclosed).
+        var probe = cursor.offset
+        var depth = 1
+        var matchingCloseByte: Int? = nil
+
+        while probe < cursor.endOffset {
+            let b = cursor.bytes[probe]
+            if b == 0x7B { // '{'
+                depth += 1
+                probe += 1
+                continue
+            }
+            if b == 0x7D { // '}'
+                depth -= 1
+                if depth == 0 {
+                    matchingCloseByte = probe
+                    break
+                }
+                probe += 1
+                continue
+            }
+            if UTF8ByteClassifier.isNewline(b) {
+                let afterNL = probe + ((b == 0x0D && probe + 1 < cursor.endOffset && cursor.bytes[probe + 1] == 0x0A) ? 2 : 1)
+                var wsProbe = afterNL
+                while wsProbe < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[wsProbe]) {
+                    wsProbe += 1
+                }
+                if wsProbe < cursor.endOffset && UTF8ByteClassifier.isNewline(cursor.bytes[wsProbe]) {
+                    // Blank line (`\par`) before matching `}` -> genuinely unclosed `{`
+                    break
+                }
+                probe = afterNL
+                continue
+            }
+            probe += max(1, UTF8ByteClassifier.scalarByteLength(leadingByte: b))
+        }
+
+        if let closeByte = matchingCloseByte {
+            if closeByte > cursor.offset {
+                let innerStart = cursor.currentPosition
+                while cursor.offset < closeByte && !cursor.isAtEnd {
+                    cursor.advanceOneScalar()
+                }
+                emit(cursor.makeToken(kind: .verbatim, from: innerStart), into: &output)
+            }
+            if cursor.peekByte() == 0x7D {
+                let closeStart = cursor.currentPosition
+                cursor.advanceASCIIByte()
+                emit(cursor.makeToken(kind: .rightBrace, from: closeStart), into: &output)
+            }
+        } else {
+            // Unclosed `{`: consume verbatim up to end of current line and omit `.rightBrace` so parser flags `AST001`.
+            let innerStart = cursor.currentPosition
+            while let b = cursor.peekByte(), !UTF8ByteClassifier.isNewline(b) {
+                cursor.advanceOneScalar()
+            }
+            if cursor.offset > innerStart.utf8Offset {
+                emit(cursor.makeToken(kind: .verbatim, from: innerStart), into: &output)
+            }
+        }
+    }
+
+    /// Checks whether `\begin` opens one of `verbatimEnvironmentNames`; if so, lexes `{<envName>}` and any allowed
+    /// header options (`[...]`, plus `{<lang>}` for `minted`), then emits the entire body up to `\end{<envName>}`
+    /// as a single `.verbatim` token, leaving `\end{<envName>}` on `cursor` for normal tokenization.
+    private func tryLexVerbatimEnvironmentAfterBegin(
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        var probe = cursor.offset
+        while probe < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[probe]) {
+            probe += 1
+        }
+        guard probe < cursor.endOffset, cursor.bytes[probe] == 0x7B else { return } // '{'
+        var closeBrace = probe + 1
+        while closeBrace < cursor.endOffset
+                && cursor.bytes[closeBrace] != 0x7D
+                && !UTF8ByteClassifier.isNewline(cursor.bytes[closeBrace]) {
+            closeBrace += 1
+        }
+        guard closeBrace < cursor.endOffset, cursor.bytes[closeBrace] == 0x7D else { return } // '}'
+        let rawEnvName = cursor.sliceString(from: probe + 1, to: closeBrace)
+            .trimmingCharacters(in: .whitespaces)
+        guard Self.verbatimEnvironmentNames.contains(rawEnvName) else { return }
+
+        // 1. Emit `{<envName>}` using standard tokens so parser sees `\begin{<envName>}`.
+        emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+        lexBalancedNormalLaTeXGroup(openByte: 0x7B, closeByte: 0x7D, cursor: &cursor, into: &output)
+
+        // 2. Lex header arguments only for environments that accept them in LaTeX:
+        //    - `Verbatim`, `BVerbatim`, `lstlisting`: optional `[options]` on the opening line
+        //    - `minted`: optional `[options]` on the opening line + mandatory `{language}`
+        //    - `verbatim`, `verbatim*`, `comment`: no arguments; body starts immediately after `}`!
+        if rawEnvName == "Verbatim" || rawEnvName == "BVerbatim" || rawEnvName == "lstlisting" {
+            var optProbe = cursor.offset
+            while optProbe < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[optProbe]) {
+                optProbe += 1
+            }
+            if optProbe < cursor.endOffset && cursor.bytes[optProbe] == 0x5B { // '['
+                emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+                lexBalancedNormalLaTeXGroup(openByte: 0x5B, closeByte: 0x5D, cursor: &cursor, into: &output)
+            }
+        } else if rawEnvName == "minted" {
+            var optProbe = cursor.offset
+            while optProbe < cursor.endOffset && UTF8ByteClassifier.isHorizontalWhitespace(cursor.bytes[optProbe]) {
+                optProbe += 1
+            }
+            if optProbe < cursor.endOffset && cursor.bytes[optProbe] == 0x5B { // '['
+                emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+                lexBalancedNormalLaTeXGroup(openByte: 0x5B, closeByte: 0x5D, cursor: &cursor, into: &output)
+            }
+            emitHorizontalWhitespaceIfPresent(cursor: &cursor, into: &output)
+            emitSingleNewlineBeforeExpectedBytes([0x7B], cursor: &cursor, into: &output)
+            if cursor.peekByte() == 0x7B { // '{<language>}'
+                lexBalancedNormalLaTeXGroup(openByte: 0x7B, closeByte: 0x7D, cursor: &cursor, into: &output)
+            }
+        }
+
+        // 3. Scan verbatim body until literal `\end{<rawEnvName>}`.
+        let endMarker = Array("\\end{\(rawEnvName)}".utf8)
+        let isCommentEnv = (rawEnvName == "comment")
+        var lineHasPercent = false
+        let bodyStart = cursor.currentPosition
+
+        while !cursor.isAtEnd {
+            if (!isCommentEnv || !lineHasPercent) && cursorMatchesUTF8Bytes(cursor: cursor, pattern: endMarker) {
+                break
+            }
+            if let b = cursor.peekByte() {
+                if UTF8ByteClassifier.isNewline(b) {
+                    lineHasPercent = false
+                } else if b == 0x25 {
+                    lineHasPercent = true
+                }
+            }
+            cursor.advanceOneScalar()
+        }
+
+        if cursor.offset > bodyStart.utf8Offset {
+            emit(cursor.makeToken(kind: .verbatim, from: bodyStart), into: &output)
+        }
+    }
+
+    private func cursorMatchesUTF8Bytes(cursor: UTF8Cursor, pattern: [UInt8]) -> Bool {
+        let len = pattern.count
+        guard cursor.offset + len <= cursor.endOffset else { return false }
+        for i in 0..<len {
+            if cursor.bytes[cursor.offset + i] != pattern[i] {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Scans the skipped branch after `\iffalse`, pairing nested `\if...` and `\fi` control words
+    /// (ignoring `%` line comments and stopping before a depth-1 `\else` or the matching outer `\fi`).
+    private func lexIfFalseConditionalSkip(
+        cursor: inout UTF8Cursor,
+        into output: inout [MarkupToken]
+    ) {
+        let bodyStart = cursor.currentPosition
+        var ifDepth = 1
+        var prevControlWord: String? = nil
+
+        while !cursor.isAtEnd {
+            guard let b = cursor.peekByte() else { break }
+
+            // `%` comments inside `\iffalse` still consume to end-of-line in TeX's mouth before conditional skipping.
+            if b == 0x25 { // '%'
+                cursor.advanceASCIIByte()
+                while let next = cursor.peekByte(), !UTF8ByteClassifier.isNewline(next) {
+                    cursor.advanceOneScalar()
+                }
+                continue
+            }
+
+            if b == 0x5C { // '\'
+                guard let second = cursor.peekByte(1) else {
+                    cursor.advanceASCIIByte()
+                    continue
+                }
+                if UTF8ByteClassifier.isASCIILetter(second) || second == 0x40 { // '@'
+                    var wordEnd = cursor.offset + 2
+                    while wordEnd < cursor.endOffset
+                            && (UTF8ByteClassifier.isASCIILetter(cursor.bytes[wordEnd]) || cursor.bytes[wordEnd] == 0x40) {
+                        wordEnd += 1
+                    }
+                    let word = cursor.sliceString(from: cursor.offset, to: wordEnd)
+
+                    if word == "\\fi" {
+                        ifDepth -= 1
+                        if ifDepth == 0 {
+                            // Stop BEFORE `\fi` so `\fi` is emitted as a normal `.command` token.
+                            break
+                        }
+                        cursor.advanceASCIICount(wordEnd - cursor.offset)
+                        prevControlWord = word
+                        continue
+                    }
+
+                    if word == "\\else" && ifDepth == 1 {
+                        // Top-level `\else` of `\iffalse` switches TeX to the active true branch!
+                        break
+                    }
+
+                    if word.hasPrefix("\\if")
+                        && !Self.nonFiIfPseudoConditionals.contains(word)
+                        && prevControlWord != "\\newif" {
+                        ifDepth += 1
+                    }
+
+                    cursor.advanceASCIICount(wordEnd - cursor.offset)
+                    prevControlWord = word
+                    continue
+                } else {
+                    // Control symbol (`\\`, `\%`, `\{`, `\}`, etc.) — consume both bytes so `\\fi` or `\%` never misfires!
+                    cursor.advanceASCIIByte()
+                    if !UTF8ByteClassifier.isNewline(second) {
+                        cursor.advanceOneScalar()
+                    }
+                    prevControlWord = nil
+                    continue
+                }
+            }
+
+            if !UTF8ByteClassifier.isHorizontalWhitespace(b) && !UTF8ByteClassifier.isNewline(b) {
+                prevControlWord = nil
+            }
+            cursor.advanceOneScalar()
+        }
+
+        if cursor.offset > bodyStart.utf8Offset {
+            emit(cursor.makeToken(kind: .verbatim, from: bodyStart), into: &output)
+        }
+    }
 
     // MARK: - 2. Typst Handwritten State-Machine Lexer
 

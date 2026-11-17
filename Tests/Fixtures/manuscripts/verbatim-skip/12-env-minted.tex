@@ -1,0 +1,13 @@
+\documentclass{article}
+\usepackage{minted}
+\begin{document}
+\section{Minted Env}\label{sec:env_minted}
+\begin{minted}[linenos]{python}
+# \cite{fake_minted} \label{fake_lbl_minted}
+\input{nonexistent_in_minted}
+raw_brace = "{" % ()
+\end{minted}
+After minted \cite{k1,k2} and \ref{sec:env_minted}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

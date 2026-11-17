@@ -1,0 +1,9 @@
+\documentclass{article}
+\usepackage{listings}
+\begin{document}
+\section{Lstinline Delimited}\label{sec:lst_delim}
+Plain \lstinline|\cite{fake_lst1} { %| and \lstinline[language=Python]+\label{fake_lbl_lst1} } %+ then \cite{k1} \label{sec:after_lst_delim}.
+See \ref{sec:lst_delim} and \ref{sec:after_lst_delim}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

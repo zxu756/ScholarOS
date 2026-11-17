@@ -1,0 +1,9 @@
+\documentclass{article}
+\usepackage{listings}
+\begin{document}
+\section{Lstinline Braced}\label{sec:lst_brace}
+Braced \lstinline[language=C]{if (ok) { \cite{fake_lst2}; } // % \label{fake_lbl_lst2}} then \cite{k1} \label{sec:after_lst_brace}.
+See \ref{sec:lst_brace} and \ref{sec:after_lst_brace}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

@@ -1,0 +1,11 @@
+{
+  "case": "10-env-fancyvrb-BVerbatim",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_bfv"
+  ],
+  "structure_errors": 0,
+  "basis": "fancyvrb package BVerbatim (boxed verbatim) environment: body is scanned literally up to \\end{BVerbatim}; inner \\cite, \\label, '}', and '$' are inert."
+}

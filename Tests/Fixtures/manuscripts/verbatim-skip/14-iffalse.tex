@@ -1,0 +1,20 @@
+\documentclass{article}
+\begin{document}
+\section{Conditional Skip}\label{sec:iffalse}
+\iffalse
+\cite{fake_if_outer} \label{fake_lbl_if1} {
+% \fi in a TeX comment does not close \iffalse
+\iftrue
+\cite{fake_if_nested}
+\else
+\cite{fake_if_nested_else}
+\fi
+\ifx\relax\relax
+\label{fake_lbl_if2}
+\fi
+\fi
+\iffalse \cite{fake_else_branch} { \else \cite{k2} \fi
+Active citation \cite{k1} and \ref{sec:iffalse}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

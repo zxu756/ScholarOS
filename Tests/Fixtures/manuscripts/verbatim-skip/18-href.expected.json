@@ -1,0 +1,14 @@
+{
+  "case": "18-href",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "sec:after_href",
+    "sec:href_cmd",
+    "sec:in_href_text"
+  ],
+  "structure_errors": 0,
+  "basis": "hyperref package (\\href{URL}{text}): only the first {URL} argument is scanned verbatim (allowing '%', '\\', and balanced '{id}'), while the second {text} argument is normal LaTeX prose where \\cite{k2} and \\label{sec:in_href_text} take effect."
+}

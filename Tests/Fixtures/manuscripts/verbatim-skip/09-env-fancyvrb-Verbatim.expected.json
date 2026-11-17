@@ -1,0 +1,11 @@
+{
+  "case": "09-env-fancyvrb-Verbatim",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_fv"
+  ],
+  "structure_errors": 0,
+  "basis": "fancyvrb package Verbatim environment: after optional [key=val], lines are scanned verbatim up to \\end{Verbatim} without command execution or brace counting."
+}

@@ -1,0 +1,11 @@
+{
+  "case": "13-env-comment",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:env_comment"
+  ],
+  "structure_errors": 0,
+  "basis": "comment package (comment.sty): \\begin{comment} discards lines literally up to \\end{comment} without TeX macro expansion, sectioning, or brace counting."
+}

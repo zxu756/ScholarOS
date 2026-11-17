@@ -650,4 +650,274 @@ struct MarkupASTAndMacroTests {
         let neurips = report.estimate(for: .neurips9Page)
         #expect(neurips?.status == .withinBudget)
     }
+
+    // MARK: - M2 Stage 03: Verbatim & Opaque Lexer Skipping + Lossless Round-Trips
+
+    private var repositoryRootURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func assertOpaqueLosslessRoundTrip(
+        _ source: String,
+        filePath: String = "test.tex",
+        expectOpaqueToken: Bool = true
+    ) -> [MarkupToken] {
+        let lexer = IncrementalMarkupLexer(configuration: .losslessCST)
+        let tokens = lexer.tokenize(source: source, format: .latex, filePath: filePath)
+        #expect(tokens.last?.kind == .eof)
+
+        let coreTokens = tokens.filter { $0.kind != .eof }
+        let reconstructed = coreTokens.map(\.lexeme).joined()
+        #expect(Data(reconstructed.utf8) == Data(source.utf8), "Token concatenation must match original bytes")
+
+        // Verify contiguous byte/position spans from 0 to source.utf8.count
+        var expectedPos = TextPosition.startOfFile
+        for tok in coreTokens {
+            #expect(!tok.lexeme.isEmpty, "Non-EOF token must not have empty lexeme")
+            #expect(tok.span.start == expectedPos, "Token span must be contiguous at \(tok)")
+            expectedPos = tok.span.end
+        }
+        #expect(expectedPos.utf8Offset == source.utf8.count)
+        #expect(tokens.last?.span.start == expectedPos)
+
+        let hasOpaque = coreTokens.contains { $0.kind == .verbatim }
+        if expectOpaqueToken {
+            #expect(hasOpaque, "Expected opaque verbatim token for: \(source)")
+        } else {
+            #expect(!hasOpaque, "Did not expect opaque verbatim token for: \(source)")
+        }
+        return tokens
+    }
+
+    @Test("M2 Stage 03 item 1 (S7, S8, S73): lexer skips all 18 verbatim/comment/iffalse/url constructs as opaque tokens without extracting commands, comments, or braces, while keeping alltt normal")
+    func m2Stage03Item1LexerOpaqueVerbatimSkippingAcrossAllConstructsAndAllttExclusion() {
+        let skippedConstructs: [(label: String, snippet: String, expectedTrailingCite: String)] = [
+            ("\\verb<c>...<c>", "Text \\verb+\\cite{fake} { %+ \\cite{k1}", "k1"),
+            ("\\verb*<c>...<c>", "Text \\verb*|\\cite{fake} } %| \\cite{k1}", "k1"),
+            ("\\lstinline<c>...<c>", "Text \\lstinline[language=C]|\\cite{fake} { %| \\cite{k1}", "k1"),
+            ("\\lstinline{...}", "Text \\lstinline{if (a) { \\cite{fake}; } % } \\cite{k1}", "k1"),
+            ("\\mintinline{lang}{...}", "Text \\mintinline[breaklines]{python}{d = {\"k\": 1} # \\cite{fake} %} \\cite{k1}", "k1"),
+            ("\\mintinline{lang}<c>...<c>", "Text \\mintinline{c}|\\cite{fake} { %| \\cite{k1}", "k1"),
+            ("verbatim env", "\\begin{verbatim}\n\\cite{fake} { %\n\\end{verbatim}\n\\cite{k1}", "k1"),
+            ("verbatim* env", "\\begin{verbatim*}\n\\cite{fake} } %\n\\end{verbatim*}\n\\cite{k1}", "k1"),
+            ("Verbatim env", "\\begin{Verbatim}[numbers=left]\n\\cite{fake} { %\n\\end{Verbatim}\n\\cite{k1}", "k1"),
+            ("BVerbatim env", "\\begin{BVerbatim}\n\\cite{fake} } %\n\\end{BVerbatim}\n\\cite{k1}", "k1"),
+            ("lstlisting env", "\\begin{lstlisting}[language=Python]\n\\cite{fake} { %\n\\end{lstlisting}\n\\cite{k1}", "k1"),
+            ("minted env", "\\begin{minted}[linenos]{python}\n\\cite{fake} { %\n\\end{minted}\n\\cite{k1}", "k1"),
+            ("comment env", "\\begin{comment}\n\\cite{fake} { %\n\\end{comment}\n\\cite{k1}", "k1"),
+            ("\\iffalse...\\fi nested", "\\iffalse \\cite{fake1} % \\fi\n \\iftrue \\cite{fake2} \\else \\cite{fake3} \\fi { \\fi \\cite{k1}", "k1"),
+            ("\\url{...}", "See \\url{https://a.com/x%20y/{z}/\\cite{fake}%} \\cite{k1}", "k1"),
+            ("\\path{...}", "See \\path{/a/%b/{c}/\\cite{fake}} \\cite{k1}", "k1"),
+            ("\\nolinkurl{...}", "See \\nolinkurl{http://a.com/%7E/{x}/\\cite{fake}} \\cite{k1}", "k1"),
+            ("\\href{...}{...}", "See \\href{http://a.com/%7E/{x}/\\cite{fake}%}{\\cite{k_anchor}} \\cite{k1}", "k1")
+        ]
+
+        let lexer = IncrementalMarkupLexer(configuration: .losslessCST)
+        for item in skippedConstructs {
+            let tokens = lexer.tokenize(source: item.snippet, format: .latex, filePath: "case.tex")
+            let hasOpaque = tokens.contains { $0.kind == .verbatim }
+            #expect(hasOpaque, "[\(item.label)] must emit opaque verbatim token")
+            #expect(!tokens.contains { $0.kind == .comment }, "[\(item.label)] '%' inside opaque region must not emit .comment")
+            #expect(!tokens.contains { $0.lexeme.contains("fake") && $0.kind != .eof && $0.kind != .verbatim }, "[\(item.label)] fake content must remain inside opaque token")
+            let citeCmdCount = tokens.filter { $0.kind == .command && $0.lexeme == "\\cite" }.count
+            let expectedCiteCmds = item.label == "\\href{...}{...}" ? 2 : 1
+            #expect(citeCmdCount == expectedCiteCmds, "[\(item.label)] expected \(expectedCiteCmds) active \\cite command(s), got \(citeCmdCount)")
+        }
+
+        // `alltt` is explicitly NOT skipped: commands inside `alltt` take effect normally.
+        let allttSource = "\\begin{alltt}\n\\cite{k_alltt} \\label{sec:alltt}\n\\end{alltt}"
+        let allttTokens = assertOpaqueLosslessRoundTrip(allttSource, expectOpaqueToken: false)
+        #expect(allttTokens.contains { $0.kind == .command && $0.lexeme == "\\cite" })
+        #expect(allttTokens.contains { $0.kind == .command && $0.lexeme == "\\label" })
+
+        // Macro definitions/aliases of `\url` or `\iffalse` (such as `.bbl` `\providecommand{\url}[1]{#1}`) must not misfire.
+        let macroDefUrl = "\\providecommand{\\url}[1]{\\texttt{#1}}\n\\let\\myfalse\\iffalse\n\\cite{k_after_def}"
+        let defTokens = assertOpaqueLosslessRoundTrip(macroDefUrl, expectOpaqueToken: false)
+        #expect(defTokens.contains { $0.kind == .command && $0.lexeme == "\\cite" })
+    }
+
+    @Test("M2 Stage 03 item 2a: lossless byte-for-byte round-trip for \\verb<c>...<c>")
+    func m2Stage03Item2LosslessRoundTripVerb() {
+        _ = assertOpaqueLosslessRoundTrip("A \\verb+\\cite{fake} { % $ }+ B \\cite{k1}\n")
+    }
+
+    @Test("M2 Stage 03 item 2b: lossless byte-for-byte round-trip for \\verb*<c>...<c>")
+    func m2Stage03Item2LosslessRoundTripVerbStar() {
+        _ = assertOpaqueLosslessRoundTrip("A \\verb*|a b \\label{fake} { %| B\n")
+    }
+
+    @Test("M2 Stage 03 item 2c: lossless byte-for-byte round-trip for \\lstinline<c>...<c>")
+    func m2Stage03Item2LosslessRoundTripLstinlineDelimited() {
+        _ = assertOpaqueLosslessRoundTrip("Code \\lstinline[language=Python]!x = {1: '%'} \\cite{fake}! end.\n")
+    }
+
+    @Test("M2 Stage 03 item 2d: lossless byte-for-byte round-trip for \\lstinline{...}")
+    func m2Stage03Item2LosslessRoundTripLstinlineBraced() {
+        _ = assertOpaqueLosslessRoundTrip("Code \\lstinline[basicstyle=\\ttfamily]{for (i=0;i<n;i++) { /* % \\cite{fake} */ }} end.\n")
+    }
+
+    @Test("M2 Stage 03 item 2e: lossless byte-for-byte round-trip for \\mintinline{lang}{...}")
+    func m2Stage03Item2LosslessRoundTripMintinlineBraced() {
+        _ = assertOpaqueLosslessRoundTrip("Py \\mintinline[linenos]{python}{x = {'a': '%'} # \\cite{fake}} end.\n")
+    }
+
+    @Test("M2 Stage 03 item 2f: lossless byte-for-byte round-trip for \\mintinline{lang}<c>...<c>")
+    func m2Stage03Item2LosslessRoundTripMintinlineDelimited() {
+        _ = assertOpaqueLosslessRoundTrip("Rust \\mintinline{rust}|let s = \"{\"; // % \\cite{fake}| end.\n")
+    }
+
+    @Test("M2 Stage 03 item 2g: lossless byte-for-byte round-trip for verbatim environment")
+    func m2Stage03Item2LosslessRoundTripEnvVerbatim() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{verbatim}\r\n\\cite{fake} { % $\r\n\\end{verbatim}\r\n")
+    }
+
+    @Test("M2 Stage 03 item 2h: lossless byte-for-byte round-trip for verbatim* environment")
+    func m2Stage03Item2LosslessRoundTripEnvVerbatimStar() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{verbatim*}\nspaces   and { \\label{fake} %\n\\end{verbatim*}\n")
+    }
+
+    @Test("M2 Stage 03 item 2i: lossless byte-for-byte round-trip for Verbatim environment")
+    func m2Stage03Item2LosslessRoundTripEnvFancyvrbVerbatim() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{Verbatim}[fontsize=\\small]\n\\cite{fake} } %\n\\end{Verbatim}\n")
+    }
+
+    @Test("M2 Stage 03 item 2j: lossless byte-for-byte round-trip for BVerbatim environment")
+    func m2Stage03Item2LosslessRoundTripEnvFancyvrbBVerbatim() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{BVerbatim}[baseline=t]\n\\cite{fake} { %\n\\end{BVerbatim}\n")
+    }
+
+    @Test("M2 Stage 03 item 2k: lossless byte-for-byte round-trip for lstlisting environment")
+    func m2Stage03Item2LosslessRoundTripEnvLstlisting() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{lstlisting}[language=C]\nint main() { /* \\cite{fake} % */ return 0;\n\\end{lstlisting}\n")
+    }
+
+    @Test("M2 Stage 03 item 2l: lossless byte-for-byte round-trip for minted environment")
+    func m2Stage03Item2LosslessRoundTripEnvMinted() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{minted}[linenos]{python}\ndef g(): # \\cite{fake} { %\n    pass\n\\end{minted}\n")
+    }
+
+    @Test("M2 Stage 03 item 2m: lossless byte-for-byte round-trip for comment environment")
+    func m2Stage03Item2LosslessRoundTripEnvComment() {
+        _ = assertOpaqueLosslessRoundTrip("\\begin{comment}\nHidden \\section{Fake} { \\cite{fake} %\n\\end{comment}\n")
+    }
+
+    @Test("M2 Stage 03 item 2n: lossless byte-for-byte round-trip for \\iffalse...\\fi with nested \\if.../\\fi")
+    func m2Stage03Item2LosslessRoundTripIffalse() {
+        _ = assertOpaqueLosslessRoundTrip("\\iffalse\n\\ifnum1=1 \\cite{fake} \\else { \\fi\n% \\fi\n\\fi\nAfter.\n")
+    }
+
+    @Test("M2 Stage 03 item 2o: lossless byte-for-byte round-trip for \\url{...}")
+    func m2Stage03Item2LosslessRoundTripUrl() {
+        _ = assertOpaqueLosslessRoundTrip("URL \\url{https://example.com/a%20b/{x,y}/%} tail.\n")
+    }
+
+    @Test("M2 Stage 03 item 2p: lossless byte-for-byte round-trip for \\path{...}")
+    func m2Stage03Item2LosslessRoundTripPath() {
+        _ = assertOpaqueLosslessRoundTrip("Path \\path{/opt/%local/{bin}/a_b} tail.\n")
+    }
+
+    @Test("M2 Stage 03 item 2q: lossless byte-for-byte round-trip for \\nolinkurl{...}")
+    func m2Stage03Item2LosslessRoundTripNolinkurl() {
+        _ = assertOpaqueLosslessRoundTrip("Nolink \\nolinkurl{http://host/%7Euser/{v1}%} tail.\n")
+    }
+
+    @Test("M2 Stage 03 item 2r: lossless byte-for-byte round-trip for \\href{...}{...}")
+    func m2Stage03Item2LosslessRoundTripHref() {
+        _ = assertOpaqueLosslessRoundTrip("Href \\href{https://host/%7E/{id}%}{anchor \\textbf{text} \\cite{k1}} tail.\n")
+    }
+
+    @Test("M2 Stage 03 item 2s: lossless byte-for-byte round-trip on entire hard-inputs/hard.tex fixture")
+    func m2Stage03Item2LosslessRoundTripHardTexFullFile() throws {
+        let hardTexURL = repositoryRootURL.appendingPathComponent("Tests/Fixtures/manuscripts/hard-inputs/hard.tex")
+        let rawData = try Data(contentsOf: hardTexURL)
+        let source = try #require(String(data: rawData, encoding: .utf8))
+
+        let tokens = assertOpaqueLosslessRoundTrip(source, filePath: "hard.tex", expectOpaqueToken: true)
+        let reconstructedData = Data(tokens.filter { $0.kind != .eof }.map(\.lexeme).joined().utf8)
+        #expect(reconstructedData == rawData)
+    }
+
+    @Test("M2 Stage 03 item 3: parser, symbol extractor, and LexerIncludeDirectiveScanner rely on opaque verbatim token")
+    func m2Stage03Item3ParserSymbolExtractorAndIncludeScannerConsumeOpaqueToken() throws {
+        // 3a. Parse `hard.tex` directly: exact citations {k1, k2, k3}, labels {sec:after, sec:url, sec:verb}, 0 fake*, 0 AST issues
+        let hardTexURL = repositoryRootURL.appendingPathComponent("Tests/Fixtures/manuscripts/hard-inputs/hard.tex")
+        let hardSource = try String(contentsOf: hardTexURL, encoding: .utf8)
+        let parser = HandwrittenMarkupCSTParser()
+        let parseResult = parser.parse(source: hardSource, filePath: "hard.tex", format: .latex)
+        let symbolTable = MacroExpansionEngine().buildSymbolTable(from: parseResult)
+
+        let citeKeys = Set(symbolTable.citationsByKey.keys)
+        let labelKeys = Set(symbolTable.labelsByKey.keys)
+        #expect(citeKeys == ["k1", "k2", "k3"], "got citeKeys=\(citeKeys)")
+        #expect(labelKeys == ["sec:after", "sec:url", "sec:verb"], "got labelKeys=\(labelKeys)")
+        #expect(citeKeys.filter { $0.hasPrefix("fake") }.isEmpty)
+        #expect(labelKeys.filter { $0.hasPrefix("fake") }.isEmpty)
+        #expect(parseResult.issues.isEmpty, "Expected 0 AST syntax issues on hard.tex, got \(parseResult.issues)")
+
+        // 3b. Include & bibliography scanner ignores fake directives inside \iffalse, \lstinline{...}, \mintinline{...}{...}, \url, and \href URL arg, while still reading directives after '%' on the same line or in \href's second arg
+        let files: [String: String] = [
+            "main.tex": """
+            \\documentclass{article}
+            \\begin{document}
+            \\iffalse
+            \\input{ghost_iffalse}
+            \\bibliography{ghost_bib_iffalse}
+            \\fi
+            \\lstinline{\\input{ghost_lstbrace} %} \\input{real_one}
+            \\mintinline{python}{\\input{ghost_mintbrace} %}
+            \\url{https://example.org/\\input{ghost_url}%} \\input{real_two}
+            \\href{https://example.org/\\bibliography{ghost_href}%}{See \\input{real_three}}
+            \\end{document}
+            """,
+            "real_one.tex": "\\section{One}\\label{sec:one}",
+            "real_two.tex": "\\section{Two}\\label{sec:two}",
+            "real_three.tex": "\\section{Three}\\label{sec:three}"
+        ]
+        let resolver = MultiFileIncludeGraphResolver()
+        let ws = resolver.resolveWorkspace(rootFilePath: "main.tex", files: files)
+        #expect(ws.includeGraph.documentReadingOrder == ["main.tex", "real_one.tex", "real_two.tex", "real_three.tex"])
+        #expect(ws.includeGraph.missingFiles.isEmpty, "Unexpected missing files: \(ws.includeGraph.missingFiles)")
+        #expect(ws.diagnostics.filter { $0.code == "INC002" }.isEmpty, "Unexpected INC002: \(ws.diagnostics)")
+    }
+
+    @Test("M2 Stage 03: incremental re-lexing across multi-line verbatim and \\iffalse...\\fi edits matches full tokenization")
+    func m2Stage03IncrementalRelexAcrossVerbatimAndConditionalBlocksEqualsFullLex() throws {
+        let original = """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}\\label{sec:intro}
+        \\begin{verbatim}
+        \\cite{fake_v1} { %
+        \\end{verbatim}
+        \\iffalse
+        \\cite{fake_if}
+        \\fi
+        Normal prose \\cite{k1}.
+        \\end{document}
+        """
+        let lexer = IncrementalMarkupLexer(configuration: .losslessCST)
+        let prevTokens = lexer.tokenize(source: original, format: .latex, filePath: "doc.tex")
+
+        let needle = "\\cite{fake_v1} { %"
+        let range = try #require(original.range(of: needle))
+        let startByte = original.utf8.distance(from: original.utf8.startIndex, to: range.lowerBound.samePosition(in: original.utf8)!)
+        let endByte = original.utf8.distance(from: original.utf8.startIndex, to: range.upperBound.samePosition(in: original.utf8)!)
+
+        var updated = original
+        updated.replaceSubrange(range, with: "\\cite{fake_v2}\nsecond line } %")
+
+        let relexed = lexer.relexEditDetailed(
+            previousTokens: prevTokens,
+            previousSourceLengthUTF8: original.utf8.count,
+            updatedSource: updated,
+            editByteRange: startByte..<endByte,
+            filePath: "doc.tex",
+            format: .latex
+        )
+        let full = lexer.tokenize(source: updated, format: .latex, filePath: "doc.tex")
+        #expect(relexed.tokens == full)
+    }
 }

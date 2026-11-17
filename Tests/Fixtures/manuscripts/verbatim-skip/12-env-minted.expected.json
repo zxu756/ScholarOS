@@ -1,0 +1,12 @@
+{
+  "case": "12-env-minted",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "sec:env_minted"
+  ],
+  "structure_errors": 0,
+  "basis": "minted package (\\begin{minted}[options]{lang} ... \\end{minted}): writes raw lines verbatim to Pygments up to \\end{minted} without TeX command execution, comment stripping, or brace matching (hand-written expectation; Tectonic --untrusted disables -shell-escape)."
+}

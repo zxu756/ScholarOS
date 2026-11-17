@@ -1,0 +1,12 @@
+{
+  "case": "15-url",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_url",
+    "sec:url_cmd"
+  ],
+  "structure_errors": 0,
+  "basis": "url / hyperref package (url.sty): \\url{...} scans its argument with catcode-12 '%' and '\\' while allowing balanced inner '{...}', so '%20', trailing '%', '{x}', and '\\cite{fake_url}' inside do not start a comment or extract citations."
+}

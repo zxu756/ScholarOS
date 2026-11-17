@@ -1,0 +1,12 @@
+{
+  "case": "16-path",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:after_path",
+    "sec:path_cmd"
+  ],
+  "structure_errors": 0,
+  "basis": "url package (\\DeclareUrlCommand\\path{\\urlstyle{tt}}): \\path{...} uses url.sty's verbatim scanner with balanced inner '{...}' and catcode-12 '%', '_', and '\\'."
+}

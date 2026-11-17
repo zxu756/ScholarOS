@@ -743,7 +743,7 @@ public struct AcademicManuscriptMetricsAnalyzer: Sendable {
     /// Environments whose body contents are excluded from prose word count (matching Perl `texcount` rules).
     private static let excludedLaTeXEnvironments: Set<String> = [
         "tikzpicture", "pgfpicture", "axis", "semilogyaxis", "loglogaxis",
-        "lstlisting", "minted", "verbatim", "verbatim*", "BVerbatim", "alltt",
+        "lstlisting", "minted", "verbatim", "verbatim*", "Verbatim", "BVerbatim", "alltt",
         "comment", "filecontents", "filecontents*",
         "tabular", "tabular*", "tabularx", "tabulary", "longtable", "supertabular", "array",
         "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "smallmatrix", "cases",
@@ -760,7 +760,7 @@ public struct AcademicManuscriptMetricsAnalyzer: Sendable {
         "\\input", "\\include", "\\includeonly", "\\subfile",
         "\\label", "\\linelabel",
         "\\ref", "\\eqref", "\\autoref", "\\cref", "\\Cref", "\\pageref", "\\nameref", "\\vref",
-        "\\includegraphics", "\\graphicspath", "\\url", "\\nolinkurl", "\\path",
+        "\\includegraphics", "\\graphicspath", "\\url", "\\nolinkurl", "\\path", "\\mintinline",
         "\\vspace", "\\vspace*", "\\hspace", "\\hspace*", "\\vskip", "\\hskip",
         "\\pagenumbering", "\\pagestyle", "\\thispagestyle", "\\color", "\\pagecolor",
         "\\counterwithin", "\\counterwithout", "\\usetikzlibrary", "\\tikzset", "\\hypersetup",
@@ -797,7 +797,7 @@ public struct AcademicManuscriptMetricsAnalyzer: Sendable {
         while idx < coreCount {
             let tok = tokens[idx]
 
-            if tok.kind == .comment {
+            if tok.kind == .comment || tok.kind == .verbatim {
                 idx += 1
                 continue
             }
@@ -1146,7 +1146,7 @@ public struct AcademicManuscriptMetricsAnalyzer: Sendable {
                 index += 1
                 continue
             }
-            if t.kind == .comment {
+            if t.kind == .comment || t.kind == .verbatim {
                 index += 1
                 continue
             }
