@@ -200,6 +200,24 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             }
         }
 
+        if parseRawBibliographyFiles {
+            let orderedDocKeys = [normRoot] + initialDocs.keys.filter { $0 != normRoot }.sorted()
+            for docPath in orderedDocKeys {
+                guard let docSnap = initialDocs[docPath] else { continue }
+                let extracted = TheBibliographyWorkspaceExtractor.extract(fromTokens: docSnap.tokens, filePath: docPath)
+                guard extracted.hasTheBibliographyEnvironment || !extracted.items.isEmpty else { continue }
+                for entry in extracted.uniqueEntries {
+                    let lower = entry.citeKey.lowercased()
+                    let alreadyExists = bibOrder.contains { $0.lowercased() == lower }
+                    if !alreadyExists {
+                        bibOrder.append(entry.citeKey)
+                        bibMap[entry.citeKey] = entry
+                        derivedEntrySources[entry.citeKey] = docPath
+                    }
+                }
+            }
+        }
+
         let extSolver: SyncTeXCoordinateSolver?
         if let syncData = syncTeXData {
             extSolver = try? SyncTeXCoordinateSolver(data: syncData)
@@ -933,16 +951,36 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     }
                     return DiagnosticsBibliographySource(kind: "bib", path: bibPath, entries: count)
                 }
-            } else if !st.orderedBibliographyKeys.isEmpty {
-                effectiveBibSources = [
-                    DiagnosticsBibliographySource(
-                        kind: "bib",
-                        path: "workspace.bib",
-                        entries: Set(st.orderedBibliographyKeys).count
-                    )
-                ]
             } else {
-                effectiveBibSources = []
+                var docTheBibSources: [DiagnosticsBibliographySource] = []
+                if !st.ignoreBibliographyDirectives {
+                    for docPath in orderedFilePaths {
+                        guard let snap = st.documents[docPath] else { continue }
+                        let extracted = TheBibliographyWorkspaceExtractor.extract(fromTokens: snap.tokens, filePath: docPath)
+                        if extracted.hasTheBibliographyEnvironment || (docPath.lowercased().hasSuffix(".bbl") && !extracted.items.isEmpty) {
+                            docTheBibSources.append(
+                                DiagnosticsBibliographySource(
+                                    kind: extracted.sourceKind,
+                                    path: docPath,
+                                    entries: extracted.uniqueEntryCount
+                                )
+                            )
+                        }
+                    }
+                }
+                if !docTheBibSources.isEmpty {
+                    effectiveBibSources = docTheBibSources
+                } else if !st.orderedBibliographyKeys.isEmpty {
+                    effectiveBibSources = [
+                        DiagnosticsBibliographySource(
+                            kind: "bib",
+                            path: "workspace.bib",
+                            entries: Set(st.orderedBibliographyKeys).count
+                        )
+                    ]
+                } else {
+                    effectiveBibSources = []
+                }
             }
 
             var verdictsByKey = st.inRunVerdictsByKey
@@ -972,6 +1010,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     key: key,
                     defined: isDefined,
                     source: src,
+                    entry: resolvedEntry.map(DiagnosticsParsedEntry.init(from:)),
                     occurrences: occs,
                     verification: verif
                 )

@@ -1,0 +1,11 @@
+{
+  "case": "02-input-bbl",
+  "main_file": "main.tex",
+  "cite_keys": ["Barron1993", "Candes1998", "Skrjanc2019", "Sonoda2021a"],
+  "bibcite_keys": ["Barron1993", "Candes1998", "Skrjanc2019", "Sonoda2021a"],
+  "labels": ["sec:bbl_in"],
+  "bibliography_sources": [
+    {"kind": "bbl", "path": "refs.bbl", "entries": 4}
+  ],
+  "structure_errors": 0
+}

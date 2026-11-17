@@ -1,0 +1,11 @@
+{
+  "case": "01-inline-thebib",
+  "main_file": "main.tex",
+  "cite_keys": ["k_arxiv_pmid", "k_minimal", "k_opt_doi", "k_plain"],
+  "bibcite_keys": ["k_arxiv_pmid", "k_minimal", "k_opt_doi", "k_plain"],
+  "labels": ["sec:inline"],
+  "bibliography_sources": [
+    {"kind": "thebibliography", "path": "main.tex", "entries": 4}
+  ],
+  "structure_errors": 0
+}

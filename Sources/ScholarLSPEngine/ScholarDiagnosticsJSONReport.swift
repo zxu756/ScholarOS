@@ -134,10 +134,102 @@ public struct DiagnosticsCitationVerification: Sendable, Codable, Hashable {
     }
 }
 
+public struct DiagnosticsParsedEntry: Sendable, Codable, Hashable {
+    public let title: String
+    public let authors: [BibAuthor]
+    public let authorsTruncated: Bool
+    public let year: Int?
+    public let venue: String
+    public let doi: String?
+    public let arxivID: String?
+    public let pmid: String?
+    public let url: String?
+
+    public init(
+        title: String,
+        authors: [BibAuthor],
+        authorsTruncated: Bool = false,
+        year: Int? = nil,
+        venue: String = "",
+        doi: String? = nil,
+        arxivID: String? = nil,
+        pmid: String? = nil,
+        url: String? = nil
+    ) {
+        self.title = title
+        self.authors = authors
+        self.authorsTruncated = authorsTruncated
+        self.year = year
+        self.venue = venue
+        self.doi = doi
+        self.arxivID = arxivID
+        self.pmid = pmid
+        self.url = url
+    }
+
+    public init(from entry: BibliographyEntry) {
+        self.title = entry.title
+        self.authors = entry.authors
+        self.authorsTruncated = entry.authorsTruncated
+        self.year = entry.year
+        self.venue = entry.venue
+        self.doi = entry.doi
+        self.arxivID = entry.arxivID
+        self.pmid = entry.pmid
+        self.url = entry.url
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case title
+        case authors
+        case authorsTruncated
+        case year
+        case venue
+        case doi
+        case arxivID
+        case pmid
+        case url
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        try container.encode(authors, forKey: .authors)
+        try container.encode(authorsTruncated, forKey: .authorsTruncated)
+        if let year {
+            try container.encode(year, forKey: .year)
+        } else {
+            try container.encodeNil(forKey: .year)
+        }
+        try container.encode(venue, forKey: .venue)
+        if let doi {
+            try container.encode(doi, forKey: .doi)
+        } else {
+            try container.encodeNil(forKey: .doi)
+        }
+        if let arxivID {
+            try container.encode(arxivID, forKey: .arxivID)
+        } else {
+            try container.encodeNil(forKey: .arxivID)
+        }
+        if let pmid {
+            try container.encode(pmid, forKey: .pmid)
+        } else {
+            try container.encodeNil(forKey: .pmid)
+        }
+        if let url {
+            try container.encode(url, forKey: .url)
+        } else {
+            try container.encodeNil(forKey: .url)
+        }
+    }
+}
+
 public struct DiagnosticsCitationEntry: Sendable, Codable, Hashable {
     public let key: String
     public let defined: Bool
     public let source: String?
+    public let entry: DiagnosticsParsedEntry?
     public let occurrences: [DiagnosticsCitationOccurrence]
     public let verification: DiagnosticsCitationVerification?
 
@@ -145,12 +237,14 @@ public struct DiagnosticsCitationEntry: Sendable, Codable, Hashable {
         key: String,
         defined: Bool,
         source: String?,
+        entry: DiagnosticsParsedEntry? = nil,
         occurrences: [DiagnosticsCitationOccurrence],
         verification: DiagnosticsCitationVerification?
     ) {
         self.key = key
         self.defined = defined
         self.source = source
+        self.entry = entry
         self.occurrences = occurrences
         self.verification = verification
     }
@@ -159,6 +253,7 @@ public struct DiagnosticsCitationEntry: Sendable, Codable, Hashable {
         case key
         case defined
         case source
+        case entry
         case occurrences
         case verification
     }
@@ -171,6 +266,11 @@ public struct DiagnosticsCitationEntry: Sendable, Codable, Hashable {
             try container.encode(source, forKey: .source)
         } else {
             try container.encodeNil(forKey: .source)
+        }
+        if let entry {
+            try container.encode(entry, forKey: .entry)
+        } else {
+            try container.encodeNil(forKey: .entry)
         }
         try container.encode(occurrences, forKey: .occurrences)
         if let verification {

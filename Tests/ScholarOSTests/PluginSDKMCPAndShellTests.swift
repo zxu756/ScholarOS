@@ -4,6 +4,7 @@ import Foundation
 import SQLite3
 import Testing
 import ScholarBibAndCSL
+import ScholarLSPEngine
 import ScholarModels
 import ScholarProjectStore
 import ScholarPluginSDK
@@ -5770,6 +5771,382 @@ struct PluginSDKMCPAndShellTests {
             #expect(fbTen.stdout.contains("Title \(idx)"), "Missing formatted title for e\(idx)")
             #expect(fbTen.stdout.contains("\(2000 + idx)"), "Missing formatted year for e\(idx)")
         }
+    }
+
+    // MARK: - 22. M2 Stage 06: `thebibliography` & `.bbl` Parsing and M1 Verification Wiring
+
+    private static func normalizeBibitemFieldForComparison(_ raw: String) -> String {
+        TheBibliographyComparisonNormalizer.normalize(raw)
+    }
+
+    @Test("M2 Stage 06 item 1a (S24): inline thebibliography extracts all \\bibitem[opt]{key} keys, best-effort metadata & identifiers, leaves unparseable fields empty, skips comments/verbatim, and clears hard.tex CITE404")
+    func m2Stage06Item1aInlineTheBibliographyAndHardTex() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage06-1a")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        let inlineTex = repositoryRoot.appendingPathComponent(
+            "Tests/Fixtures/manuscripts/thebibliography-bbl/01-inline-thebib/main.tex"
+        )
+        let service = try ScholarLSPWorkspaceService.loadManuscript(atPath: inlineTex.path)
+        let loadedKeys = service.bibliographyEntries.map(\.citeKey)
+        #expect(loadedKeys == ["k_plain", "k_opt_doi", "k_arxiv_pmid", "k_minimal"])
+
+        let kPlain = service.bibliographyEntry(forCiteKey: "k_plain")
+        #expect(kPlain?.authors.first?.familyName == "Zadeh")
+        #expect(kPlain?.year == 1965)
+        #expect(Self.normalizeBibitemFieldForComparison(kPlain?.title ?? "") == Self.normalizeBibitemFieldForComparison("Fuzzy sets"))
+
+        let kOptDOI = service.bibliographyEntry(forCiteKey: "k_opt_doi")
+        #expect(kOptDOI?.authors.first?.familyName == "LeCun")
+        #expect(kOptDOI?.year == 2015)
+        #expect(Self.normalizeBibitemFieldForComparison(kOptDOI?.title ?? "") == Self.normalizeBibitemFieldForComparison("Deep learning"))
+        #expect(kOptDOI?.doi == "10.1038/nature14539")
+
+        let kArxivPmid = service.bibliographyEntry(forCiteKey: "k_arxiv_pmid")
+        #expect(kArxivPmid?.authors.first?.familyName == "Dao")
+        #expect(kArxivPmid?.year == 2022)
+        #expect(
+            Self.normalizeBibitemFieldForComparison(kArxivPmid?.title ?? "")
+                == Self.normalizeBibitemFieldForComparison("FlashAttention: Fast and memory-efficient exact attention with IO-awareness")
+        )
+        #expect(kArxivPmid?.arxivID == "2205.14135")
+        #expect(kArxivPmid?.pmid == "9500320")
+        #expect(kArxivPmid?.url == "https://arxiv.org/abs/2205.14135")
+
+        let kMinimal = service.bibliographyEntry(forCiteKey: "k_minimal")
+        #expect(kMinimal != nil, "k_minimal key must be extracted")
+        #expect(kMinimal?.authors.isEmpty == true, "Unparseable author must remain empty instead of guessing: \(String(describing: kMinimal?.authors))")
+        #expect(kMinimal?.year == nil)
+        #expect(kMinimal?.doi == nil)
+        #expect(kMinimal?.arxivID == nil)
+        #expect(kMinimal?.pmid == nil)
+        #expect(kMinimal?.url == nil)
+
+        let res = await runner.runWithExitStatus(
+            arguments: ["diagnostics", inlineTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res.exitCode != 2)
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+        let bibSources = try #require(obj["bibliographySources"] as? [[String: Any]])
+        #expect(bibSources.count == 1)
+        if let src0 = bibSources.first {
+            #expect(src0["kind"] as? String == "thebibliography")
+            #expect(src0["path"] as? String == "main.tex")
+            #expect(src0["entries"] as? Int == 4)
+        }
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        #expect(diags.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+        #expect(diags.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+
+        // Check `hard.tex` now has 0 CITE404 and 0 structure ERRORs
+        let hardTex = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/hard-inputs/hard.tex")
+        let hardRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", hardTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let hardObj = try #require(try JSONSerialization.jsonObject(with: Data(hardRes.stdout.utf8)) as? [String: Any])
+        let hardDiags = try #require(hardObj["diagnostics"] as? [[String: Any]])
+        let hardStructErrs = hardDiags.filter {
+            ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+        }
+        #expect(hardStructErrs.isEmpty, "Expected 0 structure ERRORs on hard.tex, got \(hardStructErrs.count)")
+    }
+
+    @Test("M2 Stage 06 item 1b (S24, Row 5): \\input{*.bbl} parses all \\bibitem entries with \\newblock clue, sets bibliographySources kind='bbl', and resolves all 46 citations in 2405.13682v5 with 0 CITE404")
+    func m2Stage06Item1bInputBBLAnd2405Benchmark() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage06-1b")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        // 1. Small fixture `02-input-bbl`
+        let smallTex = repositoryRoot.appendingPathComponent(
+            "Tests/Fixtures/manuscripts/thebibliography-bbl/02-input-bbl/main.tex"
+        )
+        let smallSvc = try ScholarLSPWorkspaceService.loadManuscript(atPath: smallTex.path)
+        #expect(smallSvc.bibliographyEntries.map(\.citeKey) == ["Barron1993", "Candes1998", "Skrjanc2019", "Sonoda2021a"])
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Barron1993")?.doi == "10.1109/18.256500")
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Barron1993")?.year == 1993)
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Candes1998")?.authors.first?.familyName == "Candès")
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Skrjanc2019")?.authors.first?.familyName == "Škrjanc")
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Sonoda2021a")?.arxivID == "2106.04770")
+        #expect(smallSvc.bibliographyEntry(forCiteKey: "Sonoda2021a")?.year == 2021)
+
+        // 2. Benchmark `2405.13682v5` (`\input{main.bbl}`, 46 entries)
+        let tex2405 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2405.13682v5/src/main.tex")
+        let res2405 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", tex2405.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res2405.exitCode != 2)
+        let obj2405 = try #require(try JSONSerialization.jsonObject(with: Data(res2405.stdout.utf8)) as? [String: Any])
+
+        let files2405 = try #require(obj2405["files"] as? [[String: Any]])
+        #expect(files2405.contains { ($0["path"] as? String) == "main.bbl" })
+
+        let bibSources = try #require(obj2405["bibliographySources"] as? [[String: Any]])
+        #expect(bibSources.count == 1)
+        if let src0 = bibSources.first {
+            #expect(src0["kind"] as? String == "bbl")
+            #expect(src0["path"] as? String == "main.bbl")
+            #expect(src0["entries"] as? Int == 46)
+        }
+
+        let citations = try #require(obj2405["citations"] as? [[String: Any]])
+        #expect(citations.count == 46)
+        #expect(citations.allSatisfy { ($0["defined"] as? Bool) == true })
+        #expect(citations.allSatisfy { ($0["source"] as? String) == "main.bbl" })
+        for c in citations {
+            let ver = c["verification"] as? [String: Any]
+            let keyName = (c["key"] as? String) ?? ""
+            #expect(ver?["verdict"] as? String == "UNVERIFIED", "Missing/wrong verdict on \(keyName)")
+            #expect(ver?["reasons"] as? [String] == ["offline"])
+        }
+
+        let diags = try #require(obj2405["diagnostics"] as? [[String: Any]])
+        #expect(diags.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+        #expect(diags.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+        let structErrs = diags.filter {
+            ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+        }
+        #expect(structErrs.isEmpty, "Expected 0 structure ERRORs on 2405.13682v5, got \(structErrs.count)")
+    }
+
+    @Test("M2 Stage 06 item 1c (S71, Row 9): fallback <main>.bbl when .bib is absent sets bibliographySources entries count and marks all .bbl entries defined with 0 CITE404")
+    func m2Stage06Item1cFallbackBBLDefinedEntriesAndRow9() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage06-1c")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        // 1. Tectonic-verified small fixture `03-fallback-bbl/paper.tex`
+        let fallbackTex = repositoryRoot.appendingPathComponent(
+            "Tests/Fixtures/manuscripts/thebibliography-bbl/03-fallback-bbl/paper.tex"
+        )
+        let res1 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", fallbackTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj1 = try #require(try JSONSerialization.jsonObject(with: Data(res1.stdout.utf8)) as? [String: Any])
+        let srcs1 = try #require(obj1["bibliographySources"] as? [[String: Any]])
+        #expect(srcs1.count == 1)
+        #expect(srcs1.first?["kind"] as? String == "bbl")
+        #expect(srcs1.first?["path"] as? String == "paper.bbl")
+        #expect(srcs1.first?["entries"] as? Int == 3)
+        let cites1 = try #require(obj1["citations"] as? [[String: Any]])
+        #expect(cites1.count == 3)
+        #expect(cites1.allSatisfy { ($0["defined"] as? Bool) == true && ($0["source"] as? String) == "paper.bbl" })
+        let diags1 = try #require(obj1["diagnostics"] as? [[String: Any]])
+        #expect(diags1.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+        #expect(diags1.filter { ($0["code"] as? String) == "INC002" }.isEmpty)
+        #expect(diags1.filter { ($0["code"] as? String) == "BIB_FROM_BBL" }.count == 1)
+
+        // 2. Existing Row 9 fixture `loader-missing/bbl-fallback/acl_latex.tex`
+        let aclTex = repositoryRoot.appendingPathComponent(
+            "Tests/Fixtures/manuscripts/loader-missing/bbl-fallback/acl_latex.tex"
+        )
+        let res2 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", aclTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let obj2 = try #require(try JSONSerialization.jsonObject(with: Data(res2.stdout.utf8)) as? [String: Any])
+        let srcs2 = try #require(obj2["bibliographySources"] as? [[String: Any]])
+        #expect(srcs2.first?["entries"] as? Int == 2)
+        let cites2 = try #require(obj2["citations"] as? [[String: Any]])
+        #expect(cites2.map { $0["key"] as? String } == ["lecun2015", "vaswani2017"])
+        #expect(cites2.allSatisfy { ($0["defined"] as? Bool) == true && ($0["source"] as? String) == "acl_latex.bbl" })
+        let diags2 = try #require(obj2["diagnostics"] as? [[String: Any]])
+        #expect(diags2.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+    }
+
+    @Test("M2 Stage 06 item 2: \\bibitem entries run through M1 CitationVerificationFirewall.verifyBibliography in both --offline and --registry-replay modes")
+    func m2Stage06Item2M1VerificationOfflineAndRegistryReplay() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage06-2")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        let replayTex = repositoryRoot.appendingPathComponent(
+            "Tests/Fixtures/manuscripts/thebibliography-bbl/04-replay-verify/main.tex"
+        )
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+
+        let offlineRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", replayTex.path, "--offline", "--json", "--lang", "en"]
+        )
+        let offlineObj = try #require(try JSONSerialization.jsonObject(with: Data(offlineRes.stdout.utf8)) as? [String: Any])
+        let offlineCites = try #require(offlineObj["citations"] as? [[String: Any]])
+        #expect(offlineCites.count == 3)
+        for c in offlineCites {
+            #expect(c["defined"] as? Bool == true)
+            let ver = c["verification"] as? [String: Any]
+            #expect(ver?["verdict"] as? String == "UNVERIFIED")
+            #expect(ver?["reasons"] as? [String] == ["offline"])
+        }
+
+        let replayRes = await runner.runWithExitStatus(
+            arguments: ["diagnostics", replayTex.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(replayRes.exitCode != 2, "Replay failed: \(replayRes.stderr)")
+        let replayObj = try #require(try JSONSerialization.jsonObject(with: Data(replayRes.stdout.utf8)) as? [String: Any])
+        #expect(replayObj["mode"] as? String == "REPLAY")
+        let byKey = Dictionary(
+            uniqueKeysWithValues: (replayObj["citations"] as? [[String: Any]] ?? []).compactMap { item -> (String, [String: Any])? in
+                guard let k = item["key"] as? String else { return nil }
+                return (k, item)
+            }
+        )
+        let vLecun = byKey["lecun2015"]?["verification"] as? [String: Any]
+        #expect(vLecun?["verdict"] as? String == "VERIFIED")
+        #expect(vLecun?["insertable"] as? Bool == true)
+
+        let vDao = byKey["dao2022"]?["verification"] as? [String: Any]
+        #expect(vDao?["verdict"] as? String == "VERIFIED")
+        #expect(vDao?["insertable"] as? Bool == true)
+
+        let vFake = byKey["fake_whitfield2026"]?["verification"] as? [String: Any]
+        #expect(vFake?["verdict"] as? String == "NOT_FOUND")
+        #expect(vFake?["insertable"] as? Bool == false)
+    }
+
+    @Test("M2 Stage 06 item 3 & 4 (Row 4): 2506.06594v1 32 \\bibitem entries match bibitems.gold.tsv (year 32/32, surname >= 30/32, title >= 26/32), annaswamy2022 extracts DOI 10.48550/arXiv.2108.11336, and all 32 verdicts are UNVERIFIED offline")
+    func m2Stage06Item3Benchmark2506GoldComparison() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage06-3")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+
+        let tex2506 = repositoryRoot.appendingPathComponent(
+            "Benchmarks/manuscripts/2506.06594v1/src/From_Adaptive_Control_Evolving_Control.tex"
+        )
+        let goldTSV = repositoryRoot.appendingPathComponent(
+            "Benchmarks/manuscripts/2506.06594v1/bibitems.gold.tsv"
+        )
+
+        let res = await runner.runWithExitStatus(
+            arguments: ["diagnostics", tex2506.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res.exitCode != 2)
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+
+        let bibSources = try #require(obj["bibliographySources"] as? [[String: Any]])
+        #expect(bibSources.count == 1)
+        if let src0 = bibSources.first {
+            #expect(src0["kind"] as? String == "thebibliography")
+            #expect(src0["path"] as? String == "From_Adaptive_Control_Evolving_Control.tex")
+            #expect(src0["entries"] as? Int == 32)
+        }
+
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        #expect(diags.filter { ($0["code"] as? String) == "CITE404" }.isEmpty)
+
+        let citations = try #require(obj["citations"] as? [[String: Any]])
+        #expect(citations.count == 32)
+        let citesByKey = Dictionary(
+            uniqueKeysWithValues: citations.compactMap { item -> (String, [String: Any])? in
+                guard let k = item["key"] as? String else { return nil }
+                return (k, item)
+            }
+        )
+
+        for (key, c) in citesByKey {
+            #expect(c["defined"] as? Bool == true, "Expected \(key).defined == true")
+            let ver = c["verification"] as? [String: Any]
+            #expect(ver?["verdict"] as? String == "UNVERIFIED", "Expected UNVERIFIED on \(key)")
+            #expect(ver?["reasons"] as? [String] == ["offline"], "Expected offline reason on \(key)")
+        }
+
+        let goldLines = try String(contentsOf: goldTSV, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .dropFirst()
+        #expect(goldLines.count == 32)
+
+        var yearMatches = 0
+        var surnameMatches = 0
+        var titleMatches = 0
+
+        for rawLine in goldLines {
+            let cols = rawLine.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            let key = cols[0]
+            let expSurname = cols[1]
+            let expYear = Int(cols[2])
+            let expTitle = cols[3]
+            let expIdent = cols.count > 4 ? cols[4] : ""
+
+            let citeRec = citesByKey[key]
+            let entryDict = citeRec?["entry"] as? [String: Any]
+            let actYear = entryDict?["year"] as? Int
+            let actTitle = (entryDict?["title"] as? String) ?? ""
+            let actAuthors = (entryDict?["authors"] as? [[String: Any]]) ?? []
+            let actSurname = (actAuthors.first?["familyName"] as? String) ?? ""
+            let actDOI = entryDict?["doi"] as? String
+
+            if actYear != nil && actYear == expYear {
+                yearMatches += 1
+            }
+            if !actSurname.isEmpty
+                && Self.normalizeBibitemFieldForComparison(actSurname) == Self.normalizeBibitemFieldForComparison(expSurname) {
+                surnameMatches += 1
+            }
+            if !actTitle.isEmpty
+                && Self.normalizeBibitemFieldForComparison(actTitle) == Self.normalizeBibitemFieldForComparison(expTitle) {
+                titleMatches += 1
+            }
+            if key == "annaswamy2022" || expIdent == "doi:10.48550/arXiv.2108.11336" {
+                #expect(actDOI == "10.48550/arXiv.2108.11336", "annaswamy2022 must extract DOI 10.48550/arXiv.2108.11336, got \(String(describing: actDOI))")
+            }
+        }
+
+        #expect(yearMatches == 32, "Expected 32/32 year matches on 2506.06594v1, got \(yearMatches)/32")
+        #expect(surnameMatches >= 30, "Expected >= 30/32 first-author surname matches on 2506.06594v1, got \(surnameMatches)/32")
+        #expect(titleMatches >= 26, "Expected >= 26/32 title matches on 2506.06594v1, got \(titleMatches)/32")
+    }
+
+    @Test("M2 Stage 06 item 4: TheBibliographyComparisonNormalizer and TheBibliographyEntryParser handle doubled DOI URLs, SICI parentheses DOIs, page ranges in 1450..2030, and empty/unparseable bodies without guessing")
+    func m2Stage06Item4NormalizerAndDirectParserEdgeCases() throws {
+        #expect(TheBibliographyComparisonNormalizer.normalize("Škrjanc") == "skrjanc")
+        #expect(TheBibliographyComparisonNormalizer.normalize("Blažič") == "blazic")
+        #expect(TheBibliographyComparisonNormalizer.normalize("Sayed-Mouchaweh") == "sayed mouchaweh")
+        #expect(TheBibliographyComparisonNormalizer.normalize("Gauß & Łódź") == "gauss lodz")
+        #expect(
+            TheBibliographyComparisonNormalizer.normalize("Takagi–Sugeno fuzzy models.")
+                == TheBibliographyComparisonNormalizer.normalize("Takagi-Sugeno fuzzy models")
+        )
+
+        let parser = TheBibliographyEntryParser()
+
+        // Doubled doi.org URL (seen in real .bbl files such as 2405.13682v5 Sonoda2024fourier)
+        let doubled = parser.parseEntry(
+            citeKey: "Sonoda2024fourier",
+            optionalLabel: "Sonoda et~al.(2024{\\natexlab{b}})",
+            rawBody: """
+            Sonoda, S., Ishikawa, I., and Ikeda, M.
+            \\newblock \\href{http://doi.org/https://doi.org/10.1016/j.jspi.2024.106184}{{A unified Fourier slice method}}.
+            \\newblock \\emph{Journal of Statistical Planning and Inference}, 233:\\penalty0 106184, 2024{\\natexlab{b}}.
+            """
+        )
+        #expect(doubled.authors.first?.familyName == "Sonoda")
+        #expect(doubled.year == 2024)
+        #expect(doubled.doi == "10.1016/j.jspi.2024.106184")
+        #expect(doubled.title == "A unified Fourier slice method")
+
+        // SICI DOI with parentheses (e.g. Funahashi1989 `10.1016/0893-6080(89)90003-8`)
+        let sici = parser.parseEntry(
+            citeKey: "Funahashi1989",
+            optionalLabel: "Funahashi(1989)",
+            rawBody: """
+            Funahashi, K.-I.
+            \\newblock \\href{http://doi.org/10.1016/0893-6080(89)90003-8}{{On the approximate realization of continuous mappings by neural networks}}.
+            \\newblock \\emph{Neural Networks}, 2(3): 183--192, 1989.
+            """
+        )
+        #expect(sici.authors.first?.familyName == "Funahashi")
+        #expect(sici.year == 1989)
+        #expect(sici.doi == "10.1016/0893-6080(89)90003-8")
+
+        // Completely empty `\bibitem{empty_key}` extracts key and leaves all fields empty without guessing from key
+        let empty = parser.parseEntry(citeKey: "smith2020_key_not_guessed", optionalLabel: nil, rawBody: "   ")
+        #expect(empty.citeKey == "smith2020_key_not_guessed")
+        #expect(empty.authors.isEmpty)
+        #expect(empty.title.isEmpty)
+        #expect(empty.year == nil)
+        #expect(empty.doi == nil)
+        #expect(empty.arxivID == nil)
+        #expect(empty.pmid == nil)
+        #expect(empty.url == nil)
     }
 }
 

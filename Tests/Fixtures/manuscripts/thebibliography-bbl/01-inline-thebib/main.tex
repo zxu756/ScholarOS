@@ -1,0 +1,29 @@
+\documentclass{article}
+\usepackage{url}
+\usepackage{hyperref}
+\begin{document}
+\section{Inline Bibliography}\label{sec:inline}
+Classic work~\cite{k_plain} and deep learning~\cite{k_opt_doi} laid foundations,
+followed by fast attention~\cite{k_arxiv_pmid} and notes~\cite{k_minimal}.
+% \bibitem{fake_comment} G. Ghost. Fake comment entry, 2020.
+Inline verbatim \verb|\bibitem{fake_verb}| is ignored.
+See Section~\ref{sec:inline}.
+
+\begin{thebibliography}{99}
+
+\bibitem{k_plain}
+L. A. Zadeh. Fuzzy sets. \emph{Information and Control}, 8(3), 338--353, 1965.
+
+\bibitem[LeCun et~al.(2015)]{k_opt_doi}
+Y. LeCun, Y. Bengio, and G. Hinton, ``Deep learning,'' \emph{Nature}, vol.~521, pp.~436--444, 2015. doi:10.1038/nature14539.
+
+\bibitem[{Dao [et~al.](2022)}]{k_arxiv_pmid}
+Tri Dao, Daniel~Y. Fu, Stefano Ermon, Atri Rudra, and Christopher R{\'e}.
+\newblock FlashAttention: Fast and memory-efficient exact attention with {IO}-awareness.
+\newblock \url{https://arxiv.org/abs/2205.14135}, PMID: 9500320, 2022.
+
+\bibitem{k_minimal}
+Working Group Technical Note.
+
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,11 @@
+{
+  "case": "04-replay-verify",
+  "main_file": "main.tex",
+  "cite_keys": ["dao2022", "fake_whitfield2026", "lecun2015"],
+  "bibcite_keys": ["dao2022", "fake_whitfield2026", "lecun2015"],
+  "labels": ["sec:replay"],
+  "bibliography_sources": [
+    {"kind": "thebibliography", "path": "main.tex", "entries": 3}
+  ],
+  "structure_errors": 0
+}

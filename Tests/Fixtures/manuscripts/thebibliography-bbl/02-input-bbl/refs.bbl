@@ -1,0 +1,25 @@
+\begin{thebibliography}{4}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+
+\bibitem[Barron(1993)]{Barron1993}
+Barron, A.~R.
+\newblock \href{http://doi.org/10.1109/18.256500}{{Universal approximation bounds for superpositions of a sigmoidal function}}.
+\newblock \emph{IEEE Transactions on Information Theory}, 39\penalty0 (3):\penalty0 930--945, 1993.
+
+\bibitem[Cand{\`{e}}s(1998)]{Candes1998}
+Cand{\`{e}}s, E.~J.
+\newblock \emph{\href{https://searchworks.stanford.edu/view/9949708}{{Ridgelets: theory and applications}}}.
+\newblock PhD thesis, Stanford University, 1998.
+
+\bibitem[{\v{S}}krjanc et~al.(2019){\v{S}}krjanc, Iglesias, and Gomide]{Skrjanc2019}
+{\v{S}}krjanc, I., Iglesias, J.~A., and Gomide, F.
+\newblock Evolving fuzzy and neuro-fuzzy approaches in clustering, regression, identification, and classification: A survey.
+\newblock \emph{Information Sciences}, 490:\penalty0 344--368, 2019.
+
+\bibitem[Sonoda et~al.(2021{\natexlab{a}})Sonoda, Ishikawa, and Ikeda]{Sonoda2021a}
+Sonoda, S., Ishikawa, I., and Ikeda, M.
+\newblock \href{http://arxiv.org/abs/2106.04770}{{Ghosts in Neural Networks: Existence, Structure and Role of Infinite-Dimensional Null Space}}.
+\newblock \emph{arXiv preprint: 2106.04770}, 2021{\natexlab{a}}.
+
+\end{thebibliography}

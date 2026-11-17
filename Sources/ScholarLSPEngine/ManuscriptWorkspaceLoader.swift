@@ -203,6 +203,7 @@ public struct ManuscriptWorkspaceLoader: Sendable {
             let mainBblExists = recordingProvider.fileExists(at: mainBblRelPath)
 
             var seenBibPaths: Set<String> = []
+            var seenTheBibOrBBLPaths: Set<String> = []
             var loadedMainBblFallback = false
 
             for edge in initialWorkspace.includeGraph.edges where edge.isBibliographyResource {
@@ -221,14 +222,28 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                     satisfiedMissingBibPaths.insert(targetBibPath)
                     if !loadedMainBblFallback {
                         loadedMainBblFallback = true
+                        seenTheBibOrBBLPaths.insert(mainBblRelPath)
+                        var bblEntryCount = 0
                         if let decodedBbl = try? recordingProvider.readDecoded(at: mainBblRelPath) {
                             fallbackBBLFiles[mainBblRelPath] = decodedBbl.text
+                            let extractedBbl = TheBibliographyWorkspaceExtractor.extract(
+                                fromSource: decodedBbl.text,
+                                filePath: mainBblRelPath,
+                                lexer: lexer
+                            )
+                            bblEntryCount = extractedBbl.uniqueEntryCount
+                            for bblEntry in extractedBbl.uniqueEntries {
+                                entries.append(bblEntry)
+                                if entrySourceByKey[bblEntry.citeKey] == nil {
+                                    entrySourceByKey[bblEntry.citeKey] = mainBblRelPath
+                                }
+                            }
                         }
                         bibSources.append(
                             DiagnosticsBibliographySource(
                                 kind: "bbl",
                                 path: mainBblRelPath,
-                                entries: 0
+                                entries: bblEntryCount
                             )
                         )
                     }
@@ -242,6 +257,36 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                         )
                     )
                 }
+            }
+
+            // Scan reachable `.tex` and `\input{*.bbl}` files in reading order for `thebibliography` environments.
+            for relPath in initialWorkspace.includeGraph.documentReadingOrder where !seenTheBibOrBBLPaths.contains(relPath) {
+                let extracted: TheBibliographyExtractionResult
+                if let fileTokens = initialWorkspace.perFileParseResults[relPath]?.tokens {
+                    extracted = TheBibliographyWorkspaceExtractor.extract(fromTokens: fileTokens, filePath: relPath)
+                } else if let text = manuscriptFiles[relPath] {
+                    extracted = TheBibliographyWorkspaceExtractor.extract(fromSource: text, filePath: relPath, lexer: lexer)
+                } else {
+                    continue
+                }
+                let isBBL = relPath.lowercased().hasSuffix(".bbl")
+                guard extracted.hasTheBibliographyEnvironment || (isBBL && !extracted.items.isEmpty) else {
+                    continue
+                }
+                seenTheBibOrBBLPaths.insert(relPath)
+                for theBibEntry in extracted.uniqueEntries {
+                    entries.append(theBibEntry)
+                    if entrySourceByKey[theBibEntry.citeKey] == nil {
+                        entrySourceByKey[theBibEntry.citeKey] = relPath
+                    }
+                }
+                bibSources.append(
+                    DiagnosticsBibliographySource(
+                        kind: extracted.sourceKind,
+                        path: relPath,
+                        entries: extracted.uniqueEntryCount
+                    )
+                )
             }
         }
 

@@ -1,0 +1,11 @@
+{
+  "case": "03-fallback-bbl",
+  "main_file": "paper.tex",
+  "cite_keys": ["hochreiter1997", "lecun2015", "who2021"],
+  "bibcite_keys": ["hochreiter1997", "lecun2015", "who2021"],
+  "labels": ["sec:fallback"],
+  "bibliography_sources": [
+    {"kind": "bbl", "path": "paper.bbl", "entries": 3}
+  ],
+  "structure_errors": 0
+}
