@@ -973,4 +973,268 @@ struct MarkupASTAndMacroTests {
         #expect(Set(symMint.citationsByKey.keys) == ["k"])
         #expect(parsedMint.issues.isEmpty)
     }
+
+    // MARK: - M2 Stage 04: Citation & Cross-Ref Command Tables, Optional Args, Key Normalization, and S67 Fixes
+
+    @Test("M2 Stage 04 item 1 (S64): citation command table extracts single-key, multi-key, 1 and 2 optional arguments, starred forms, and chained multicites")
+    func m2Stage04Item1CitationCommandTableExtraction() {
+        let table = LaTeXCommandRole.citationCommandTable
+        let expectedBaseCommands: Set<String> = [
+            "\\cite", "\\citep", "\\citet", "\\citealt", "\\citealp", "\\citeauthor", "\\citeyear", "\\citeyearpar",
+            "\\citenum", "\\Citet", "\\Citep", "\\Citealt", "\\Citealp", "\\Citeauthor", "\\Cite",
+            "\\parencite", "\\Parencite", "\\textcite", "\\Textcite", "\\autocite", "\\Autocite",
+            "\\citetitle", "\\footcite", "\\footfullcite", "\\fullcite", "\\supercite", "\\smartcite",
+            "\\cites", "\\parencites", "\\textcites", "\\autocites",
+            "\\citeA", "\\citeN", "\\shortcite", "\\nocite"
+        ]
+        #expect(Set(table.map(\.baseCommand)) == expectedBaseCommands)
+        #expect(table.count == expectedBaseCommands.count)
+
+        let parser = HandwrittenMarkupCSTParser()
+        let macroEngine = MacroExpansionEngine()
+
+        for spec in table {
+            let cmd = spec.baseCommand
+            var fragments: [String] = [
+                "\(cmd){k_single}",
+                "\(cmd){k_multi_1, k_multi_2}"
+            ]
+            var expectedKeys: Set<String> = ["k_single", "k_multi_1", "k_multi_2"]
+
+            if spec.maxOptionalArguments >= 1 {
+                fragments.append("\(cmd)[p.~4]{k_opt1}")
+                expectedKeys.insert("k_opt1")
+            }
+            if spec.maxOptionalArguments >= 2 {
+                fragments.append("\(cmd)[see][p.~5]{k_opt2_a, k_opt2_b}")
+                expectedKeys.formUnion(["k_opt2_a", "k_opt2_b"])
+            }
+            if spec.supportsStarred {
+                fragments.append("\(cmd)*{k_star_1}")
+                fragments.append("\(cmd)*[p.~8]{k_star_opt1}")
+                fragments.append("\(cmd)*[cf.][p.~9]{k_star_m1, k_star_m2}")
+                expectedKeys.formUnion(["k_star_1", "k_star_opt1", "k_star_m1", "k_star_m2"])
+            }
+            if spec.isMulticite {
+                fragments.append("\(cmd)[see][p.~2]{k_mc1}[cf.]{k_mc2, k_mc3}{k_mc4}")
+                expectedKeys.formUnion(["k_mc1", "k_mc2", "k_mc3", "k_mc4"])
+            }
+
+            let doc = """
+            \\documentclass{article}
+            \\begin{document}
+            \(fragments.joined(separator: " and ")).
+            \\end{document}
+            """
+            let parsed = parser.parse(source: doc, filePath: "cite_\(cmd.dropFirst()).tex", format: .latex)
+            let sym = macroEngine.buildSymbolTable(from: parsed)
+            let actualKeys = Set(sym.citationsByKey.keys)
+            #expect(actualKeys == expectedKeys, "[\(cmd)] expected \(expectedKeys), got \(actualKeys)")
+            #expect(parsed.issues.isEmpty, "[\(cmd)] expected 0 AST issues, got \(parsed.issues)")
+        }
+    }
+
+    @Test("M2 Stage 04 item 2 (S64): cross-reference command table extracts targets, multi-key cref/Cref, and starred forms without AST012")
+    func m2Stage04Item2CrossReferenceCommandTableAndStarredForms() {
+        let table = LaTeXCommandRole.crossReferenceCommandTable
+        let expectedBaseCommands: Set<String> = [
+            "\\ref", "\\eqref", "\\pageref", "\\nameref", "\\autoref", "\\Autoref",
+            "\\cref", "\\Cref", "\\cpageref", "\\Cpageref", "\\labelcref", "\\namecref", "\\nameCref",
+            "\\subref", "\\hyperref", "\\vref", "\\Vref", "\\fref", "\\Fref", "\\sref"
+        ]
+        #expect(Set(table.map(\.baseCommand)) == expectedBaseCommands)
+        #expect(table.count == expectedBaseCommands.count)
+
+        let parser = HandwrittenMarkupCSTParser()
+        let macroEngine = MacroExpansionEngine()
+
+        for spec in table {
+            let cmd = spec.baseCommand
+            var fragments: [String] = []
+            var expectedTargets: Set<String> = ["sec:a"]
+
+            if spec.targetInBracket {
+                fragments.append("\(cmd)[sec:a]{target text}")
+            } else {
+                fragments.append("\(cmd){sec:a}")
+            }
+
+            if spec.supportsStarred {
+                fragments.append("\(cmd)*{sec:star}")
+                expectedTargets.insert("sec:star")
+            }
+
+            if spec.supportsMultiKey {
+                fragments.append("\(cmd){eq:m1, eq:m2,sec:m3}")
+                expectedTargets.formUnion(["eq:m1", "eq:m2", "sec:m3"])
+                if spec.supportsStarred {
+                    fragments.append("\(cmd)*{eq:sm1, eq:sm2}")
+                    expectedTargets.formUnion(["eq:sm1", "eq:sm2"])
+                }
+            }
+
+            let doc = """
+            \\documentclass{article}
+            \\begin{document}
+            \(fragments.joined(separator: " and ")).
+            \\end{document}
+            """
+            let parsed = parser.parse(source: doc, filePath: "xref_\(cmd.dropFirst()).tex", format: .latex)
+            let sym = macroEngine.buildSymbolTable(from: parsed)
+            let actualTargets = Set(sym.crossReferences.map(\.targetKey))
+            #expect(actualTargets == expectedTargets, "[\(cmd)] expected \(expectedTargets), got \(actualTargets)")
+            #expect(!parsed.issues.contains { $0.code == .malformedCrossReference }, "[\(cmd)] unexpected AST012: \(parsed.issues)")
+            #expect(parsed.issues.isEmpty, "[\(cmd)] expected 0 AST issues, got \(parsed.issues)")
+        }
+    }
+
+    @Test("M2 Stage 04 item 3 (S65): optional [...] arguments of theorem environments, \\section, and \\caption extract \\cite and \\ref")
+    func m2Stage04Item3OptionalArgumentCiteAndRefExtraction() {
+        let source = """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Setup}\\label{sec:setup}
+        \\begin{equation}\\label{eq:base} x = 1 \\end{equation}
+        \\begin{lemma}[Uniform bound~\\citep{k_thm1}, cf.~\\ref{sec:setup} and {\\citet[Lemma~2]{k_thm2}}]\\label{lem:bound}
+        Proof uses \\citep[see~\\eqref{eq:base}]{k_prenote}.
+        \\end{lemma}
+        \\section[Short title~\\cite{k_sec_opt} (\\ref{sec:setup})]{Full title~\\cite{k_sec_body}}\\label{sec:two}
+        \\begin{figure}[t]
+        \\caption[Short caption~\\cite{k_cap_opt} (\\ref{lem:bound})]{Full caption~\\cite{k_cap_body}.}\\label{fig:one}
+        \\end{figure}
+        \\end{document}
+        """
+        let parser = HandwrittenMarkupCSTParser()
+        let parsed = parser.parse(source: source, filePath: "optarg.tex", format: .latex)
+        let sym = MacroExpansionEngine().buildSymbolTable(from: parsed)
+
+        let expectedCites: Set<String> = [
+            "k_thm1", "k_thm2", "k_prenote", "k_sec_opt", "k_sec_body", "k_cap_opt", "k_cap_body"
+        ]
+        let expectedRefs: Set<String> = ["sec:setup", "eq:base", "lem:bound"]
+        let expectedLabels: Set<String> = ["sec:setup", "eq:base", "lem:bound", "sec:two", "fig:one"]
+
+        #expect(Set(sym.citationsByKey.keys) == expectedCites)
+        #expect(Set(sym.crossReferences.map(\.targetKey)) == expectedRefs)
+        #expect(Set(sym.labelsByKey.keys) == expectedLabels)
+        #expect(parsed.issues.isEmpty, "Expected 0 AST issues, got \(parsed.issues)")
+    }
+
+    @Test("M2 Stage 04 item 4a (S66): label, cross-reference, and citation keys trim outer whitespace and collapse internal consecutive whitespace")
+    func m2Stage04Item4aKeyWhitespaceNormalizationInParserAndSymbolTable() {
+        let source = """
+        \\documentclass{article}
+        \\begin{document}
+        \\begin{corollary}\\label{  Cor: tilted   Gibbs |gen|  }
+        \\end{corollary}
+        \\begin{equation}\\label{eq: multi
+           line}
+        x = y
+        \\end{equation}
+        See \\ref{Cor: tilted  Gibbs |gen|} and \\cref{  Cor: tilted    Gibbs |gen| , eq: multi   line  }.
+        Cite \\citep{  k_alpha ,
+           k_beta  ,  multi   word\t key  }.
+        \\end{document}
+        """
+        let parser = HandwrittenMarkupCSTParser()
+        let parsed = parser.parse(source: source, filePath: "norm.tex", format: .latex)
+        let sym = MacroExpansionEngine().buildSymbolTable(from: parsed)
+
+        #expect(Set(sym.labelsByKey.keys) == ["Cor: tilted Gibbs |gen|", "eq: multi line"])
+        #expect(Set(sym.crossReferences.map(\.targetKey)) == ["Cor: tilted Gibbs |gen|", "eq: multi line"])
+        #expect(Set(sym.citationsByKey.keys) == ["k_alpha", "k_beta", "multi word key"])
+        #expect(parsed.issues.isEmpty, "Expected 0 AST issues, got \(parsed.issues)")
+    }
+
+    @Test("M2 Stage 04 item 5 (S67): valid TeX brace-group environments, nested subsidiary math environments, and comment-line optional arguments emit 0 AST* while real syntax errors still emit AST*")
+    func m2Stage04Item5S67ValidConstructsZeroASTErrorsAndRealErrorsPreserved() throws {
+        let validSource = """
+        \\documentclass{article}
+        \\usepackage[colorinlistoftodos, color=blue!30!white %   ,shadow
+        \t% ,disable
+        ]{todonotes}
+        \\author{Alice
+        %\\thanks{Grant 1}
+        %\\thanks{Grant 2}
+        }
+        \\begin{document}
+        {\\begin{center}Centered~\\cite{k1}\\end{center}}
+        {\\small\\begin{tabular}{ll}A & B \\\\ C & D\\end{tabular}}
+        \\resizebox{\\columnwidth}{!}{%
+        \\begin{tabular}{ll}X & Y\\end{tabular}%
+        }
+        {\\color{blue}
+
+        First paragraph inside group.
+
+        Second paragraph inside group.
+        }
+        \\begin{equation}\\label{eq:s1}
+        \\begin{split} a &= b \\\\ &= c \\end{split}
+        \\end{equation}
+        \\begin{equation*}
+        \\begin{split}
+        f(x) &= \\begin{cases} 1, & x > 0 \\\\ 0, & x \\le 0 \\end{cases}
+        \\end{split}
+        \\end{equation*}
+        \\begin{align}
+        \\begin{aligned} u &= 1 \\\\ v &= 2 \\end{aligned}
+        \\quad
+        \\begin{gathered} p \\\\ q \\end{gathered}
+        \\quad
+        \\begin{alignedat}{2} a &= 1 & b &= 2 \\end{alignedat}
+        \\end{align}
+        \\begin{gather}
+        M = \\left(\\begin{array}{cc} 1 & 0 \\\\ 0 & 1 \\end{array}\\right)
+        + \\begin{pmatrix} 1 & 2 \\end{pmatrix}
+        + \\begin{bmatrix} 3 \\end{bmatrix}
+        + \\begin{Bmatrix} 4 \\end{Bmatrix}
+        + \\begin{vmatrix} 5 \\end{vmatrix}
+        + \\begin{Vmatrix} 6 \\end{Vmatrix}
+        + \\begin{dcases} \\begin{smallmatrix} 1 & 0 \\end{smallmatrix}, & t > 0 \\end{dcases}
+        \\end{gather}
+        Inline $\\begin{psmallmatrix} 1 & 0 \\\\ 0 & 1 \\end{psmallmatrix}$ and \\[ \\begin{rcases} x = 1 \\end{rcases} \\].
+        \\end{document}
+        """
+        let parser = HandwrittenMarkupCSTParser()
+        let parsedValid = parser.parse(source: validSource, filePath: "s67_valid.tex", format: .latex)
+        #expect(parsedValid.issues.isEmpty, "Valid S67 LaTeX must emit 0 AST issues, got \(parsedValid.issues)")
+
+        // Real benchmark manuscript 2409.19431v3 (previously 274 AST* issues, missing 2 optarg cites, 1 double-space label)
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let p2409URL = repoRoot.appendingPathComponent("Benchmarks/manuscripts/2409.19431v3/src/ICML_Camera_Ready_GE_tilted.tex")
+        let src2409 = try String(contentsOf: p2409URL, encoding: .utf8)
+        let parsed2409 = parser.parse(source: src2409, filePath: "ICML_Camera_Ready_GE_tilted.tex", format: .latex)
+        #expect(parsed2409.issues.isEmpty, "2409.19431v3 must emit 0 AST issues, got \(parsed2409.issues.count): \(parsed2409.issues.prefix(5))")
+        let sym2409 = MacroExpansionEngine().buildSymbolTable(from: parsed2409)
+        #expect(sym2409.citationsByKey.count == 79)
+        #expect(sym2409.citationsByKey["mohri2018foundations"] != nil)
+        #expect(sym2409.citationsByKey["polyanskiy2022information"] != nil)
+        #expect(sym2409.labelsByKey.count == 167)
+        #expect(sym2409.labelsByKey["Cor: tilted Gibbs |gen|"] != nil)
+
+        // Positive error checks: genuinely broken LaTeX syntax must STILL emit AST* errors!
+        let unclosedBraceInEnv = "\\begin{document}\\begin{figure}{ unclosed \\end{figure}\\end{document}"
+        let r1 = parser.parse(source: unclosedBraceInEnv, filePath: "err1.tex", format: .latex)
+        #expect(r1.issues.contains { $0.code == .unclosedBrace && $0.severity == .error })
+
+        let strayCloseBrace = "\\begin{document} text } more \\end{document}"
+        let r2 = parser.parse(source: strayCloseBrace, filePath: "err2.tex", format: .latex)
+        #expect(r2.issues.contains { $0.code == .unexpectedClosingBrace && $0.severity == .error })
+
+        let unclosedSplitInEq = "\\begin{document}\\begin{equation}\\begin{split} a = b \\end{equation}\\end{document}"
+        let r3 = parser.parse(source: unclosedSplitInEq, filePath: "err3.tex", format: .latex)
+        #expect(!r3.issues.filter { $0.severity == .error }.isEmpty, "Unclosed split inside equation must still report an AST error")
+
+        let mismatchedDisplayMath = "\\begin{document}\\begin{align} x = 1 \\end{itemize}\\end{document}"
+        let r4 = parser.parse(source: mismatchedDisplayMath, filePath: "err4.tex", format: .latex)
+        #expect(r4.issues.contains { $0.code == .mismatchedEnvironmentEnd && $0.severity == .error })
+
+        let unclosedBracketBlankLine = "\\usepackage[a, b\n\n\\begin{document}x\\end{document}"
+        let r5 = parser.parse(source: unclosedBracketBlankLine, filePath: "err5.tex", format: .latex)
+        #expect(r5.issues.contains { $0.code == .unclosedBracket && $0.severity == .error })
+    }
 }

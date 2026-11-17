@@ -341,13 +341,60 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
         var actions: [LSPCodeAction] = []
 
         let bibByKey = Dictionary(bibliography.map { ($0.citeKey, $0) }, uniquingKeysWith: { first, _ in first })
+        let bibByLowerKey = Dictionary(
+            bibliography.map { ($0.citeKey.lowercased(), $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let verifiedCiteKeys = bibliography
             .filter { resolveEffectiveFirewall(for: $0, inRunVerdictsByKey: inRunVerdictsByKey).0.allowsManuscriptInsertion }
             .map(\.citeKey)
         let allCiteKeys = bibByKey.keys.sorted()
+        var reportedCaseMismatchKeys = Set<String>()
 
         for occ in workspace.symbolTable.allCitationOccurrences {
-            guard let entry = bibByKey[occ.citeKey] else {
+            let entry: BibliographyEntry
+            if let exactEntry = bibByKey[occ.citeKey] {
+                entry = exactEntry
+            } else if let ciEntry = bibByLowerKey[occ.citeKey.lowercased()] {
+                entry = ciEntry
+                if reportedCaseMismatchKeys.insert(occ.citeKey).inserted {
+                    diagnostics.append(
+                        LSPDiagnostic(
+                            code: "CITE_KEY_CASE",
+                            category: .structure,
+                            severity: .warning,
+                            message: "Citation key '\(occ.citeKey)' matched bibliography entry '\(ciEntry.citeKey)' only case-insensitively (cited as '\(occ.citeKey)', defined in bibliography as '\(ciEntry.citeKey)').",
+                            span: occ.span,
+                            suggestedFix: "Change '\(occ.citeKey)' to '\(ciEntry.citeKey)'."
+                        )
+                    )
+                    if let pr = workspace.perFileParseResults[occ.span.filePath],
+                       let source = sourcesByFile[occ.span.filePath] {
+                        let lineIdx = LineByteIndex(source: source)
+                        if let replaceEdit = locateKeyEditInDirective(
+                            tokens: pr.tokens,
+                            directiveSpan: occ.span,
+                            oldKey: occ.citeKey,
+                            newKey: ciEntry.citeKey,
+                            source: source,
+                            lineIndex: lineIdx
+                        ) {
+                            actions.append(
+                                LSPCodeAction(
+                                    id: "fix:CITE_KEY_CASE:\(occ.span.filePath):\(occ.span.start.line):\(occ.citeKey)",
+                                    title: "Match bibliography key case '\(occ.citeKey)' -> '\(ciEntry.citeKey)'",
+                                    diagnosticCode: "CITE_KEY_CASE",
+                                    kind: .quickFix,
+                                    workspaceEdit: LSPWorkspaceEdit(
+                                        title: "Match citation key case '\(occ.citeKey)' -> '\(ciEntry.citeKey)'",
+                                        editsByFile: [occ.span.filePath: [replaceEdit]]
+                                    )
+                                )
+                            )
+                        }
+                    }
+                }
+            } else {
                 // Missing from bibliography (`CITE404`)
                 let closest = closestCandidate(to: occ.citeKey, in: verifiedCiteKeys.isEmpty ? allCiteKeys : verifiedCiteKeys, maxDistance: 4)
                 diagnostics.append(
@@ -566,11 +613,12 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
 
         // 5C. Uncited bibliography entries (`LINT_UNCITED_BIB_ENTRY`)
         if enableUncitedBibLint && !bibliography.isEmpty && !workspace.symbolTable.allCitationOccurrences.isEmpty {
+            let citedLowerBibKeys = Set(citedBibKeys.map { $0.lowercased() })
             let hoverEngine = HoverDefinitionAndReferencesEngine(firewall: firewall)
             let fallbackBibEdge = workspace.includeGraph.edges.first(where: \.isBibliographyResource)
             let rootSpan = TextSpan(filePath: workspace.includeGraph.rootFilePath, start: .startOfFile, end: .startOfFile)
 
-            for entry in bibliography where !citedBibKeys.contains(entry.citeKey) {
+            for entry in bibliography where !citedBibKeys.contains(entry.citeKey) && !citedLowerBibKeys.contains(entry.citeKey.lowercased()) {
                 let targetSpan = hoverEngine.locateBibTeXEntryDefinition(
                     citeKey: entry.citeKey,
                     originSpan: nil,

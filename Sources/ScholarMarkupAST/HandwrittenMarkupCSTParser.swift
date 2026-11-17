@@ -350,15 +350,40 @@ private struct ParseStreamWorker {
     var index: Int = 0
     var issues: [MarkupParseIssue] = []
     var activeEnvironmentStack: [String] = []
+    var braceGroupDepth: Int = 0
     var declaredTypstLabels: Set<String> = []
     var sawBeginDocument: Bool = false
     var sawEndDocument: Bool = false
 
     private static let displayMathEnvironments: Set<String> = [
         "equation", "equation*", "align", "align*", "gather", "gather*",
+        "alignat", "alignat*", "xalignat", "xalignat*", "xxalignat",
         "multline", "multline*", "flalign", "flalign*", "eqnarray", "eqnarray*",
-        "math", "displaymath"
+        "math", "displaymath", "empheq"
     ]
+
+    private static let subsidiaryMathEnvironments: Set<String> = [
+        "split",
+        "aligned", "aligned*", "lgathered", "rgathered", "gathered",
+        "alignedat", "multlined",
+        "cases", "dcases", "dcases*", "rcases", "rcases*", "drcases", "drcases*",
+        "numcases", "subnumcases",
+        "array", "subarray",
+        "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix",
+        "smallmatrix", "psmallmatrix", "bsmallmatrix", "Bsmallmatrix", "vsmallmatrix", "Vsmallmatrix",
+        "matrix*", "pmatrix*", "bmatrix*", "Bmatrix*", "vmatrix*", "Vmatrix*",
+        "psmallmatrix*", "bsmallmatrix*", "Bsmallmatrix*", "vsmallmatrix*", "Vsmallmatrix*",
+        "bordermatrix", "kbordermatrix",
+        "NiceMatrix", "pNiceMatrix", "bNiceMatrix", "BNiceMatrix", "vNiceMatrix", "VNiceMatrix", "NiceArray"
+    ]
+
+    private static func isSubsidiaryMathEnvironment(_ name: String) -> Bool {
+        if subsidiaryMathEnvironments.contains(name) {
+            return true
+        }
+        let bare = name.hasSuffix("*") ? String(name.dropLast()) : name
+        return bare.hasSuffix("matrix") || bare.hasSuffix("cases")
+    }
 
     private static let typstCrossRefPrefixes: [String] = [
         "sec:", "subsec:", "chap:", "ch:", "part:", "app:", "appendix:",
@@ -422,42 +447,66 @@ private struct ParseStreamWorker {
     }
 
     mutating func skipSameLineOrSingleNewlineWhitespace() {
-        var newlinesSeen = 0
-        while !isAtEnd {
-            let tok = peek()
-            if tok.kind == .comment {
-                advance()
-            } else if tok.kind == .whitespace {
-                if tok.lexeme.contains("\n") || tok.lexeme.contains("\r") {
-                    if newlinesSeen >= 1 {
-                        break
-                    }
-                    newlinesSeen += 1
-                }
-                advance()
-            } else {
-                break
-            }
+        guard !isAtEnd else { return }
+        let kind = peek().kind
+        guard kind == .whitespace || kind == .comment else { return }
+        let (blankLines, nextIdx) = countBlankLinesInTrivia(startingAt: index)
+        if blankLines == 0 {
+            index = nextIdx
         }
     }
 
-    func countConsecutiveNewlines(startingAt startIdx: Int) -> (newlineCount: Int, nextIndex: Int) {
+    /// Counts genuine TeX paragraph-break blank lines (`\par`) in the contiguous `.whitespace` / `.comment`
+    /// trivia run starting at `startIdx`.
+    ///
+    /// In Knuth's TeX mouth, `%` discards the remainder of the current input line *including* its line-end,
+    /// so a line containing a `%` comment never generates a line-end or `\par`, even when multiple `%`
+    /// comment-only lines appear consecutively. Only a physical line that begins at line-start (State *N*)
+    /// and reaches `\n`/`\r` with only horizontal whitespace and no `.comment` token produces `\par`.
+    func countBlankLinesInTrivia(startingAt startIdx: Int) -> (blankLineCount: Int, nextIndex: Int) {
+        var atLineStart = (startIdx == 0)
+        var lineHasComment = false
+        if startIdx > 0 {
+            let prev = tokens[startIdx - 1]
+            if prev.kind == .comment {
+                lineHasComment = true
+            } else if prev.kind == .whitespace,
+                      let lastByte = prev.lexeme.utf8.last,
+                      (lastByte == 0x0A || lastByte == 0x0D) {
+                atLineStart = true
+            }
+        }
+
         var idx = startIdx
-        var newlines = 0
+        var blankLines = 0
         while idx < tokens.count {
             let tok = tokens[idx]
-            if tok.kind == .whitespace {
-                if tok.lexeme.contains("\n") || tok.lexeme.contains("\r") {
-                    newlines += 1
-                }
+            if tok.kind == .comment {
+                lineHasComment = true
                 idx += 1
-            } else if tok.kind == .comment {
+            } else if tok.kind == .whitespace {
+                let bytes = Array(tok.lexeme.utf8)
+                var bIdx = 0
+                while bIdx < bytes.count {
+                    let b = bytes[bIdx]
+                    if b == 0x0D || b == 0x0A {
+                        if b == 0x0D && bIdx + 1 < bytes.count && bytes[bIdx + 1] == 0x0A {
+                            bIdx += 1
+                        }
+                        if atLineStart && !lineHasComment {
+                            blankLines += 1
+                        }
+                        atLineStart = true
+                        lineHasComment = false
+                    }
+                    bIdx += 1
+                }
                 idx += 1
             } else {
                 break
             }
         }
-        return (newlines, idx)
+        return (blankLines, idx)
     }
 
     mutating func emitIssue(
@@ -494,10 +543,10 @@ private struct ParseStreamWorker {
         var paragraph = ParagraphAccumulator()
 
         while !isAtEnd {
-            // Blank line (`>= 2` newlines) flushes active paragraph cleanly.
+            // Blank line (`\par`) flushes active paragraph cleanly.
             if peek().kind == .whitespace {
-                let (newlines, nextIdx) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
+                let (blankLines, nextIdx) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
                     flushParagraph(&paragraph, intoSections: &sectionStack, orTopLevel: &topLevelNodes)
                     index = nextIdx
                     continue
@@ -813,7 +862,11 @@ private struct ParseStreamWorker {
             }
 
         case .leftBrace:
-            parseInlineBracedGroup(into: &paragraph)
+            parseGeneralLaTeXBraceGroup(
+                paragraph: &paragraph,
+                sectionStack: &sectionStack,
+                topLevelNodes: &topLevelNodes
+            )
 
         case .rightBrace:
             let stray = advance()
@@ -903,15 +956,25 @@ private struct ParseStreamWorker {
         let baseLevel = Self.latexSectionLevel(for: cmdTok.lexeme)
         let isStarred = cmdTok.lexeme.hasSuffix("*")
 
+        var sectionChildren: [MarkupASTNode] = []
+        var extractedLabel: String? = nil
+
         skipSameLineOrSingleNewlineWhitespace()
-        // Optional short title `\section[Short]{Full Title}`
+        // Optional short title `\section[Short]{Full Title}` (extracts `\cite`, `\ref`, `\label`)
         if peek().kind == .leftBracket {
-            _ = consumeBracketGroup(allowMultiline: false)
+            let opt = consumeBracketGroup(allowMultiline: true, extractSemanticNodes: true)
+            for child in opt.semanticNodes {
+                if case .labelDeclaration(let key) = child.kind, extractedLabel == nil {
+                    extractedLabel = key
+                }
+                sectionChildren.append(child)
+            }
+            if let rec = opt.recoveryNode {
+                sectionChildren.append(rec)
+            }
             skipSameLineOrSingleNewlineWhitespace()
         }
 
-        var sectionChildren: [MarkupASTNode] = []
-        var extractedLabel: String? = nil
         let rawTitle: String
         var headerEndPos = cmdTok.span.end
 
@@ -1083,14 +1146,23 @@ private struct ParseStreamWorker {
             )
         }
 
-        // Optional placement/parameter brackets (`\begin{figure}[htbp]`, `\begin{tabular}{lcc}`).
-        skipHorizontalWhitespaceAndComments()
-        if peek().kind == .leftBracket {
-            let opt = consumeBracketGroup(allowMultiline: IncrementalMarkupLexer.verbatimEnvironmentNames.contains(envName))
+        // Optional placement/title/parameter brackets (`\begin{figure}[htbp]`, `\begin{lemma}[Bound~\citep{x}]`).
+        var detectedLabel: String? = nil
+        let extractOptSemantics = !IncrementalMarkupLexer.verbatimEnvironmentNames.contains(envName)
+        skipSameLineOrSingleNewlineWhitespace()
+        while peek().kind == .leftBracket {
+            let opt = consumeBracketGroup(allowMultiline: true, extractSemanticNodes: extractOptSemantics)
             headerEndPos = opt.endPos
+            for node in opt.semanticNodes {
+                if case .labelDeclaration(let key) = node.kind, detectedLabel == nil {
+                    detectedLabel = key
+                }
+                envChildren.append(node)
+            }
             if let rec = opt.recoveryNode {
                 envChildren.append(rec)
             }
+            skipHorizontalWhitespaceAndComments()
         }
         if envName == "tabular" || envName == "tabular*" || envName == "tabularx" || envName == "array" || envName == "minipage" || envName == "subfigure" || envName == "minted" {
             skipHorizontalWhitespaceAndComments()
@@ -1098,6 +1170,15 @@ private struct ParseStreamWorker {
                 let colSpec = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: envName)
                 headerEndPos = colSpec.endPos
                 if let rec = colSpec.recoveryNode {
+                    envChildren.append(rec)
+                }
+                skipHorizontalWhitespaceAndComments()
+            }
+            while peek().kind == .leftBracket {
+                let postOpt = consumeBracketGroup(allowMultiline: true, extractSemanticNodes: extractOptSemantics)
+                headerEndPos = postOpt.endPos
+                envChildren.append(contentsOf: postOpt.semanticNodes)
+                if let rec = postOpt.recoveryNode {
                     envChildren.append(rec)
                 }
                 skipHorizontalWhitespaceAndComments()
@@ -1135,9 +1216,9 @@ private struct ParseStreamWorker {
         activeEnvironmentStack.append(envName)
         defer { _ = activeEnvironmentStack.popLast() }
 
-        var detectedLabel: String? = nil
         var detectedCaption: String? = nil
         var paragraph = ParagraphAccumulator()
+        var envSectionStack: [OpenSectionFrame] = []
         var envEndPos = headerEndPos
         var closedCleanly = false
 
@@ -1146,9 +1227,9 @@ private struct ParseStreamWorker {
 
             // Blank line inside `abstract`, `theorem`, `proof`, etc. flushes paragraph.
             if tok.kind == .whitespace {
-                let (newlines, nextIdx) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
-                    flushEnvironmentParagraph(&paragraph, into: &envChildren)
+                let (blankLines, nextIdx) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
+                    flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     index = nextIdx
                     continue
                 }
@@ -1169,7 +1250,7 @@ private struct ParseStreamWorker {
                 if role == .sectioning {
                     let lvl = Self.latexSectionLevel(for: tok.lexeme)
                     if lvl <= 3 {
-                        flushEnvironmentParagraph(&paragraph, into: &envChildren)
+                        flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
                         let missingSpan = TextSpan(filePath: filePath, start: startPos, end: tok.span.start)
                         let errNode = emitIssue(
                             code: .missingEnvironmentEnd,
@@ -1187,7 +1268,7 @@ private struct ParseStreamWorker {
                 }
 
                 if role == .environmentEnd {
-                    flushEnvironmentParagraph(&paragraph, into: &envChildren)
+                    flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     let closingName = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
 
                     if closingName == envName {
@@ -1247,7 +1328,7 @@ private struct ParseStreamWorker {
 
                 // Caption inside `figure`, `table`, `algorithm`, etc.
                 if role == .captionCommand {
-                    flushEnvironmentParagraph(&paragraph, into: &envChildren)
+                    flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     let capResult = parseLaTeXCaptionCommand()
                     if !capResult.captionText.isEmpty && detectedCaption == nil {
                         detectedCaption = capResult.captionText
@@ -1256,7 +1337,7 @@ private struct ParseStreamWorker {
                         if case .labelDeclaration(let key) = node.kind, detectedLabel == nil {
                             detectedLabel = key
                         }
-                        envChildren.append(node)
+                        appendNode(node, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     }
                     continue
                 }
@@ -1273,23 +1354,20 @@ private struct ParseStreamWorker {
 
                 // Nested environment (`subfigure`, `tabular` inside `table`, `itemize` inside `theorem`).
                 if role == .environmentBegin {
-                    flushEnvironmentParagraph(&paragraph, into: &envChildren)
+                    flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     let nestedEnv = parseLaTeXEnvironment()
-                    // Propagate label upward only if nested env is `tabular` without outer label? Keep outer independent;
-                    // outer `table` usually has its own `\label`, or if `detectedLabel == nil` and nested has one? Keep separate unless `subfigure`? Actually keeping outer `detectedLabel` from direct `\label` is cleanest!
-                    envChildren.append(nestedEnv)
+                    appendNode(nestedEnv, intoSections: &envSectionStack, orTopLevel: &envChildren)
                     continue
                 }
             }
 
             // Delegate inline & nested items inside the environment body.
-            var dummySections: [OpenSectionFrame] = []
             parseNextLaTeXItem(
                 paragraph: &paragraph,
-                sectionStack: &dummySections,
+                sectionStack: &envSectionStack,
                 topLevelNodes: &envChildren
             )
-            // Also capture any `\label` that was appended to `envChildren`.
+            // Also capture any `\label` that was appended to `paragraph`.
             if detectedLabel == nil {
                 for node in paragraph.inlineNodes {
                     if case .labelDeclaration(let key) = node.kind {
@@ -1300,7 +1378,13 @@ private struct ParseStreamWorker {
             }
         }
 
-        flushEnvironmentParagraph(&paragraph, into: &envChildren)
+        flushParagraph(&paragraph, intoSections: &envSectionStack, orTopLevel: &envChildren)
+        closeSections(
+            downToOrEqualLevel: Int.min,
+            endPos: envEndPos,
+            sectionStack: &envSectionStack,
+            topLevelNodes: &envChildren
+        )
 
         if !closedCleanly {
             envEndPos = peek().span.end
@@ -1349,14 +1433,79 @@ private struct ParseStreamWorker {
         var detectedLabel: String? = nil
         var endPos = bodyStartPos
         var closedCleanly = false
+        var innerMathEnvStack: [(name: String, startPos: TextPosition)] = []
 
         while !isAtEnd {
             let tok = peek()
             if tok.kind == .command {
                 let role = LaTeXCommandRole.classify(tok.lexeme)
-                if role == .environmentEnd {
+                if role == .environmentBegin {
+                    if let innerName = peekLaTeXEnvironmentName(atCommandIndex: index),
+                       Self.isSubsidiaryMathEnvironment(innerName) {
+                        let beginTok = advance()
+                        formulaTokens.append(beginTok.lexeme)
+                        endPos = beginTok.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\begin")
+                            formulaTokens.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.append((name: innerName, startPos: beginTok.span.start))
+                        continue
+                    }
+                } else if role == .environmentEnd {
                     let closingName = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
-                    if closingName == envName {
+                    if let topInner = innerMathEnvStack.last, closingName == topInner.name {
+                        let endCmd = advance()
+                        formulaTokens.append(endCmd.lexeme)
+                        endPos = endCmd.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\end")
+                            formulaTokens.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.removeLast()
+                        continue
+                    } else if let matchIdx = innerMathEnvStack.lastIndex(where: { $0.name == closingName }) {
+                        while innerMathEnvStack.count - 1 > matchIdx {
+                            let unclosed = innerMathEnvStack.removeLast()
+                            children.append(
+                                emitIssue(
+                                    code: .missingEnvironmentEnd,
+                                    severity: .error,
+                                    message: "Missing '\\end{\(unclosed.name)}' before '\\end{\(closingName)}'.",
+                                    span: TextSpan(filePath: filePath, start: unclosed.startPos, end: tok.span.start),
+                                    suggestedFix: "\\end{\(unclosed.name)}",
+                                    recoveredConstruct: unclosed.name
+                                )
+                            )
+                        }
+                        let endCmd = advance()
+                        formulaTokens.append(endCmd.lexeme)
+                        endPos = endCmd.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\end")
+                            formulaTokens.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.removeLast()
+                        continue
+                    } else if closingName == envName {
+                        while let unclosed = innerMathEnvStack.popLast() {
+                            children.append(
+                                emitIssue(
+                                    code: .missingEnvironmentEnd,
+                                    severity: .error,
+                                    message: "Missing '\\end{\(unclosed.name)}' before '\\end{\(envName)}'.",
+                                    span: TextSpan(filePath: filePath, start: unclosed.startPos, end: tok.span.start),
+                                    suggestedFix: "\\end{\(unclosed.name)}",
+                                    recoveredConstruct: unclosed.name
+                                )
+                            )
+                        }
                         let endCmd = advance()
                         endPos = endCmd.span.end
                         skipHorizontalWhitespaceAndComments()
@@ -1367,6 +1516,18 @@ private struct ParseStreamWorker {
                         closedCleanly = true
                         break
                     } else if closingName == "document" || activeEnvironmentStack.contains(closingName) {
+                        while let unclosed = innerMathEnvStack.popLast() {
+                            children.append(
+                                emitIssue(
+                                    code: .missingEnvironmentEnd,
+                                    severity: .error,
+                                    message: "Missing '\\end{\(unclosed.name)}' before '\\end{\(closingName)}'.",
+                                    span: TextSpan(filePath: filePath, start: unclosed.startPos, end: tok.span.start),
+                                    suggestedFix: "\\end{\(unclosed.name)}",
+                                    recoveredConstruct: unclosed.name
+                                )
+                            )
+                        }
                         let missingSpan = TextSpan(filePath: filePath, start: startPos, end: tok.span.start)
                         children.append(
                             emitIssue(
@@ -1381,6 +1542,27 @@ private struct ParseStreamWorker {
                         endPos = tok.span.start
                         closedCleanly = true
                         break
+                    } else if let unclosedInner = innerMathEnvStack.popLast() {
+                        let mismatchStart = tok.span.start
+                        advance()
+                        var mismatchEnd = tok.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\end")
+                            mismatchEnd = grp.endPos
+                        }
+                        children.append(
+                            emitIssue(
+                                code: .mismatchedEnvironmentEnd,
+                                severity: .error,
+                                message: "Mismatched math environment: opened '\\begin{\(unclosedInner.name)}' but encountered '\\end{\(closingName)}'.",
+                                span: TextSpan(filePath: filePath, start: mismatchStart, end: mismatchEnd),
+                                suggestedFix: "\\end{\(unclosedInner.name)}",
+                                recoveredConstruct: unclosedInner.name
+                            )
+                        )
+                        endPos = mismatchEnd
+                        continue
                     } else {
                         let mismatchStart = tok.span.start
                         advance()
@@ -1434,6 +1616,21 @@ private struct ParseStreamWorker {
                     let refs = parseLaTeXCrossReference()
                     children.append(contentsOf: refs)
                     continue
+                } else if role == .proseFormatting {
+                    let fmtTok = advance()
+                    formulaTokens.append(fmtTok.lexeme)
+                    endPos = fmtTok.span.end
+                    skipHorizontalWhitespaceAndComments()
+                    if peek().kind == .leftBrace {
+                        let grp = consumeStructuredProseBraceGroup(constructName: fmtTok.lexeme)
+                        formulaTokens.append("{\(grp.cleanText)}")
+                        endPos = grp.endPos
+                        children.append(contentsOf: grp.semanticNodes)
+                        if let rec = grp.recoveryNode {
+                            children.append(rec)
+                        }
+                    }
+                    continue
                 }
             }
             if tok.kind != .comment && tok.kind != .verbatim {
@@ -1445,6 +1642,18 @@ private struct ParseStreamWorker {
 
         if !closedCleanly {
             endPos = peek().span.end
+            while let unclosed = innerMathEnvStack.popLast() {
+                children.append(
+                    emitIssue(
+                        code: .missingEnvironmentEnd,
+                        severity: .error,
+                        message: "Unclosed subsidiary math environment '\\begin{\(unclosed.name)}' at end of file.",
+                        span: TextSpan(filePath: filePath, start: unclosed.startPos, end: endPos),
+                        suggestedFix: "\\end{\(unclosed.name)}",
+                        recoveredConstruct: unclosed.name
+                    )
+                )
+            }
             children.append(
                 emitIssue(
                     code: .missingEnvironmentEnd,
@@ -1483,13 +1692,14 @@ private struct ParseStreamWorker {
             }
         }
 
-        skipHorizontalWhitespaceAndComments()
+        skipSameLineOrSingleNewlineWhitespace()
         if peek().kind == .leftBracket {
-            let opt = consumeBracketGroup(allowMultiline: true)
+            let opt = consumeBracketGroup(allowMultiline: true, extractSemanticNodes: true)
+            nodes.append(contentsOf: opt.semanticNodes)
             if let rec = opt.recoveryNode {
                 nodes.append(rec)
             }
-            skipHorizontalWhitespaceAndComments()
+            skipSameLineOrSingleNewlineWhitespace()
         }
 
         guard peek().kind == .leftBrace else {
@@ -1509,23 +1719,27 @@ private struct ParseStreamWorker {
         let cmdTok = advance()
         let startPos = cmdTok.span.start
         var endPos = cmdTok.span.end
+        var commandLexeme = cmdTok.lexeme
+        if !commandLexeme.hasSuffix("*"), peek().kind == .punctuation, peek().lexeme == "*" {
+            let starTok = advance()
+            commandLexeme.append("*")
+            endPos = starTok.span.end
+        }
         var results: [MarkupASTNode] = []
 
-        let isMultiCiteVariant = cmdTok.lexeme.hasSuffix("s") && (
-            cmdTok.lexeme == "\\cites" || cmdTok.lexeme == "\\parencites"
-            || cmdTok.lexeme == "\\textcites" || cmdTok.lexeme == "\\autocites"
-        )
+        let isMultiCiteVariant = LaTeXCommandRole.citationSpec(for: commandLexeme)?.isMulticite == true
 
         repeat {
             let groupStart = results.isEmpty ? startPos : peek().span.start
             skipSameLineOrSingleNewlineWhitespace()
 
-            // Collect 0, 1, or 2 optional `[...]` prenote/postnote arguments.
+            // Collect 0, 1, or 2 optional `[...]` prenote/postnote arguments (also extracting any inner `\ref`/`\cite`).
             var optArgs: [String] = []
             while optArgs.count < 2 && peek().kind == .leftBracket {
-                let opt = consumeBracketGroup(allowMultiline: false)
+                let opt = consumeBracketGroup(allowMultiline: true, extractSemanticNodes: true)
                 optArgs.append(opt.content.trimmingCharacters(in: .whitespacesAndNewlines))
                 endPos = opt.endPos
+                results.append(contentsOf: opt.semanticNodes)
                 if let rec = opt.recoveryNode {
                     results.append(rec)
                 }
@@ -1550,17 +1764,17 @@ private struct ParseStreamWorker {
                     let errNode = emitIssue(
                         code: .malformedCitationCommand,
                         severity: .error,
-                        message: "Expected '{citekey}' argument after '\(cmdTok.lexeme)'.",
+                        message: "Expected '{citekey}' argument after '\(commandLexeme)'.",
                         span: TextSpan(filePath: filePath, start: startPos, end: endPos),
-                        suggestedFix: "\(cmdTok.lexeme){author2024}",
-                        recoveredConstruct: cmdTok.lexeme
+                        suggestedFix: "\(commandLexeme){author2024}",
+                        recoveredConstruct: commandLexeme
                     )
                     results.append(errNode)
                 }
                 break
             }
 
-            let keyGroup = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: cmdTok.lexeme)
+            let keyGroup = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: commandLexeme)
             endPos = keyGroup.endPos
             if let rec = keyGroup.recoveryNode {
                 results.append(rec)
@@ -1568,17 +1782,18 @@ private struct ParseStreamWorker {
 
             let keys = keyGroup.rawContent
                 .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .map { LaTeXKeyNormalizer.normalize($0) }
                 .filter { !$0.isEmpty }
 
             let citeSpan = TextSpan(filePath: filePath, start: groupStart, end: endPos)
-            if keys.isEmpty && keyGroup.rawContent.trimmingCharacters(in: .whitespacesAndNewlines) != "*" {
+            let normalizedRaw = LaTeXKeyNormalizer.normalize(keyGroup.rawContent)
+            if keys.isEmpty && normalizedRaw != "*" {
                 let errNode = emitIssue(
                     code: .malformedCitationCommand,
                     severity: .warning,
-                    message: "Empty citation key list in '\(cmdTok.lexeme){}'.",
+                    message: "Empty citation key list in '\(commandLexeme){}'.",
                     span: citeSpan,
-                    recoveredConstruct: cmdTok.lexeme
+                    recoveredConstruct: commandLexeme
                 )
                 results.append(errNode)
             } else {
@@ -1586,7 +1801,7 @@ private struct ParseStreamWorker {
                 results.append(
                     MarkupASTNode(
                         kind: .citation(
-                            command: cmdTok.lexeme,
+                            command: commandLexeme,
                             citeKeys: finalKeys,
                             prenote: prenote,
                             postnote: postnote
@@ -1608,7 +1823,17 @@ private struct ParseStreamWorker {
     private mutating func parseLaTeXLabelDeclaration() -> MarkupASTNode {
         let cmdTok = advance()
         let startPos = cmdTok.span.start
-        skipHorizontalWhitespaceAndComments()
+        skipSameLineOrSingleNewlineWhitespace()
+
+        var children: [MarkupASTNode] = []
+        // `cleveref` allows `\label[type]{key}` with an optional counter-type bracket.
+        if peek().kind == .leftBracket {
+            let opt = consumeBracketGroup(allowMultiline: false)
+            if let rec = opt.recoveryNode {
+                children.append(rec)
+            }
+            skipSameLineOrSingleNewlineWhitespace()
+        }
 
         guard peek().kind == .leftBrace else {
             return emitIssue(
@@ -1622,9 +1847,8 @@ private struct ParseStreamWorker {
         }
 
         let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: cmdTok.lexeme)
-        let key = grp.rawContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = LaTeXKeyNormalizer.normalize(grp.rawContent)
         let span = TextSpan(filePath: filePath, start: startPos, end: grp.endPos)
-        var children: [MarkupASTNode] = []
         if let rec = grp.recoveryNode {
             children.append(rec)
         }
@@ -1650,24 +1874,41 @@ private struct ParseStreamWorker {
     private mutating func parseLaTeXCrossReference() -> [MarkupASTNode] {
         let cmdTok = advance()
         let startPos = cmdTok.span.start
-        skipHorizontalWhitespaceAndComments()
+        var commandLexeme = cmdTok.lexeme
+        var cmdEndPos = cmdTok.span.end
+        if !commandLexeme.hasSuffix("*"), peek().kind == .punctuation, peek().lexeme == "*" {
+            let starTok = advance()
+            commandLexeme.append("*")
+            cmdEndPos = starTok.span.end
+        }
+        skipSameLineOrSingleNewlineWhitespace()
 
         // `\hyperref[sec:intro]{Section 1}` places the target label inside `[...]`!
-        if cmdTok.lexeme == "\\hyperref" && peek().kind == .leftBracket {
+        if commandLexeme == "\\hyperref" && peek().kind == .leftBracket {
             let targetBracket = consumeBracketGroup(allowMultiline: false)
             var endPos = targetBracket.endPos
-            skipHorizontalWhitespaceAndComments()
-            if peek().kind == .leftBrace {
-                let anchor = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\hyperref")
-                endPos = anchor.endPos
+            var extraNodes: [MarkupASTNode] = []
+            if let rec = targetBracket.recoveryNode {
+                extraNodes.append(rec)
             }
-            let key = targetBracket.content.trimmingCharacters(in: .whitespacesAndNewlines)
-            return [
+            skipSameLineOrSingleNewlineWhitespace()
+            if peek().kind == .leftBrace {
+                let anchor = consumeStructuredProseBraceGroup(constructName: "\\hyperref")
+                endPos = anchor.endPos
+                extraNodes.append(contentsOf: anchor.semanticNodes)
+                if let rec = anchor.recoveryNode {
+                    extraNodes.append(rec)
+                }
+            }
+            let key = LaTeXKeyNormalizer.normalize(targetBracket.content)
+            var out: [MarkupASTNode] = [
                 MarkupASTNode(
-                    kind: .crossReference(command: cmdTok.lexeme, targetKey: key),
+                    kind: .crossReference(command: commandLexeme, targetKey: key),
                     span: TextSpan(filePath: filePath, start: startPos, end: endPos)
                 )
             ]
+            out.append(contentsOf: extraNodes)
+            return out
         }
 
         guard peek().kind == .leftBrace else {
@@ -1675,19 +1916,19 @@ private struct ParseStreamWorker {
                 emitIssue(
                     code: .malformedCrossReference,
                     severity: .error,
-                    message: "Expected '{label}' target after '\(cmdTok.lexeme)'.",
-                    span: cmdTok.span,
-                    suggestedFix: "\(cmdTok.lexeme){sec:intro}",
-                    recoveredConstruct: cmdTok.lexeme
+                    message: "Expected '{label}' target after '\(commandLexeme)'.",
+                    span: TextSpan(filePath: filePath, start: startPos, end: cmdEndPos),
+                    suggestedFix: "\(commandLexeme){sec:intro}",
+                    recoveredConstruct: commandLexeme
                 )
             ]
         }
 
-        let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: cmdTok.lexeme)
+        let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: commandLexeme)
         let span = TextSpan(filePath: filePath, start: startPos, end: grp.endPos)
         let keys = grp.rawContent
             .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { LaTeXKeyNormalizer.normalize($0) }
             .filter { !$0.isEmpty }
 
         if keys.isEmpty {
@@ -1695,16 +1936,16 @@ private struct ParseStreamWorker {
                 emitIssue(
                     code: .malformedCrossReference,
                     severity: .warning,
-                    message: "Empty cross-reference target in '\(cmdTok.lexeme){}'.",
+                    message: "Empty cross-reference target in '\(commandLexeme){}'.",
                     span: span,
-                    recoveredConstruct: cmdTok.lexeme
+                    recoveredConstruct: commandLexeme
                 )
             ]
         }
 
         var nodes: [MarkupASTNode] = keys.map { key in
             MarkupASTNode(
-                kind: .crossReference(command: cmdTok.lexeme, targetKey: key),
+                kind: .crossReference(command: commandLexeme, targetKey: key),
                 span: span
             )
         }
@@ -2055,42 +2296,104 @@ private struct ParseStreamWorker {
         var childNodes: [MarkupASTNode] = []
         var endPos = openTok.span.end
         var closed = false
+        var innerMathEnvStack: [(name: String, startPos: TextPosition)] = []
 
         while !isAtEnd {
             let tok = peek()
 
             // Matching closing delimiter!
             if (tok.kind == .mathDisplay || tok.kind == .mathInline) && tok.lexeme == expectedCloseLexeme {
+                while let unclosed = innerMathEnvStack.popLast() {
+                    childNodes.append(
+                        emitIssue(
+                            code: .missingEnvironmentEnd,
+                            severity: .error,
+                            message: "Missing '\\end{\(unclosed.name)}' before '\(expectedCloseLexeme)'.",
+                            span: TextSpan(filePath: filePath, start: unclosed.startPos, end: tok.span.start),
+                            suggestedFix: "\\end{\(unclosed.name)}",
+                            recoveredConstruct: unclosed.name
+                        )
+                    )
+                }
                 endPos = tok.span.end
                 advance()
                 closed = true
                 break
             }
 
-            // Recovery boundary 1: inline `$` or `\(` never spans across a blank paragraph break (`\n\n`) in valid TeX!
+            // Recovery boundary 1: inline `$` or `\(` never spans across a blank paragraph break (`\par`) in valid TeX!
             if !isDisplay && tok.kind == .whitespace {
-                let (newlines, _) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
+                let (blankLines, _) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
                     break
                 }
             }
 
-            // Recovery boundary 2: encountering `\section`, `\subsection`, or an outer `\end{...}` / `\begin{figure}`
+            // Recovery boundary 2: encountering `\section`, `\subsection`, or an outer `\end{...}` / non-math `\begin{figure}`
             // while inside unclosed math must recover immediately so downstream manuscript structure stays intact!
             if tok.kind == .command {
                 let role = LaTeXCommandRole.classify(tok.lexeme)
                 if role == .sectioning || role == .appendixSwitch {
                     break
                 }
-                if role == .environmentEnd {
-                    let closingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
-                    if closingEnv == "document" || activeEnvironmentStack.contains(closingEnv) {
+                if role == .environmentBegin {
+                    let openingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
+                    if Self.isSubsidiaryMathEnvironment(openingEnv) {
+                        let beginTok = advance()
+                        formulaParts.append(beginTok.lexeme)
+                        endPos = beginTok.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\begin")
+                            formulaParts.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.append((name: openingEnv, startPos: beginTok.span.start))
+                        continue
+                    } else if !isDisplay {
                         break
                     }
                 }
-                if !isDisplay && role == .environmentBegin {
-                    let openingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
-                    if !Self.inlineMathAllowedSubEnvironments.contains(openingEnv) {
+                if role == .environmentEnd {
+                    let closingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
+                    if let topInner = innerMathEnvStack.last, closingEnv == topInner.name {
+                        let endTok = advance()
+                        formulaParts.append(endTok.lexeme)
+                        endPos = endTok.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\end")
+                            formulaParts.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.removeLast()
+                        continue
+                    } else if let matchIdx = innerMathEnvStack.lastIndex(where: { $0.name == closingEnv }) {
+                        while innerMathEnvStack.count - 1 > matchIdx {
+                            let unclosed = innerMathEnvStack.removeLast()
+                            childNodes.append(
+                                emitIssue(
+                                    code: .missingEnvironmentEnd,
+                                    severity: .error,
+                                    message: "Missing '\\end{\(unclosed.name)}' before '\\end{\(closingEnv)}'.",
+                                    span: TextSpan(filePath: filePath, start: unclosed.startPos, end: tok.span.start),
+                                    suggestedFix: "\\end{\(unclosed.name)}",
+                                    recoveredConstruct: unclosed.name
+                                )
+                            )
+                        }
+                        let endTok = advance()
+                        formulaParts.append(endTok.lexeme)
+                        endPos = endTok.span.end
+                        skipHorizontalWhitespaceAndComments()
+                        if peek().kind == .leftBrace {
+                            let grp = consumeBraceGroupRaw(recoverAtStructuralBoundary: true, constructName: "\\end")
+                            formulaParts.append("{\(grp.rawContent)}")
+                            endPos = grp.endPos
+                        }
+                        innerMathEnvStack.removeLast()
+                        continue
+                    } else if closingEnv == "document" || activeEnvironmentStack.contains(closingEnv) {
                         break
                     }
                 }
@@ -2101,6 +2404,34 @@ private struct ParseStreamWorker {
                     }
                     childNodes.append(lblNode)
                     endPos = lblNode.span.end
+                    continue
+                }
+                if role == .citation {
+                    let cites = parseLaTeXCitation()
+                    childNodes.append(contentsOf: cites)
+                    if let last = cites.last { endPos = last.span.end }
+                    continue
+                }
+                if role == .crossReference {
+                    let refs = parseLaTeXCrossReference()
+                    childNodes.append(contentsOf: refs)
+                    if let last = refs.last { endPos = last.span.end }
+                    continue
+                }
+                if role == .proseFormatting {
+                    let fmtTok = advance()
+                    formulaParts.append(fmtTok.lexeme)
+                    endPos = fmtTok.span.end
+                    skipHorizontalWhitespaceAndComments()
+                    if peek().kind == .leftBrace {
+                        let grp = consumeStructuredProseBraceGroup(constructName: fmtTok.lexeme)
+                        formulaParts.append("{\(grp.cleanText)}")
+                        endPos = grp.endPos
+                        childNodes.append(contentsOf: grp.semanticNodes)
+                        if let rec = grp.recoveryNode {
+                            childNodes.append(rec)
+                        }
+                    }
                     continue
                 }
             }
@@ -2134,11 +2465,6 @@ private struct ParseStreamWorker {
         return [mathNode]
     }
 
-    private static let inlineMathAllowedSubEnvironments: Set<String> = [
-        "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix",
-        "smallmatrix", "cases", "aligned", "array", "split"
-    ]
-
     // MARK: LaTeX Inline Braced & Formatting Helpers
 
     private mutating func parseInlineFormattingCommand(into paragraph: inout ParagraphAccumulator) {
@@ -2160,20 +2486,99 @@ private struct ParseStreamWorker {
         }
     }
 
-    private mutating func parseInlineBracedGroup(into paragraph: inout ParagraphAccumulator) {
-        let start = peek().span.start
-        let grp = consumeStructuredProseBraceGroup(constructName: "{...}")
-        if !grp.cleanText.isEmpty {
-            paragraph.recordProseFragment(
-                grp.cleanText,
-                span: TextSpan(filePath: filePath, start: start, end: grp.endPos)
+    /// Parses a general TeX `{...}` group (`{\begin{center}...}`, `\resizebox{\columnwidth}{!}{\begin{tabular}...}`,
+    /// multi-paragraph `{\color{blue}\n\n...\n\n}`), allowing nested environments, blank-line paragraph breaks,
+    /// citations, labels, cross-references, and includes inside `{...}` without false `AST001`/`AST002` errors,
+    /// while still reporting `AST001` if `{` is unclosed before an outer `\end{...}` or EOF.
+    private mutating func parseGeneralLaTeXBraceGroup(
+        paragraph: inout ParagraphAccumulator,
+        sectionStack: inout [OpenSectionFrame],
+        topLevelNodes: inout [MarkupASTNode]
+    ) {
+        let openTok = advance() // `{`
+        let startPos = openTok.span.start
+
+        if braceGroupDepth >= configuration.maxNestingDepth {
+            let errNode = emitIssue(
+                code: .unclosedBrace,
+                severity: .error,
+                message: "Maximum brace group nesting depth (\(configuration.maxNestingDepth)) exceeded.",
+                span: openTok.span,
+                suggestedFix: "}",
+                recoveredConstruct: "{...}"
             )
+            paragraph.recordInlineSemanticNode(errNode)
+            return
         }
-        for sem in grp.semanticNodes {
-            paragraph.recordInlineSemanticNode(sem)
+
+        braceGroupDepth += 1
+        defer { braceGroupDepth -= 1 }
+
+        var endPos = openTok.span.end
+        var closedCleanly = false
+
+        while !isAtEnd {
+            let tok = peek()
+
+            if tok.kind == .rightBrace {
+                endPos = tok.span.end
+                advance()
+                closedCleanly = true
+                break
+            }
+
+            if tok.kind == .whitespace {
+                let (blankLines, nextIdx) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
+                    flushParagraph(&paragraph, intoSections: &sectionStack, orTopLevel: &topLevelNodes)
+                    index = nextIdx
+                    if index > 0 {
+                        endPos = tokens[index - 1].span.end
+                    }
+                    continue
+                }
+                paragraph.recordProseFragment(" ", span: tok.span)
+                endPos = tok.span.end
+                advance()
+                continue
+            }
+
+            if tok.kind == .comment {
+                endPos = tok.span.end
+                advance()
+                continue
+            }
+
+            // If an enclosing outer environment (`\end{figure}`, `\end{document}`, etc.) closes before `}`,
+            // leave `\end{...}` on the stream for the outer frame and report unclosed `{`!
+            if tok.kind == .command, LaTeXCommandRole.classify(tok.lexeme) == .environmentEnd {
+                let closingName = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
+                if closingName == "document" || activeEnvironmentStack.contains(closingName) {
+                    endPos = tok.span.start
+                    break
+                }
+            }
+
+            parseNextLaTeXItem(
+                paragraph: &paragraph,
+                sectionStack: &sectionStack,
+                topLevelNodes: &topLevelNodes
+            )
+            if index > 0 {
+                endPos = tokens[index - 1].span.end
+            }
         }
-        if let rec = grp.recoveryNode {
-            paragraph.recordInlineSemanticNode(rec)
+
+        if !closedCleanly {
+            let errNode = emitIssue(
+                code: .unclosedBrace,
+                severity: .error,
+                message: "Unclosed '{' in '{...}'; recovered cleanly.",
+                span: TextSpan(filePath: filePath, start: startPos, end: endPos),
+                suggestedFix: "}",
+                recoveredConstruct: "{...}"
+            )
+            paragraph.recordInlineSemanticNode(errNode)
         }
     }
 
@@ -2237,8 +2642,8 @@ private struct ParseStreamWorker {
             }
 
             if recoverAtStructuralBoundary && tok.kind == .whitespace {
-                let (newlines, _) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 && constructName != "\\newcommand" && constructName != "\\renewcommand" && constructName != "\\providecommand" {
+                let (blankLines, _) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 && constructName != "\\newcommand" && constructName != "\\renewcommand" && constructName != "\\providecommand" {
                     break
                 }
             }
@@ -2294,8 +2699,8 @@ private struct ParseStreamWorker {
 
             // Recover cleanly if someone forgot `}` at the end of `\section{Introduction\n\nWe propose...`
             if tok.kind == .whitespace {
-                let (newlines, _) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
+                let (blankLines, _) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
                     break
                 }
                 textFragments.append(" ")
@@ -2306,8 +2711,24 @@ private struct ParseStreamWorker {
 
             if tok.kind == .command {
                 let role = LaTeXCommandRole.classify(tok.lexeme)
-                if role == .sectioning || role == .environmentBegin || role == .environmentEnd {
+                if role == .sectioning {
                     break
+                }
+                if role == .environmentEnd {
+                    let closingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
+                    if closingEnv == "document" || activeEnvironmentStack.contains(closingEnv) {
+                        break
+                    }
+                }
+                if role == .environmentBegin {
+                    let openingEnv = peekLaTeXEnvironmentName(atCommandIndex: index) ?? ""
+                    if openingEnv == "document" {
+                        break
+                    }
+                    let envNode = parseLaTeXEnvironment()
+                    semanticNodes.append(envNode)
+                    endPos = envNode.span.end
+                    continue
                 }
                 if role == .citation {
                     let cites = parseLaTeXCitation()
@@ -2384,14 +2805,16 @@ private struct ParseStreamWorker {
     }
 
     private mutating func consumeBracketGroup(
-        allowMultiline: Bool
-    ) -> (content: String, endPos: TextPosition, recoveryNode: MarkupASTNode?) {
+        allowMultiline: Bool,
+        extractSemanticNodes: Bool = false
+    ) -> (content: String, endPos: TextPosition, semanticNodes: [MarkupASTNode], recoveryNode: MarkupASTNode?) {
         let openTok = advance() // `[`
         let startPos = openTok.span.start
         var endPos = openTok.span.end
         var bracketDepth = 1
         var braceDepth = 0
         var parts: [String] = []
+        var semanticNodes: [MarkupASTNode] = []
 
         while !isAtEnd && bracketDepth > 0 {
             let tok = peek()
@@ -2435,9 +2858,43 @@ private struct ParseStreamWorker {
                 break
             }
             if allowMultiline && tok.kind == .whitespace {
-                let (newlines, _) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
+                let (blankLines, _) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
                     break
+                }
+            }
+
+            if extractSemanticNodes && tok.kind == .command {
+                let role = LaTeXCommandRole.classify(tok.lexeme)
+                if role == .citation {
+                    let startIdx = index
+                    let cites = parseLaTeXCitation()
+                    semanticNodes.append(contentsOf: cites)
+                    for k in startIdx..<index where tokens[k].kind != .comment {
+                        parts.append(tokens[k].lexeme)
+                    }
+                    if let last = cites.last { endPos = last.span.end }
+                    continue
+                }
+                if role == .crossReference {
+                    let startIdx = index
+                    let refs = parseLaTeXCrossReference()
+                    semanticNodes.append(contentsOf: refs)
+                    for k in startIdx..<index where tokens[k].kind != .comment {
+                        parts.append(tokens[k].lexeme)
+                    }
+                    if let last = refs.last { endPos = last.span.end }
+                    continue
+                }
+                if role == .labelDeclaration {
+                    let startIdx = index
+                    let lbl = parseLaTeXLabelDeclaration()
+                    semanticNodes.append(lbl)
+                    for k in startIdx..<index where tokens[k].kind != .comment {
+                        parts.append(tokens[k].lexeme)
+                    }
+                    endPos = lbl.span.end
+                    continue
                 }
             }
 
@@ -2459,7 +2916,7 @@ private struct ParseStreamWorker {
                 suggestedFix: "]"
             )
         }
-        return (parts.joined(), endPos, recoveryNode)
+        return (parts.joined(), endPos, semanticNodes, recoveryNode)
     }
 
     // MARK: - 2. Typst Top-Level & Block Item Dispatch
@@ -2838,8 +3295,8 @@ private struct ParseStreamWorker {
                 break
             }
             if t.kind == .whitespace {
-                let (newlines, _) = countConsecutiveNewlines(startingAt: index)
-                if newlines >= 2 {
+                let (blankLines, _) = countBlankLinesInTrivia(startingAt: index)
+                if blankLines >= 1 {
                     break
                 }
             }

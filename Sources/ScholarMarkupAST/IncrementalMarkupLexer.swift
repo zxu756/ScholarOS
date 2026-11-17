@@ -161,6 +161,83 @@ public struct LineByteIndex: Sendable, Codable, Hashable {
 
 // MARK: - Command & Directive Semantic Classifiers
 
+/// TeX-compatible whitespace normalizer for label, cross-reference, and citation keys.
+public enum LaTeXKeyNormalizer {
+    /// Strips leading and trailing whitespace and collapses internal runs of whitespace
+    /// (spaces, tabs, CR/LF) into a single ASCII space `" "`.
+    public static func normalize(_ raw: Substring) -> String {
+        var result = ""
+        result.reserveCapacity(raw.utf8.count)
+        var pendingSpace = false
+        var sawNonWhitespace = false
+        for ch in raw {
+            if ch.isWhitespace || ch.isNewline {
+                if sawNonWhitespace {
+                    pendingSpace = true
+                }
+            } else {
+                if pendingSpace {
+                    result.append(" ")
+                    pendingSpace = false
+                }
+                result.append(ch)
+                sawNonWhitespace = true
+            }
+        }
+        return result
+    }
+
+    public static func normalize(_ raw: String) -> String {
+        normalize(raw[...])
+    }
+}
+
+/// Declarative specification for a LaTeX citation command in `LaTeXCommandRole.citationCommandTable`.
+public struct LaTeXCitationCommandSpec: Sendable, Codable, Hashable {
+    public let baseCommand: String
+    public let packageOrigin: String
+    public let supportsStarred: Bool
+    public let maxOptionalArguments: Int
+    public let isMulticite: Bool
+
+    public init(
+        baseCommand: String,
+        packageOrigin: String,
+        supportsStarred: Bool,
+        maxOptionalArguments: Int,
+        isMulticite: Bool = false
+    ) {
+        self.baseCommand = baseCommand
+        self.packageOrigin = packageOrigin
+        self.supportsStarred = supportsStarred
+        self.maxOptionalArguments = maxOptionalArguments
+        self.isMulticite = isMulticite
+    }
+}
+
+/// Declarative specification for a LaTeX cross-reference command in `LaTeXCommandRole.crossReferenceCommandTable`.
+public struct LaTeXCrossReferenceCommandSpec: Sendable, Codable, Hashable {
+    public let baseCommand: String
+    public let packageOrigin: String
+    public let supportsStarred: Bool
+    public let supportsMultiKey: Bool
+    public let targetInBracket: Bool
+
+    public init(
+        baseCommand: String,
+        packageOrigin: String,
+        supportsStarred: Bool,
+        supportsMultiKey: Bool = false,
+        targetInBracket: Bool = false
+    ) {
+        self.baseCommand = baseCommand
+        self.packageOrigin = packageOrigin
+        self.supportsStarred = supportsStarred
+        self.supportsMultiKey = supportsMultiKey
+        self.targetInBracket = targetInBracket
+    }
+}
+
 /// Fine-grained lexical classification for LaTeX control words and control symbols.
 public enum LaTeXCommandRole: String, Sendable, Codable, Hashable, CaseIterable {
     case documentClass
@@ -182,6 +259,111 @@ public enum LaTeXCommandRole: String, Sendable, Codable, Hashable, CaseIterable 
     case controlSymbol
     case generalCommand
 
+    /// Canonical table of supported LaTeX citation commands (LaTeX2e, natbib, biblatex, apacite, chicago/aaai).
+    public static let citationCommandTable: [LaTeXCitationCommandSpec] = [
+        LaTeXCitationCommandSpec(baseCommand: "\\cite", packageOrigin: "latex2e/biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citep", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citet", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citealt", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citealp", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citeauthor", packageOrigin: "natbib/biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citeyear", packageOrigin: "natbib/biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citeyearpar", packageOrigin: "natbib", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citenum", packageOrigin: "natbib", supportsStarred: false, maxOptionalArguments: 0),
+        LaTeXCitationCommandSpec(baseCommand: "\\Citet", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Citep", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Citealt", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Citealp", packageOrigin: "natbib", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Citeauthor", packageOrigin: "natbib/biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Cite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\parencite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Parencite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\textcite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Textcite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\autocite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\Autocite", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citetitle", packageOrigin: "biblatex", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\footcite", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\footfullcite", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\fullcite", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\supercite", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\smartcite", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\cites", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2, isMulticite: true),
+        LaTeXCitationCommandSpec(baseCommand: "\\parencites", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2, isMulticite: true),
+        LaTeXCitationCommandSpec(baseCommand: "\\textcites", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2, isMulticite: true),
+        LaTeXCitationCommandSpec(baseCommand: "\\autocites", packageOrigin: "biblatex", supportsStarred: false, maxOptionalArguments: 2, isMulticite: true),
+        LaTeXCitationCommandSpec(baseCommand: "\\citeA", packageOrigin: "apacite", supportsStarred: true, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\citeN", packageOrigin: "chicago", supportsStarred: false, maxOptionalArguments: 1),
+        LaTeXCitationCommandSpec(baseCommand: "\\shortcite", packageOrigin: "chicago/aaai", supportsStarred: false, maxOptionalArguments: 2),
+        LaTeXCitationCommandSpec(baseCommand: "\\nocite", packageOrigin: "latex2e", supportsStarred: false, maxOptionalArguments: 0)
+    ]
+
+    /// Canonical table of supported LaTeX cross-reference commands (LaTeX2e, hyperref, amsmath, cleveref, subcaption, biblatex, varioref, fancyref).
+    public static let crossReferenceCommandTable: [LaTeXCrossReferenceCommandSpec] = [
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\ref", packageOrigin: "latex2e/hyperref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\eqref", packageOrigin: "amsmath", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\pageref", packageOrigin: "latex2e/hyperref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\nameref", packageOrigin: "nameref/hyperref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\autoref", packageOrigin: "hyperref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\Autoref", packageOrigin: "biblatex/catoptions", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\cref", packageOrigin: "cleveref", supportsStarred: true, supportsMultiKey: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\Cref", packageOrigin: "cleveref", supportsStarred: true, supportsMultiKey: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\cpageref", packageOrigin: "cleveref", supportsStarred: false, supportsMultiKey: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\Cpageref", packageOrigin: "cleveref", supportsStarred: false, supportsMultiKey: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\labelcref", packageOrigin: "cleveref", supportsStarred: false, supportsMultiKey: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\namecref", packageOrigin: "cleveref", supportsStarred: false),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\nameCref", packageOrigin: "cleveref", supportsStarred: false),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\subref", packageOrigin: "subcaption", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\hyperref", packageOrigin: "hyperref", supportsStarred: false, targetInBracket: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\vref", packageOrigin: "varioref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\Vref", packageOrigin: "varioref", supportsStarred: true),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\fref", packageOrigin: "fancyref", supportsStarred: false),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\Fref", packageOrigin: "fancyref", supportsStarred: false),
+        LaTeXCrossReferenceCommandSpec(baseCommand: "\\sref", packageOrigin: "fancyref", supportsStarred: false)
+    ]
+
+    private static let citationSpecByBase: [String: LaTeXCitationCommandSpec] = Dictionary(
+        uniqueKeysWithValues: citationCommandTable.map { ($0.baseCommand, $0) }
+    )
+
+    private static let crossRefSpecByBase: [String: LaTeXCrossReferenceCommandSpec] = Dictionary(
+        uniqueKeysWithValues: crossReferenceCommandTable.map { ($0.baseCommand, $0) }
+    )
+
+    /// Full set of citation command lexemes (including `*` variants) derived from `citationCommandTable`.
+    public static let allCitationCommands: Set<String> = {
+        var set = Set<String>()
+        for spec in citationCommandTable {
+            set.insert(spec.baseCommand)
+            if spec.supportsStarred {
+                set.insert(spec.baseCommand + "*")
+            }
+        }
+        return set
+    }()
+
+    /// Full set of cross-reference command lexemes (including `*` variants) derived from `crossReferenceCommandTable`.
+    public static let allCrossReferenceCommands: Set<String> = {
+        var set = Set<String>()
+        for spec in crossReferenceCommandTable {
+            set.insert(spec.baseCommand)
+            if spec.supportsStarred {
+                set.insert(spec.baseCommand + "*")
+            }
+        }
+        return set
+    }()
+
+    public static func citationSpec(for lexeme: String) -> LaTeXCitationCommandSpec? {
+        let base = lexeme.hasSuffix("*") ? String(lexeme.dropLast()) : lexeme
+        return citationSpecByBase[base]
+    }
+
+    public static func crossReferenceSpec(for lexeme: String) -> LaTeXCrossReferenceCommandSpec? {
+        let base = lexeme.hasSuffix("*") ? String(lexeme.dropLast()) : lexeme
+        return crossRefSpecByBase[base]
+    }
+
     private static let sectioningCommands: Set<String> = [
         "\\part", "\\part*",
         "\\chapter", "\\chapter*",
@@ -192,21 +374,9 @@ public enum LaTeXCommandRole: String, Sendable, Codable, Hashable, CaseIterable 
         "\\subparagraph", "\\subparagraph*"
     ]
 
-    private static let citationCommands: Set<String> = [
-        "\\cite", "\\cite*", "\\citep", "\\citep*", "\\citet", "\\citet*",
-        "\\citealt", "\\citealt*", "\\citealp", "\\citealp*",
-        "\\citeauthor", "\\citeauthor*", "\\citeyear", "\\citeyearpar",
-        "\\parencite", "\\parencite*", "\\textcite", "\\textcite*",
-        "\\autocite", "\\autocite*", "\\footcite", "\\footfullcite",
-        "\\fullcite", "\\supercite", "\\smartcite", "\\nocite",
-        "\\cites", "\\parencites", "\\textcites", "\\autocites"
-    ]
+    private static var citationCommands: Set<String> { allCitationCommands }
 
-    private static let crossRefCommands: Set<String> = [
-        "\\ref", "\\eqref", "\\autoref", "\\cref", "\\Cref",
-        "\\cpageref", "\\Cpageref", "\\pageref", "\\nameref",
-        "\\hyperref", "\\vref", "\\Vref", "\\fref", "\\Fref", "\\sref"
-    ]
+    private static var crossRefCommands: Set<String> { allCrossReferenceCommands }
 
     private static let fileIncludeCommands: Set<String> = [
         "\\input", "\\include", "\\includeonly", "\\subfile",
@@ -1558,15 +1728,22 @@ public struct IncrementalMarkupLexer: Sendable {
         "\\url", "\\path", "\\nolinkurl", "\\href"
     ]
 
-    private static let starredCapableCommands: Set<String> = [
-        "\\part", "\\chapter", "\\section", "\\subsection", "\\subsubsection",
-        "\\paragraph", "\\subparagraph",
-        "\\newcommand", "\\renewcommand", "\\providecommand", "\\DeclareRobustCommand",
-        "\\DeclareMathOperator", "\\caption",
-        "\\cite", "\\citep", "\\citet", "\\citealt", "\\citealp", "\\citeauthor",
-        "\\parencite", "\\textcite", "\\autocite", "\\vspace", "\\hspace",
-        "\\import", "\\subimport", "\\verb"
-    ]
+    private static let starredCapableCommands: Set<String> = {
+        var set: Set<String> = [
+            "\\part", "\\chapter", "\\section", "\\subsection", "\\subsubsection",
+            "\\paragraph", "\\subparagraph",
+            "\\newcommand", "\\renewcommand", "\\providecommand", "\\DeclareRobustCommand",
+            "\\DeclareMathOperator", "\\caption",
+            "\\vspace", "\\hspace", "\\import", "\\subimport", "\\verb"
+        ]
+        for spec in LaTeXCommandRole.citationCommandTable where spec.supportsStarred {
+            set.insert(spec.baseCommand)
+        }
+        for spec in LaTeXCommandRole.crossReferenceCommandTable where spec.supportsStarred {
+            set.insert(spec.baseCommand)
+        }
+        return set
+    }()
 
     private static let commandNameTakingPrimitives: Set<String> = [
         "\\def", "\\gdef", "\\edef", "\\xdef",

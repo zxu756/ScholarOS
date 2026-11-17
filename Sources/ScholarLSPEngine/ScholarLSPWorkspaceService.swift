@@ -542,8 +542,22 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         }
     }
 
+    private static func resolveBibliographyEntry(forCiteKey rawKey: String, in st: InternalState) -> BibliographyEntry? {
+        let key = LaTeXKeyNormalizer.normalize(rawKey)
+        if let exact = st.bibliographyByKey[key] {
+            return exact
+        }
+        let lower = key.lowercased()
+        for bibKey in st.orderedBibliographyKeys where bibKey.lowercased() == lower {
+            if let matched = st.bibliographyByKey[bibKey] {
+                return matched
+            }
+        }
+        return nil
+    }
+
     public func bibliographyEntry(forCiteKey citeKey: String) -> BibliographyEntry? {
-        withLock { $0.bibliographyByKey[citeKey] }
+        withLock { Self.resolveBibliographyEntry(forCiteKey: citeKey, in: $0) }
     }
 
     public var inRunVerdicts: [String: CitationFirewallEntryVerdict] {
@@ -613,13 +627,17 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
     /// Assertion throwing `ScholarOSError.unverifiedCitationBlocked` (`ERR_UNVERIFIED_CITATION`)
     /// if ANY cited key in the manuscript is missing or not `VERIFIED` in the current run.
     public func assertAllCitedEntriesPassFirewall() throws {
-        let (ws, bibMap, inRun) = withLock { st -> (MergedManuscriptWorkspaceAST, [String: BibliographyEntry], [String: CitationFirewallEntryVerdict]) in
-            (ensureWorkspaceAST(&st), st.bibliographyByKey, st.inRunVerdictsByKey)
+        let (ws, bibMap, canonicalCited, inRun) = withLock { st -> (MergedManuscriptWorkspaceAST, [String: BibliographyEntry], [String], [String: CitationFirewallEntryVerdict]) in
+            let ast = ensureWorkspaceAST(&st)
+            let rawUnique = Set(ast.symbolTable.allCitationOccurrences.map(\.citeKey)).sorted()
+            let mapped = rawUnique.map { key in
+                Self.resolveBibliographyEntry(forCiteKey: key, in: st)?.citeKey ?? key
+            }
+            return (ast, st.bibliographyByKey, mapped, st.inRunVerdictsByKey)
         }
-
-        let uniqueCited = Set(ws.symbolTable.allCitationOccurrences.map(\.citeKey)).sorted()
+        _ = ws
         _ = try citationFirewall.assertAllCitationsAllowed(
-            citeKeys: uniqueCited,
+            citeKeys: canonicalCited,
             in: bibMap,
             verifiedVerdicts: inRun
         )
@@ -630,8 +648,9 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         withLock { st in
             let ws = ensureWorkspaceAST(&st)
             let citedKeys = Set(ws.symbolTable.allCitationOccurrences.map(\.citeKey))
+            let citedLower = Set(citedKeys.map { $0.lowercased() })
             return st.orderedBibliographyKeys.compactMap { key in
-                guard citedKeys.contains(key) else { return nil }
+                guard citedKeys.contains(key) || citedLower.contains(key.lowercased()) else { return nil }
                 return st.bibliographyByKey[key]
             }
         }
@@ -933,8 +952,10 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             let sortedCitedKeys = ws.symbolTable.citationsByKey.keys.sorted()
             let fallbackBibSourcePath = effectiveBibSources.first?.path
             let citationRecords = sortedCitedKeys.map { key -> DiagnosticsCitationEntry in
-                let isDefined = st.bibliographyByKey[key] != nil
-                let src: String? = isDefined ? (st.entrySourceByKey[key] ?? fallbackBibSourcePath) : nil
+                let resolvedEntry = Self.resolveBibliographyEntry(forCiteKey: key, in: st)
+                let isDefined = resolvedEntry != nil
+                let canonicalKey = resolvedEntry?.citeKey ?? key
+                let src: String? = isDefined ? (st.entrySourceByKey[canonicalKey] ?? fallbackBibSourcePath) : nil
                 let occs = (ws.symbolTable.citationsByKey[key] ?? []).map { occ in
                     DiagnosticsCitationOccurrence(
                         file: occ.span.filePath,
@@ -944,7 +965,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     )
                 }
                 let verif: DiagnosticsCitationVerification? = isDefined
-                    ? verdictsByKey[key].map(DiagnosticsCitationVerification.init(from:))
+                    ? (verdictsByKey[key] ?? verdictsByKey[canonicalKey]).map(DiagnosticsCitationVerification.init(from:))
                     : nil
                 return DiagnosticsCitationEntry(
                     key: key,
@@ -956,7 +977,12 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             }
 
             let citedKeySet = Set(sortedCitedKeys)
-            let uncitedEntries = Set(st.orderedBibliographyKeys.filter { !citedKeySet.contains($0) }).sorted()
+            let citedLowerSet = Set(sortedCitedKeys.map { $0.lowercased() })
+            let uncitedEntries = Set(
+                st.orderedBibliographyKeys.filter {
+                    !citedKeySet.contains($0) && !citedLowerSet.contains($0.lowercased())
+                }
+            ).sorted()
 
             let labelRecords = ws.symbolTable.allLabelDeclarations
                 .map { decl in

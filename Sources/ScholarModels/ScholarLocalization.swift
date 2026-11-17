@@ -528,6 +528,17 @@ extension LSPDiagnostic {
             }
             return "文件不是合法的 UTF-8 编码，已按 Windows-1252 回退读取 (ENC001)。"
         }
+        if code == "CITE_KEY_CASE" {
+            if let r1 = message.range(of: "cited as '"),
+               let e1 = message[r1.upperBound...].firstIndex(of: "'"),
+               let r2 = message.range(of: "defined in bibliography as '"),
+               let e2 = message[r2.upperBound...].firstIndex(of: "'") {
+                let cited = String(message[r1.upperBound..<e1])
+                let defined = String(message[r2.upperBound..<e2])
+                return "引用键大小写不一致：正文写作 '\(cited)'，文献库中定义为 '\(defined)' (CITE_KEY_CASE)。"
+            }
+            return message
+        }
         if code == "BIB_FROM_BBL" {
             return message
         }

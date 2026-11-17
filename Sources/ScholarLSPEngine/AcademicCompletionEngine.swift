@@ -1173,18 +1173,9 @@ public struct AcademicCompletionEngine: Sendable {
         return (directive, envName, pos + 1)
     }
 
-    private static let latexCiteCommands: Set<String> = [
-        "\\cite", "\\cite*", "\\citep", "\\citep*", "\\citet", "\\citet*",
-        "\\citealp", "\\citealt", "\\citeauthor", "\\citeyear", "\\citeyearpar",
-        "\\parencite", "\\parencite*", "\\textcite", "\\autocite", "\\autocite*",
-        "\\footcite", "\\supercite", "\\smartcite", "\\nocite", "\\fullcite", "\\cites"
-    ]
+    private static var latexCiteCommands: Set<String> { LaTeXCommandRole.allCitationCommands }
 
-    private static let latexRefCommands: Set<String> = [
-        "\\ref", "\\eqref", "\\pageref", "\\autoref", "\\cref", "\\Cref",
-        "\\cpageref", "\\Cpageref", "\\namecref", "\\nameCref", "\\vref", "\\Vref",
-        "\\fref", "\\Fref", "\\labelcref"
-    ]
+    private static var latexRefCommands: Set<String> { LaTeXCommandRole.allCrossReferenceCommands }
 
     private static let latexIncludeCommands: Set<String> = [
         "\\input", "\\include", "\\subfile", "\\import", "\\subimport",

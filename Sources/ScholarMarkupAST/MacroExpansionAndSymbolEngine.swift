@@ -1327,7 +1327,8 @@ public struct MacroExpansionEngine: Sendable {
         case .section(_, let title, _):
             nextSectionTitle = title
 
-        case .environment(let name, let label, let caption):
+        case .environment(let name, let rawLabel, let caption):
+            let label = rawLabel.map { LaTeXKeyNormalizer.normalize($0) }
             nextEnvironment = name
             nextCaption = caption
             let isNumberedEnv = !name.hasSuffix("*") && name != "abstract" && name != "proof" && name != "itemize" && name != "enumerate"
@@ -1352,7 +1353,9 @@ public struct MacroExpansionEngine: Sendable {
         case .paragraph(let plainPreview):
             nextParagraphPreview = plainPreview
 
-        case .labelDeclaration(let key) where !key.isEmpty:
+        case .labelDeclaration(let rawKey):
+            let key = LaTeXKeyNormalizer.normalize(rawKey)
+            guard !key.isEmpty else { break }
             let category = LabelCategory.infer(fromKey: key, enclosingEnvironment: enclosingEnvironment)
             let contextTitle = enclosingCaption ?? enclosingSectionTitle
             let record = LabelSymbolRecord(
@@ -1371,7 +1374,9 @@ public struct MacroExpansionEngine: Sendable {
             }
 
         case .citation(let command, let citeKeys, let prenote, let postnote):
-            for key in citeKeys where key != "*" && !key.isEmpty {
+            for rawKey in citeKeys {
+                let key = LaTeXKeyNormalizer.normalize(rawKey)
+                guard key != "*" && !key.isEmpty else { continue }
                 let occ = CitationOccurrenceRecord(
                     citeKey: key,
                     command: command,
@@ -1385,8 +1390,9 @@ public struct MacroExpansionEngine: Sendable {
                 citationsByKey[key, default: []].append(occ)
             }
 
-        case .crossReference(let command, let targetKey):
-            let expectedCat: LabelCategory? = (command == "\\eqref") ? .equation : nil
+        case .crossReference(let command, let rawTargetKey):
+            let targetKey = LaTeXKeyNormalizer.normalize(rawTargetKey)
+            let expectedCat: LabelCategory? = (command == "\\eqref" || command == "\\eqref*") ? .equation : nil
             crossReferences.append(
                 CrossReferenceOccurrenceRecord(
                     command: command,

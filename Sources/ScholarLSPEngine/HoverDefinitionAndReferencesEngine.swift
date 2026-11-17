@@ -499,7 +499,9 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
             sourcesByFile: [:]
         )
 
-        guard let entry = bibByKey[citeKey] else {
+        let resolvedEntry = bibByKey[citeKey]
+            ?? bibByKey.first(where: { $0.key.lowercased() == citeKey.lowercased() })?.value
+        guard let entry = resolvedEntry else {
             let suggestion = closestKey(to: citeKey, among: Array(bibByKey.keys))
             var md: [String] = [
                 "> **Error (`CITE404`):** Citation key `\(citeKey)` was not found in the workspace bibliography.",
@@ -836,18 +838,9 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
 
     // MARK: - Token-Stream Pinpoint Symbol Scanner
 
-    private static let citeCommandSet: Set<String> = [
-        "\\cite", "\\cite*", "\\citep", "\\citep*", "\\citet", "\\citet*",
-        "\\citealp", "\\citealt", "\\citeauthor", "\\citeyear", "\\citeyearpar",
-        "\\parencite", "\\parencite*", "\\textcite", "\\autocite", "\\autocite*",
-        "\\footcite", "\\supercite", "\\smartcite", "\\nocite", "\\fullcite", "\\cites"
-    ]
+    private static var citeCommandSet: Set<String> { LaTeXCommandRole.allCitationCommands }
 
-    private static let refCommandSet: Set<String> = [
-        "\\ref", "\\eqref", "\\pageref", "\\autoref", "\\cref", "\\Cref",
-        "\\cpageref", "\\Cpageref", "\\namecref", "\\nameCref", "\\vref", "\\Vref",
-        "\\fref", "\\Fref", "\\labelcref"
-    ]
+    private static var refCommandSet: Set<String> { LaTeXCommandRole.allCrossReferenceCommands }
 
     private func resolveFromTokenStream(
         tokens: [MarkupToken],
@@ -1162,7 +1155,7 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
                             i += 1
                         }
                         let foundKey = String(decoding: bytes[keyStart..<i], as: UTF8.self)
-                        if foundKey == citeKey {
+                        if foundKey == citeKey || foundKey.lowercased() == citeKey.lowercased() {
                             let startPos = idx.position(forUTF8Offset: entryStart, in: bibText)
                             let endPos = idx.position(forUTF8Offset: i, in: bibText)
                             let lineEnd = idx.endUTF8Offset(ofLine: startPos.line)
@@ -1250,12 +1243,13 @@ public struct HoverDefinitionAndReferencesEngine: Sendable {
         for (segIdx, seg) in segments.enumerated() {
             let leadBytes = seg.prefix(while: { $0.isWhitespace }).utf8.count
             let trimmed = seg.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
+            let normalized = LaTeXKeyNormalizer.normalize(trimmed)
+            if !normalized.isEmpty {
                 let kStartByte = runningUTF8 + leadBytes
                 let kEndByte = kStartByte + trimmed.utf8.count
                 let startPos = lineIndex.position(forUTF8Offset: kStartByte, in: source)
                 let endPos = lineIndex.position(forUTF8Offset: kEndByte, in: source)
-                results.append((trimmed, TextSpan(filePath: filePath, start: startPos, end: endPos)))
+                results.append((normalized, TextSpan(filePath: filePath, start: startPos, end: endPos)))
             }
             runningUTF8 += seg.utf8.count
             if segIdx + 1 < segments.count {
