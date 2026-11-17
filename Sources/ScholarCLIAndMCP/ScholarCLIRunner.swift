@@ -478,6 +478,7 @@ public struct ScholarCLIRunner: Sendable {
             return CLIExecutionOutput(
                 stdout: try formatDiagnostics(
                     diagReport,
+                    verificationReport: verificationResult.report,
                     asJSON: false,
                     isDemo: isDemo,
                     isReplay: verificationResult.isReplay,
@@ -1687,8 +1688,43 @@ public struct ScholarCLIRunner: Sendable {
         )
     }
 
+    private static func citationVerificationSummaryLine(
+        audit: CitationFirewallAuditReport,
+        lang: ScholarLanguage
+    ) -> String {
+        let total = audit.totalEvaluated
+        let v = audit.verifiedCount
+        let d = audit.driftCount
+        let nf = audit.notFoundCount
+        let r = audit.retractedCount
+        let u = audit.unverifiedCount
+        let keyWord = (total == 1) ? "key" : "keys"
+        if u > 0 {
+            let sortedReasons = audit.unverifiedByReason.keys.sorted()
+            let reasonItems: [String]
+            if sortedReasons.isEmpty {
+                reasonItems = ["offline \(u)"]
+            } else {
+                reasonItems = sortedReasons.map { key in
+                    "\(key) \(audit.unverifiedByReason[key] ?? 0)"
+                }
+            }
+            let enReasons = reasonItems.joined(separator: ", ")
+            let zhReasons = reasonItems.joined(separator: "，")
+            return lang.L(
+                "Citation verification: \(total) \(keyWord), VERIFIED \(v), DRIFT \(d), NOT_FOUND \(nf), RETRACTED \(r), UNVERIFIED \(u) (reasons: \(enReasons)); results incomplete",
+                "引用核查：\(total) 个键，VERIFIED \(v)，DRIFT \(d)，NOT_FOUND \(nf)，RETRACTED \(r)，UNVERIFIED \(u)（原因：\(zhReasons)）；结果不完整"
+            )
+        }
+        return lang.L(
+            "Citation verification: \(total) \(keyWord), VERIFIED \(v), DRIFT \(d), NOT_FOUND \(nf), RETRACTED \(r), UNVERIFIED 0",
+            "引用核查：\(total) 个键，VERIFIED \(v)，DRIFT \(d)，NOT_FOUND \(nf)，RETRACTED \(r)，UNVERIFIED 0"
+        )
+    }
+
     private func formatDiagnostics(
         _ report: WorkspaceDiagnosticsReport,
+        verificationReport: CitationFirewallAuditReport? = nil,
         asJSON: Bool,
         isDemo: Bool,
         isReplay: Bool = false,
@@ -1712,23 +1748,27 @@ public struct ScholarCLIRunner: Sendable {
             let data = try encoder.encode(report.diagnostics)
             return String(decoding: data, as: UTF8.self)
         }
-        var headerLines: [String] = []
+        var outLines: [String] = []
         if isDemo {
-            headerLines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
+            outLines.append(lang.L("[DEMO] Sample unverified dataset", "[DEMO / 演示数据] 示例未核查数据集"))
         }
         if isReplay {
-            headerLines.append(Self.replayBannerLine(usesCache: replayUsesCache, lang: lang))
+            outLines.append(Self.replayBannerLine(usesCache: replayUsesCache, lang: lang))
         }
-        let body: String
-        if report.diagnostics.isEmpty {
-            body = lang.L("0 diagnostics", "0 条诊断")
-        } else {
-            body = report.diagnostics.map { diag in
+
+        let nonCitationDiags = report.diagnostics.filter { $0.category != .citation }
+        let citationDiags = report.diagnostics.filter { $0.category == .citation }
+
+        for diag in nonCitationDiags {
+            outLines.append(
                 "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
-            }.joined(separator: "\n")
+            )
         }
-        var outLines = headerLines + [body]
+
         if noVerify {
+            if nonCitationDiags.isEmpty {
+                outLines.append(lang.L("0 diagnostics", "0 条诊断"))
+            }
             let keyNoun = noVerifyCitedKeyCount == 1 ? "key" : "keys"
             outLines.append(
                 lang.L(
@@ -1736,6 +1776,23 @@ public struct ScholarCLIRunner: Sendable {
                     "引用核查：未核查引用（已指定 --no-verify，共 \(noVerifyCitedKeyCount) 个引用键）"
                 )
             )
+        } else if let audit = verificationReport {
+            outLines.append(Self.citationVerificationSummaryLine(audit: audit, lang: lang))
+            for diag in citationDiags {
+                outLines.append(
+                    "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
+                )
+            }
+        } else {
+            if nonCitationDiags.isEmpty && citationDiags.isEmpty {
+                outLines.append(lang.L("0 diagnostics", "0 条诊断"))
+            } else {
+                for diag in citationDiags {
+                    outLines.append(
+                        "[\(diag.severity.rawValue)] \(diag.code) \(diag.span.filePath):\(diag.span.start.line):\(diag.span.start.column) - \(diag.localizedMessage(lang))"
+                    )
+                }
+            }
         }
         return outLines.joined(separator: "\n")
     }

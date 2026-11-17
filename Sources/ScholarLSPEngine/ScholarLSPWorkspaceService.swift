@@ -1006,10 +1006,33 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 }
             }
 
-            let skipVerification = st.skipCitationVerification || verificationReport == nil
+            let normalizedMode = (mode.lowercased() == "replay") ? "REPLAY" : mode
+            let skipVerification = st.skipCitationVerification || normalizedMode == "no-verify"
+
+            let effectiveVerificationReport: CitationFirewallAuditReport?
+            if skipVerification {
+                effectiveVerificationReport = nil
+            } else if let verificationReport {
+                effectiveVerificationReport = verificationReport
+            } else {
+                let citedKeys = Set(ws.symbolTable.allCitationOccurrences.map(\.citeKey))
+                let citedLower = Set(citedKeys.map { $0.lowercased() })
+                let citedEntries = st.orderedBibliographyKeys.compactMap { key -> BibliographyEntry? in
+                    guard citedKeys.contains(key) || citedLower.contains(key.lowercased()) else { return nil }
+                    return st.bibliographyByKey[key]
+                }
+                let fallbackVerdicts = citedEntries.map { entry -> CitationFirewallEntryVerdict in
+                    if let inRun = st.inRunVerdictsByKey[entry.citeKey] {
+                        return inRun
+                    }
+                    return citationFirewall.evaluate(entry)
+                }
+                effectiveVerificationReport = citationFirewall.summarizeVerdicts(fallbackVerdicts)
+            }
+
             var verdictsByKey = st.inRunVerdictsByKey
-            if let verificationReport {
-                for verdict in verificationReport.verdicts {
+            if let effectiveVerificationReport {
+                for verdict in effectiveVerificationReport.verdicts {
                     verdictsByKey[verdict.citeKey] = verdict
                 }
             }
@@ -1021,14 +1044,21 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                 let isDefined = resolvedEntry != nil
                 let canonicalKey = resolvedEntry?.citeKey ?? key
                 let src: String? = isDefined ? (st.entrySourceByKey[canonicalKey] ?? fallbackBibSourcePath) : nil
-                let occs = (ws.symbolTable.citationsByKey[key] ?? []).map { occ in
-                    DiagnosticsCitationOccurrence(
-                        file: occ.span.filePath,
-                        line: occ.span.start.line,
-                        column: occ.span.start.column,
-                        command: occ.command
-                    )
-                }
+                let occs = (ws.symbolTable.citationsByKey[key] ?? [])
+                    .map { occ in
+                        DiagnosticsCitationOccurrence(
+                            file: occ.span.filePath,
+                            line: occ.span.start.line,
+                            column: occ.span.start.column,
+                            command: occ.command
+                        )
+                    }
+                    .sorted { lhs, rhs in
+                        if lhs.file != rhs.file { return lhs.file < rhs.file }
+                        if lhs.line != rhs.line { return lhs.line < rhs.line }
+                        if lhs.column != rhs.column { return lhs.column < rhs.column }
+                        return lhs.command < rhs.command
+                    }
                 let verif: DiagnosticsCitationVerification? = (isDefined && !skipVerification)
                     ? (verdictsByKey[key] ?? verdictsByKey[canonicalKey]).map(DiagnosticsCitationVerification.init(from:))
                     : nil
@@ -1074,15 +1104,23 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                     return lhs.line < rhs.line
                 }
 
-            let referenceRecords = ws.symbolTable.crossReferences.map { ref in
-                DiagnosticsReferenceRecord(
-                    key: ref.targetKey,
-                    file: ref.span.filePath,
-                    line: ref.span.start.line,
-                    command: ref.command,
-                    resolved: !ref.targetKey.isEmpty && ws.symbolTable.labelsByKey[ref.targetKey] != nil
-                )
-            }
+            let referenceRecords = ws.symbolTable.crossReferences
+                .sorted { lhs, rhs in
+                    if lhs.span.filePath != rhs.span.filePath { return lhs.span.filePath < rhs.span.filePath }
+                    if lhs.span.start.line != rhs.span.start.line { return lhs.span.start.line < rhs.span.start.line }
+                    if lhs.span.start.column != rhs.span.start.column { return lhs.span.start.column < rhs.span.start.column }
+                    if lhs.targetKey != rhs.targetKey { return lhs.targetKey < rhs.targetKey }
+                    return lhs.command < rhs.command
+                }
+                .map { ref in
+                    DiagnosticsReferenceRecord(
+                        key: ref.targetKey,
+                        file: ref.span.filePath,
+                        line: ref.span.start.line,
+                        command: ref.command,
+                        resolved: !ref.targetKey.isEmpty && ws.symbolTable.labelsByKey[ref.targetKey] != nil
+                    )
+                }
 
             let itemRecords = diagReport.diagnostics.map(DiagnosticsItemRecord.init(from:))
 
@@ -1099,16 +1137,16 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
             }
 
             let verdictCounts: [String: Int] = [
-                CitationFirewallClass.verified.rawValue: verificationReport?.verifiedCount ?? 0,
-                CitationFirewallClass.drift.rawValue: verificationReport?.driftCount ?? 0,
-                CitationFirewallClass.notFound.rawValue: verificationReport?.notFoundCount ?? 0,
-                CitationFirewallClass.retracted.rawValue: verificationReport?.retractedCount ?? 0,
-                CitationFirewallClass.unverified.rawValue: verificationReport?.unverifiedCount ?? 0
+                CitationFirewallClass.verified.rawValue: effectiveVerificationReport?.verifiedCount ?? 0,
+                CitationFirewallClass.drift.rawValue: effectiveVerificationReport?.driftCount ?? 0,
+                CitationFirewallClass.notFound.rawValue: effectiveVerificationReport?.notFoundCount ?? 0,
+                CitationFirewallClass.retracted.rawValue: effectiveVerificationReport?.retractedCount ?? 0,
+                CitationFirewallClass.unverified.rawValue: effectiveVerificationReport?.unverifiedCount ?? 0
             ]
-            let isComplete = (!skipVerification) && (verificationReport?.complete == true)
+            let isComplete = (!skipVerification) && (effectiveVerificationReport?.complete == true)
 
             return ScholarDiagnosticsJSONReport(
-                mode: mode,
+                mode: normalizedMode,
                 root: st.rootFilePath,
                 files: fileRecords,
                 bibliographySources: effectiveBibSources,

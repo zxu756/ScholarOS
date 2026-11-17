@@ -363,6 +363,95 @@ public struct ScholarMCPServer: Sendable {
 
             case "scholar_lsp_diagnostics":
                 let callOffline = (arguments["offline"] as? Bool == true)
+                if let rawPathValue = arguments["path"], !(rawPathValue is NSNull) {
+                    guard let manuscriptPath = rawPathValue as? String else {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Argument 'path' for scholar_lsp_diagnostics must be a string."
+                        )
+                    }
+                    guard !manuscriptPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Argument 'path' for scholar_lsp_diagnostics must not be empty."
+                        )
+                    }
+                    if arguments["source"] != nil && !(arguments["source"] is NSNull) {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Cannot combine 'path' with inline 'source' in scholar_lsp_diagnostics."
+                        )
+                    }
+                    if let proj = arguments["projectPath"] as? String, !proj.isEmpty {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Cannot combine 'path' with 'projectPath' in scholar_lsp_diagnostics."
+                        )
+                    }
+                    if arguments["demo"] as? Bool == true {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Cannot combine 'path' with 'demo: true' in scholar_lsp_diagnostics."
+                        )
+                    }
+                    let callNoVerify = (arguments["noVerify"] as? Bool == true)
+                    let explicitReplayArg = (arguments["registryReplayPath"] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let hasExplicitReplay = (explicitReplayArg?.isEmpty == false)
+                    if callNoVerify && (callOffline || hasExplicitReplay) {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Cannot combine 'noVerify' with 'offline' or 'registryReplayPath' in scholar_lsp_diagnostics."
+                        )
+                    }
+                    if callOffline && hasExplicitReplay {
+                        throw ScholarOSError.invalidCLIArguments(
+                            "Cannot combine 'offline' with 'registryReplayPath' in scholar_lsp_diagnostics."
+                        )
+                    }
+
+                    let rawBibPath = (arguments["bibPath"] as? String)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    let explicitBibPath = (rawBibPath?.isEmpty == false) ? rawBibPath : nil
+
+                    let lsp = try ScholarLSPWorkspaceService.loadManuscript(
+                        atPath: manuscriptPath,
+                        explicitBibPath: explicitBibPath,
+                        clock: registryClock
+                    )
+
+                    if callNoVerify {
+                        lsp.setSkipCitationVerification(true)
+                        let jsonReport = lsp.buildDiagnosticsJSONReport(mode: "no-verify", verificationReport: nil)
+                        let data = try jsonReport.encodeJSONData(sortedKeys: true)
+                        return textResult(String(decoding: data, as: UTF8.self), isError: false)
+                    }
+
+                    let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+                    let jsonModeLabel: String
+                    switch mode {
+                    case .offline:
+                        jsonModeLabel = "offline"
+                    case .replay:
+                        jsonModeLabel = "REPLAY"
+                    case .online, .record:
+                        jsonModeLabel = "online"
+                    }
+
+                    let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                        entries: lsp.citedBibliographyEntries,
+                        mode: mode,
+                        noCache: noCache || isOffline || callOffline,
+                        environment: effectiveEnvironment,
+                        clock: registryClock,
+                        sharedRateLimiter: sharedRateLimiter,
+                        sharedStandardCache: sharedStandardCache,
+                        sharedReplayExplicitCache: sharedReplayExplicitCache,
+                        language: resolvedLanguage(arguments: arguments)
+                    )
+                    lsp.applyVerificationReport(verificationResult.report)
+                    let jsonReport = lsp.buildDiagnosticsJSONReport(
+                        mode: jsonModeLabel,
+                        verificationReport: verificationResult.report
+                    )
+                    let data = try jsonReport.encodeJSONData(sortedKeys: true)
+                    return textResult(String(decoding: data, as: UTF8.self), isError: false)
+                }
+
                 if let inlineSource = arguments["source"] as? String {
                     let path = arguments["filePath"] as? String ?? "main.tex"
                     var entries: [BibliographyEntry] = []
@@ -701,10 +790,14 @@ public struct ScholarMCPServer: Sendable {
         ],
         [
             "name": "scholar_lsp_diagnostics",
-            "description": "Run the built-in LaTeX/Typst CST, cross-reference, float-label, and Citation Firewall LSP diagnostics engine (verifying cited bibliography entries online by default unless offline: true or registryReplayPath is set).",
+            "description": "Run the built-in LaTeX/Typst CST, cross-reference, float-label, and Citation Firewall LSP diagnostics engine. Pass 'path' (manuscript main .tex file) to load multi-file manuscripts via the unified loader and return the scholaros.diagnostics/1 JSON object identical to CLI 'diagnostics <path> --json', or pass inline 'source'.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
+                    "path": ["type": "string"],
+                    "bibPath": ["type": "string"],
+                    "noVerify": ["type": "boolean"],
+                    "lang": ["type": "string"],
                     "source": ["type": "string"],
                     "bibtex": ["type": "string"],
                     "filePath": ["type": "string"],

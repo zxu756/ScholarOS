@@ -1168,19 +1168,22 @@ public struct WorkspaceDiagnosticsAndQuickFixEngine: Sendable {
             }
         }
         return unique.sorted { lhs, rhs in
-            if lhs.severity != rhs.severity {
-                return lhs.severity > rhs.severity
-            }
             if lhs.span.filePath != rhs.span.filePath {
                 return lhs.span.filePath < rhs.span.filePath
             }
-            if lhs.span.start != rhs.span.start {
-                return lhs.span.start < rhs.span.start
+            if lhs.span.start.line != rhs.span.start.line {
+                return lhs.span.start.line < rhs.span.start.line
+            }
+            if lhs.span.start.column != rhs.span.start.column {
+                return lhs.span.start.column < rhs.span.start.column
             }
             if lhs.code != rhs.code {
                 return lhs.code < rhs.code
             }
-            return lhs.message < rhs.message
+            if lhs.message != rhs.message {
+                return lhs.message < rhs.message
+            }
+            return lhs.severity > rhs.severity
         }
     }
 
