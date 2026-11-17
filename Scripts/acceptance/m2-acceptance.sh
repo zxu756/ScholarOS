@@ -2,14 +2,16 @@
 #
 # M2 acceptance verification script (`Scripts/acceptance/m2-acceptance.sh`).
 #
-# Stage 01–04 scope:
+# Stage 01–05 scope:
 #   - Row 1: 11 arXiv CC BY 4.0 manuscripts — `citations[].key` and `labels[].key` sets vs `expected.json`
 #   - Row 2: 11 manuscripts — `category == "structure"` ERROR diagnostics vs `expected.json` LaTeX/BibTeX logs
 #   - Row 3 (determinism part): 11 manuscripts run twice (`--offline --json` and `--offline` text) — byte-for-byte identical
-#   - Row 6 (CITE_KEY_CASE part): `2410.04196v2` `\citep{bayestune}` vs `Bayestune` (`.bib` entry-count half deferred to Stage 05 -> overall marked `SKIP (没跑)` unless CITE_KEY_CASE fails)
+#   - Row 6: 9 `.bib` manuscripts unique entry counts vs `bibtex-entry-counts.tsv` (0 `BIB001`) + `2410.04196v2` `\citep{bayestune}` `CITE_KEY_CASE`
 #   - Row 7: Hard inputs (`hard-inputs/hard.tex` vs `expected/hard-inputs.json` + all per-syntax `verbatim-skip` fixtures)
 #   - Row 8: Multi-file include graph (`\include`, `\input`, unbraced `\input`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`, child `\bibliography`, commented/verbatim skip)
 #   - Row 9: Missing include/bib (`INC002` with file & line) and `<main>.bbl` fallback (`BIB_FROM_BBL`, `.bbl` entry parsing deferred to Stage 06)
+#   - Row 10: Broken `.bib` single-entry error recovery (`bib-recovery/ten.bib`: `e3`, startLine 15, line 22, remaining 9 entries vs `.bbl`, exit codes per Settled #3)
+#   - Row 11: BibTeX field normalization & inheritance (`bib-fields/refs.bib`: `and others` / `authorsTruncated`, `crossref` inheritance & parent uncited suppression, `howpublished` `\url`/`\href`, `BIB003`)
 #   - Row 12: S64 citation/cross-ref command tables, S65 optional arguments, S66 normalized keys & `CITE_KEY_CASE`, S67 parser constructs (`parser-commands`), and Latin-1 / Windows-1252 root/child files (`ENC001`)
 #   - Remaining rows: marked `SKIP (没跑)` for subsequent M2 stages
 #
@@ -507,29 +509,112 @@ PY
     done
 
     if should_run_row 6; then
-        echo "== [Row 6] 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv（留给第 5 段）与 2410.04196v2 \\citep{bayestune} CITE_KEY_CASE =="
+        echo "== [Row 6] 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv（0 条 BIB001）与 2410.04196v2 \\citep{bayestune} CITE_KEY_CASE =="
         set +e
         ROW6_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
-import json, os, subprocess, sys
+import csv, json, os, subprocess, sys
 
 repo_root, cli_bin, sandbox_home, run1_dir = sys.argv[1:5]
-cached_2410 = os.path.join(run1_dir, "2410.04196v2.json")
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
 
-if os.path.isfile(cached_2410):
-    obj = json.load(open(cached_2410, encoding="utf-8"))
-else:
-    env = dict(os.environ)
-    env["HOME"] = sandbox_home
-    env["CFFIXED_USER_HOME"] = sandbox_home
-    env.pop("SCHOLAR_CACHE_DIR", None)
-    main_2410 = os.path.join(repo_root, "Benchmarks", "manuscripts", "2410.04196v2", "src", "main.tex")
-    proc = subprocess.run([cli_bin, "diagnostics", main_2410, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+papers_tsv = os.path.join(repo_root, "Benchmarks", "manuscripts", "papers.tsv")
+counts_tsv = os.path.join(repo_root, "Benchmarks", "manuscripts", "bibtex-entry-counts.tsv")
+
+main_by_paper = {}
+with open(papers_tsv, encoding="utf-8") as pf:
+    for r in csv.DictReader(pf, delimiter="\t"):
+        main_by_paper[f"{r['arxiv_id']}{r['version']}"] = r["main_file"]
+
+def load_paper_diag(pid: str):
+    cached = os.path.join(run1_dir, f"{pid}.json")
+    if os.path.isfile(cached):
+        return json.load(open(cached, encoding="utf-8"))
+    main_rel = main_by_paper[pid]
+    main_tex = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", main_rel)
+    proc = subprocess.run([cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
     if proc.returncode == 2:
-        print(f"  FAIL: CLI exited 2 on 2410.04196v2: {proc.stderr.decode('utf-8', 'replace')}")
-        sys.exit(1)
-    obj = json.loads(proc.stdout.decode("utf-8"))
+        raise RuntimeError(f"CLI exited 2 on {pid}: {proc.stderr.decode('utf-8', 'replace')}")
+    return json.loads(proc.stdout.decode("utf-8"))
 
 failures = []
+matched_bibs = 0
+total_bibs = 0
+
+with open(counts_tsv, encoding="utf-8") as cf:
+    for raw_line in cf:
+        line = raw_line.strip()
+        if not line:
+            continue
+        total_bibs += 1
+        parts = line.split("\t")
+        pid, bib_file = parts[0], parts[1]
+        kv = dict(item.split("=", 1) for item in parts[2:])
+        expected_entries = int(kv["bibtex_entries"])
+        expected_repeated = int(kv["repeated"])
+
+        try:
+            obj_p = load_paper_diag(pid)
+        except Exception as exc:
+            failures.append(str(exc))
+            continue
+
+        bib_sources = obj_p.get("bibliographySources", [])
+        matching_srcs = [
+            s for s in bib_sources
+            if s.get("kind") == "bib" and os.path.basename(s.get("path", "")) == bib_file
+        ]
+        diags_p = obj_p.get("diagnostics", [])
+        bib001_p = [d for d in diags_p if d.get("code") == "BIB001"]
+        bib002_p = [d for d in diags_p if d.get("code") == "BIB002"]
+
+        if len(matching_srcs) != 1:
+            failures.append(f"[{pid}] expected 1 bib source matching {bib_file}, got {bib_sources}")
+            continue
+
+        src_rec = matching_srcs[0]
+        actual_entries = src_rec.get("entries")
+        src_errs = src_rec.get("errors") or []
+
+        # Also cross-check direct `verify-citations <bib> --offline --json` unique citeKey count & 0 parse_error
+        bib_abs = os.path.join(repo_root, "Benchmarks", "manuscripts", pid, "src", src_rec["path"])
+        p_vc = subprocess.run([cli_bin, "verify-citations", bib_abs, "--offline", "--json", "--lang", "en"], env=env, capture_output=True)
+        vc_ok = (p_vc.returncode != 2)
+        vc_unique = -1
+        vc_parse_err = -1
+        if vc_ok:
+            vc_obj = json.loads(p_vc.stdout.decode("utf-8"))
+            vc_unique = len({v["citeKey"].lower() for v in vc_obj.get("verdicts", [])})
+            vc_parse_err = (vc_obj.get("unverifiedByReason") or {}).get("parse_error", 0)
+
+        paper_ok = (
+            actual_entries == expected_entries
+            and len(src_errs) == 0
+            and len(bib001_p) == 0
+            and vc_ok
+            and vc_unique == expected_entries
+            and vc_parse_err == 0
+            and len(bib002_p) == expected_repeated
+        )
+        status_str = "PASS" if paper_ok else "FAIL"
+        print(
+            f"  [{pid} {bib_file}] {status_str}: entries={actual_entries}/{expected_entries}, "
+            f"verify_unique={vc_unique}/{expected_entries}, BIB001={len(bib001_p)}, BIB002={len(bib002_p)}/{expected_repeated}"
+        )
+        if paper_ok:
+            matched_bibs += 1
+        else:
+            failures.append(
+                f"[{pid} {bib_file}] entries={actual_entries}/{expected_entries}, vc_unique={vc_unique}, "
+                f"src_errors={src_errs}, BIB001={bib001_p}, vc_parse_err={vc_parse_err}, BIB002={len(bib002_p)}/{expected_repeated}"
+            )
+
+if total_bibs != 9:
+    failures.append(f"Expected 9 rows in bibtex-entry-counts.tsv, found {total_bibs}")
+
+obj = load_paper_diag("2410.04196v2")
 cites = {c["key"]: c for c in obj.get("citations", [])}
 bt = cites.get("bayestune")
 if not bt:
@@ -561,26 +646,27 @@ else:
     if "bayestune" not in msg or "Bayestune" not in msg:
         failures.append(f"CITE_KEY_CASE message must name both 'bayestune' and 'Bayestune': {msg}")
 
+print(f"row6_matching_bibs={matched_bibs}/{total_bibs}")
+if bt and len(case_warns) == 1 and not cite404:
+    print(
+        f"  [2410.04196v2 CITE_KEY_CASE] PASS: bayestune defined={bt.get('defined')}, "
+        f"source={bt.get('source')}, CITE404=0, CITE_KEY_CASE=1 ({case_warns[0].get('severity')}: {case_warns[0].get('message')})"
+    )
+
 if failures:
     for f in failures:
-        print(f"  FAIL [CITE_KEY_CASE]: {f}")
+        print(f"  FAIL [Row 6]: {f}")
     sys.exit(1)
-
-print(
-    f"  [2410.04196v2 CITE_KEY_CASE] PASS: bayestune defined={bt.get('defined')}, "
-    f"source={bt.get('source')}, CITE404=0, CITE_KEY_CASE=1 ({case_warns[0].get('severity')}: {case_warns[0].get('message')})"
-)
-print("  没跑 — 9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 与 BIB001 检查留给第 5 段")
 sys.exit(0)
 PY
 )"
         ROW6_RC=$?
         set -e
         echo "$ROW6_OUT"
-        if [[ "$ROW6_RC" -ne 0 ]]; then
-            record_fail 6 "2410.04196v2 \\citep{bayestune} CITE_KEY_CASE check failed"
+        if [[ "$ROW6_RC" -eq 0 ]]; then
+            record_pass 6 "All 9 manuscript .bib files match bibtex-entry-counts.tsv unique entry counts with 0 BIB001, and 2410.04196v2 \\citep{bayestune} emits CITE_KEY_CASE with 0 CITE404"
         else
-            record_skip 6 "2410.04196v2 CITE_KEY_CASE 已核验通过；9 篇 .bib 条目数对照 bibtex-entry-counts.tsv 留给第 5 段"
+            record_fail 6 "Row 6 .bib entry counts, BIB001, or 2410.04196v2 CITE_KEY_CASE check failed"
         fi
     fi
 
@@ -896,21 +982,274 @@ PY
     fi
 
     # ==================================================================
-    # Rows 10..11: Deferred to Stage 05
+    # Row 10: Single-entry BibTeX recovery (`Tests/Fixtures/manuscripts/bib-recovery/ten.bib`)
     # ==================================================================
-    declare -a DEFERRED_ROWS_10_11=(
-        "10:坏 .bib 恢复 (bib-recovery/ten.bib, BIB001) — 留给第 5 段"
-        "11:BibTeX 字段继承与规范化 (and others, crossref, howpublished) — 留给第 5 段"
-    )
-    for entry in "${DEFERRED_ROWS_10_11[@]}"; do
-        r_num="${entry%%:*}"
-        r_desc="${entry#*:}"
-        if should_run_row "$r_num"; then
-            echo "== [Row $r_num] $r_desc =="
-            echo "没跑 — $r_desc"
-            record_skip "$r_num" "$r_desc"
+    if should_run_row 10; then
+        echo "== [Row 10] 坏 .bib 恢复 (bib-recovery/ten.bib: e3 开始行 15、出错行 22，其余 9 条对照 .bbl，退出码按已定第 3 条) =="
+        set +e
+        ROW10_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, re, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, work_scratch = sys.argv[1:5]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+failures = []
+
+rec_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "bib-recovery")
+ten_bib = os.path.join(rec_dir, "ten.bib")
+main_tex = os.path.join(rec_dir, "main.tex")
+bbl_path = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "expected", "bib-recovery.bibtex.bbl")
+
+# Parse expected 9 clean items from BibTeX-generated bib-recovery.bibtex.bbl
+bbl_text = open(bbl_path, encoding="utf-8").read()
+bbl_blocks = re.split(r"\\bibitem\{([^}]+)\}", bbl_text)[1:]
+expected_clean = {}
+for idx in range(0, len(bbl_blocks), 2):
+    k = bbl_blocks[idx].strip()
+    body = bbl_blocks[idx + 1].strip()
+    if k == "e3":
+        continue
+    parts = [p.strip() for p in body.split("\\newblock")]
+    author_line = parts[0].rstrip(".").replace("~", " ").strip()
+    title_line = parts[1].rstrip(".").strip()
+    m_vj = re.search(r"\{\\em\s+([^}]+)\},\s*(\d{4})", parts[2])
+    expected_clean[k] = {
+        "author": author_line,
+        "title": title_line,
+        "venue": m_vj.group(1) if m_vj else "",
+        "year": int(m_vj.group(2)) if m_vj else None,
+    }
+
+if len(expected_clean) != 9:
+    failures.append(f"Expected 9 clean entries in bib-recovery.bibtex.bbl, parsed {len(expected_clean)}")
+
+# 10A. verify-citations ten.bib --offline --json
+p_vc = subprocess.run([cli_bin, "verify-citations", ten_bib, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_vc.returncode != 1:
+    failures.append(f"verify-citations ten.bib expected exit 1 (Settled #3), got {p_vc.returncode}; stderr={p_vc.stderr}")
+else:
+    vc_obj = json.loads(p_vc.stdout)
+    verdicts_by_key = {v["citeKey"]: v for v in vc_obj.get("verdicts", [])}
+    unv_reasons = vc_obj.get("unverifiedByReason", {})
+    if vc_obj.get("complete") is not False:
+        failures.append(f"verify-citations complete expected False, got {vc_obj.get('complete')}")
+    if unv_reasons != {"offline": 9, "parse_error": 1}:
+        failures.append(f"verify-citations unverifiedByReason expected {{'offline':9,'parse_error':1}}, got {unv_reasons}")
+    if not all(tok in p_vc.stderr for tok in ("e3", "15", "22")):
+        failures.append(f"verify-citations stderr must report e3, startLine 15, line 22; got: {p_vc.stderr}")
+    v_e3 = verdicts_by_key.get("e3")
+    if not v_e3:
+        failures.append("verify-citations missing e3 verdict")
+    else:
+        pe_info = (v_e3.get("auditedEntry") or {}).get("parseErrorInfo") or {}
+        if (
+            v_e3.get("firewallClass") != "UNVERIFIED"
+            or v_e3.get("reasons") != ["parse_error"]
+            or v_e3.get("insertable") is not False
+            or (v_e3.get("auditedEntry") or {}).get("parseError") is not True
+            or pe_info.get("startLine") != 15
+            or pe_info.get("line") != 22
+        ):
+            failures.append(f"verify-citations e3 verdict mismatch: {v_e3}")
+    for k, exp in sorted(expected_clean.items()):
+        v = verdicts_by_key.get(k)
+        if not v:
+            failures.append(f"verify-citations missing recovered clean entry {k}")
+            continue
+        ae = v.get("auditedEntry") or {}
+        authors = ae.get("authors") or []
+        full_author = f"{authors[0].get('givenName', '')} {authors[0].get('familyName', '')}".strip() if len(authors) == 1 else ""
+        if (
+            ae.get("parseError") is not False
+            or full_author != exp["author"]
+            or ae.get("title") != exp["title"]
+            or ae.get("venue") != exp["venue"]
+            or ae.get("year") != exp["year"]
+        ):
+            failures.append(f"verify-citations {k} mismatch vs .bbl: actual={ae} vs expected={exp}")
+    print(f"  [verify-citations] exit={p_vc.returncode}, unverifiedByReason={unv_reasons}, e3=(UNVERIFIED, parse_error, startLine=15, line=22), clean_matched=9/9")
+
+# 10B. format-bib ten.bib (text & --json)
+p_fb = subprocess.run([cli_bin, "format-bib", ten_bib, "--style", "ieee", "--lang", "en"], env=env, capture_output=True, text=True)
+p_fb_json = subprocess.run([cli_bin, "format-bib", ten_bib, "--style", "ieee", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_fb.returncode != 1 or p_fb_json.returncode != 1:
+    failures.append(f"format-bib ten.bib expected exit 1 (Settled #3), got text={p_fb.returncode}, json={p_fb_json.returncode}")
+else:
+    if not all(tok in p_fb.stderr for tok in ("e3", "15", "22")):
+        failures.append(f"format-bib stderr must report e3, startLine 15, line 22; got: {p_fb.stderr}")
+    fb_obj = json.loads(p_fb_json.stdout)
+    fb_items = {it["citeKeys"][0]: it["bibliographyPlainText"] for it in fb_obj.get("items", []) if it.get("citeKeys")}
+    for k, exp in sorted(expected_clean.items()):
+        txt = fb_items.get(k, "")
+        fam = exp["author"].split()[-1]
+        if fam not in txt or exp["title"] not in txt or str(exp["year"]) not in txt:
+            failures.append(f"format-bib missing/mismatched recovered item {k}: '{txt}' vs {exp}")
+    print(f"  [format-bib] exit={p_fb.returncode}, stderr_has_e3_15_22=True, formatted_clean_items={len(fb_items)}/9")
+
+# 10C. diagnostics main.tex --bib ten.bib --offline --json
+p_dg = subprocess.run([cli_bin, "diagnostics", main_tex, "--bib", ten_bib, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_dg.returncode == 2:
+    failures.append(f"diagnostics --bib ten.bib exited 2: {p_dg.stderr}")
+else:
+    dg_obj = json.loads(p_dg.stdout)
+    bsrcs = dg_obj.get("bibliographySources", [])
+    berrs = (bsrcs[0].get("errors") if bsrcs else None) or []
+    diags = dg_obj.get("diagnostics", [])
+    bib001 = [d for d in diags if d.get("code") == "BIB001"]
+    cite404 = [d for d in diags if d.get("code") == "CITE404"]
+    cites_by_key = {c["key"]: c for c in dg_obj.get("citations", [])}
+    c_e3_ver = (cites_by_key.get("e3") or {}).get("verification") or {}
+    if len(berrs) != 1 or berrs[0].get("key") != "e3" or berrs[0].get("startLine") != 15 or berrs[0].get("line") != 22:
+        failures.append(f"diagnostics bibliographySources.errors mismatch: {berrs}")
+    if len(bib001) != 1 or bib001[0].get("severity") != "ERROR" or bib001[0].get("category") != "structure" or bib001[0].get("line") != 22:
+        failures.append(f"diagnostics BIB001 mismatch: {bib001}")
+    if cite404:
+        failures.append(f"diagnostics unexpected CITE404 on ten.bib: {cite404}")
+    if c_e3_ver.get("verdict") != "UNVERIFIED" or c_e3_ver.get("reasons") != ["parse_error"] or c_e3_ver.get("insertable") is not False:
+        failures.append(f"diagnostics citations[e3].verification mismatch: {c_e3_ver}")
+    print(f"  [diagnostics --bib] exit={p_dg.returncode}, BIB001=1 (line=22, startLine=15, key=e3), CITE404=0")
+
+# 10D. Zero clean entries -> exit 2 on both verify-citations and format-bib
+zero_bib = os.path.join(work_scratch, "row10-zero-clean.bib")
+with open(zero_bib, "w", encoding="utf-8") as zf:
+    zf.write("@article{broken_only,\n  title = {Unclosed\n")
+rc_vc_zero = subprocess.run([cli_bin, "verify-citations", zero_bib, "--offline"], env=env, capture_output=True).returncode
+rc_fb_zero = subprocess.run([cli_bin, "format-bib", zero_bib], env=env, capture_output=True).returncode
+if rc_vc_zero != 2 or rc_fb_zero != 2:
+    failures.append(f"zero-clean-entry .bib expected exit 2, got verify-citations={rc_vc_zero}, format-bib={rc_fb_zero}")
+else:
+    print(f"  [zero-clean-entry check] verify-citations exit={rc_vc_zero}, format-bib exit={rc_fb_zero}")
+
+if failures:
+    for f in failures:
+        print(f"  FAIL [Row 10]: {f}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW10_RC=$?
+        set -e
+        echo "$ROW10_OUT"
+        if [[ "$ROW10_RC" -eq 0 ]]; then
+            record_pass 10 "ten.bib reports e3 (startLine 15, line 22, UNVERIFIED parse_error), recovers all 9 clean entries matching BibTeX .bbl, and exits 1 (2 when 0 clean entries)"
+        else
+            record_fail 10 "Broken .bib recovery, BIB001 reporting, or Settled #3 exit codes failed on bib-recovery/ten.bib"
         fi
-    done
+    fi
+
+    # ==================================================================
+    # Row 11: BibTeX field normalization & crossref inheritance (`Tests/Fixtures/manuscripts/bib-fields/refs.bib`)
+    # ==================================================================
+    if should_run_row 11; then
+        echo "== [Row 11] BibTeX 字段继承与规范化 (bib-fields/refs.bib: and others、crossref、howpublished \\url/\\href、父条目不报未使用、BIB003) =="
+        set +e
+        ROW11_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, subprocess, sys
+
+repo_root, cli_bin, sandbox_home, work_scratch = sys.argv[1:5]
+env = dict(os.environ)
+env["HOME"] = sandbox_home
+env["CFFIXED_USER_HOME"] = sandbox_home
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+failures = []
+bf_dir = os.path.join(repo_root, "Tests", "Fixtures", "manuscripts", "bib-fields")
+refs_bib = os.path.join(bf_dir, "refs.bib")
+main_tex = os.path.join(bf_dir, "main.tex")
+
+# 11A. Parsed entries via verify-citations --offline --json
+p_vc = subprocess.run([cli_bin, "verify-citations", refs_bib, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_vc.returncode == 2:
+    failures.append(f"verify-citations refs.bib exited 2: {p_vc.stderr}")
+else:
+    vc_obj = json.loads(p_vc.stdout)
+    by_key = {e["citeKey"]: e for e in vc_obj.get("auditedEntries", [])}
+
+    p1 = by_key.get("paper1") or {}
+    p1_surnames = [a.get("familyName") for a in p1.get("authors", [])]
+    if p1_surnames != ["Smith", "Jones"] or p1.get("authorsTruncated") is not True:
+        failures.append(f"paper1 expected authors=['Smith','Jones'] & authorsTruncated=True, got surnames={p1_surnames}, truncated={p1.get('authorsTruncated')}")
+    if p1.get("venue") != "Child Booktitle Wins" or p1.get("year") != 2020 or p1.get("publisher") != "ACM":
+        failures.append(f"paper1 crossref inheritance mismatch: venue={p1.get('venue')!r}, year={p1.get('year')}, publisher={p1.get('publisher')!r}")
+
+    p2 = by_key.get("paper2") or {}
+    if p2.get("venue") != "Proceedings of the 10th Conference on Things" or p2.get("year") != 2020 or p2.get("publisher") != "ACM":
+        failures.append(f"paper2 crossref inheritance mismatch: venue={p2.get('venue')!r}, year={p2.get('year')}, publisher={p2.get('publisher')!r}")
+
+    w1 = by_key.get("web1") or {}
+    w2 = by_key.get("web2") or {}
+    if w1.get("url") != "https://www.who.int/report%20one" or w1.get("venue", "") != "" or "http" in w1.get("venue", "") or "who.int" in w1.get("venue", ""):
+        failures.append(f"web1 URL/venue mismatch: url={w1.get('url')!r}, venue={w1.get('venue')!r}")
+    if w2.get("url") != "https://example.org/x" or w2.get("venue", "") != "" or "http" in w2.get("venue", "") or "example.org" in w2.get("venue", ""):
+        failures.append(f"web2 URL/venue mismatch: url={w2.get('url')!r}, venue={w2.get('venue')!r}")
+
+    print(
+        f"  [entries] paper1=(authors={p1_surnames}, authorsTruncated={p1.get('authorsTruncated')}, venue={p1.get('venue')!r}, year={p1.get('year')}, publisher={p1.get('publisher')!r}) | "
+        f"paper2=(venue={p2.get('venue')!r}, year={p2.get('year')}) | "
+        f"web1.url={w1.get('url')!r} (venue={w1.get('venue')!r}) | web2.url={w2.get('url')!r} (venue={w2.get('venue')!r})"
+    )
+
+# 11B. format-bib --style ieee must not emit "and et al."
+p_fb = subprocess.run([cli_bin, "format-bib", refs_bib, "--style", "ieee", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_fb.returncode != 0:
+    failures.append(f"format-bib refs.bib --style ieee exited {p_fb.returncode}: {p_fb.stderr}")
+else:
+    if "A. Smith, B. Jones, et al." not in p_fb.stdout or "and et al." in p_fb.stdout or "& et al." in p_fb.stdout:
+        failures.append(f"format-bib --style ieee invalid et al. rendering: {p_fb.stdout}")
+    else:
+        print("  [format-bib --style ieee] PASS: 'A. Smith, B. Jones, et al.' rendered with no 'and et al.'")
+
+# 11C. diagnostics main.tex -> conf2020 not reported uncited; missing parent -> WARNING BIB003
+p_dg = subprocess.run([cli_bin, "diagnostics", main_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_dg.returncode == 2:
+    failures.append(f"diagnostics bib-fields/main.tex exited 2: {p_dg.stderr}")
+else:
+    dg_obj = json.loads(p_dg.stdout)
+    uncited = dg_obj.get("uncitedEntries", [])
+    lint_uncited = [d for d in dg_obj.get("diagnostics", []) if d.get("code") == "LINT_UNCITED_BIB_ENTRY"]
+    if "conf2020" in uncited or uncited or lint_uncited:
+        failures.append(f"conf2020 must not be reported uncited; uncitedEntries={uncited}, LINT_UNCITED_BIB_ENTRY={lint_uncited}")
+    else:
+        print(f"  [uncited suppression] PASS: uncitedEntries={uncited}, LINT_UNCITED_BIB_ENTRY=0")
+
+miss_dir = os.path.join(work_scratch, "row11-missing-parent")
+os.makedirs(miss_dir, exist_ok=True)
+miss_tex = os.path.join(miss_dir, "main.tex")
+miss_bib = os.path.join(miss_dir, "refs.bib")
+with open(miss_tex, "w", encoding="utf-8") as tf:
+    tf.write("\\documentclass{article}\\begin{document}\\cite{c1}\\bibliography{refs}\\end{document}\n")
+with open(miss_bib, "w", encoding="utf-8") as bf:
+    bf.write("@inproceedings{c1,\n  author = {Ada Lovelace},\n  title = {Note G},\n  crossref = {no_such_proc}\n}\n")
+p_miss = subprocess.run([cli_bin, "diagnostics", miss_tex, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+if p_miss.returncode == 2:
+    failures.append(f"diagnostics missing-crossref exited 2: {p_miss.stderr}")
+else:
+    miss_diags = json.loads(p_miss.stdout).get("diagnostics", [])
+    bib003 = [d for d in miss_diags if d.get("code") == "BIB003" and d.get("severity") == "WARNING"]
+    if len(bib003) != 1:
+        failures.append(f"expected 1 WARNING BIB003 for missing crossref parent, got {miss_diags}")
+    else:
+        print(f"  [missing crossref parent] PASS: WARNING BIB003 emitted ({bib003[0].get('message')})")
+
+if failures:
+    for f in failures:
+        print(f"  FAIL [Row 11]: {f}")
+    sys.exit(1)
+sys.exit(0)
+PY
+)"
+        ROW11_RC=$?
+        set -e
+        echo "$ROW11_OUT"
+        if [[ "$ROW11_RC" -eq 0 ]]; then
+            record_pass 11 "bib-fields/refs.bib sets authorsTruncated without 'and et al.', inherits crossref fields, extracts howpublished URLs without venue pollution, suppresses uncited on conf2020, and warns BIB003 on missing parent"
+        else
+            record_fail 11 "Row 11 BibTeX field normalization, crossref inheritance, or uncited suppression check failed"
+        fi
+    fi
 
     # ==================================================================
     # Row 12: S64–S67 command tables & parser constructs + Latin-1 / Windows-1252 encoding fallback
