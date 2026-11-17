@@ -331,6 +331,83 @@ case "$MODE" in
                 echo "[test.sh] MILESTONE 1 PASSED."
                 ;;
 
+            2)
+                TREE_BEFORE="$(working_tree_state)"
+                PREFS_BEFORE="$(count_scholaros_preference_files)"
+                CACHE_BEFORE="$(scholaros_cache_dir_state)"
+                SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                export SCHOLAR_REPORT_DIR
+
+                echo "[test.sh] Running M2 + M1 scoped unit tests..."
+                swift_test --no-parallel --filter "(MarkupASTAndMacroTests|BibCSLAndFirewallTests|LSPEngineAndSyncTeXTests|ProjectStoreAndTrackChangesTests|PluginSDKMCPAndShellTests|ScholarStudioViewsTests|ZZZCacheHomeIsolationGuardTests)"
+                echo "[test.sh] Running M1 benchmark Python tooling unit tests..."
+                python3 -I -m unittest discover -s "$REPO_ROOT/Benchmarks/citations/tools/tests" -t "$REPO_ROOT/Benchmarks/citations/tools"
+
+                run_m0_acceptance_scripts "$RECORD"
+
+                require_executable "$REPO_ROOT/Scripts/acceptance/m1-acceptance.sh"
+                require_executable "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py"
+                require_executable "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh"
+                require_executable "$REPO_ROOT/Scripts/acceptance/hard-inputs.sh"
+
+                M2_FAILED=0
+                echo "[test.sh] Running M1 acceptance script (regression check)..."
+                set +e
+                if [[ "$RECORD" -eq 1 ]]; then
+                    "$REPO_ROOT/Scripts/acceptance/m1-acceptance.sh" --record
+                else
+                    "$REPO_ROOT/Scripts/acceptance/m1-acceptance.sh"
+                fi
+                M2_M1_ACC_EXIT=$?
+                set -e
+                if [[ "$M2_M1_ACC_EXIT" -ne 0 ]]; then
+                    M2_FAILED=1
+                fi
+
+                echo "[test.sh] Running M1 citation benchmark (--replay)..."
+                set +e
+                if [[ "$RECORD" -eq 1 ]]; then
+                    python3 -I "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py" --replay --record
+                else
+                    python3 -I "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py" --replay
+                fi
+                M2_M1_BENCH_EXIT=$?
+                set -e
+                if [[ "$M2_M1_BENCH_EXIT" -ne 0 ]]; then
+                    M2_FAILED=1
+                fi
+
+                echo "[test.sh] Running M2 acceptance script..."
+                set +e
+                if [[ "$RECORD" -eq 1 ]]; then
+                    "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh" --record
+                else
+                    "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh"
+                fi
+                M2_ACC_EXIT=$?
+                set -e
+                if [[ "$M2_ACC_EXIT" -ne 0 ]]; then
+                    M2_FAILED=1
+                fi
+
+                echo "[test.sh] Running M2 hard-inputs fast check..."
+                set +e
+                "$REPO_ROOT/Scripts/acceptance/hard-inputs.sh"
+                M2_HARD_EXIT=$?
+                set -e
+                if [[ "$M2_HARD_EXIT" -ne 0 ]]; then
+                    M2_FAILED=1
+                fi
+
+                assert_post_run_hygiene "$RECORD" "$PREFS_BEFORE" "$CACHE_BEFORE" "$TREE_BEFORE"
+                echo "[test.sh] Reports: $SCHOLAR_REPORT_DIR"
+                if [[ "$M2_FAILED" -ne 0 ]]; then
+                    echo "[test.sh] MILESTONE 2 FAILED (m1-acceptance exit=$M2_M1_ACC_EXIT, m1-citation-bench exit=$M2_M1_BENCH_EXIT, m2-acceptance exit=$M2_ACC_EXIT, hard-inputs exit=$M2_HARD_EXIT)." >&2
+                    exit 1
+                fi
+                echo "[test.sh] MILESTONE 2 PASSED."
+                ;;
+
             *)
                 echo "ERROR: Milestone M${MS} acceptance script is not implemented yet." >&2
                 exit 1
@@ -361,6 +438,8 @@ case "$MODE" in
 
         require_executable "$REPO_ROOT/Scripts/acceptance/m1-acceptance.sh"
         require_executable "$REPO_ROOT/Scripts/acceptance/m1-citation-bench.py"
+        require_executable "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh"
+        require_executable "$REPO_ROOT/Scripts/acceptance/hard-inputs.sh"
 
         REL_FAILED=0
         echo "[test.sh] Running M1 acceptance script..."
@@ -386,6 +465,28 @@ case "$MODE" in
         REL_REPLAY_EXIT=$?
         set -e
         if [[ "$REL_REPLAY_EXIT" -ne 0 ]]; then
+            REL_FAILED=1
+        fi
+
+        echo "[test.sh] Running M2 acceptance script..."
+        set +e
+        if [[ "$RECORD" -eq 1 ]]; then
+            "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh" --record
+        else
+            "$REPO_ROOT/Scripts/acceptance/m2-acceptance.sh"
+        fi
+        REL_M2_EXIT=$?
+        set -e
+        if [[ "$REL_M2_EXIT" -ne 0 ]]; then
+            REL_FAILED=1
+        fi
+
+        echo "[test.sh] Running M2 hard-inputs fast check..."
+        set +e
+        "$REPO_ROOT/Scripts/acceptance/hard-inputs.sh"
+        REL_HARD_EXIT=$?
+        set -e
+        if [[ "$REL_HARD_EXIT" -ne 0 ]]; then
             REL_FAILED=1
         fi
 

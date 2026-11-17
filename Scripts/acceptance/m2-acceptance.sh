@@ -18,10 +18,13 @@
 #   - Row 13: Unique-key `ERR_UNVERIFIED_CITATION` (`3` keys cited twice each under `--offline` -> `3` diagnostics, `category == "citation"`, `0` structure ERRORs, exit `3`)
 #   - Row 14: Fabricated DOI with `x-firewall-class = {VERIFIED}` under `diagnostics --registry-replay` (`ERR_UNVERIFIED_CITATION`, `未采信` / `not trusted` in `findings`, exit `1`, and `m1-acceptance.sh --row 18` passes)
 #   - Row 15: MCP `scholar_lsp_diagnostics` with `path` across all 11 benchmark manuscripts — byte-for-byte identical JSON to CLI `--json`
-#   - Rows 16–20: marked `SKIP (没跑)` for Stage 08 / dispatcher
+#   - Row 16: M1 480-entry citation benchmark `--replay` + per-entry verdicts & per-group exit codes vs `Scripts/acceptance/baselines/m1-per-entry-v1.3.0.json`
+#   - Row 17: Read-only `git apply --check` across all 5 `m2-*.patch` mutation files (`SKIP / 没跑`; full clone/apply/revert run via `Scripts/acceptance/m2-mutations.sh`)
+#   - Row 18: Wall-clock timing check for `m2-acceptance.sh` (<= 60 s debug build) and `hard-inputs.sh` (<= 1 s)
+#   - Row 19: `m2-regen-expected.sh --check` (prints `没跑` / `SKIP` when Tectonic or offline package/cache inputs `SCHOLAR_M2_PACKAGES_DIR` + `SCHOLAR_TECTONIC_CACHE_DIR` are absent)
+#   - Row 20: Post-run hygiene (temp dirs cleaned, `~/Library/Caches`, `~/Library/Preferences`, `~/Library/Application Support` free of new `ScholarOS`/`Tectonic` files, `git diff --exit-code Benchmarks/`)
 #
-# All runs are strictly `--offline` under an isolated `HOME` / `CFFIXED_USER_HOME` (`lib-cli-guard.sh`).
-# Tectonic and `m2-regen-expected.sh` are never invoked here.
+# All runs use `--offline` or `--registry-replay` under an isolated `HOME` / `CFFIXED_USER_HOME` (`lib-cli-guard.sh`).
 #
 # Usage:
 #   Scripts/acceptance/m2-acceptance.sh [--record] [--row <1..20>]
@@ -29,6 +32,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+
+M2_START_EPOCH="$(python3 -I -c 'import time; print(f"{time.monotonic():.6f}")')"
 
 RECORD=0
 ONLY_ROW=""
@@ -61,6 +66,71 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+REAL_USER_HOME="$(python3 -I -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
+
+snapshot_real_home_scholaros_tectonic() {
+    python3 -I - "$REAL_USER_HOME" <<'PY'
+import os, sys
+
+home = sys.argv[1]
+entries = []
+for sub in ("Caches", "Preferences", "Application Support"):
+    base = os.path.join(home, "Library", sub)
+    if not os.path.isdir(base):
+        entries.append(f"{base}:ABSENT")
+        continue
+    for name in sorted(os.listdir(base)):
+        low = name.lower()
+        if "scholaros" in low or "tectonic" in low:
+            p = os.path.join(base, name)
+            if os.path.isdir(p):
+                entries.append(f"{p}:DIR")
+                for root, dirs, files in os.walk(p):
+                    dirs.sort()
+                    for fn in sorted(files):
+                        fp = os.path.join(root, fn)
+                        try:
+                            st = os.stat(fp)
+                            entries.append(f"{fp}:{st.st_size}:{int(st.st_mtime)}")
+                        except OSError:
+                            entries.append(f"{fp}:ERR")
+            else:
+                try:
+                    st = os.stat(p)
+                    entries.append(f"{p}:{st.st_size}:{int(st.st_mtime)}")
+                except OSError:
+                    entries.append(f"{p}:ERR")
+print("\n".join(entries))
+PY
+}
+
+snapshot_tmpdir_m2() {
+    python3 -I - "${TMPDIR:-/tmp}" <<'PY'
+import os, sys
+
+tdir = sys.argv[1]
+if not os.path.isdir(tdir):
+    sys.exit(0)
+prefixes = (
+    "scholaros-hard-inputs.",
+    "scholaros-bench-work.",
+    "scholaros-m1-work.",
+    "scholaros-m1-report.",
+    "scholaros-m1-sub.",
+    "scholaros-m2-sub.",
+    "m2-regen.",
+)
+items = sorted(n for n in os.listdir(tdir) if n.startswith(prefixes))
+print("\n".join(items))
+PY
+}
+
+HOME_SNAP_BEFORE="$(snapshot_real_home_scholaros_tectonic)"
+TMP_SNAP_BEFORE="$(snapshot_tmpdir_m2)"
+BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+REPORTS_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
+OUTER_WAS_SET_AT_ENTRY="${SCHOLAR_OUTER_NO_NETWORK:-0}"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m2-work.XXXXXX")"
 WORK_SCRATCH="$WORK/scratch"
@@ -2116,25 +2186,354 @@ PY
     fi
 
     # ==================================================================
-    # Rows 16..20: Deferred to Stage 08 / dispatcher (marked 没跑 / SKIPPED)
+    # Row 16: M1 480-entry citation benchmark --replay & per-entry parity vs v1.3.0
     # ==================================================================
-    declare -a DEFERRED_ROWS_16_20=(
-        "16:M1 全量回放不退步、禁网单元测试与 milestone 1 — 留给第 5、8 段"
-        "17:源码变异检查 (a)-(e) — 留给第 8 段"
-        "18:禁网沙箱 milestone 2 与 m2-acceptance.sh / hard-inputs.sh 耗时 — 留给第 8 段"
-        "19:调度方 Tectonic m2-regen-expected.sh --check — 调度方专用，测试不调用"
-        "20:跑后环境与工作区洁净检查 — 留给第 8 段"
-    )
+    if should_run_row 16; then
+        echo "== [Row 16] M1 评测集回放不退步 (m1-citation-bench.py --replay 全量 + 480 条逐条与各组退出码对照 v1.3.0) =="
+        set +e
+        python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$WORK_SCRATCH" >"$WORK/row16.out" 2>&1 <<'PY'
+import glob, json, os, subprocess, sys
 
-    for entry in "${DEFERRED_ROWS_16_20[@]}"; do
-        r_num="${entry%%:*}"
-        r_desc="${entry#*:}"
-        if should_run_row "$r_num"; then
-            echo "== [Row $r_num] $r_desc =="
-            echo "没跑 — $r_desc"
-            record_skip "$r_num" "$r_desc"
+repo_root, cli_bin, work_scratch = sys.argv[1:4]
+baseline_path = os.path.join(repo_root, "Scripts", "acceptance", "baselines", "m1-per-entry-v1.3.0.json")
+bench_script = os.path.join(repo_root, "Scripts", "acceptance", "m1-citation-bench.py")
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+entries_dir = os.path.join(repo_root, "Benchmarks", "citations", "entries")
+
+if not os.path.isfile(baseline_path):
+    print(f"  FAIL [Row 16]: missing v1.3.0 baseline file {baseline_path}")
+    sys.exit(1)
+
+r16_home = os.path.join(work_scratch, "r16-home")
+os.makedirs(r16_home, exist_ok=True)
+env = dict(os.environ)
+env["HOME"] = r16_home
+env["CFFIXED_USER_HOME"] = r16_home
+env["SCHOLAR_CLI_BIN"] = cli_bin
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+failures = []
+
+# 16A. Full M1 citation benchmark replay
+bench_out = os.path.join(work_scratch, "r16-m1-bench.json")
+p_bench = subprocess.run(
+    [sys.executable, "-I", bench_script, "--replay", "--output", bench_out],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+if p_bench.returncode != 0:
+    failures.append(f"m1-citation-bench.py --replay exited {p_bench.returncode}: {p_bench.stderr.strip()}")
+else:
+    bench_obj = json.loads(open(bench_out, encoding="utf-8").read())
+    evaluated = (bench_obj.get("overall_metrics") or {}).get("evaluated_count")
+    non_ins_ver = (bench_obj.get("hard_requirements") or {}).get("non_insertable_verified_count")
+    miss_cnt = bench_obj.get("replay_miss_count")
+    if bench_obj.get("complete") is not True or evaluated != 480 or non_ins_ver != 0 or miss_cnt != 0:
+        failures.append(
+            f"m1-citation-bench.py --replay metrics unexpected: complete={bench_obj.get('complete')}, "
+            f"evaluated={evaluated}, non_insertable_verified={non_ins_ver}, replay_miss={miss_cnt}"
+        )
+    else:
+        print(
+            f"  [m1-citation-bench --replay] PASS: exit=0, complete=True, evaluated={evaluated}, "
+            f"replay_miss={miss_cnt}, non_insertable_verified={non_ins_ver}"
+        )
+
+# 16B. Per-entry 480-item verdicts/reasons/insertable and per-group exit codes vs v1.3.0
+per_home = os.path.join(work_scratch, "r16-per-entry-home")
+os.makedirs(per_home, exist_ok=True)
+per_env = dict(env)
+per_env["HOME"] = per_home
+per_env["CFFIXED_USER_HOME"] = per_home
+per_env.pop("SCHOLAR_CACHE_DIR", None)
+
+cur_entries = {}
+cur_exits = []
+bib_files = sorted(glob.glob(os.path.join(entries_dir, "*.bib")))
+if len(bib_files) != 12:
+    failures.append(f"expected 12 benchmark .bib files in {entries_dir}, found {len(bib_files)}")
+
+for bib_path in bib_files:
+    grp = os.path.basename(bib_path)[:-4]
+    p_vc = subprocess.run(
+        [cli_bin, "verify-citations", bib_path, "--registry-replay", rec_dir, "--verbose", "--json", "--lang", "en"],
+        env=per_env,
+        capture_output=True,
+        text=True,
+    )
+    cur_exits.append(f"{grp} exit={p_vc.returncode}")
+    if p_vc.returncode == 2:
+        failures.append(f"verify-citations exited 2 on {grp}: {p_vc.stderr.strip()}")
+        continue
+    try:
+        payload = json.loads(p_vc.stdout)
+    except Exception as exc:
+        failures.append(f"invalid JSON from verify-citations on {grp}: {exc}")
+        continue
+    for it in payload.get("verdicts") or []:
+        key = it.get("citeKey")
+        cur_entries[f"{grp}/{key}"] = {
+            "verdict": it.get("firewallClass"),
+            "reasons": sorted(it.get("reasons") or []),
+            "insertable": it.get("insertable"),
+        }
+
+v130 = json.loads(open(baseline_path, encoding="utf-8").read())
+v130_entries = v130.get("entries") or {}
+v130_exits = [x for x in (v130.get("exits") or []) if x]
+
+if len(v130_entries) != 480 or len(cur_entries) != 480:
+    failures.append(f"expected 480 entries (v1.3.0={len(v130_entries)}, current={len(cur_entries)})")
+
+all_keys = sorted(set(v130_entries) | set(cur_entries))
+entry_diffs = []
+for k in all_keys:
+    if v130_entries.get(k) != cur_entries.get(k):
+        entry_diffs.append((k, v130_entries.get(k), cur_entries.get(k)))
+
+if entry_diffs:
+    for k, old_v, new_v in entry_diffs[:20]:
+        failures.append(f"entry diff {k}: v1.3.0={old_v} vs current={new_v}")
+
+if cur_exits != v130_exits:
+    failures.append(f"per-group exits mismatch: v1.3.0={v130_exits} vs current={cur_exits}")
+
+matched_entries = len(all_keys) - len(entry_diffs)
+matched_exits = sum(1 for a, b in zip(cur_exits, v130_exits) if a == b)
+print(
+    f"  [per-entry vs v1.3.0] entries_matched={matched_entries}/480, "
+    f"group_exits_matched={matched_exits}/{len(v130_exits)}"
+)
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL [Row 16]: {msg}")
+    sys.exit(1)
+sys.exit(0)
+PY
+        ROW16_RC=$?
+        set -e
+        cat "$WORK/row16.out"
+        if [[ "$ROW16_RC" -eq 0 ]]; then
+            record_pass 16 "m1-citation-bench.py --replay passes and all 480 per-entry verdicts/reasons/insertable and 12 group exit codes match v1.3.0 identically"
+        else
+            record_fail 16 "Row 16 M1 480-entry replay or v1.3.0 per-entry parity check failed"
         fi
-    done
+    fi
+
+    # ==================================================================
+    # Row 17: Mutation patches check (read-only git apply --check; m2-mutations.sh run by dispatcher)
+    # ==================================================================
+    if should_run_row 17; then
+        echo "== [Row 17] 变异补丁与脚本检查 (Scripts/acceptance/mutations/m2-*.patch & m2-mutations.sh) =="
+        MUT_RUNNER="$REPO_ROOT/Scripts/acceptance/m2-mutations.sh"
+        declare -a M2_PATCHES=(
+            "$REPO_ROOT/Scripts/acceptance/mutations/m2-01-disable-verbatim-skip.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m2-02-bibtex-abort-on-error.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m2-03-bibtex-strict-field-chars.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m2-04-drop-thebibliography-and-bbl.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m2-05-suppress-sym003.patch"
+        )
+        R17_OK=1
+        if [[ ! -x "$MUT_RUNNER" ]]; then
+            echo "  FAIL: Missing or non-executable $MUT_RUNNER"
+            R17_OK=0
+        else
+            set +e
+            bash -n "$MUT_RUNNER" 2>"$WORK/r17-runner.err"
+            RUNNER_SYNTAX_RC=$?
+            set -e
+            if [[ "$RUNNER_SYNTAX_RC" -ne 0 ]]; then
+                cat "$WORK/r17-runner.err" || true
+                R17_OK=0
+            fi
+        fi
+
+        for p_file in "${M2_PATCHES[@]}"; do
+            p_base="$(basename "$p_file")"
+            if [[ ! -f "$p_file" ]]; then
+                echo "  FAIL: Missing mutation patch $p_base"
+                R17_OK=0
+                continue
+            fi
+            set +e
+            if [[ "${SCHOLAR_M2_MUTATION_ACTIVE:-}" == "$p_base" ]]; then
+                git -C "$REPO_ROOT" apply -R --check "$p_file" 2>"$WORK/r17-${p_base}.err"
+                P_RC=$?
+                echo "  patch_reverse_apply_check_exit=$P_RC ($p_base, active mutation)"
+            else
+                git -C "$REPO_ROOT" apply --check "$p_file" 2>"$WORK/r17-${p_base}.err"
+                P_RC=$?
+                echo "  patch_apply_check_exit=$P_RC ($p_base)"
+            fi
+            set -e
+            if [[ "$P_RC" -ne 0 ]]; then
+                cat "$WORK/r17-${p_base}.err" || true
+                R17_OK=0
+            fi
+        done
+
+        if [[ "$R17_OK" -ne 1 ]]; then
+            record_fail 17 "M2 mutation patches or m2-mutations.sh failed git apply --check / syntax check"
+        else
+            echo "SKIP: 没跑 — 5 个 m2-*.patch 补丁已通过 git apply --check 校验；克隆打补丁、构建与还原由调度方运行 Scripts/acceptance/m2-mutations.sh"
+            record_skip 17 "All 5 m2-*.patch files verified clean with git apply --check; dispatcher runs Scripts/acceptance/m2-mutations.sh"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 18: Wall-clock timing budget (m2-acceptance.sh <= 60s debug build, hard-inputs.sh <= 1s)
+    # ==================================================================
+    if should_run_row 18; then
+        echo "== [Row 18] 耗时检查 (m2-acceptance.sh <= 60s debug 构建，hard-inputs.sh <= 1s；禁网 milestone 2 由调度方运行) =="
+        set +e
+        python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$M2_START_EPOCH" >"$WORK/row18.out" 2>&1 <<'PY'
+import os, subprocess, sys, time
+
+repo_root, cli_bin, m2_start_s = sys.argv[1:4]
+m2_start = float(m2_start_s)
+hard_script = os.path.join(repo_root, "Scripts", "acceptance", "hard-inputs.sh")
+
+env = dict(os.environ)
+env["SCHOLAR_CLI_BIN"] = cli_bin
+env.pop("SCHOLAR_REPORT_DIR", None)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+t0 = time.monotonic()
+p_hard = subprocess.run([hard_script], env=env, capture_output=True, text=True)
+hard_elapsed = time.monotonic() - t0
+m2_elapsed = time.monotonic() - m2_start
+
+print(f"  hard_inputs_exit={p_hard.returncode} hard_inputs_elapsed={hard_elapsed:.3f}s (budget <= 1.000s)")
+print(f"  m2_acceptance_elapsed={m2_elapsed:.3f}s (budget <= 60.000s)")
+
+ok = True
+if p_hard.returncode != 0:
+    ok = False
+    print(f"  FAIL [Row 18]: hard-inputs.sh exited {p_hard.returncode}: {p_hard.stdout} {p_hard.stderr}")
+if hard_elapsed > 1.0:
+    ok = False
+    print(f"  FAIL [Row 18]: hard-inputs.sh exceeded 1.0s budget ({hard_elapsed:.3f}s)")
+if m2_elapsed > 60.0:
+    ok = False
+    print(f"  FAIL [Row 18]: m2-acceptance.sh exceeded 60.0s debug budget ({m2_elapsed:.3f}s)")
+
+sys.exit(0 if ok else 1)
+PY
+        ROW18_RC=$?
+        set -e
+        cat "$WORK/row18.out"
+        if [[ "$ROW18_RC" -eq 0 ]]; then
+            record_pass 18 "Wall-clock budgets satisfied (m2-acceptance.sh <= 60s debug build, hard-inputs.sh <= 1s)"
+        else
+            record_fail 18 "Row 18 wall-clock budget or hard-inputs.sh execution failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 19: Tectonic expected-set regeneration check (m2-regen-expected.sh --check)
+    # ==================================================================
+    if should_run_row 19; then
+        echo "== [Row 19] Tectonic 期望重生成核对 (Scripts/acceptance/m2-regen-expected.sh --check) =="
+        REGEN_SCRIPT="$REPO_ROOT/Scripts/acceptance/m2-regen-expected.sh"
+        set +e
+        "$REGEN_SCRIPT" --check --tectonic "$WORK/nonexistent-tectonic" >"$WORK/r19-guard.out" 2>&1
+        R19_GUARD_RC=$?
+        set -e
+        R19_GUARD_MSG="$(tr '\n' ' ' < "$WORK/r19-guard.out")"
+        echo "  missing_tectonic_guard_exit=$R19_GUARD_RC output=${R19_GUARD_MSG}"
+
+        if [[ "$R19_GUARD_RC" -ne 2 ]] || ! grep -q "没跑" "$WORK/r19-guard.out"; then
+            record_fail 19 "m2-regen-expected.sh --check without Tectonic did not print '没跑' and exit 2"
+        else
+            TECTONIC_CANDIDATE="${SCHOLAR_TECTONIC_BIN:-}"
+            if [[ -z "$TECTONIC_CANDIDATE" ]]; then
+                TECTONIC_CANDIDATE="$(command -v tectonic || true)"
+                if [[ -z "$TECTONIC_CANDIDATE" && -x /opt/homebrew/bin/tectonic ]]; then
+                    TECTONIC_CANDIDATE="/opt/homebrew/bin/tectonic"
+                fi
+            fi
+
+            if [[ -z "$TECTONIC_CANDIDATE" || ! -x "$TECTONIC_CANDIDATE" ]]; then
+                set +e
+                "$REGEN_SCRIPT" --check ${SCHOLAR_TECTONIC_BIN:+--tectonic "$SCHOLAR_TECTONIC_BIN"} >"$WORK/r19-run.out" 2>&1
+                R19_RUN_RC=$?
+                set -e
+                cat "$WORK/r19-run.out"
+                if [[ "$R19_RUN_RC" -eq 2 ]] && grep -q "没跑" "$WORK/r19-run.out"; then
+                    record_skip 19 "Tectonic not installed — m2-regen-expected.sh --check printed '没跑' (not counted as PASS)"
+                else
+                    record_fail 19 "Unexpected exit $R19_RUN_RC from m2-regen-expected.sh --check without Tectonic"
+                fi
+            elif [[ -n "${SCHOLAR_M2_PACKAGES_DIR:-}" && -n "${SCHOLAR_TECTONIC_CACHE_DIR:-}" && "$OUTER_WAS_SET_AT_ENTRY" != "1" && "${SCHOLAR_OUTER_NO_NETWORK:-0}" != "1" ]]; then
+                set +e
+                "$REGEN_SCRIPT" --check \
+                    --packages "$SCHOLAR_M2_PACKAGES_DIR" \
+                    --tectonic-cache "$SCHOLAR_TECTONIC_CACHE_DIR" \
+                    --tectonic "$TECTONIC_CANDIDATE" >"$WORK/r19-run.out" 2>&1
+                R19_RUN_RC=$?
+                set -e
+                cat "$WORK/r19-run.out"
+                if [[ "$R19_RUN_RC" -eq 0 ]]; then
+                    record_pass 19 "m2-regen-expected.sh --check verified all 11 expected.json files match Tectonic output"
+                elif [[ "$R19_RUN_RC" -eq 2 ]] && grep -q "没跑" "$WORK/r19-run.out"; then
+                    record_skip 19 "m2-regen-expected.sh --check printed '没跑' (not counted as PASS)"
+                else
+                    record_fail 19 "m2-regen-expected.sh --check reported differences or failed (exit=$R19_RUN_RC)"
+                fi
+            else
+                echo "SKIP: 没跑 — 未提供离线源码包与缓存目录（SCHOLAR_M2_PACKAGES_DIR / SCHOLAR_TECTONIC_CACHE_DIR）或当前处于禁网外层沙箱内；由调度方运行 m2-regen-expected.sh --check"
+                record_skip 19 "m2-regen-expected.sh --check requires offline packages/cache outside outer sandbox (没跑; not counted as PASS)"
+            fi
+        fi
+    fi
+
+    # ==================================================================
+    # Row 20: Post-run hygiene (temp dirs cleaned, ~/Library free of ScholarOS/Tectonic additions, Benchmarks/ clean)
+    # ==================================================================
+    if should_run_row 20; then
+        echo "== [Row 20] 跑后洁净检查 (临时目录清理、真实 ~/Library 无新增 ScholarOS/Tectonic 文件、git diff --exit-code Benchmarks/) =="
+        rm -rf "$WORK_SCRATCH"
+        HOME_SNAP_AFTER="$(snapshot_real_home_scholaros_tectonic)"
+        TMP_SNAP_AFTER="$(snapshot_tmpdir_m2)"
+        BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+        REPORTS_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
+        EXIT_TRAP_DEF="$(trap -p EXIT)"
+        set +e
+        git -C "$REPO_ROOT" diff --exit-code -- Benchmarks >/dev/null 2>&1
+        BENCH_DIFF_EXIT=$?
+        set -e
+
+        R20_OK=1
+        if [[ -e "$WORK_SCRATCH" || -z "$EXIT_TRAP_DEF" ]]; then
+            echo "  FAIL: WORK_SCRATCH was not removed or EXIT cleanup trap is missing"
+            R20_OK=0
+        fi
+        if [[ "$TMP_SNAP_BEFORE" != "$TMP_SNAP_AFTER" ]]; then
+            echo "  FAIL: stray temporary directories left in TMPDIR (before='$TMP_SNAP_BEFORE' after='$TMP_SNAP_AFTER')"
+            R20_OK=0
+        fi
+        if [[ "$HOME_SNAP_BEFORE" != "$HOME_SNAP_AFTER" ]]; then
+            echo "  FAIL: real ~/Library (Caches / Preferences / Application Support) ScholarOS or Tectonic files changed"
+            R20_OK=0
+        fi
+        if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then
+            echo "  FAIL: Benchmarks/ was modified during the run (diff_exit=$BENCH_DIFF_EXIT)"
+            R20_OK=0
+        fi
+        if [[ "$RECORD" -eq 0 && "$REPORTS_STATUS_BEFORE" != "$REPORTS_STATUS_AFTER" ]]; then
+            echo "  FAIL: reports/ was modified without --record"
+            R20_OK=0
+        fi
+
+        echo "  scratch_cleaned=$([[ ! -e "$WORK_SCRATCH" ]] && echo true || echo false) tmp_clean=$([[ "$TMP_SNAP_BEFORE" == "$TMP_SNAP_AFTER" ]] && echo true || echo false) real_home_untouched=$([[ "$HOME_SNAP_BEFORE" == "$HOME_SNAP_AFTER" ]] && echo true || echo false) benchmarks_diff_exit=$BENCH_DIFF_EXIT reports_untouched=$([[ "$RECORD" -eq 1 || "$REPORTS_STATUS_BEFORE" == "$REPORTS_STATUS_AFTER" ]] && echo true || echo false)"
+        if [[ "$R20_OK" -eq 1 ]]; then
+            record_pass 20 "Temporary directories cleaned, real ~/Library free of new ScholarOS/Tectonic files, and git diff --exit-code Benchmarks/ passed"
+        else
+            record_fail 20 "Row 20 post-run hygiene check failed"
+        fi
+    fi
 
     echo "========================================================================"
     echo "M2 Acceptance Summary:"
