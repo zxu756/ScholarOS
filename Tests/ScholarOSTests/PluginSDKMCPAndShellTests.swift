@@ -6713,6 +6713,98 @@ struct PluginSDKMCPAndShellTests {
         let inlineArr = try #require(rawInlineArr as? [[String: Any]])
         #expect(inlineArr.isEmpty)
     }
+
+    @Test("M2 Stage 07 item 5 & 6 (Row 14 & Row 15): x-firewall-class={VERIFIED} fabricated DOI under diagnostics --registry-replay emits 1 ERROR ERR_UNVERIFIED_CITATION, records untrusted finding (未采信 / not trusted), exits 1, and MCP scholar_lsp_diagnostics(path:) matches CLI --json byte-for-byte under --lang zh & en")
+    func m2Stage07Item6Row14TamperedFirewallAndMCPLangParity() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item6")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let tamperedBib = tempDir.appendingPathComponent("row14.bib")
+        try """
+        @article{fake_tampered,
+          author           = {Whitfield, Eleanor and Patel, Raj},
+          title            = {Quantum Gradient Descent in Biological Neural Networks},
+          journal          = {Nature Machine Intelligence},
+          year             = {2026},
+          doi              = {10.1038/fake.2026.99999},
+          x-firewall-class = {VERIFIED}
+        }
+        """.write(to: tamperedBib, atomically: true, encoding: .utf8)
+
+        let draftTex = tempDir.appendingPathComponent("row14.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}
+        First cite~\\cite{fake_tampered} and second cite~\\cite{fake_tampered}.
+        \\end{document}
+        """.write(to: draftTex, atomically: true, encoding: .utf8)
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let runner = ScholarCLIRunner(registryClock: .immediate, environment: env)
+
+        // 1. JSON & exit code under --registry-replay (--lang zh & --lang en)
+        let cliZHJSON = await runner.runWithExitStatus(
+            arguments: ["diagnostics", draftTex.path, "--bib", tamperedBib.path, "--registry-replay", registryDir.path, "--json", "--lang", "zh"]
+        )
+        #expect(cliZHJSON.exitCode == 1)
+        let zhObj = try #require(try JSONSerialization.jsonObject(with: Data(cliZHJSON.stdout.utf8)) as? [String: Any])
+        #expect(zhObj["mode"] as? String == "REPLAY")
+        #expect(zhObj["complete"] as? Bool == true)
+        let zhDiags = try #require(zhObj["diagnostics"] as? [[String: Any]])
+        let zhCiteDiags = zhDiags.filter { ($0["code"] as? String) == "ERR_UNVERIFIED_CITATION" }
+        #expect(zhCiteDiags.count == 1, "Cited twice -> 1 unique-key ERR_UNVERIFIED_CITATION")
+        #expect(zhCiteDiags.first?["category"] as? String == "citation")
+        #expect(zhCiteDiags.first?["severity"] as? String == "ERROR")
+        let zhCites = try #require(zhObj["citations"] as? [[String: Any]])
+        let zhVerif = try #require(zhCites.first?["verification"] as? [String: Any])
+        #expect(zhVerif["verdict"] as? String == "NOT_FOUND")
+        #expect(zhVerif["insertable"] as? Bool == false)
+        let zhFindings = try #require(zhVerif["findings"] as? [[String: Any]])
+        #expect(zhFindings.contains { (($0["detail"] as? String) ?? "").contains("未采信") }, "Expected '未采信' in findings: \(zhFindings)")
+
+        let cliENJSON = await runner.runWithExitStatus(
+            arguments: ["diagnostics", draftTex.path, "--bib", tamperedBib.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(cliENJSON.exitCode == 1)
+        let enObj = try #require(try JSONSerialization.jsonObject(with: Data(cliENJSON.stdout.utf8)) as? [String: Any])
+        let enCites = try #require(enObj["citations"] as? [[String: Any]])
+        let enVerif = try #require(enCites.first?["verification"] as? [String: Any])
+        let enFindings = try #require(enVerif["findings"] as? [[String: Any]])
+        #expect(enFindings.contains { (($0["detail"] as? String) ?? "").lowercased().contains("not trusted") })
+
+        // 2. MCP `scholaros mcp --registry-replay <dir> --lang zh` matches CLI `--json --lang zh` byte-for-byte
+        let rpcData = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "scholar_lsp_diagnostics",
+                "arguments": [
+                    "path": draftTex.path,
+                    "bibPath": tamperedBib.path
+                ]
+            ]
+        ] as [String: Any])
+        let mcpRunnerZH = ScholarCLIRunner(
+            registryClock: .immediate,
+            environment: env,
+            mcpInputLines: [String(decoding: rpcData, as: UTF8.self)]
+        )
+        let mcpZHRes = await mcpRunnerZH.runWithExitStatus(
+            arguments: ["mcp", "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        #expect(mcpZHRes.exitCode == 0)
+        let mcpEnvObj = try #require(try JSONSerialization.jsonObject(with: Data(mcpZHRes.stdout.utf8)) as? [String: Any])
+        let mcpResult = try #require(mcpEnvObj["result"] as? [String: Any])
+        #expect(mcpResult["isError"] as? Bool == false)
+        let mcpZHText = try #require(((mcpResult["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(
+            Data(mcpZHText.utf8) == Data(cliZHJSON.stdout.utf8),
+            "MCP with CLI --lang zh must match CLI diagnostics --json --lang zh byte-for-byte"
+        )
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
