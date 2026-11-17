@@ -1,0 +1,17 @@
+{
+  "case": "c30-cites",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3",
+    "k4"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "biblatex",
+  "basis": "biblatex multicite \\cites: chained [pre][post]{keys} groups extract all keys across all groups (biblatex not in offline Tectonic cache)."
+}

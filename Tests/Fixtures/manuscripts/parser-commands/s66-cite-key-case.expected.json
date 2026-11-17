@@ -1,0 +1,17 @@
+{
+  "case": "s66-cite-key-case",
+  "cite_keys": [
+    "bayestune",
+    "k1"
+  ],
+  "labels": [
+    "sec:exp"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [
+    "CITE_KEY_CASE"
+  ],
+  "offline_missing_pkg": null,
+  "basis": "S66: BibTeX matches citation keys case-insensitively (bayestune -> Bayestune in refs.bib), marking bayestune defined with 0 CITE404 and emitting WARNING CITE_KEY_CASE naming both forms."
+}

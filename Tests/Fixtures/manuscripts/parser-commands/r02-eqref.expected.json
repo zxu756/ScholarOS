@@ -1,0 +1,14 @@
+{
+  "case": "r02-eqref",
+  "cite_keys": [],
+  "labels": [
+    "eq:a"
+  ],
+  "references": [
+    "eq:a"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "amsmath \\eqref: parenthesized equation reference."
+}

@@ -1,0 +1,18 @@
+{
+  "case": "r12-subref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "fig:both",
+    "fig:sub1",
+    "fig:sub2"
+  ],
+  "references": [
+    "fig:both",
+    "fig:sub1",
+    "fig:sub2"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "subcaption \\subref and \\subref*: references subfigure labels with and without hyperlinks, with 0 AST012."
+}

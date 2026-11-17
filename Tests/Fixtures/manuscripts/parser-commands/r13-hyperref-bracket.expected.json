@@ -1,0 +1,14 @@
+{
+  "case": "r13-hyperref-bracket",
+  "cite_keys": [],
+  "labels": [
+    "sec:target"
+  ],
+  "references": [
+    "sec:target"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "hyperref \\hyperref[label]{text}: extracts bracketed target label key."
+}

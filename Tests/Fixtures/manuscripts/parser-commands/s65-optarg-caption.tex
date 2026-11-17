@@ -1,0 +1,11 @@
+\documentclass{article}
+\begin{document}
+\listoffigures
+\section{Intro}\label{sec:fig}
+\begin{figure}[t]
+\caption[Short caption~\cite{k1} (\ref{sec:fig})]{Long caption~\cite{k2}.}\label{fig:cap}
+\end{figure}
+See \ref{fig:cap}.
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

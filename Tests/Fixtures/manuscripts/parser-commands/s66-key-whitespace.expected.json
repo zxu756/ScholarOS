@@ -1,0 +1,17 @@
+{
+  "case": "s66-key-whitespace",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "Cor: tilted Gibbs |gen|"
+  ],
+  "references": [
+    "Cor: tilted Gibbs |gen|"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S66: TeX token reader collapses internal consecutive whitespace and newline+indent runs in \\label, \\ref, and \\cite keys."
+}

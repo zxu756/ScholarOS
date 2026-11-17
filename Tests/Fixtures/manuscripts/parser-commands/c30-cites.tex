@@ -1,0 +1,8 @@
+\documentclass{article}
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{refs.bib}
+\begin{document}
+\section{Test}\label{sec:test}
+Multiple \cites[see][p.~2]{k1}[cf.]{k2, k3}{k4}.
+\printbibliography
+\end{document}

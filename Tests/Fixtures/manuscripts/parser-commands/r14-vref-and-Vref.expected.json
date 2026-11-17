@@ -1,0 +1,16 @@
+{
+  "case": "r14-vref-and-Vref",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "varioref",
+  "basis": "varioref \\vref, \\vref*, and \\Vref: page-aware cross-references (varioref not in offline Tectonic cache)."
+}

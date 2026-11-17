@@ -1,0 +1,16 @@
+{
+  "case": "c36-shortcite",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "chicago",
+  "basis": "chicago / named / aaai \\shortcite: abbreviated citation; extracts single key, multi-key, and optional arguments (chicago not in offline Tectonic cache)."
+}

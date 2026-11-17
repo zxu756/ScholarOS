@@ -1,0 +1,18 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\begin{document}
+\begin{equation}\label{eq:mat}
+M = \left(\begin{array}{cc} 1 & 0 \\ 0 & 1 \end{array}\right)
++ \begin{pmatrix} a & b \\ c & d \end{pmatrix}
++ \begin{bmatrix} 1 \\ 2 \end{bmatrix}
++ \begin{Bmatrix} 3 \end{Bmatrix}
++ \begin{vmatrix} 4 \end{vmatrix}
++ \begin{Vmatrix} 5 \end{Vmatrix}
+\end{equation}
+\begin{align*}
+g(x) &= \begin{cases} \begin{matrix} 1 & 2 \end{matrix}, & x > 0 \\ 0, & x \le 0 \end{cases}, &
+h(x) &= \begin{dcases} \bigl(\begin{smallmatrix} 1 & 0 \\ 0 & 1 \end{smallmatrix}\bigr), & x > 0 \\ \begin{bsmallmatrix} 0 \end{bsmallmatrix}, & x \le 0 \end{dcases}
+\end{align*}
+See \eqref{eq:mat}.
+\end{document}

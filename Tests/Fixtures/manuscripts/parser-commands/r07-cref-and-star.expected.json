@@ -1,0 +1,18 @@
+{
+  "case": "r07-cref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "eq:b",
+    "sec:a",
+    "sec:c"
+  ],
+  "references": [
+    "eq:b",
+    "sec:a",
+    "sec:c"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "cleveref \\cref and \\cref*: extracts all comma-separated multi-key targets and allows starred form without AST012."
+}

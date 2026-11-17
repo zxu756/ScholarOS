@@ -1,0 +1,19 @@
+{
+  "case": "s65-optarg-caption",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "fig:cap",
+    "sec:fig"
+  ],
+  "references": [
+    "fig:cap",
+    "sec:fig"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S65: \\caption[short]{long} extracts \\cite and \\ref from both the optional LoF caption and the mandatory caption."
+}

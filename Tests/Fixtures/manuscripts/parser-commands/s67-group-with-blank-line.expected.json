@@ -1,0 +1,16 @@
+{
+  "case": "s67-group-with-blank-line",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:color"
+  ],
+  "references": [
+    "sec:color"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: Plain TeX {...} groups allow blank lines (\\par) across multiple paragraphs without emitting AST001/AST002."
+}

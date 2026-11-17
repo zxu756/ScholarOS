@@ -1,0 +1,16 @@
+{
+  "case": "r15-fref-Fref-sref",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "fancyref",
+  "basis": "fancyref \\fref, \\Fref, and short \\sref cross-references (fancyref not in offline Tectonic cache)."
+}

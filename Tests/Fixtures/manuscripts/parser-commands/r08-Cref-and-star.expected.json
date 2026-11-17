@@ -1,0 +1,18 @@
+{
+  "case": "r08-Cref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "eq:b",
+    "sec:a",
+    "sec:c"
+  ],
+  "references": [
+    "eq:b",
+    "sec:a",
+    "sec:c"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "cleveref \\Cref and \\Cref*: capitalized multi-key cross-reference in unstarred and starred forms without AST012."
+}

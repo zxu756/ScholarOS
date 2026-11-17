@@ -1,0 +1,18 @@
+{
+  "case": "c06-citealp",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3",
+    "k4",
+    "k5"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "natbib \\citealp and \\citealp*: extracts single key, multi-key, 1 and 2 optional pre/postnotes, and starred full-author variant."
+}

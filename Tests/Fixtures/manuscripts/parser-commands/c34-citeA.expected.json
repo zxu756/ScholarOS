@@ -1,0 +1,17 @@
+{
+  "case": "c34-citeA",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3",
+    "k4"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "apacite",
+  "basis": "apacite \\citeA: textual APA citation; extracts single key, multi-key, and 1/2 optional arguments (apacite not in offline Tectonic cache)."
+}

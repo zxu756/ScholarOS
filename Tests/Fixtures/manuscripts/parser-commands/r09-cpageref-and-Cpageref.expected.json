@@ -1,0 +1,16 @@
+{
+  "case": "r09-cpageref-and-Cpageref",
+  "cite_keys": [],
+  "labels": [
+    "eq:b",
+    "sec:a"
+  ],
+  "references": [
+    "eq:b",
+    "sec:a"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "cleveref \\cpageref and \\Cpageref: multi-key page range cross-references."
+}

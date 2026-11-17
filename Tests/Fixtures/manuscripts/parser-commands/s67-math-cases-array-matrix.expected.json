@@ -1,0 +1,14 @@
+{
+  "case": "s67-math-cases-array-matrix",
+  "cite_keys": [],
+  "labels": [
+    "eq:mat"
+  ],
+  "references": [
+    "eq:mat"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: equation/align* nesting cases, dcases, array, matrix, pmatrix, bmatrix, Bmatrix, vmatrix, Vmatrix, smallmatrix, and bsmallmatrix emit 0 AST005/AST006."
+}

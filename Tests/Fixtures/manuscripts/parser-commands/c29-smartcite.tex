@@ -1,0 +1,8 @@
+\documentclass{article}
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{refs.bib}
+\begin{document}
+\section{Test}\label{sec:test}
+See \smartcite{k1}, \smartcite[p.~4]{k2}, and \smartcite[see][p.~5]{k3, k4}.
+\printbibliography
+\end{document}

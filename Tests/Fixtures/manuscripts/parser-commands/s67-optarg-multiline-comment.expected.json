@@ -1,0 +1,14 @@
+{
+  "case": "s67-optarg-multiline-comment",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "sec:notes"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67 (2409.19431 lines 144-146): multi-line optional [...] argument with an entire comment-only line in the middle does not create \\par in TeX and emits 0 AST003."
+}

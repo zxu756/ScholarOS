@@ -5134,6 +5134,125 @@ struct PluginSDKMCPAndShellTests {
             #expect(structErrors.count == expectedStructErrs, "[\(caseSlug)] expected \(expectedStructErrs) structure ERRORs, got \(structErrors)")
         }
     }
+
+    // MARK: - 20. M2 Stage 04: CITE_KEY_CASE, 2409/2410 Benchmarks, and Parser-Commands Fixtures
+
+    @Test("M2 Stage 04 item 4b (S66): case-insensitive .bib fallback marks bayestune defined, emits WARNING CITE_KEY_CASE naming both spellings with 0 CITE404 on 2410.04196v2, and 2409.19431v3 matches expected sets")
+    func m2Stage04Item4bCiteKeyCaseWarningAnd2410And2409EndToEnd() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage04-item4b")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        // 1. 2410.04196v2: `\citep{bayestune}` vs `@inproceedings{Bayestune, ...}` in `fhbi.bib`
+        let p2410 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2410.04196v2/src/main.tex")
+        let res2410 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", p2410.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res2410.exitCode != 2)
+        let obj2410 = try #require(try JSONSerialization.jsonObject(with: Data(res2410.stdout.utf8)) as? [String: Any])
+        let cites2410 = try #require(obj2410["citations"] as? [[String: Any]])
+        let bayestuneRec = try #require(cites2410.first { ($0["key"] as? String) == "bayestune" })
+        #expect(bayestuneRec["defined"] as? Bool == true, "bayestune must be marked defined via case-insensitive match to Bayestune")
+        #expect(bayestuneRec["source"] as? String == "fhbi.bib")
+        #expect(bayestuneRec["verification"] is [String: Any], "bayestune must receive M1 verification object from Bayestune")
+
+        let uncited2410 = Set(try #require(obj2410["uncitedEntries"] as? [String]))
+        #expect(!uncited2410.contains("Bayestune"), "Bayestune matched by bayestune must not be listed in uncitedEntries")
+
+        let diags2410 = try #require(obj2410["diagnostics"] as? [[String: Any]])
+        #expect(diags2410.filter { ($0["code"] as? String) == "CITE404" }.isEmpty, "Expected 0 CITE404 on 2410.04196v2")
+        #expect(diags2410.filter { (($0["code"] as? String) ?? "").hasPrefix("AST") }.isEmpty, "Expected 0 AST* on 2410.04196v2")
+        let caseWarns = diags2410.filter { ($0["code"] as? String) == "CITE_KEY_CASE" }
+        try #require(caseWarns.count == 1)
+        #expect(caseWarns[0]["severity"] as? String == "WARNING")
+        #expect(caseWarns[0]["category"] as? String == "structure")
+        let warnMsg = try #require(caseWarns[0]["message"] as? String)
+        #expect(warnMsg.contains("bayestune") && warnMsg.contains("Bayestune"), "CITE_KEY_CASE message must name both spellings: \(warnMsg)")
+
+        // 2. 2409.19431v3: Row 1 sets (79 cite_keys, 167 labels) and 0 structure ERRORs
+        let p2409 = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2409.19431v3/src/ICML_Camera_Ready_GE_tilted.tex")
+        let exp2409URL = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2409.19431v3/expected.json")
+        let exp2409 = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: exp2409URL)) as? [String: Any])
+        let res2409 = await runner.runWithExitStatus(
+            arguments: ["diagnostics", p2409.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res2409.exitCode != 2)
+        let obj2409 = try #require(try JSONSerialization.jsonObject(with: Data(res2409.stdout.utf8)) as? [String: Any])
+        let actualCites2409 = Set((obj2409["citations"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+        let expectedCites2409 = Set(try #require(exp2409["cite_keys"] as? [String]))
+        let actualLabels2409 = Set((obj2409["labels"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+        let expectedLabels2409 = Set(try #require(exp2409["labels"] as? [String]))
+        #expect(actualCites2409 == expectedCites2409)
+        #expect(actualLabels2409 == expectedLabels2409)
+        let diags2409 = try #require(obj2409["diagnostics"] as? [[String: Any]])
+        let structErrs2409 = diags2409.filter {
+            ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+        }
+        #expect(structErrs2409.isEmpty, "Expected 0 structure ERRORs on 2409.19431v3, got \(structErrs2409)")
+    }
+
+    @Test("M2 Stage 04 item 6: all 63 per-command and per-construct fixtures in Tests/Fixtures/manuscripts/parser-commands match expected citations, labels, references, warnings, and 0 AST*/INC002 errors")
+    func m2Stage04Item6AllParserCommandSmallFixturesMatchExpected() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage04-item6")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let runner = ScholarCLIRunner(environment: ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path])
+
+        let fixtureDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/parser-commands", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(at: fixtureDir, includingPropertiesForKeys: nil)
+        let expectedFiles = contents
+            .filter { $0.lastPathComponent.hasSuffix(".expected.json") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+        #expect(expectedFiles.count == 63, "Expected 63 parser-commands expected files, found \(expectedFiles.count)")
+
+        for expURL in expectedFiles {
+            let expObj = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: expURL)) as? [String: Any])
+            let slug = try #require(expObj["case"] as? String)
+            let expectedCites = Set(try #require(expObj["cite_keys"] as? [String]))
+            let expectedLabels = Set(try #require(expObj["labels"] as? [String]))
+            let expectedRefs = Set(try #require(expObj["references"] as? [String]))
+            let expectedStructErrs = try #require(expObj["structure_errors"] as? Int)
+            let expectedWarnings = Set(try #require(expObj["expected_warnings"] as? [String]))
+
+            let texURL = fixtureDir.appendingPathComponent("\(slug).tex")
+            #expect(FileManager.default.fileExists(atPath: texURL.path), "Missing \(texURL.path)")
+
+            let res = await runner.runWithExitStatus(
+                arguments: ["diagnostics", texURL.path, "--offline", "--json", "--lang", "en"]
+            )
+            #expect(res.exitCode != 2, "[\(slug)] CLI exited 2: \(res.stderr)")
+            let actualObj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+
+            let actualCites = Set((actualObj["citations"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+            let actualLabels = Set((actualObj["labels"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+            let actualRefs = Set((actualObj["references"] as? [[String: Any]] ?? []).compactMap { $0["key"] as? String })
+            let diagsArr = try #require(actualObj["diagnostics"] as? [[String: Any]])
+            let structErrors = diagsArr.filter {
+                ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+            }
+            let astDiags = diagsArr.filter { (($0["code"] as? String) ?? "").hasPrefix("AST") }
+            let inc002Diags = diagsArr.filter { ($0["code"] as? String) == "INC002" }
+            let warningCodes = Set(
+                diagsArr
+                    .filter { ($0["severity"] as? String) == "WARNING" }
+                    .compactMap { $0["code"] as? String }
+            )
+
+            #expect(actualCites == expectedCites, "[\(slug)] cite_keys mismatch: actual=\(actualCites) expected=\(expectedCites)")
+            #expect(actualLabels == expectedLabels, "[\(slug)] labels mismatch: actual=\(actualLabels) expected=\(expectedLabels)")
+            #expect(actualRefs == expectedRefs, "[\(slug)] references mismatch: actual=\(actualRefs) expected=\(expectedRefs)")
+            #expect(structErrors.count == expectedStructErrs, "[\(slug)] expected \(expectedStructErrs) structure ERRORs, got \(structErrors)")
+            #expect(astDiags.isEmpty, "[\(slug)] unexpected AST* diagnostics: \(astDiags)")
+            #expect(inc002Diags.isEmpty, "[\(slug)] unexpected INC002 diagnostics: \(inc002Diags)")
+            for reqWarn in expectedWarnings {
+                #expect(warningCodes.contains(reqWarn), "[\(slug)] missing expected WARNING \(reqWarn) in \(diagsArr)")
+            }
+        }
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

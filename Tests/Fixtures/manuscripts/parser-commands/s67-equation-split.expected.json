@@ -1,0 +1,14 @@
+{
+  "case": "s67-equation-split",
+  "cite_keys": [],
+  "labels": [
+    "eq:split1"
+  ],
+  "references": [
+    "eq:split1"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: equation and equation* nesting split (and split nesting cases) are valid amsmath constructs with 0 AST005/AST006."
+}

@@ -1,0 +1,16 @@
+{
+  "case": "r03-pageref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "LaTeX2e \\pageref and hyperref \\pageref*: extracts both unstarred and starred page references with 0 AST012."
+}

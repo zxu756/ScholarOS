@@ -1,0 +1,10 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\begin{document}
+\section{First}\label{sec:a}
+\begin{equation}\label{eq:b} u = v \end{equation}
+\subsection{Third}\label{sec:c}
+See \cref{sec:a,eq:b} and \cref*{sec:a,sec:c}.
+\end{document}

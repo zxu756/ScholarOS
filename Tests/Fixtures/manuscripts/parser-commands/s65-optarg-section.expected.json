@@ -1,0 +1,19 @@
+{
+  "case": "s65-optarg-section",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "sec:intro",
+    "sec:two"
+  ],
+  "references": [
+    "sec:intro",
+    "sec:two"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S65: \\section[short]{long} extracts \\cite and \\ref from both the optional ToC/header title and the mandatory title."
+}

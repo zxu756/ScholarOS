@@ -1,0 +1,16 @@
+{
+  "case": "r04-nameref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "nameref / hyperref \\nameref and \\nameref*: extracts section title references in both forms."
+}

@@ -1,0 +1,19 @@
+{
+  "case": "s65-optarg-theorem",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "lem:bound",
+    "sec:setup"
+  ],
+  "references": [
+    "lem:bound",
+    "sec:setup"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S65: \\begin{lemma}[...] optional theorem note extracts inner \\citep, nested {\\citet[...]{...}}, and \\ref."
+}

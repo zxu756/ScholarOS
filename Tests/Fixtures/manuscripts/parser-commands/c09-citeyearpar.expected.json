@@ -1,0 +1,17 @@
+{
+  "case": "c09-citeyearpar",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3",
+    "k4"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "natbib \\citeyearpar: parenthetical year citation with single/multi-key and 1/2 optional arguments."
+}

@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{natbib}
+\begin{document}
+\begin{table}[t]
+\caption{Scaled table.}\label{tab:scaled}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{ll}
+Method & Source \\
+Ours & \citep{k1}
+\end{tabular}%
+}
+\end{table}
+See Table~\ref{tab:scaled}.
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}

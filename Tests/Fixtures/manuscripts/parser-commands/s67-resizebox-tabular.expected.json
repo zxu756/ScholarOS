@@ -1,0 +1,16 @@
+{
+  "case": "s67-resizebox-tabular",
+  "cite_keys": [
+    "k1"
+  ],
+  "labels": [
+    "tab:scaled"
+  ],
+  "references": [
+    "tab:scaled"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: \\resizebox{\\columnwidth}{!}{\\begin{tabular}...\\end{tabular}} is valid LaTeX and must emit 0 AST001/AST002 errors."
+}

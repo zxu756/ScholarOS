@@ -1,0 +1,16 @@
+{
+  "case": "r06-Autoref",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": "biblatex",
+  "basis": "biblatex / catoptions \\Autoref and \\Autoref*: sentence-initial capitalized autoref; extracts target labels without AST012 (biblatex not in offline Tectonic cache)."
+}

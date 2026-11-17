@@ -1,0 +1,8 @@
+\documentclass{article}
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{refs.bib}
+\begin{document}
+\section{Test}\label{sec:test}
+See \fullcite{k1}, \fullcite[p.~4]{k2}, and \fullcite[see][p.~5]{k3, k4}.
+\printbibliography
+\end{document}

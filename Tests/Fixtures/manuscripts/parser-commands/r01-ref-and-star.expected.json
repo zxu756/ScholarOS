@@ -1,0 +1,16 @@
+{
+  "case": "r01-ref-and-star",
+  "cite_keys": [],
+  "labels": [
+    "sec:a",
+    "sec:b"
+  ],
+  "references": [
+    "sec:a",
+    "sec:b"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "LaTeX2e \\ref and hyperref \\ref*: starred form suppresses hyperlink without syntax error (no AST012)."
+}

@@ -1,0 +1,16 @@
+{
+  "case": "s67-math-aligned-gathered-alignedat",
+  "cite_keys": [],
+  "labels": [
+    "eq:ag1",
+    "eq:ag2"
+  ],
+  "references": [
+    "eq:ag1",
+    "eq:ag2"
+  ],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: equation and align nesting aligned, gathered, and alignedat are valid amsmath constructs with 0 AST005/AST006."
+}

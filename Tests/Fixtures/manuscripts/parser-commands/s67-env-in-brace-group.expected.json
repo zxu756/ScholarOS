@@ -1,0 +1,15 @@
+{
+  "case": "s67-env-in-brace-group",
+  "cite_keys": [
+    "k1",
+    "k2"
+  ],
+  "labels": [
+    "sec:grp"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "S67: Environments directly inside TeX brace groups {...} are valid LaTeX and must emit 0 AST001/AST002 errors."
+}

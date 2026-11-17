@@ -1,0 +1,18 @@
+{
+  "case": "c14-Citealp",
+  "cite_keys": [
+    "k1",
+    "k2",
+    "k3",
+    "k4",
+    "k5"
+  ],
+  "labels": [
+    "sec:test"
+  ],
+  "references": [],
+  "structure_errors": 0,
+  "expected_warnings": [],
+  "offline_missing_pkg": null,
+  "basis": "natbib capitalized \\Citealp and \\Citealp*: sentence-initial form; extracts single key, multi-key, 1/2 optional args, and starred form."
+}
