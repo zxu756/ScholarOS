@@ -2966,7 +2966,9 @@ struct PluginSDKMCPAndShellTests {
             try proc.run()
             let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
             let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
+            guard proc.waitForExit() else {
+                throw ProcessDidNotExit(description: "ScholarOS verify-citations did not exit within 60 seconds")
+            }
             return (
                 proc.terminationStatus,
                 String(decoding: outData, as: UTF8.self),
@@ -3494,7 +3496,7 @@ struct PluginSDKMCPAndShellTests {
             try proc.run()
             // Intentionally keep stdin open while waiting for exit to prove startup validation happens before reading stdin!
             let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            proc.waitUntilExit()
+            #expect(proc.waitForExit(), "ScholarOS mcp did not exit within 60 seconds")
             try? stdinPipe.fileHandleForWriting.close()
             #expect(proc.terminationStatus == 2, "Spawned `ScholarOS mcp --registry-replay <corruptDir>` must exit 2 at startup; got \(proc.terminationStatus)")
             #expect(!String(decoding: errData, as: UTF8.self).isEmpty)
