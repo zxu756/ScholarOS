@@ -6427,6 +6427,292 @@ struct PluginSDKMCPAndShellTests {
         )
         #expect(noVerifyErr.exitCode == 1, "--no-verify must still exit 1 on structure ERROR")
     }
+
+    @Test("M2 Stage 07 item 3 (S63, item 6): scholaros.diagnostics/1 JSON deterministic (file, line, column, code) sorting, counts/complete/REPLAY/resolved fields, and clock-independent byte-identical output")
+    func m2Stage07Item3DiagnosticsJSONSortingCompletenessAndNoTimestampDeterminism() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item3")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let subTex = tempDir.appendingPathComponent("sub.tex")
+        try """
+        \\section{Sub}
+        \\label{sec:sub}
+        Sub ref~\\ref{sec:sub} and broken~\\ref{missing_sub}.
+        """.write(to: subTex, atomically: true, encoding: .utf8)
+
+        let mainTex = tempDir.appendingPathComponent("main.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\begin{figure}\\label{fig:early}\\caption{Early cap}\\end{figure}
+        \\input{sub}
+        Main broken~\\ref{missing_main} and resolved~\\ref{fig:early} with~\\cite{real_lecun}.
+        Again~\\cite{real_lecun}.
+        \\end{document}
+        """.write(to: mainTex, atomically: true, encoding: .utf8)
+
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+
+        let dateJan = ISO8601DateFormatter().date(from: "2026-01-02T03:04:05Z") ?? Date(timeIntervalSince1970: 1_767_323_045)
+        let dateFeb = ISO8601DateFormatter().date(from: "2026-02-01T00:00:00Z") ?? Date(timeIntervalSince1970: 1_769_904_000)
+        let dateNov = ISO8601DateFormatter().date(from: "2026-11-17T08:30:00Z") ?? Date(timeIntervalSince1970: 1_794_904_200)
+
+        // Direct service call to buildDiagnosticsJSONReport(mode: "offline") without pre-computed verificationReport
+        let directLSP = try ScholarLSPWorkspaceService.loadManuscript(
+            atPath: mainTex.path,
+            explicitBibPath: recheckBibURL.path,
+            clock: ClosureRegistryClock(now: { 0 }, currentDate: { dateJan }, sleep: { _ in })
+        )
+        let directJSON = directLSP.buildDiagnosticsJSONReport(mode: "offline")
+        #expect(directJSON.complete == false, "Offline report with UNVERIFIED citations must set complete=false")
+        #expect(directJSON.counts.verdicts["UNVERIFIED"] == 1, "Direct offline buildDiagnosticsJSONReport must populate verdict counts")
+        #expect(directJSON.citations.first?.verification?.verdict == "UNVERIFIED")
+        #expect(directJSON.citations.first?.verification?.reasons == ["offline"])
+
+        // Canonical (file, line, column, code) ordering of diagnostics[] (WARNING at main.tex:3 must precede ERROR at main.tex:5)
+        let diagTuples = directJSON.diagnostics.map { ($0.file, $0.line, $0.column, $0.code) }
+        let expectedSortedTuples = diagTuples.sorted { lhs, rhs in
+            if lhs.0 != rhs.0 { return lhs.0 < rhs.0 }
+            if lhs.1 != rhs.1 { return lhs.1 < rhs.1 }
+            if lhs.2 != rhs.2 { return lhs.2 < rhs.2 }
+            return lhs.3 < rhs.3
+        }
+        #expect(
+            diagTuples.map { "\($0.0):\($0.1):\($0.2):\($0.3)" } == expectedSortedTuples.map { "\($0.0):\($0.1):\($0.2):\($0.3)" },
+            "diagnostics[] must be sorted by (file, line, column, code), got \(diagTuples)"
+        )
+
+        // References carry accurate resolved booleans and deterministic ordering
+        var refMap: [String: Bool] = [:]
+        for refItem in directJSON.references {
+            refMap[refItem.key] = refItem.resolved
+        }
+        #expect(refMap["fig:early"] == true)
+        #expect(refMap["sec:sub"] == true)
+        #expect(refMap["missing_main"] == false)
+        #expect(refMap["missing_sub"] == false)
+
+        // Two CLI runs with two different clocks produce byte-for-byte identical JSON in both offline and REPLAY modes
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let runnerClockA = ScholarCLIRunner(
+            registryClock: ClosureRegistryClock(now: { 0 }, currentDate: { dateFeb }, sleep: { _ in }),
+            environment: env
+        )
+        let runnerClockB = ScholarCLIRunner(
+            registryClock: ClosureRegistryClock(now: { 0 }, currentDate: { dateNov }, sleep: { _ in }),
+            environment: env
+        )
+
+        let offA = await runnerClockA.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        let offB = await runnerClockB.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(offA.stdout == offB.stdout, "Offline JSON must be clock-independent and byte-identical")
+        #expect(!offA.stdout.contains("2026-02-01"))
+        #expect(!offA.stdout.contains("2026-11-17"))
+
+        let repA = await runnerClockA.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        let repB = await runnerClockB.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(repA.stdout == repB.stdout, "Replay JSON must be clock-independent and byte-identical")
+        let rawRepJSON = try JSONSerialization.jsonObject(with: Data(repA.stdout.utf8))
+        let repObj = try #require(rawRepJSON as? [String: Any])
+        #expect(repObj["mode"] as? String == "REPLAY")
+        #expect(repObj["complete"] as? Bool == true)
+        let counts = try #require(repObj["counts"] as? [String: Any])
+        let byCode = try #require(counts["byCode"] as? [String: Int])
+        let bySeverity = try #require(counts["bySeverity"] as? [String: Int])
+        let verdicts = try #require(counts["verdicts"] as? [String: Int])
+        #expect(byCode["SYM004"] == 2)
+        #expect(byCode["LINT_LABEL_BEFORE_CAPTION"] == 1)
+        #expect(bySeverity["ERROR"] == 2)
+        #expect(bySeverity["WARNING"] == 1)
+        #expect(verdicts["VERIFIED"] == 1)
+        #expect(verdicts["UNVERIFIED"] == 0)
+    }
+
+    @Test("M2 Stage 07 item 4 (S62, item 6): diagnostics bilingual text output lists sorted structure/lint diagnostics first, then 1-line citation summary, then per-key non-VERIFIED entries")
+    func m2Stage07Item4DiagnosticsBilingualStructuredTextOutput() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item4")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let mainTex = tempDir.appendingPathComponent("main.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\begin{figure}\\label{fig:early}\\caption{Cap}\\end{figure}
+        See~\\ref{fig:early} and broken~\\ref{missing_lbl}.
+        First cites~\\cite{real_lecun, wrongyear5, real_nodoi}.
+        Second cites~\\cite{real_lecun} and~\\cite{wrongyear5} and~\\cite{real_nodoi}.
+        \\end{document}
+        """.write(to: mainTex, atomically: true, encoding: .utf8)
+
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let runner = ScholarCLIRunner(registryClock: .immediate, environment: env)
+
+        // 1. Offline Chinese text output
+        let offZH = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--offline", "--lang", "zh"]
+        )
+        #expect(offZH.exitCode == 1) // SYM004 structure ERROR
+        let zhLines = offZH.stdout.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let expectedZHSummary = "引用核查：3 个键，VERIFIED 0，DRIFT 0，NOT_FOUND 0，RETRACTED 0，UNVERIFIED 3（原因：offline 3）；结果不完整"
+        let zhSummaryIdx = try #require(
+            zhLines.firstIndex(of: expectedZHSummary),
+            "ZH text output must contain exact summary line '\(expectedZHSummary)', got:\n\(offZH.stdout)"
+        )
+        let zhCaptionIdx = try #require(zhLines.firstIndex { $0.contains("LINT_LABEL_BEFORE_CAPTION") })
+        let zhSym004Idx = try #require(zhLines.firstIndex { $0.contains("SYM004") })
+        #expect(zhCaptionIdx < zhSym004Idx, "main.tex:3 LINT_LABEL_BEFORE_CAPTION must precede main.tex:4 SYM004")
+        #expect(zhSym004Idx < zhSummaryIdx, "Structure/lint diagnostics must appear before the citation summary line")
+        let zhAfterSummary = Array(zhLines[(zhSummaryIdx + 1)...]).filter { !$0.isEmpty }
+        #expect(zhAfterSummary.count == 3, "Expected 3 non-VERIFIED citation lines after summary, got \(zhAfterSummary)")
+        for ln in zhAfterSummary {
+            #expect(ln.contains("[WARNING]"))
+            #expect(ln.contains("ERR_UNVERIFIED_CITATION"))
+            #expect(ln.contains("offline"))
+        }
+
+        // 2. Offline English text output (0 CJK characters)
+        let offEN = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--offline", "--lang", "en"]
+        )
+        let enLines = offEN.stdout.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let expectedENSummary = "Citation verification: 3 keys, VERIFIED 0, DRIFT 0, NOT_FOUND 0, RETRACTED 0, UNVERIFIED 3 (reasons: offline 3); results incomplete"
+        let enSummaryIdx = try #require(
+            enLines.firstIndex(of: expectedENSummary),
+            "EN text output must contain exact summary line '\(expectedENSummary)', got:\n\(offEN.stdout)"
+        )
+        let enCaptionIdx = try #require(enLines.firstIndex { $0.contains("LINT_LABEL_BEFORE_CAPTION") })
+        let enSym004Idx = try #require(enLines.firstIndex { $0.contains("SYM004") })
+        #expect(enCaptionIdx < enSym004Idx)
+        #expect(enSym004Idx < enSummaryIdx)
+        let hasCJKInEN = offEN.stdout.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+        #expect(!hasCJKInEN, "English text output must not leak CJK characters: \(offEN.stdout)")
+
+        // 3. Replay text output: VERIFIED key (real_lecun) omitted from trailing list; DRIFT (ERROR) & UNVERIFIED (WARNING) listed once each
+        let repZH = await runner.runWithExitStatus(
+            arguments: ["diagnostics", mainTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--lang", "zh"]
+        )
+        let repZHLines = repZH.stdout.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let expectedRepZHSummary = "引用核查：3 个键，VERIFIED 1，DRIFT 1，NOT_FOUND 0，RETRACTED 0，UNVERIFIED 1（原因：no_match_in_search 1）；结果不完整"
+        let repZHSummaryIdx = try #require(
+            repZHLines.firstIndex(of: expectedRepZHSummary),
+            "ZH replay output missing expected summary, got:\n\(repZH.stdout)"
+        )
+        let repZHAfter = Array(repZHLines[(repZHSummaryIdx + 1)...]).filter { !$0.isEmpty }
+        #expect(repZHAfter.count == 2, "Only the 2 non-VERIFIED keys (real_nodoi, wrongyear5) must follow the summary, got \(repZHAfter)")
+        #expect(!repZHAfter.contains { $0.contains("real_lecun") }, "VERIFIED key real_lecun must not be listed after summary")
+        #expect(repZHAfter.contains { $0.contains("[WARNING]") && $0.contains("real_nodoi") && $0.contains("no_match_in_search") })
+        #expect(repZHAfter.contains { $0.contains("[ERROR]") && $0.contains("wrongyear5") && $0.contains("DRIFT") })
+    }
+
+    @Test("M2 Stage 07 item 5 (item 7, Settled #4, Row 15): MCP scholar_lsp_diagnostics supports path parameter returning byte-for-byte identical JSON to CLI --json while preserving inline source")
+    func m2Stage07Item5MCPLspDiagnosticsPathByteIdenticalToCLIAndInlineSourcePreserved() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item5")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // 1. Tool schema advertises `path`
+        let diagToolDef = try #require(
+            ScholarMCPServer.toolDefinitions.first { ($0["name"] as? String) == "scholar_lsp_diagnostics" }
+        )
+        let schemaProps = try #require((diagToolDef["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])
+        #expect(schemaProps["path"] != nil, "scholar_lsp_diagnostics inputSchema.properties must advertise 'path'")
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let runner = ScholarCLIRunner(registryClock: .immediate, environment: env)
+
+        let multiMain = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/include-multi/main.tex").path
+        let thebibMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2506.06594v1/src/From_Adaptive_Control_Evolving_Control.tex").path
+        let bblMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2405.13682v5/src/main.tex").path
+        let dupLabelMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2503.18124v1/src/main.tex").path
+
+        // 2. Offline MCP `scholar_lsp_diagnostics` with `path` matches CLI `diagnostics <path> --offline --json` byte-for-byte
+        for targetPath in [multiMain, thebibMain, bblMain, dupLabelMain] {
+            let cliRes = await runner.runWithExitStatus(
+                arguments: ["diagnostics", targetPath, "--offline", "--json"]
+            )
+            let rpcReqData = try JSONSerialization.data(withJSONObject: [
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": [
+                    "name": "scholar_lsp_diagnostics",
+                    "arguments": ["path": targetPath]
+                ]
+            ] as [String: Any])
+            let rpcReqLine = String(decoding: rpcReqData, as: UTF8.self)
+            let mcpRunner = ScholarCLIRunner(
+                registryClock: .immediate,
+                environment: env,
+                mcpInputLines: [rpcReqLine]
+            )
+            let mcpRes = await mcpRunner.runWithExitStatus(
+                arguments: ["mcp", "--offline"]
+            )
+            #expect(mcpRes.exitCode == 0)
+            let rawEnvelope = try JSONSerialization.jsonObject(with: Data(mcpRes.stdout.utf8))
+            let envelope = try #require(rawEnvelope as? [String: Any])
+            let resultObj = try #require(envelope["result"] as? [String: Any])
+            #expect(resultObj["isError"] as? Bool == false, "Valid manuscript path must return isError=false: \(resultObj)")
+            let mcpText = try #require(((resultObj["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            #expect(
+                Data(mcpText.utf8) == Data(cliRes.stdout.utf8),
+                "MCP scholar_lsp_diagnostics(path:) must match CLI --json byte-for-byte for \(targetPath)"
+            )
+        }
+
+        // 3. Replay mode with explicit bibPath also matches CLI --json byte-for-byte
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let replayTex = tempDir.appendingPathComponent("replay_mcp.tex")
+        try "\\documentclass{article}\\begin{document}Cite~\\cite{real_lecun, fake_nonsentinel}.\\end{document}\n"
+            .write(to: replayTex, atomically: true, encoding: .utf8)
+
+        let cliReplay = await runner.runWithExitStatus(
+            arguments: ["diagnostics", replayTex.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--json"]
+        )
+        let replaySnapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let mcpReplayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: replaySnapshot,
+            registryClock: .immediate,
+            environment: env
+        )
+        let mcpReplayTool = await mcpReplayServer.executeToolCallAsync(
+            name: "scholar_lsp_diagnostics",
+            arguments: ["path": replayTex.path, "bibPath": recheckBibURL.path]
+        )
+        #expect(mcpReplayTool["isError"] as? Bool == false)
+        let mcpReplayText = try #require(((mcpReplayTool["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(Data(mcpReplayText.utf8) == Data(cliReplay.stdout.utf8))
+
+        // 4. Missing path returns isError=true; legacy inline `source` usage still works
+        let mcpOfflineServer = ScholarMCPServer(isOffline: true, registryClock: .immediate, environment: env)
+        let missingRes = await mcpOfflineServer.executeToolCallAsync(
+            name: "scholar_lsp_diagnostics",
+            arguments: ["path": tempDir.appendingPathComponent("does_not_exist.tex").path]
+        )
+        #expect(missingRes["isError"] as? Bool == true)
+
+        let inlineRes = await mcpOfflineServer.executeToolCallAsync(
+            name: "scholar_lsp_diagnostics",
+            arguments: ["source": "\\section{Test}\\label{s}Ref~\\ref{s}.\n"]
+        )
+        #expect(inlineRes["isError"] as? Bool == false)
+        let inlineText = try #require(((inlineRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let rawInlineArr = try JSONSerialization.jsonObject(with: Data(inlineText.utf8))
+        let inlineArr = try #require(rawInlineArr as? [[String: Any]])
+        #expect(inlineArr.isEmpty)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
