@@ -165,6 +165,22 @@ PY
         echo "FAIL: every 'ScholarOS verify-citations' command in README must pass --offline or --registry-replay so replay never touches the network"
         exit 1
     fi
+    if grep -E 'ScholarOS[[:space:]]+diagnostics[[:space:]]' "$WORK/README.md.commands.txt" | grep -v -E -- '(--offline|--registry-replay|--no-verify)'; then
+        echo "FAIL: every 'ScholarOS diagnostics' command in README must pass --offline, --registry-replay, or --no-verify so replay never touches the network"
+        exit 1
+    fi
+    if ! grep -q -E 'ScholarOS[[:space:]]+diagnostics[[:space:]].*--offline' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS diagnostics ... --offline' example"
+        exit 1
+    fi
+    if ! grep -q -E 'ScholarOS[[:space:]]+diagnostics[[:space:]].*--no-verify' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS diagnostics ... --no-verify' example"
+        exit 1
+    fi
+    if ! grep -q -F 'Scripts/test.sh milestone 2' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include 'Scripts/test.sh milestone 2'"
+        exit 1
+    fi
     if ! grep -q -F 'Scripts/test.sh milestone 1' "$WORK/README.md.commands.txt"; then
         echo "FAIL: README bash blocks must include 'Scripts/test.sh milestone 1'"
         exit 1
@@ -214,6 +230,26 @@ PY
         fi
         if ! grep -q -F 'Hard gate (non-insertable VERIFIED == 0): count=0 passed=True' "$WORK/$README_FILE.replay.out"; then
             echo "FAIL: replaying $README_FILE did not confirm hard gate count=0 passed=True"
+            exit 1
+        fi
+        if ! grep -q -F 'Citation verification: 1 key, VERIFIED 1, DRIFT 0, NOT_FOUND 0, RETRACTED 0, UNVERIFIED 0' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not emit expected English citation verification summary line from diagnostics --registry-replay"
+            exit 1
+        fi
+        if ! grep -q -F '引用核查：1 个键，VERIFIED 1，DRIFT 0，NOT_FOUND 0，RETRACTED 0，UNVERIFIED 0' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not emit expected Chinese citation verification summary line from diagnostics --registry-replay"
+            exit 1
+        fi
+        if ! grep -q -F 'Citation verification: 1 key, VERIFIED 0, DRIFT 0, NOT_FOUND 0, RETRACTED 0, UNVERIFIED 1 (reasons: offline 1); results incomplete' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not emit expected incomplete summary line from diagnostics --offline"
+            exit 1
+        fi
+        if ! grep -q -F 'expected_exit=3' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not capture expected_exit=3 from offline diagnostics/verify-citations"
+            exit 1
+        fi
+        if ! grep -q -F '引用核查：未核查引用（已指定 --no-verify，共 1 个引用键）' "$WORK/$README_FILE.replay.out"; then
+            echo "FAIL: replaying $README_FILE did not emit expected --no-verify notice from diagnostics --no-verify"
             exit 1
         fi
         echo ""
