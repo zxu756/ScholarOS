@@ -9,6 +9,7 @@ public struct BibTeXParseDiagnostic: Sendable, Codable, Hashable, Equatable {
         case warning
     }
 
+    public let code: String?
     public let line: Int
     public let column: Int
     public let severity: Severity
@@ -16,16 +17,32 @@ public struct BibTeXParseDiagnostic: Sendable, Codable, Hashable, Equatable {
     public let message: String
 
     public init(
+        code: String? = nil,
         line: Int,
         column: Int,
         severity: Severity,
         citeKey: String? = nil,
         message: String
     ) {
+        self.code = code
         self.line = line
         self.column = column
         self.severity = severity
         self.citeKey = citeKey
+        self.message = message
+    }
+}
+
+public struct BibTeXEntryParseError: Sendable, Codable, Hashable, Equatable {
+    public let key: String?
+    public let startLine: Int
+    public let line: Int
+    public let message: String
+
+    public init(key: String?, startLine: Int, line: Int, message: String) {
+        self.key = key
+        self.startLine = startLine
+        self.line = line
         self.message = message
     }
 }
@@ -37,6 +54,7 @@ public struct BibTeXDocument: Sendable, Codable, Hashable {
     public var entries: [BibliographyEntry]
     public var unmappedFieldsByCiteKey: [String: [String: String]]
     public var diagnostics: [BibTeXParseDiagnostic]
+    public var errors: [BibTeXEntryParseError]
 
     public init(
         preambles: [String] = [],
@@ -44,7 +62,8 @@ public struct BibTeXDocument: Sendable, Codable, Hashable {
         comments: [String] = [],
         entries: [BibliographyEntry] = [],
         unmappedFieldsByCiteKey: [String: [String: String]] = [:],
-        diagnostics: [BibTeXParseDiagnostic] = []
+        diagnostics: [BibTeXParseDiagnostic] = [],
+        errors: [BibTeXEntryParseError] = []
     ) {
         self.preambles = preambles
         self.macros = macros
@@ -52,6 +71,7 @@ public struct BibTeXDocument: Sendable, Codable, Hashable {
         self.entries = entries
         self.unmappedFieldsByCiteKey = unmappedFieldsByCiteKey
         self.diagnostics = diagnostics
+        self.errors = errors
     }
 }
 
@@ -1047,11 +1067,47 @@ public struct BibTeXCodec: Sendable {
 
     // MARK: - Public Parse & Serialize Entrypoints
 
+    private static let standardAuxiliaryBibFieldNames: Set<String> = [
+        "address", "location", "edition", "chapter", "series", "type", "note", "annote",
+        "key", "crossref", "isbn", "issn", "keywords", "language", "langid", "primaryclass",
+        "urldate", "timestamp", "biburl", "bibsource", "copyright", "lccn", "mrnumber",
+        "coden", "numpages", "subtitle", "booksubtitle", "journalsubtitle", "abstractnote"
+    ]
+
     public func parse(_ source: String) throws -> [BibliographyEntry] {
         try parseDocument(source).entries
     }
 
     public func parseDocument(_ source: String) throws -> BibTeXDocument {
+        let doc = parseDocumentRecovering(source)
+        let validEntryCount = doc.entries.filter { !$0.parseError }.count
+        if validEntryCount == 0 {
+            if let firstError = doc.errors.first {
+                throw ScholarOSError.bibliographyParseFailure(
+                    format: "BibTeX",
+                    line: firstError.line,
+                    detail: firstError.message
+                )
+            }
+            if doc.entries.isEmpty
+                && doc.preambles.isEmpty
+                && doc.macros.isEmpty
+                && Self.hasNonCommentContent(source)
+            {
+                throw ScholarOSError.bibliographyParseFailure(
+                    format: "BibTeX",
+                    line: 1,
+                    detail: "No valid BibTeX entries found."
+                )
+            }
+        }
+        return doc
+    }
+
+    /// Parses a BibTeX document with BibTeX 0.99d single-entry error recovery:
+    /// when a syntax error occurs inside an entry, records `(key, startLine, line, message)` in `errors`,
+    /// retains any already-parsed fields on that entry with `parseError = true`, and skips to the next `@`.
+    public func parseDocumentRecovering(_ source: String) -> BibTeXDocument {
         var scanner = BibTeXScanner(source: source)
         var macros = Self.defaultMacros
         for (k, v) in customMacros {
@@ -1063,6 +1119,8 @@ public struct BibTeXCodec: Sendable {
         var entries: [BibliographyEntry] = []
         var unmappedByKey: [String: [String: String]] = [:]
         var diagnostics: [BibTeXParseDiagnostic] = []
+        var errors: [BibTeXEntryParseError] = []
+        var reportedUnknownFieldNames: Set<String> = []
 
         while !scanner.isAtEnd {
             scanner.skipInterEntryTrivia(commentsSink: &comments)
@@ -1074,210 +1132,271 @@ public struct BibTeXCodec: Sendable {
                 continue
             }
 
-            scanner.skipWhitespaceAndLineComments()
-            let rawTypeName = scanner.readIdentifier()
-            guard !rawTypeName.isEmpty else {
-                throw ScholarOSError.bibliographyParseFailure(
-                    format: "BibTeX",
-                    line: entryLine,
-                    detail: "Expected entry type identifier after '@'."
-                )
-            }
+            var currentCiteKey: String? = nil
+            var currentLowerType: String = "misc"
+            var currentRawFields: [String: String] = [:]
 
-            let lowerType = rawTypeName.lowercased()
-            scanner.skipWhitespaceAndLineComments()
-
-            // `@comment` without braces (line comment form) or with `{...}` / `(...)`
-            if lowerType == "comment" {
-                if scanner.peek() == "{" || scanner.peek() == "(" {
-                    let closeChar: Character = (scanner.peek() == "{") ? "}" : ")"
-                    scanner.advance()
-                    let commentBody = try scanner.readBalancedRawBody(closingDelimiter: closeChar, startLine: entryLine)
-                    comments.append(commentBody.trimmingCharacters(in: .whitespacesAndNewlines))
-                } else {
-                    comments.append(scanner.readRestOfLine().trimmingCharacters(in: .whitespacesAndNewlines))
-                }
-                continue
-            }
-
-            guard let openDelim = scanner.peek(), (openDelim == "{" || openDelim == "(") else {
-                throw ScholarOSError.bibliographyParseFailure(
-                    format: "BibTeX",
-                    line: scanner.line,
-                    detail: "Expected '{' or '(' to open @\(rawTypeName) entry."
-                )
-            }
-            let closeDelim: Character = (openDelim == "{") ? "}" : ")"
-            scanner.advance()
-            scanner.skipWhitespaceAndLineComments()
-
-            // `@preamble{ ... }`
-            if lowerType == "preamble" {
-                let value = try parseValueExpression(
-                    scanner: &scanner,
-                    macros: macros,
-                    closingEntryDelimiter: closeDelim,
-                    diagnostics: &diagnostics,
-                    citeKeyContext: nil
-                )
+            do {
                 scanner.skipWhitespaceAndLineComments()
-                _ = scanner.consumeIf(",")
-                scanner.skipWhitespaceAndLineComments()
-                guard scanner.consumeIf(closeDelim) else {
+                let rawTypeName = scanner.readIdentifier()
+                guard !rawTypeName.isEmpty else {
                     throw ScholarOSError.bibliographyParseFailure(
                         format: "BibTeX",
                         line: scanner.line,
-                        detail: "Unclosed @preamble block starting at line \(entryLine)."
+                        detail: "Expected entry type identifier after '@'."
                     )
                 }
-                preambles.append(value)
-                continue
-            }
 
-            // `@string{ key = value }`
-            if lowerType == "string" {
-                let macroName = scanner.readFieldOrMacroName()
-                guard !macroName.isEmpty else {
+                let lowerType = rawTypeName.lowercased()
+                currentLowerType = lowerType
+                scanner.skipWhitespaceAndLineComments()
+
+                // `@comment` without braces (line comment form) or with `{...}` / `(...)`
+                if lowerType == "comment" {
+                    if scanner.peek() == "{" || scanner.peek() == "(" {
+                        let closeChar: Character = (scanner.peek() == "{") ? "}" : ")"
+                        scanner.advance()
+                        let commentBody = try scanner.readBalancedRawBody(closingDelimiter: closeChar, startLine: entryLine)
+                        comments.append(commentBody.trimmingCharacters(in: .whitespacesAndNewlines))
+                    } else {
+                        comments.append(scanner.readRestOfLine().trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
+                    continue
+                }
+
+                guard let openDelim = scanner.peek(), (openDelim == "{" || openDelim == "(") else {
                     throw ScholarOSError.bibliographyParseFailure(
                         format: "BibTeX",
                         line: scanner.line,
-                        detail: "Expected macro identifier inside @string definition."
+                        detail: "Expected '{' or '(' to open @\(rawTypeName) entry."
                     )
                 }
+                let closeDelim: Character = (openDelim == "{") ? "}" : ")"
+                scanner.advance()
                 scanner.skipWhitespaceAndLineComments()
-                guard scanner.consumeIf("=") else {
-                    throw ScholarOSError.bibliographyParseFailure(
-                        format: "BibTeX",
-                        line: scanner.line,
-                        detail: "Expected '=' in @string{\(macroName) = ...}."
+
+                // `@preamble{ ... }`
+                if lowerType == "preamble" {
+                    let value = try parseValueExpression(
+                        scanner: &scanner,
+                        macros: macros,
+                        closingEntryDelimiter: closeDelim,
+                        diagnostics: &diagnostics,
+                        citeKeyContext: nil
                     )
-                }
-                scanner.skipWhitespaceAndLineComments()
-                let macroValue = try parseValueExpression(
-                    scanner: &scanner,
-                    macros: macros,
-                    closingEntryDelimiter: closeDelim,
-                    diagnostics: &diagnostics,
-                    citeKeyContext: nil
-                )
-                scanner.skipWhitespaceAndLineComments()
-                _ = scanner.consumeIf(",")
-                scanner.skipWhitespaceAndLineComments()
-                guard scanner.consumeIf(closeDelim) else {
-                    throw ScholarOSError.bibliographyParseFailure(
-                        format: "BibTeX",
-                        line: scanner.line,
-                        detail: "Unclosed @string{\(macroName)} starting at line \(entryLine)."
-                    )
-                }
-                let lowerKey = macroName.lowercased()
-                macros[lowerKey] = macroValue
-                userMacros[lowerKey] = macroValue
-                continue
-            }
-
-            // Standard bibliographic entry `@article{citeKey, field = val, ...}`
-            let keyLine = scanner.line
-            let citeKey = scanner.readCitationKey(closingDelimiter: closeDelim)
-            guard !citeKey.isEmpty else {
-                throw ScholarOSError.bibliographyParseFailure(
-                    format: "BibTeX",
-                    line: keyLine,
-                    detail: "Missing citation key in @\(rawTypeName) entry."
-                )
-            }
-
-            scanner.skipWhitespaceAndLineComments()
-            var rawFields: [String: String] = [:]
-            var fieldOrder: [String] = []
-
-            if scanner.consumeIf(closeDelim) {
-                // Empty entry body `@misc{key}`
-            } else {
-                guard scanner.consumeIf(",") else {
-                    throw ScholarOSError.bibliographyParseFailure(
-                        format: "BibTeX",
-                        line: scanner.line,
-                        detail: "Expected ',' after citation key '\(citeKey)' in @\(rawTypeName)."
-                    )
-                }
-
-                while true {
                     scanner.skipWhitespaceAndLineComments()
-                    if scanner.isAtEnd {
+                    _ = scanner.consumeIf(",")
+                    scanner.skipWhitespaceAndLineComments()
+                    guard scanner.consumeIf(closeDelim) else {
                         throw ScholarOSError.bibliographyParseFailure(
                             format: "BibTeX",
-                            line: entryLine,
-                            detail: "Unexpected end of file inside @\(rawTypeName){\(citeKey), ...}."
+                            line: scanner.line,
+                            detail: "Unclosed @preamble block starting at line \(entryLine)."
                         )
                     }
-                    if scanner.consumeIf(closeDelim) {
-                        break
-                    }
-                    // Allow redundant commas
-                    if scanner.consumeIf(",") {
-                        continue
-                    }
+                    preambles.append(value)
+                    continue
+                }
 
-                    let fieldLine = scanner.line
-                    let fieldName = scanner.readFieldOrMacroName()
-                    guard !fieldName.isEmpty else {
+                // `@string{ key = value }`
+                if lowerType == "string" {
+                    let macroName = scanner.readMacroName()
+                    guard !macroName.isEmpty else {
                         throw ScholarOSError.bibliographyParseFailure(
                             format: "BibTeX",
-                            line: fieldLine,
-                            detail: "Expected field name or '\(closeDelim)' inside @\(rawTypeName){\(citeKey)}."
+                            line: scanner.line,
+                            detail: "Expected macro identifier inside @string definition."
                         )
                     }
-
                     scanner.skipWhitespaceAndLineComments()
                     guard scanner.consumeIf("=") else {
                         throw ScholarOSError.bibliographyParseFailure(
                             format: "BibTeX",
                             line: scanner.line,
-                            detail: "Expected '=' after field '\(fieldName)' in @\(rawTypeName){\(citeKey)}."
+                            detail: "Expected '=' in @string{\(macroName) = ...}."
                         )
                     }
-
                     scanner.skipWhitespaceAndLineComments()
-                    let fieldValue = try parseValueExpression(
+                    let macroValue = try parseValueExpression(
                         scanner: &scanner,
                         macros: macros,
                         closingEntryDelimiter: closeDelim,
                         diagnostics: &diagnostics,
-                        citeKeyContext: citeKey
+                        citeKeyContext: nil
                     )
-
-                    let normalizedField = fieldName.lowercased()
-                    if rawFields[normalizedField] == nil {
-                        fieldOrder.append(normalizedField)
-                    }
-                    rawFields[normalizedField] = fieldValue
-
                     scanner.skipWhitespaceAndLineComments()
-                    if scanner.consumeIf(",") {
-                        continue
-                    } else if scanner.consumeIf(closeDelim) {
-                        break
-                    } else {
+                    _ = scanner.consumeIf(",")
+                    scanner.skipWhitespaceAndLineComments()
+                    guard scanner.consumeIf(closeDelim) else {
                         throw ScholarOSError.bibliographyParseFailure(
                             format: "BibTeX",
                             line: scanner.line,
-                            detail: "Expected ',' or '\(closeDelim)' after field '\(fieldName)' in @\(rawTypeName){\(citeKey)}."
+                            detail: "Unclosed @string{\(macroName)} starting at line \(entryLine)."
                         )
                     }
+                    let lowerKey = macroName.lowercased()
+                    macros[lowerKey] = macroValue
+                    userMacros[lowerKey] = macroValue
+                    continue
                 }
-            }
 
-            let (entry, unmapped) = buildBibliographyEntry(
-                citeKey: citeKey,
-                rawEntryType: lowerType,
-                rawFields: rawFields,
-                line: entryLine,
-                diagnostics: &diagnostics
-            )
-            entries.append(entry)
-            if !unmapped.isEmpty {
-                unmappedByKey[citeKey] = unmapped
+                // Standard bibliographic entry `@article{citeKey, field = val, ...}`
+                let keyLine = scanner.line
+                let citeKey = scanner.readCitationKey(closingDelimiter: closeDelim)
+                guard !citeKey.isEmpty else {
+                    throw ScholarOSError.bibliographyParseFailure(
+                        format: "BibTeX",
+                        line: keyLine,
+                        detail: "Missing citation key in @\(rawTypeName) entry."
+                    )
+                }
+                currentCiteKey = citeKey
+
+                scanner.skipWhitespaceAndLineComments()
+                var fieldOrder: [String] = []
+
+                if scanner.consumeIf(closeDelim) {
+                    // Empty entry body `@misc{key}`
+                } else {
+                    guard scanner.consumeIf(",") else {
+                        throw ScholarOSError.bibliographyParseFailure(
+                            format: "BibTeX",
+                            line: scanner.line,
+                            detail: "Expected ',' after citation key '\(citeKey)' in @\(rawTypeName)."
+                        )
+                    }
+
+                    while true {
+                        scanner.skipWhitespaceAndLineComments()
+                        if scanner.isAtEnd {
+                            throw ScholarOSError.bibliographyParseFailure(
+                                format: "BibTeX",
+                                line: scanner.line,
+                                detail: "Unexpected end of file inside @\(rawTypeName){\(citeKey), ...}."
+                            )
+                        }
+                        if scanner.consumeIf(closeDelim) {
+                            break
+                        }
+                        // Allow redundant commas
+                        if scanner.consumeIf(",") {
+                            continue
+                        }
+
+                        let fieldLine = scanner.line
+                        let fieldName = scanner.readFieldOrMacroName()
+                        guard !fieldName.isEmpty else {
+                            throw ScholarOSError.bibliographyParseFailure(
+                                format: "BibTeX",
+                                line: fieldLine,
+                                detail: "Expected field name or '\(closeDelim)' inside @\(rawTypeName){\(citeKey)}."
+                            )
+                        }
+
+                        scanner.skipWhitespaceAndLineComments()
+                        guard scanner.consumeIf("=") else {
+                            throw ScholarOSError.bibliographyParseFailure(
+                                format: "BibTeX",
+                                line: scanner.line,
+                                detail: "Expected '=' after field '\(fieldName)' in @\(rawTypeName){\(citeKey)}."
+                            )
+                        }
+
+                        scanner.skipWhitespaceAndLineComments()
+                        let fieldValue = try parseValueExpression(
+                            scanner: &scanner,
+                            macros: macros,
+                            closingEntryDelimiter: closeDelim,
+                            diagnostics: &diagnostics,
+                            citeKeyContext: citeKey
+                        )
+
+                        let normalizedField = fieldName.lowercased()
+                        if currentRawFields[normalizedField] == nil {
+                            fieldOrder.append(normalizedField)
+                        }
+                        currentRawFields[normalizedField] = fieldValue
+
+                        scanner.skipWhitespaceAndLineComments()
+                        if scanner.consumeIf(",") {
+                            continue
+                        } else if scanner.consumeIf(closeDelim) {
+                            break
+                        } else {
+                            throw ScholarOSError.bibliographyParseFailure(
+                                format: "BibTeX",
+                                line: scanner.line,
+                                detail: "Expected ',' or '\(closeDelim)' after field '\(fieldName)' in @\(rawTypeName){\(citeKey)}."
+                            )
+                        }
+                    }
+                }
+
+                let (entry, unmapped) = buildBibliographyEntry(
+                    citeKey: citeKey,
+                    rawEntryType: lowerType,
+                    rawFields: currentRawFields,
+                    line: entryLine,
+                    diagnostics: &diagnostics
+                )
+                for unmappedKey in unmapped.keys.sorted()
+                where !Self.standardAuxiliaryBibFieldNames.contains(unmappedKey)
+                    && reportedUnknownFieldNames.insert(unmappedKey).inserted
+                {
+                    diagnostics.append(
+                        BibTeXParseDiagnostic(
+                            code: "BIB_UNKNOWN_FIELD",
+                            line: entryLine,
+                            column: 1,
+                            severity: .info,
+                            citeKey: citeKey,
+                            message: "Ignored unrecognized BibTeX field '\(unmappedKey)'."
+                        )
+                    )
+                }
+                entries.append(entry)
+                if !unmapped.isEmpty {
+                    unmappedByKey[citeKey] = unmapped
+                }
+            } catch let ScholarOSError.bibliographyParseFailure(_, errLine, detail) {
+                errors.append(
+                    BibTeXEntryParseError(
+                        key: currentCiteKey,
+                        startLine: entryLine,
+                        line: errLine,
+                        message: detail
+                    )
+                )
+                if let partialKey = currentCiteKey, !partialKey.isEmpty {
+                    var (partialEntry, partialUnmapped) = buildBibliographyEntry(
+                        citeKey: partialKey,
+                        rawEntryType: currentLowerType,
+                        rawFields: currentRawFields,
+                        line: entryLine,
+                        diagnostics: &diagnostics
+                    )
+                    partialEntry.parseError = true
+                    partialEntry.parseErrorInfo = BibEntryParseError(
+                        startLine: entryLine,
+                        line: errLine,
+                        message: detail
+                    )
+                    entries.append(partialEntry)
+                    if !partialUnmapped.isEmpty {
+                        unmappedByKey[partialKey] = partialUnmapped
+                    }
+                }
+                scanner.skipToNextAtSign()
+            } catch {
+                errors.append(
+                    BibTeXEntryParseError(
+                        key: currentCiteKey,
+                        startLine: entryLine,
+                        line: scanner.line,
+                        message: error.localizedDescription
+                    )
+                )
+                scanner.skipToNextAtSign()
             }
         }
 
@@ -1287,8 +1406,36 @@ public struct BibTeXCodec: Sendable {
             comments: comments,
             entries: entries,
             unmappedFieldsByCiteKey: unmappedByKey,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            errors: errors
         )
+    }
+
+    private static func hasNonCommentContent(_ source: String) -> Bool {
+        let normalizedSource = normalizeLineEndingsToLF(source)
+        for rawLine in normalizedSource.split(separator: "\n", omittingEmptySubsequences: false) {
+            let lineChars = Array(rawLine)
+            var idx = 0
+            var codeSlice = ""
+            while idx < lineChars.count {
+                let ch = lineChars[idx]
+                if ch == "\\" && idx + 1 < lineChars.count {
+                    codeSlice.append(ch)
+                    codeSlice.append(lineChars[idx + 1])
+                    idx += 2
+                    continue
+                }
+                if ch == "%" {
+                    break
+                }
+                codeSlice.append(ch)
+                idx += 1
+            }
+            if !codeSlice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return true
+            }
+        }
+        return false
     }
 
     public func serialize(_ entries: [BibliographyEntry]) -> String {
@@ -1508,7 +1655,7 @@ public struct BibTeXCodec: Sendable {
             } else if next.isNumber || (next == "-" && scanner.peekNext()?.isNumber == true) {
                 pieces.append(scanner.readNumericLiteral())
             } else {
-                let ident = scanner.readFieldOrMacroName()
+                let ident = scanner.readMacroName()
                 guard !ident.isEmpty else {
                     throw ScholarOSError.bibliographyParseFailure(
                         format: "BibTeX",
@@ -2052,6 +2199,39 @@ private struct BibTeXScanner {
         }
     }
 
+    private static let forbiddenIdentifierCharacters: Set<Character> = [
+        "\"", "#", "%", "'", "(", ")", ",", "=", "{", "}"
+    ]
+
+    /// BibTeX 0.99d `id_class` character rule: any printable non-whitespace character
+    /// outside `"#%'(),={}`.
+    static func isBibTeXIdentifierCharacter(_ ch: Character) -> Bool {
+        if ch.isWhitespace || forbiddenIdentifierCharacters.contains(ch) {
+            return false
+        }
+        for scalar in ch.unicodeScalars {
+            if scalar.value <= 0x20 || scalar.value == 0x7F {
+                return false
+            }
+        }
+        return true
+    }
+
+    mutating func skipToNextAtSign() {
+        while let ch = peek() {
+            if ch == "@" {
+                break
+            }
+            if ch == "%" {
+                while let c = peek(), c != "\n" {
+                    advance()
+                }
+                continue
+            }
+            advance()
+        }
+    }
+
     mutating func readRestOfLine() -> String {
         var out = ""
         while let ch = peek(), ch != "\n" {
@@ -2063,8 +2243,15 @@ private struct BibTeXScanner {
     }
 
     mutating func readIdentifier() -> String {
+        guard let first = peek(),
+              !first.isNumber,
+              first != "@",
+              Self.isBibTeXIdentifierCharacter(first)
+        else {
+            return ""
+        }
         var out = ""
-        while let ch = peek(), (ch.isLetter || ch.isNumber || ch == "_" || ch == "-" || ch == ":") {
+        while let ch = peek(), Self.isBibTeXIdentifierCharacter(ch) {
             out.append(ch)
             advance()
         }
@@ -2073,23 +2260,50 @@ private struct BibTeXScanner {
 
     mutating func readFieldOrMacroName() -> String {
         var out = ""
-        while let ch = peek() {
-            if ch.isLetter || ch.isNumber || ch == "_" || ch == "-" || ch == ":" || ch == "." || ch == "/" || ch == "+" {
-                out.append(ch)
-                advance()
-            } else {
-                break
-            }
+        while let ch = peek(), Self.isBibTeXIdentifierCharacter(ch) {
+            out.append(ch)
+            advance()
         }
         return out
     }
 
-    mutating func readCitationKey(closingDelimiter: Character) -> String {
+    mutating func readMacroName() -> String {
+        guard let first = peek(),
+              !first.isNumber,
+              Self.isBibTeXIdentifierCharacter(first)
+        else {
+            return ""
+        }
+        if first == "@" && lookaheadStartsNewEntryAtCurrentAtSign() {
+            return ""
+        }
         var out = ""
-        while let ch = peek() {
-            if ch == "," || ch == closingDelimiter || ch == " " || ch == "\t" || ch == "\r" || ch == "\n" {
-                break
-            }
+        while let ch = peek(), Self.isBibTeXIdentifierCharacter(ch) {
+            out.append(ch)
+            advance()
+        }
+        return out
+    }
+
+    private func lookaheadStartsNewEntryAtCurrentAtSign() -> Bool {
+        var probe = index + 1
+        var sawName = false
+        while probe < chars.count && Self.isBibTeXIdentifierCharacter(chars[probe]) {
+            sawName = true
+            probe += 1
+        }
+        guard sawName else { return false }
+        while probe < chars.count && (chars[probe] == " " || chars[probe] == "\t" || chars[probe] == "\r" || chars[probe] == "\n") {
+            probe += 1
+        }
+        guard probe < chars.count else { return false }
+        return chars[probe] == "{" || chars[probe] == "("
+    }
+
+    mutating func readCitationKey(closingDelimiter: Character) -> String {
+        _ = closingDelimiter
+        var out = ""
+        while let ch = peek(), Self.isBibTeXIdentifierCharacter(ch) {
             out.append(ch)
             advance()
         }
@@ -2155,7 +2369,7 @@ private struct BibTeXScanner {
 
         throw ScholarOSError.bibliographyParseFailure(
             format: "BibTeX",
-            line: startLine,
+            line: line,
             detail: "Unclosed BibTeX braced block; expected '\(closingDelimiter)' for block opened at line \(startLine)."
         )
     }
@@ -2170,7 +2384,7 @@ private struct BibTeXScanner {
                 guard let escaped = peek() else {
                     throw ScholarOSError.bibliographyParseFailure(
                         format: "BibTeX",
-                        line: startLine,
+                        line: line,
                         detail: "Trailing backslash inside quoted BibTeX string opened at line \(startLine)."
                     )
                 }
@@ -2217,7 +2431,7 @@ private struct BibTeXScanner {
 
         throw ScholarOSError.bibliographyParseFailure(
             format: "BibTeX",
-            line: startLine,
+            line: line,
             detail: "Unclosed quoted BibTeX value opened at line \(startLine)."
         )
     }

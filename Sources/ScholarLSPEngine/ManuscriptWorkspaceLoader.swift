@@ -113,24 +113,57 @@ public struct ManuscriptWorkspaceLoader: Sendable {
         var fallbackBBLFiles: [String: String] = [:]
         var explicitDecodedByPath: [String: DecodedTextFile] = [:]
 
+        func appendBibDocument(
+            _ bibDoc: BibTeXDocument,
+            displayPath: String
+        ) {
+            entries.append(contentsOf: bibDoc.entries)
+            let parseErrs = bibDoc.errors.map { err in
+                DiagnosticsBibliographyParseError(
+                    key: err.key,
+                    startLine: err.startLine,
+                    line: err.line,
+                    message: err.message
+                )
+            }
+            bibSources.append(
+                DiagnosticsBibliographySource(
+                    kind: "bib",
+                    path: displayPath,
+                    entries: Set(bibDoc.entries.map(\.citeKey)).count,
+                    errors: parseErrs
+                )
+            )
+            for entry in bibDoc.entries where entrySourceByKey[entry.citeKey] == nil {
+                entrySourceByKey[entry.citeKey] = displayPath
+            }
+            for err in bibDoc.errors {
+                let errLine = max(1, err.line)
+                let keyClause = err.key.map { "entry '\($0)' " } ?? ""
+                loaderDiagnostics.append(
+                    LSPDiagnostic(
+                        code: "BIB001",
+                        category: .structure,
+                        severity: .error,
+                        message: "BibTeX parse error in \(keyClause)(started at line \(err.startLine), error at line \(err.line)): \(err.message)",
+                        span: TextSpan(
+                            filePath: displayPath,
+                            start: TextPosition(line: errLine, column: 1),
+                            end: TextPosition(line: errLine, column: 1)
+                        )
+                    )
+                )
+            }
+        }
+
         if let explicitBibPath {
             let decodedBib = try ScholarTextFileReader.readRegularFile(atPath: explicitBibPath)
             let displayPath = Self.displayRelativePath(explicitBibPath, baseDirURL: baseDirURL)
             explicitDecodedByPath[displayPath] = decodedBib
 
-            let parsed = try bibCodec.parse(decodedBib.text)
+            let bibDoc = try bibCodec.parseDocument(decodedBib.text)
             rawBibFiles[displayPath] = decodedBib.text
-            entries = parsed
-            bibSources.append(
-                DiagnosticsBibliographySource(
-                    kind: "bib",
-                    path: displayPath,
-                    entries: Set(parsed.map(\.citeKey)).count
-                )
-            )
-            for entry in parsed where entrySourceByKey[entry.citeKey] == nil {
-                entrySourceByKey[entry.citeKey] = displayPath
-            }
+            appendBibDocument(bibDoc, displayPath: displayPath)
         } else {
             let rootStem = (rootRelPath as NSString).deletingPathExtension
             let mainBblRelPath = (rootStem.isEmpty ? rootRelPath : rootStem) + ".bbl"
@@ -149,45 +182,8 @@ public struct ManuscriptWorkspaceLoader: Sendable {
                         continue
                     }
                     rawBibFiles[targetBibPath] = decodedBib.text
-
-                    do {
-                        let parsed = try bibCodec.parse(decodedBib.text)
-                        entries.append(contentsOf: parsed)
-                        bibSources.append(
-                            DiagnosticsBibliographySource(
-                                kind: "bib",
-                                path: targetBibPath,
-                                entries: Set(parsed.map(\.citeKey)).count
-                            )
-                        )
-                        for entry in parsed where entrySourceByKey[entry.citeKey] == nil {
-                            entrySourceByKey[entry.citeKey] = targetBibPath
-                        }
-                    } catch let ScholarOSError.bibliographyParseFailure(_, errLine, detail) {
-                        bibSources.append(
-                            DiagnosticsBibliographySource(
-                                kind: "bib",
-                                path: targetBibPath,
-                                entries: 0,
-                                errors: [
-                                    DiagnosticsBibliographyParseError(
-                                        key: nil,
-                                        startLine: errLine,
-                                        line: errLine,
-                                        message: detail
-                                    )
-                                ]
-                            )
-                        )
-                    } catch {
-                        bibSources.append(
-                            DiagnosticsBibliographySource(
-                                kind: "bib",
-                                path: targetBibPath,
-                                entries: 0
-                            )
-                        )
-                    }
+                    let bibDoc = bibCodec.parseDocumentRecovering(decodedBib.text)
+                    appendBibDocument(bibDoc, displayPath: targetBibPath)
                 } else if mainBblExists {
                     satisfiedMissingBibPaths.insert(targetBibPath)
                     if !loadedMainBblFallback {

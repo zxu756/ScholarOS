@@ -81,6 +81,18 @@ public enum StoredFirewallVerdictFreshness: Sendable, Equatable {
     case missingProvenance
 }
 
+public struct BibEntryParseError: Sendable, Codable, Hashable, Equatable {
+    public let startLine: Int
+    public let line: Int
+    public let message: String
+
+    public init(startLine: Int, line: Int, message: String) {
+        self.startLine = startLine
+        self.line = line
+        self.message = message
+    }
+}
+
 public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
     public static let validVerdictTTLSeconds: TimeInterval = 30 * 86_400
     public static let notFoundVerdictTTLSeconds: TimeInterval = 86_400
@@ -90,6 +102,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
     public var kind: BibEntryKind
     public var title: String
     public var authors: [BibAuthor]
+    public var authorsTruncated: Bool
     public var year: Int?
     public var venue: String
     public var publisher: String?
@@ -101,6 +114,9 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
     public var pmid: String?
     public var url: String?
     public var abstractText: String?
+    public var crossref: String?
+    public var parseError: Bool
+    public var parseErrorInfo: BibEntryParseError?
     public var firewallClass: CitationFirewallClass
     public var firewallAuditNote: String
     public var firewallVerifiedSource: String?
@@ -117,6 +133,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         kind: BibEntryKind = .article,
         title: String,
         authors: [BibAuthor],
+        authorsTruncated: Bool = false,
         year: Int? = nil,
         venue: String = "",
         publisher: String? = nil,
@@ -128,6 +145,9 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         pmid: String? = nil,
         url: String? = nil,
         abstractText: String? = nil,
+        crossref: String? = nil,
+        parseError: Bool = false,
+        parseErrorInfo: BibEntryParseError? = nil,
         firewallClass: CitationFirewallClass = .unverified,
         firewallAuditNote: String = "",
         firewallVerifiedSource: String? = nil,
@@ -143,6 +163,7 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         self.kind = kind
         self.title = title
         self.authors = authors
+        self.authorsTruncated = authorsTruncated
         self.year = year
         self.venue = venue
         self.publisher = publisher
@@ -154,6 +175,9 @@ public struct BibliographyEntry: Sendable, Codable, Hashable, Identifiable {
         self.pmid = pmid
         self.url = url
         self.abstractText = abstractText
+        self.crossref = crossref
+        self.parseError = parseError
+        self.parseErrorInfo = parseErrorInfo
         self.firewallClass = firewallClass
         self.firewallAuditNote = firewallAuditNote
         self.firewallVerifiedSource = firewallVerifiedSource

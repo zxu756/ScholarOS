@@ -5253,6 +5253,150 @@ struct PluginSDKMCPAndShellTests {
             }
         }
     }
+
+    @Test("M2 Stage 05 item 1 (S9, S49): BibTeX single-entry error recovery on bib-recovery/ten.bib records e3 (startLine 15, line 22), preserves partial fields with parseError=true, recovers all 9 remaining entries, and emits BIB001 in diagnostics")
+    func m2Stage05Item1BibRecoveryTenBibSingleEntryErrorRecovery() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item1")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let recDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/bib-recovery", isDirectory: true)
+        let tenBibURL = recDir.appendingPathComponent("ten.bib")
+        let mainTexURL = recDir.appendingPathComponent("main.tex")
+        let tenRaw = try String(contentsOf: tenBibURL, encoding: .utf8)
+
+        let doc = try BibTeXCodec().parseDocument(tenRaw)
+        #expect(doc.errors.count == 1, "Expected 1 BibTeX entry parse error on ten.bib, got \(doc.errors)")
+        if let err = doc.errors.first {
+            #expect(err.key == "e3")
+            #expect(err.startLine == 15)
+            #expect(err.line == 22)
+        }
+
+        #expect(doc.entries.count == 10, "Expected 10 recovered entries (9 clean + partial e3), got \(doc.entries.count)")
+        let byKey = Dictionary(uniqueKeysWithValues: doc.entries.map { ($0.citeKey, $0) })
+
+        let e3 = try #require(byKey["e3"])
+        #expect(e3.parseError == true)
+        #expect(e3.parseErrorInfo?.startLine == 15)
+        #expect(e3.parseErrorInfo?.line == 22)
+        #expect(e3.authors == [BibAuthor(givenName: "C", familyName: "Three")])
+        #expect(e3.title.contains("Broken title"))
+        #expect(e3.year == nil)
+        #expect(e3.venue.isEmpty)
+
+        for idx in [1, 2, 4, 5, 6, 7, 8, 9, 10] {
+            let key = "e\(idx)"
+            let ent = try #require(byKey[key], "Missing recovered entry \(key)")
+            #expect(ent.parseError == false, "Expected \(key).parseError == false")
+            #expect(ent.authors == [BibAuthor(givenName: "A", familyName: "Author\(idx)")])
+            #expect(ent.title == "Title \(idx)")
+            #expect(ent.venue == "J")
+            #expect(ent.year == 2000 + idx)
+        }
+
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        for args in [
+            ["diagnostics", mainTexURL.path, "--offline", "--json", "--lang", "en"],
+            ["diagnostics", mainTexURL.path, "--bib", tenBibURL.path, "--offline", "--json", "--lang", "en"]
+        ] {
+            let res = await runner.runWithExitStatus(arguments: args)
+            #expect(res.exitCode != 2, "diagnostics exited 2 for \(args): \(res.stderr)")
+            let obj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+            let bibSources = try #require(obj["bibliographySources"] as? [[String: Any]])
+            #expect(bibSources.count == 1)
+            if let src0 = bibSources.first {
+                #expect(src0["entries"] as? Int == 10)
+                let srcErrors = src0["errors"] as? [[String: Any]] ?? []
+                #expect(srcErrors.count == 1)
+                if let se = srcErrors.first {
+                    #expect(se["key"] as? String == "e3")
+                    #expect(se["startLine"] as? Int == 15)
+                    #expect(se["line"] as? Int == 22)
+                }
+            }
+            let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+            let bib001 = diags.filter { ($0["code"] as? String) == "BIB001" }
+            let cite404 = diags.filter { ($0["code"] as? String) == "CITE404" }
+            #expect(cite404.isEmpty, "Expected 0 CITE404 on bib-recovery, got \(cite404)")
+            #expect(bib001.count == 1, "Expected 1 ERROR BIB001 on bib-recovery, got \(bib001)")
+            if let b = bib001.first {
+                #expect(b["severity"] as? String == "ERROR")
+                #expect(b["category"] as? String == "structure")
+                #expect(b["line"] as? Int == 22)
+                let msg = b["message"] as? String ?? ""
+                #expect(msg.contains("e3") && msg.contains("15") && msg.contains("22"), "BIB001 message must report key e3, startLine 15, line 22: \(msg)")
+            }
+        }
+    }
+
+    @Test("M2 Stage 05 item 2 (S70): BibTeX identifier character rules accept printable chars outside '\"#%'(),={}' including \\pages, and 2503.18124v1 main.bib reads 289 unique keys with 0 BIB001 and 0 CITE404")
+    func m2Stage05Item2BibTeXFieldAndKeyCharacterRulesAnd2503MainBib() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage05-item2")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let syntheticBib = """
+        @article{key\\slash*tilde~bang!$amp&semi;lt<gt>hat^pipe|[br],
+          author = {Roberts, P. H.},
+          title = {Kinematic Dynamo Models},
+          journal = {Phil. Trans. R. Soc. A},
+          year = {1972},
+          volume = {272},
+          \\pages = {663},
+          opt*field~1 = {ignored unknown field}
+        }
+        """
+        let synDoc = try BibTeXCodec().parseDocument(syntheticBib)
+        #expect(synDoc.errors.isEmpty)
+        #expect(synDoc.entries.count == 1)
+        let synEntry = try #require(synDoc.entries.first)
+        #expect(synEntry.citeKey == "key\\slash*tilde~bang!$amp&semi;lt<gt>hat^pipe|[br]")
+        #expect(synEntry.year == 1972)
+        #expect(synEntry.volume == "272")
+        #expect(synEntry.pages == nil)
+        let synInfos = synDoc.diagnostics.filter { $0.severity == .info }
+        let synWarns = synDoc.diagnostics.filter { $0.severity == .warning }
+        #expect(synWarns.isEmpty)
+        #expect(synInfos.filter { $0.message.contains("\\pages") }.count <= 1)
+
+        let main2503Dir = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2503.18124v1/src", isDirectory: true)
+        let main2503BibURL = main2503Dir.appendingPathComponent("main.bib")
+        let main2503TexURL = main2503Dir.appendingPathComponent("main.tex")
+        let main2503BibRaw = try String(contentsOf: main2503BibURL, encoding: .utf8)
+
+        let doc2503 = try BibTeXCodec().parseDocument(main2503BibRaw)
+        #expect(doc2503.errors.isEmpty, "Expected 0 parse errors on 2503.18124v1 main.bib, got \(doc2503.errors)")
+        #expect(Set(doc2503.entries.map(\.citeKey)).count == 289)
+        let kd2 = try #require(doc2503.entries.first { $0.citeKey == "KD_2" })
+        #expect(kd2.year == 1972)
+        #expect(kd2.volume == "272")
+
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        let res = await runner.runWithExitStatus(
+            arguments: ["diagnostics", main2503TexURL.path, "--offline", "--json", "--lang", "en"]
+        )
+        #expect(res.exitCode != 2)
+        let obj = try #require(try JSONSerialization.jsonObject(with: Data(res.stdout.utf8)) as? [String: Any])
+        let bibSources = try #require(obj["bibliographySources"] as? [[String: Any]])
+        #expect(bibSources.count == 1)
+        #expect(bibSources.first?["entries"] as? Int == 289)
+        let firstBibErrors = bibSources.first?["errors"] as? [[String: Any]] ?? []
+        #expect(firstBibErrors.isEmpty)
+
+        let diags = try #require(obj["diagnostics"] as? [[String: Any]])
+        let structErrors = diags.filter {
+            ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR"
+        }
+        let bib001 = diags.filter { ($0["code"] as? String) == "BIB001" }
+        let cite404 = diags.filter { ($0["code"] as? String) == "CITE404" }
+        #expect(bib001.isEmpty)
+        #expect(cite404.isEmpty)
+        #expect(structErrors.count == 2, "Expected only 2 SYM003 structure ERRORs on 2503.18124v1, got \(structErrors)")
+        #expect(structErrors.allSatisfy { ($0["code"] as? String) == "SYM003" })
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")

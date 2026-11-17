@@ -539,6 +539,21 @@ extension LSPDiagnostic {
             }
             return message
         }
+        if code == "BIB001" {
+            if let key = Self.extractCiteKey(from: message) {
+                return "BibTeX 条目 \(key) 解析出错 (BIB001)：\(message)"
+            }
+            return "BibTeX 条目解析出错 (BIB001)：\(message)"
+        }
+        if code == "BIB002" {
+            if let key = Self.extractCiteKey(from: message) {
+                return "BibTeX 存在重复键 \(key)，已保留第一条 (BIB002)。"
+            }
+            return "BibTeX 文件中存在重复条目键，已保留第一条 (BIB002)。"
+        }
+        if code == "BIB003" {
+            return "BibTeX 条目的 crossref 父条目不存在 (BIB003)：\(message)"
+        }
         if code == "BIB_FROM_BBL" {
             return message
         }

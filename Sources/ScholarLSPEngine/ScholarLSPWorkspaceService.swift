@@ -188,7 +188,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
         for (bPath, bText) in bibliographyFiles.sorted(by: { $0.key < $1.key }) {
             let normBib = Self.normalizeWorkspacePath(bPath)
             rawBibs[normBib] = bText
-            if parseRawBibliographyFiles, let parsed = try? bibCodec.parse(bText) {
+            if parseRawBibliographyFiles {
+                let parsed = bibCodec.parseDocumentRecovering(bText).entries
                 for entry in parsed {
                     if bibMap[entry.citeKey] == nil {
                         bibOrder.append(entry.citeKey)
@@ -1116,6 +1117,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         kind: entry.kind,
                         title: entry.title,
                         authors: entry.authors,
+                        authorsTruncated: entry.authorsTruncated,
                         year: entry.year,
                         venue: entry.venue,
                         publisher: entry.publisher,
@@ -1127,6 +1129,9 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                         pmid: entry.pmid,
                         url: entry.url,
                         abstractText: entry.abstractText,
+                        crossref: entry.crossref,
+                        parseError: entry.parseError,
+                        parseErrorInfo: entry.parseErrorInfo,
                         firewallClass: entry.firewallClass,
                         firewallAuditNote: entry.firewallAuditNote,
                         firewallVerifiedSource: entry.firewallVerifiedSource,
