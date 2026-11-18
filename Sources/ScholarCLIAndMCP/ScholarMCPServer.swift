@@ -129,8 +129,25 @@ public struct ScholarMCPServer: Sendable {
         case "tools/call":
             let params = req["params"] as? [String: Any] ?? [:]
             let toolName = params["name"] as? String ?? ""
-            let arguments = params["arguments"] as? [String: Any] ?? [:]
-            resultPayload = executeToolCall(name: toolName, arguments: arguments)
+            if let rawArgs = params["arguments"], !(rawArgs is NSNull) {
+                guard let arguments = rawArgs as? [String: Any] else {
+                    let lang = resolvedLanguage(arguments: [:])
+                    resultPayload = invalidArgumentResult(
+                        toolName: toolName,
+                        invalidArguments: [],
+                        reasons: ["arguments_must_be_object"],
+                        customReason: lang.L(
+                            "Parameter 'arguments' for tool '\(toolName)' must be a JSON object.",
+                            "工具 '\(toolName)' 的 'arguments' 字段必须是 JSON 对象。"
+                        ),
+                        language: lang
+                    )
+                    break
+                }
+                resultPayload = executeToolCall(name: toolName, arguments: arguments)
+            } else {
+                resultPayload = executeToolCall(name: toolName, arguments: [:])
+            }
 
         default:
             // JSON-RPC 2.0 notifications omit `id` and expect no response.
@@ -178,8 +195,25 @@ public struct ScholarMCPServer: Sendable {
         case "tools/call":
             let params = req["params"] as? [String: Any] ?? [:]
             let toolName = params["name"] as? String ?? ""
-            let arguments = params["arguments"] as? [String: Any] ?? [:]
-            resultPayload = await executeToolCallAsync(name: toolName, arguments: arguments)
+            if let rawArgs = params["arguments"], !(rawArgs is NSNull) {
+                guard let arguments = rawArgs as? [String: Any] else {
+                    let lang = resolvedLanguage(arguments: [:])
+                    resultPayload = invalidArgumentResult(
+                        toolName: toolName,
+                        invalidArguments: [],
+                        reasons: ["arguments_must_be_object"],
+                        customReason: lang.L(
+                            "Parameter 'arguments' for tool '\(toolName)' must be a JSON object.",
+                            "工具 '\(toolName)' 的 'arguments' 字段必须是 JSON 对象。"
+                        ),
+                        language: lang
+                    )
+                    break
+                }
+                resultPayload = await executeToolCallAsync(name: toolName, arguments: arguments)
+            } else {
+                resultPayload = await executeToolCallAsync(name: toolName, arguments: [:])
+            }
 
         default:
             if idVal == nil && method.hasPrefix("notifications/") {
@@ -226,18 +260,19 @@ public struct ScholarMCPServer: Sendable {
 
     // MARK: - Tool Execution Router
 
+    public var isReplayServer: Bool {
+        if isOffline { return false }
+        if defaultRegistryReplaySnapshot != nil { return true }
+        if let defaultPath = defaultRegistryReplayPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !defaultPath.isEmpty {
+            return true
+        }
+        return false
+    }
+
     private func resolveReplaySnapshotIfActive(arguments: [String: Any]) throws -> RegistryReplaySnapshot? {
         if (arguments["offline"] as? Bool == true) || isOffline {
             return nil
-        }
-        if let argReplayPath = (arguments["registryReplayPath"] as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !argReplayPath.isEmpty {
-            if let prevalidated = defaultRegistryReplaySnapshot,
-               defaultRegistryReplayPath?.trimmingCharacters(in: .whitespacesAndNewlines) == argReplayPath {
-                return prevalidated
-            }
-            return try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: argReplayPath))
         }
         if let prevalidated = defaultRegistryReplaySnapshot {
             return prevalidated
@@ -247,6 +282,91 @@ public struct ScholarMCPServer: Sendable {
             return try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: defaultPath))
         }
         return nil
+    }
+
+    private static var allowedArgumentsByTool: [String: [String]] {
+        var map: [String: [String]] = [:]
+        for def in toolDefinitions {
+            guard let name = def["name"] as? String else { continue }
+            let props = (def["inputSchema"] as? [String: Any])?["properties"] as? [String: Any] ?? [:]
+            map[name] = props.keys.sorted()
+        }
+        return map
+    }
+
+    private func invalidArgumentResult(
+        toolName: String,
+        invalidArguments: [String],
+        reasons: [String],
+        customReason: String? = nil,
+        language: ScholarLanguage
+    ) -> [String: Any] {
+        let allowed = Self.allowedArgumentsByTool[toolName] ?? []
+        let allowedListText = allowed.isEmpty ? "(none)" : allowed.joined(separator: ", ")
+        let reasonText: String
+        if let customReason {
+            reasonText = customReason
+        } else if invalidArguments.contains("registryReplayPath") {
+            let joinedInvalid = invalidArguments.joined(separator: ", ")
+            reasonText = language.L(
+                "Argument 'registryReplayPath' is not accepted in MCP tool calls; replay mode can only be enabled at server startup via 'scholaros mcp --registry-replay <dir>'. Unrecognized argument(s) for '\(toolName)': \(joinedInvalid). Allowed arguments: \(allowedListText).",
+                "MCP 工具调用不接受 'registryReplayPath' 参数；录制回放只能在启动服务器时通过 'scholaros mcp --registry-replay <目录>' 指定。工具 '\(toolName)' 不认识的参数：\(joinedInvalid)。允许的参数：\(allowedListText)。"
+            )
+        } else {
+            let joinedInvalid = invalidArguments.joined(separator: ", ")
+            reasonText = language.L(
+                "Unrecognized argument(s) for '\(toolName)': \(joinedInvalid). Allowed arguments: \(allowedListText).",
+                "工具 '\(toolName)' 不认识的参数：\(joinedInvalid)。允许的参数：\(allowedListText)。"
+            )
+        }
+        let actionText = language.L(
+            "No verification or file modification performed. Remove unsupported arguments and retry.",
+            "未执行文献核查，也未改动任何文件。请去掉不支持的参数后重试。"
+        )
+
+        var payload: [String: Any] = [
+            "error_code": "ERR_INVALID_ARGUMENT",
+            "category": "invalid_argument",
+            "tool": toolName,
+            "invalid_arguments": invalidArguments,
+            "allowed_arguments": allowed,
+            "reasons": reasons,
+            "reason": reasonText,
+            "action": actionText
+        ]
+        if isReplayServer {
+            payload["mode"] = "REPLAY"
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
+            return textResult(String(decoding: data, as: UTF8.self), isError: true)
+        }
+        return textResult("{\"error_code\":\"ERR_INVALID_ARGUMENT\",\"category\":\"invalid_argument\"}", isError: true)
+    }
+
+    private func validateToolArguments(toolName: String, arguments: [String: Any]) -> [String: Any]? {
+        guard let allowed = Self.allowedArgumentsByTool[toolName] else {
+            return nil
+        }
+        let allowedSet = Set(allowed)
+        let unknown = arguments.keys.filter { !allowedSet.contains($0) }.sorted()
+        guard !unknown.isEmpty else {
+            return nil
+        }
+        var reasons: [String] = []
+        if unknown.contains("registryReplayPath") {
+            reasons.append("replay_path_not_allowed_in_tool_arguments")
+            if unknown.count > 1 {
+                reasons.append("unknown_argument")
+            }
+        } else {
+            reasons.append("unknown_argument")
+        }
+        return invalidArgumentResult(
+            toolName: toolName,
+            invalidArguments: unknown,
+            reasons: reasons,
+            language: resolvedLanguage(arguments: arguments)
+        )
     }
 
     private func resolveVerificationMode(
@@ -277,6 +397,9 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public func executeToolCallAsync(name: String, arguments: [String: Any]) async -> [String: Any] {
+        if let argErr = validateToolArguments(toolName: name, arguments: arguments) {
+            return argErr
+        }
         do {
             switch name {
             case "scholar_cite_key":
@@ -396,17 +519,9 @@ public struct ScholarMCPServer: Sendable {
                         )
                     }
                     let callNoVerify = (arguments["noVerify"] as? Bool == true)
-                    let explicitReplayArg = (arguments["registryReplayPath"] as? String)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    let hasExplicitReplay = (explicitReplayArg?.isEmpty == false)
-                    if callNoVerify && (callOffline || hasExplicitReplay) {
+                    if callNoVerify && callOffline {
                         throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'noVerify' with 'offline' or 'registryReplayPath' in scholar_lsp_diagnostics."
-                        )
-                    }
-                    if callOffline && hasExplicitReplay {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'offline' with 'registryReplayPath' in scholar_lsp_diagnostics."
+                            "Cannot combine 'noVerify' with 'offline' in scholar_lsp_diagnostics."
                         )
                     }
 
@@ -536,6 +651,15 @@ public struct ScholarMCPServer: Sendable {
                 return executeToolCall(name: name, arguments: arguments)
             }
         } catch let scholarErr as ScholarOSError {
+            if case .invalidCLIArguments(let detail) = scholarErr {
+                return invalidArgumentResult(
+                    toolName: name,
+                    invalidArguments: [],
+                    reasons: ["invalid_argument_value"],
+                    customReason: detail,
+                    language: resolvedLanguage(arguments: arguments)
+                )
+            }
             let prefix = "[\(scholarErr.errorCodeIdentifier)] "
             let body = scholarErr.errorDescription ?? String(describing: scholarErr)
             let formatted = body.hasPrefix("[") ? body : (prefix + body)
@@ -548,6 +672,9 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public func executeToolCall(name: String, arguments: [String: Any]) -> [String: Any] {
+        if let argErr = validateToolArguments(toolName: name, arguments: arguments) {
+            return argErr
+        }
         if name == "scholar_verify_bibliography" || name == "scholar_lsp_diagnostics" || name == "scholar_cite_key" {
             final class Box: @unchecked Sendable {
                 var value: [String: Any] = [:]
@@ -672,6 +799,15 @@ public struct ScholarMCPServer: Sendable {
                 return textResult("[ERR_SCHOLAROS] Unknown MCP tool '\(name)'", isError: true)
             }
         } catch let scholarErr as ScholarOSError {
+            if case .invalidCLIArguments(let detail) = scholarErr {
+                return invalidArgumentResult(
+                    toolName: name,
+                    invalidArguments: [],
+                    reasons: ["invalid_argument_value"],
+                    customReason: detail,
+                    language: resolvedLanguage(arguments: arguments)
+                )
+            }
             let prefix = "[\(scholarErr.errorCodeIdentifier)] "
             let body = scholarErr.errorDescription ?? String(describing: scholarErr)
             let formatted = body.hasPrefix("[") ? body : (prefix + body)
@@ -764,7 +900,7 @@ public struct ScholarMCPServer: Sendable {
         [
         [
             "name": "scholar_cite_key",
-            "description": "Citation insertion check. Verifies the target entry through the shared Citation Verification Firewall (online by default unless offline: true or registryReplayPath is set) and returns formatted \\cite{key} or #cite(<key>) ONLY if VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
+            "description": "Citation insertion check. Verifies the target entry through the shared Citation Verification Firewall (online by default unless offline: true is passed or server started with --offline / --registry-replay) and returns formatted \\cite{key} or #cite(<key>) ONLY if VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -774,7 +910,7 @@ public struct ScholarMCPServer: Sendable {
                     "bibtex": ["type": "string"],
                     "projectPath": ["type": "string"],
                     "offline": ["type": "boolean"],
-                    "registryReplayPath": ["type": "string"],
+                    "lang": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ],
                 "required": ["citeKey"]
@@ -782,14 +918,14 @@ public struct ScholarMCPServer: Sendable {
         ],
         [
             "name": "scholar_verify_bibliography",
-            "description": "Verify a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (queries public registries online by default; pass offline: true to skip network and cache for one call, or registryReplayPath to replay recorded fixtures).",
+            "description": "Verify a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (queries public registries online by default; pass offline: true to skip network and cache for one call).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bibtex": ["type": "string"],
                     "projectPath": ["type": "string"],
                     "offline": ["type": "boolean"],
-                    "registryReplayPath": ["type": "string"],
+                    "lang": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ]
             ]
@@ -809,7 +945,6 @@ public struct ScholarMCPServer: Sendable {
                     "filePath": ["type": "string"],
                     "projectPath": ["type": "string"],
                     "offline": ["type": "boolean"],
-                    "registryReplayPath": ["type": "string"],
                     "demo": ["type": "boolean"]
                 ]
             ]
@@ -821,6 +956,7 @@ public struct ScholarMCPServer: Sendable {
                 "type": "object",
                 "properties": [
                     "claim": ["type": "string"],
+                    "citeKey": ["type": "string"],
                     "filePath": ["type": "string"],
                     "line": ["type": "integer"],
                     "topK": ["type": "integer"],
