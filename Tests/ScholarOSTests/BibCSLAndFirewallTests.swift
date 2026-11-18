@@ -4428,6 +4428,7 @@ struct BibCSLAndFirewallTests {
         let onlineMixedZH = try await CitationVerificationFirewall.verifyBibliography(
             entries: [mixedEntry],
             mode: .replay(snapshot: replaySnapshot),
+            environment: [:],
             language: .zhHans
         )
         let mixedVerdictZH = try #require(onlineMixedZH.report.verdicts.first)
@@ -4446,6 +4447,7 @@ struct BibCSLAndFirewallTests {
         let onlineMixedEN = try await CitationVerificationFirewall.verifyBibliography(
             entries: [mixedEntry],
             mode: .replay(snapshot: replaySnapshot),
+            environment: [:],
             language: .en
         )
         let mixedVerdictEN = try #require(onlineMixedEN.report.verdicts.first)
@@ -4546,6 +4548,7 @@ struct BibCSLAndFirewallTests {
         let zhRes = try await CitationVerificationFirewall.verifyBibliography(
             entries: parsed,
             mode: .replay(snapshot: replaySnapshot),
+            environment: [:],
             language: .zhHans
         )
         let v1ZH = try #require(zhRes.report.verdicts.first { $0.citeKey == "lecun_tagged" })
@@ -4560,6 +4563,7 @@ struct BibCSLAndFirewallTests {
         let enRes = try await CitationVerificationFirewall.verifyBibliography(
             entries: parsed,
             mode: .replay(snapshot: replaySnapshot),
+            environment: [:],
             language: .en
         )
         let v1EN = try #require(enRes.report.verdicts.first { $0.citeKey == "lecun_tagged" })

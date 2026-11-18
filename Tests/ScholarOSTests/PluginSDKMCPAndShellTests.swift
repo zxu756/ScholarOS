@@ -486,7 +486,7 @@ struct PluginSDKMCPAndShellTests {
         let tempDir = try makeTempDirectory(prefix: "scholaros-cli-exports")
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        let cli = ScholarCLIRunner()
+        let cli = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
 
         let verifyRun = try await cli.run(arguments: ["verify-citations", "--demo"])
         #expect(verifyRun.exitCode == 3)
@@ -1177,7 +1177,7 @@ struct PluginSDKMCPAndShellTests {
         }
         """.write(to: bibURL, atomically: true, encoding: .utf8)
 
-        let runner = ScholarCLIRunner()
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
         let enOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "en"])
         let zhOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "zh"])
         #expect(enOut.exitCode == 1)
@@ -1220,7 +1220,7 @@ struct PluginSDKMCPAndShellTests {
             await offlineCounter.increment()
             throw RegistryTransportError(kind: .transportError, detail: "--offline must send zero requests", url: req.url)
         }
-        let offlineRunner = ScholarCLIRunner(registryTransport: offlineSpyTransport)
+        let offlineRunner = ScholarCLIRunner(registryTransport: offlineSpyTransport, environment: [:])
         let enOffline = try await offlineRunner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "en"])
         let zhOffline = try await offlineRunner.run(arguments: ["verify-citations", bibPath, "--offline", "--lang", "zh"])
         #expect(await offlineCounter.count == 0)
@@ -1288,7 +1288,7 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("M1 item 9: --help documents --registry-record and --registry-replay in EN/ZH, and invalid flag combinations or missing dirs exit 2")
     func m1Item9CLIHelpDocumentsRecordAndReplayAndRejectsInvalidFlagCombinationsWithExit2() async throws {
-        let runner = ScholarCLIRunner()
+        let runner = ScholarCLIRunner(environment: [:])
         let helpEN = try await runner.execute(arguments: ["--help", "--lang", "en"])
         let helpZH = try await runner.execute(arguments: ["--help", "--lang", "zh"])
 
@@ -1376,7 +1376,10 @@ struct PluginSDKMCPAndShellTests {
             await spyCounter.recordCall()
             throw RegistryTransportError(kind: .transportError, detail: "Replay must never invoke live transport", url: req.url)
         }
-        let replayRunner = ScholarCLIRunner(registryTransport: spyTransport)
+        let replayRunner = ScholarCLIRunner(
+            registryTransport: spyTransport,
+            environment: ["HOME": tempDir.appendingPathComponent("home-replay", isDirectory: true).path]
+        )
 
         // 1. Text replay carries prominent [REPLAY] marker and makes 0 transport calls
         let textReplay = await replayRunner.runWithExitStatus(
@@ -1491,7 +1494,7 @@ struct PluginSDKMCPAndShellTests {
             await spyCounter.increment()
             throw RegistryTransportError(kind: .transportError, detail: "Replay must not touch network transport", url: req.url)
         }
-        let replayRunner = ScholarCLIRunner(registryTransport: spyTransport)
+        let replayRunner = ScholarCLIRunner(registryTransport: spyTransport, environment: [:])
         let bibPath = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib").path
 
         let textRun1 = await replayRunner.runWithExitStatus(
@@ -1767,7 +1770,7 @@ struct PluginSDKMCPAndShellTests {
         }
         """.write(to: stage04BibURL, atomically: true, encoding: .utf8)
 
-        let runner = ScholarCLIRunner()
+        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
 
         let zhRun = await runner.runWithExitStatus(
@@ -1797,7 +1800,7 @@ struct PluginSDKMCPAndShellTests {
 
     @Test("M1 item 3 (Stage 05): CLI verify-citations replay on stage05-arxiv-pmid-search.bib formats arXiv, PubMed, dual DOI+arXiv, and identifierless verdicts in en, zh, and json")
     func m1Stage05CLIVerifyCitationsReplayFormatsArXivPubMedDualAndIdentifierlessInEnZhAndJSON() async throws {
-        let runner = ScholarCLIRunner()
+        let runner = ScholarCLIRunner(environment: [:])
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry")
         let stage05BibURL = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry-sources/stage05-arxiv-pmid-search.bib")
 
@@ -1949,7 +1952,10 @@ struct PluginSDKMCPAndShellTests {
             _ = await offlineTracker.record()
             throw RegistryTransportError(kind: .transportError, detail: "Must not be called", url: req.url)
         }
-        let guardedRunner = ScholarCLIRunner(registryTransport: failIfCalledTransport)
+        let guardedRunner = ScholarCLIRunner(
+            registryTransport: failIfCalledTransport,
+            environment: ["HOME": tempDir.appendingPathComponent("home-guarded", isDirectory: true).path]
+        )
 
         let offlineVerbose = await guardedRunner.runWithExitStatus(
             arguments: ["verify-citations", singleBibURL.path, "--offline", "--verbose", "--lang", "en"]
@@ -2119,7 +2125,11 @@ struct PluginSDKMCPAndShellTests {
         let failTransport = ClosureRegistrySession { req in
             throw RegistryTransportError(kind: .transportError, detail: "Replay only", url: req.url)
         }
-        let runner = ScholarCLIRunner(registryTransport: failTransport, registryClock: .immediate)
+        let runner = ScholarCLIRunner(
+            registryTransport: failTransport,
+            registryClock: .immediate,
+            environment: ["HOME": tempDir.appendingPathComponent("home-row16", isDirectory: true).path]
+        )
 
         let cleanRealEntries = """
         @article{real_lecun,
@@ -2304,7 +2314,10 @@ struct PluginSDKMCPAndShellTests {
         let failTransport = ClosureRegistrySession { req in
             throw RegistryTransportError(kind: .transportError, detail: "Replay only", url: req.url)
         }
-        let runner = ScholarCLIRunner(registryTransport: failTransport)
+        let runner = ScholarCLIRunner(
+            registryTransport: failTransport,
+            environment: ["HOME": tempDir.appendingPathComponent("home-row17", isDirectory: true).path]
+        )
 
         let jsonRun = await runner.runWithExitStatus(
             arguments: ["verify-citations", combinedBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
@@ -2416,7 +2429,9 @@ struct PluginSDKMCPAndShellTests {
         }
         """.write(to: twoBibURL, atomically: true, encoding: .utf8)
 
-        let runner = ScholarCLIRunner()
+        let runner = ScholarCLIRunner(
+            environment: ["HOME": tempDir.appendingPathComponent("home-singular", isDirectory: true).path]
+        )
         let oneOffline = await runner.runWithExitStatus(
             arguments: ["verify-citations", oneBibURL.path, "--offline", "--lang", "en"]
         )
@@ -2954,6 +2969,7 @@ struct PluginSDKMCPAndShellTests {
                 "en"
             ]
             var env = ProcessInfo.processInfo.environment
+            env.removeValue(forKey: "SCHOLAR_CACHE_DIR")
             env["HOME"] = isolatedHome.path
             env["CFFIXED_USER_HOME"] = isolatedHome.path
             env["SCHOLAR_CACHE_DIR"] = sharedCacheDir.path
@@ -3484,6 +3500,7 @@ struct PluginSDKMCPAndShellTests {
             proc.executableURL = binaryURL
             proc.arguments = ["mcp", "--registry-replay", corruptDir.path]
             var env = ProcessInfo.processInfo.environment
+            env.removeValue(forKey: "SCHOLAR_CACHE_DIR")
             env["HOME"] = isolatedHome.path
             env["CFFIXED_USER_HOME"] = isolatedHome.path
             proc.environment = env

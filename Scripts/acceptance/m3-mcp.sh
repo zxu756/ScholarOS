@@ -609,10 +609,10 @@ PY
         ) >"$WORK_SCRATCH/r19-withcache.log" 2>&1
         R19_RC2=$?
 
-        R19_PARSE="$(python3 -I - "$WORK_SCRATCH/r19-nocache.log" "$R19_RC1" "$WORK_SCRATCH/r19-withcache.log" "$R19_RC2" <<'PY'
-import re, sys
+        R19_PARSE="$(python3 -I - "$WORK_SCRATCH/r19-nocache.log" "$R19_RC1" "$WORK_SCRATCH/r19-withcache.log" "$R19_RC2" "$R19_CACHE" <<'PY'
+import os, re, sys
 
-log1, rc1, log2, rc2 = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4])
+log1, rc1, log2, rc2, cache_dir = sys.argv[1], int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), sys.argv[5]
 
 def extract_count(path: str):
     txt = open(path, encoding="utf-8", errors="replace").read()
@@ -621,12 +621,13 @@ def extract_count(path: str):
 
 c1, t1 = extract_count(log1)
 c2, t2 = extract_count(log2)
-print(f"  [Row 19] without_SCHOLAR_CACHE_DIR: exit={rc1} tests={c1} | with_SCHOLAR_CACHE_DIR: exit={rc2} tests={c2}")
+leaked_db = os.path.exists(os.path.join(cache_dir, "registry.sqlite"))
+print(f"  [Row 19] without_SCHOLAR_CACHE_DIR: exit={rc1} tests={c1} | with_SCHOLAR_CACHE_DIR: exit={rc2} tests={c2} caller_cache_untouched={not leaked_db}")
 if rc1 != 0 or c1 < 289:
     print("  --- tail of without_SCHOLAR_CACHE_DIR ---")
     print("\n".join(t1.splitlines()[-20:]))
     sys.exit(1)
-if rc2 != 0 or c2 < 289:
+if rc2 != 0 or c2 < 289 or leaked_db:
     print("  --- tail of with_SCHOLAR_CACHE_DIR ---")
     print("\n".join(t2.splitlines()[-20:]))
     sys.exit(1)
