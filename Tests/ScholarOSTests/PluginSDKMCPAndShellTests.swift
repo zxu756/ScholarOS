@@ -1177,7 +1177,7 @@ struct PluginSDKMCPAndShellTests {
         }
         """.write(to: bibURL, atomically: true, encoding: .utf8)
 
-        let runner = ScholarCLIRunner(environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path])
+        let runner = ScholarCLIRunner(environment: ["HOME": tmpDir.path, "CFFIXED_USER_HOME": tmpDir.path])
         let enOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "en"])
         let zhOut = try await runner.run(arguments: ["verify-citations", bibURL.path, "--offline", "--lang", "zh"])
         #expect(enOut.exitCode == 1)
