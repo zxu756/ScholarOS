@@ -7040,7 +7040,8 @@ struct PluginSDKMCPAndShellTests {
             environment: env
         )
 
-        // 3. `scholar_verify_bibliography`: mode == "REPLAY" AND firewallVerifiedAtUTC == "2026-11-16" (NOT "2026-11-25")
+        // 3. `scholar_verify_bibliography`: mode == "REPLAY" AND firewallVerifiedAtUTC matches recorded fetchedAt
+        //    (`Tests/Fixtures/registry` recorded 2026-11-15; `Benchmarks/citations/recordings` recorded 2026-11-16; NEITHER uses clock 2026-11-25)
         let verifyRes = await replayServer.executeToolCallAsync(
             name: "scholar_verify_bibliography",
             arguments: ["bibtex": rawRecheckBib]
@@ -7053,13 +7054,44 @@ struct PluginSDKMCPAndShellTests {
         let lecunVerdict = try #require(verdicts.first { ($0["citeKey"] as? String) == "real_lecun" })
         let lecunAudited = try #require(lecunVerdict["auditedEntry"] as? [String: Any])
         #expect(
-            lecunAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16",
-            "Expected recorded date 2026-11-16 on replay auditedEntry, got \(String(describing: lecunAudited["firewallVerifiedAtUTC"]))"
+            lecunAudited["firewallVerifiedAtUTC"] as? String == "2026-11-15",
+            "Expected recorded date 2026-11-15 on Tests/Fixtures/registry replay auditedEntry, got \(String(describing: lecunAudited["firewallVerifiedAtUTC"]))"
         )
         let fakeVerdict = try #require(verdicts.first { ($0["citeKey"] as? String) == "fake_nonsentinel" })
         #expect(fakeVerdict["firewallClass"] as? String == "NOT_FOUND")
         let fakeAudited = try #require(fakeVerdict["auditedEntry"] as? [String: Any])
-        #expect(fakeAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16")
+        #expect(fakeAudited["firewallVerifiedAtUTC"] as? String == "2026-11-15")
+
+        // Also check Benchmarks/citations/recordings (recorded 2026-11-16) on audit_001 -> firewallVerifiedAtUTC == "2026-11-16"
+        let benchRecordingsDir = repositoryRoot.appendingPathComponent("Benchmarks/citations/recordings", isDirectory: true)
+        let benchSnapshot = try RegistryReplaySnapshot(directoryURL: benchRecordingsDir)
+        let benchReplayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: benchRecordingsDir.path,
+            defaultRegistryReplaySnapshot: benchSnapshot,
+            registryClock: futureClock,
+            environment: env
+        )
+        let audit001Bib = """
+        @article{audit_001,
+          author  = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey},
+          title   = {Deep learning},
+          journal = {Nature},
+          year    = {2015},
+          volume  = {521},
+          pages   = {436--444},
+          doi     = {10.1038/nature14539}
+        }
+        """
+        let benchVerifyRes = await benchReplayServer.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": audit001Bib]
+        )
+        let benchVerifyText = try #require(((benchVerifyRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let benchVerifyObj = try #require(JSONSerialization.jsonObject(with: Data(benchVerifyText.utf8)) as? [String: Any])
+        #expect(benchVerifyObj["mode"] as? String == "REPLAY")
+        let benchVerdicts = try #require(benchVerifyObj["verdicts"] as? [[String: Any]])
+        let benchAudited = try #require((benchVerdicts.first)?["auditedEntry"] as? [String: Any])
+        #expect(benchAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16")
 
         // 4. `scholar_cite_key` on replay server: returns JSON with top-level mode == "REPLAY" (both success and rejection)
         let citeOK = await replayServer.executeToolCallAsync(

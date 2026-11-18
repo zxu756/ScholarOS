@@ -838,7 +838,8 @@ struct LSPEngineAndSyncTeXTests {
 
     @Test("M1 Stage 09 (S48): LSP completion, hover, diagnostics, and assertAllCitedEntriesPassFirewall honor provenance and 30d/1d TTL expiration")
     func m1Stage09LSPCompletionHoverDiagnosticsRespectProvenanceAndClockExpiration() async throws {
-        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(9 * 3600)
+        // Tests/Fixtures/registry was recorded on 2026-11-15 (S75 populates firewallVerifiedAtUTC from recorded fetchedAt)
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-15")).addingTimeInterval(9 * 3600)
         let clock = LSPDialableClock(initialUTCDate: initialUTC)
         let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
 
@@ -894,13 +895,13 @@ struct LSPEngineAndSyncTeXTests {
         let preDiags = service.diagnostics(in: "main.tex")
         #expect(preDiags.contains { $0.code == "ERR_UNVERIFIED_CITATION" && $0.message.contains("real_lecun") })
 
-        // 2. Run verifyCitationsOnline(using: replay) -> writes source + 2026-11-16 back to entries
+        // 2. Run verifyCitationsOnline(using: replay) -> writes source + 2026-11-15 (recorded fetchedAt) back to entries
         let onlineReport = await service.verifyCitationsOnline(using: replay)
         #expect(onlineReport.verifiedCount == 1)
         #expect(onlineReport.notFoundCount == 1)
         let storedLecun = try #require(service.bibliographyEntry(forCiteKey: "real_lecun"))
         #expect(storedLecun.firewallVerifiedSource?.isEmpty == false)
-        #expect(storedLecun.firewallVerifiedAtUTC == "2026-11-16")
+        #expect(storedLecun.firewallVerifiedAtUTC == "2026-11-15")
 
         // Create a fresh LSP service from the written-back entries (no inRunVerdicts, testing persisted entry provenance!)
         let persistedService = ScholarLSPWorkspaceService(
@@ -921,7 +922,7 @@ struct LSPEngineAndSyncTeXTests {
         // Meanwhile fake_nonsentinel (NOT_FOUND, 1-day TTL) is already >1d old at +29d -> treated as UNVERIFIED with expired notice!
         let fakeHoverAt29d = try #require(persistedService.hover(atLine: 3, column: 48, in: "main.tex"))
         #expect(fakeHoverAt29d.firewallClass == .unverified)
-        #expect(fakeHoverAt29d.markdownBody.contains("2026-11-16"))
+        #expect(fakeHoverAt29d.markdownBody.contains("2026-11-15"))
 
         // Advance past 30 days (+2 more days -> +31d total): real_lecun ALSO expires on BOTH persistedService and original service!
         clock.advance(by: 2 * 86_400)
@@ -929,10 +930,10 @@ struct LSPEngineAndSyncTeXTests {
         for svc in [persistedService, service] {
             let expHover = try #require(svc.hover(atLine: 3, column: 20, in: "main.tex"))
             #expect(expHover.firewallClass == .unverified)
-            #expect(expHover.markdownBody.contains("2026-11-16"))
+            #expect(expHover.markdownBody.contains("2026-11-15"))
             let expComp = try #require(svc.completions(atLine: 4, column: 18, in: "main.tex").first { $0.insertText == "real_lecun" })
             #expect(!expComp.subtitle.contains("• Verified"))
-            #expect(expComp.detailMarkdown.contains("2026-11-16"))
+            #expect(expComp.detailMarkdown.contains("2026-11-15"))
             #expect(throws: ScholarOSError.self) {
                 try svc.assertAllCitedEntriesPassFirewall()
             }
@@ -945,8 +946,8 @@ struct LSPEngineAndSyncTeXTests {
         )
         let expDiags = freshExpiredDiagService.diagnostics(in: "main.tex")
         let expLecunDiag = try #require(expDiags.first { $0.code == "ERR_UNVERIFIED_CITATION" })
-        #expect(expLecunDiag.message.contains("2026-11-16"))
-        #expect(expLecunDiag.localizedMessage(.zhHans).contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+        #expect(expLecunDiag.message.contains("2026-11-15"))
+        #expect(expLecunDiag.localizedMessage(.zhHans).contains("结论是 2026-11-15 取得的，已过期，需要重新核查"))
     }
 
     // MARK: - M2 Stage 02: Direct Library `ScholarLSPWorkspaceService.loadManuscript` Tests

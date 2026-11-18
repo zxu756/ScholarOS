@@ -4590,8 +4590,8 @@ struct BibCSLAndFirewallTests {
 
     @Test("M1 Stage 09 (S42 items 3 & 5, S48 items 1-3): bare firewallClass rejected; clock TTL 30d VERIFIED and 1d NOT_FOUND enforced; rejection messages distinguish unchecked vs problematic")
     func m1Stage09S42AndS48AssertionProvenanceClockExpirationAndRejectionReasons() async throws {
-        // 2026-11-16T10:00:00Z
-        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(10 * 3600)
+        // 2026-11-15T10:00:00Z (matching Tests/Fixtures/registry recorded requested_at date 2026-11-15 per S75)
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-15")).addingTimeInterval(10 * 3600)
         let clock = DialableRegistryClock(initialUTCDate: initialUTC)
         let firewall = CitationVerificationFirewall(clock: clock)
         let replay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
@@ -4656,7 +4656,7 @@ struct BibCSLAndFirewallTests {
         #expect(lecunVerdict.firewallClass == .verified)
         let writtenBackLecun = lecunVerdict.auditedEntry
         #expect(writtenBackLecun.firewallVerifiedSource?.isEmpty == false)
-        #expect(writtenBackLecun.firewallVerifiedAtUTC == "2026-11-16")
+        #expect(writtenBackLecun.firewallVerifiedAtUTC == "2026-11-15")
 
         // t = 0: allowed both via in-run verdict and via written-back entry
         let immediateAllowed = try firewall.assertCitationAllowed(
@@ -4685,7 +4685,7 @@ struct BibCSLAndFirewallTests {
             Issue.record("Expected >30d VERIFIED verdict to expire and be rejected")
         } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
             #expect(status == "UNVERIFIED")
-            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+            #expect(reasonZH.contains("结论是 2026-11-15 取得的，已过期，需要重新核查"))
         }
 
         do {
@@ -4697,7 +4697,7 @@ struct BibCSLAndFirewallTests {
             Issue.record("Expected >30d VERIFIED verdict to expire and be rejected in EN")
         } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonEN) {
             #expect(status == "UNVERIFIED")
-            #expect(reasonEN.contains("2026-11-16"))
+            #expect(reasonEN.contains("2026-11-15"))
             #expect(reasonEN.lowercased().contains("expired"))
         }
 
@@ -4720,7 +4720,7 @@ struct BibCSLAndFirewallTests {
         #expect(fakeVerdict.firewallClass == .notFound)
         let writtenBackFake = fakeVerdict.auditedEntry
         #expect(writtenBackFake.firewallVerifiedSource?.isEmpty == false)
-        #expect(writtenBackFake.firewallVerifiedAtUTC == "2026-11-16")
+        #expect(writtenBackFake.firewallVerifiedAtUTC == "2026-11-15")
 
         // Within 1 day (t = 0): rejected with NOT_FOUND
         do {
@@ -4745,7 +4745,7 @@ struct BibCSLAndFirewallTests {
             Issue.record("Expected expired NOT_FOUND entry to remain blocked")
         } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
             #expect(status == "UNVERIFIED")
-            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+            #expect(reasonZH.contains("结论是 2026-11-15 取得的，已过期，需要重新核查"))
         }
 
         // 4. Rejection messages clearly distinguish UNVERIFIED (offline / transport_error) vs NOT_FOUND / DRIFT / RETRACTED

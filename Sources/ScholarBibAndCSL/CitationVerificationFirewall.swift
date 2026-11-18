@@ -151,6 +151,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
     public let findings: [FirewallFinding]
     public let auditNote: String
     public let auditedEntry: BibliographyEntry
+    public let evaluatedAt: Date?
 
     /// Convenience alias matching `insertable` (not encoded separately in JSON).
     public var allowsManuscriptInsertion: Bool { insertable }
@@ -176,7 +177,8 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         fields: [CitationFieldDiscrepancy] = [],
         findings: [FirewallFinding],
         auditNote: String,
-        auditedEntry: BibliographyEntry
+        auditedEntry: BibliographyEntry,
+        evaluatedAt: Date? = nil
     ) {
         self.citeKey = citeKey
         self.firewallClass = firewallClass
@@ -187,6 +189,83 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         self.findings = findings
         self.auditNote = auditNote
         self.auditedEntry = auditedEntry
+        self.evaluatedAt = evaluatedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.citeKey = try c.decode(String.self, forKey: .citeKey)
+        self.firewallClass = try c.decode(CitationFirewallClass.self, forKey: .firewallClass)
+        self.insertable = try c.decode(Bool.self, forKey: .insertable)
+        self.reasons = try c.decode([String].self, forKey: .reasons)
+        self.sources = try c.decode([CitationVerdictSourceRecord].self, forKey: .sources)
+        self.fields = try c.decode([CitationFieldDiscrepancy].self, forKey: .fields)
+        self.findings = try c.decode([FirewallFinding].self, forKey: .findings)
+        self.auditNote = try c.decode(String.self, forKey: .auditNote)
+        self.auditedEntry = try c.decode(BibliographyEntry.self, forKey: .auditedEntry)
+        self.evaluatedAt = nil
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(citeKey, forKey: .citeKey)
+        try c.encode(firewallClass, forKey: .firewallClass)
+        try c.encode(insertable, forKey: .insertable)
+        try c.encode(reasons, forKey: .reasons)
+        try c.encode(sources, forKey: .sources)
+        try c.encode(fields, forKey: .fields)
+        try c.encode(findings, forKey: .findings)
+        try c.encode(auditNote, forKey: .auditNote)
+        try c.encode(auditedEntry, forKey: .auditedEntry)
+    }
+
+    public static func == (lhs: CitationFirewallEntryVerdict, rhs: CitationFirewallEntryVerdict) -> Bool {
+        lhs.citeKey == rhs.citeKey
+            && lhs.firewallClass == rhs.firewallClass
+            && lhs.insertable == rhs.insertable
+            && lhs.reasons == rhs.reasons
+            && lhs.sources == rhs.sources
+            && lhs.fields == rhs.fields
+            && lhs.findings == rhs.findings
+            && lhs.auditNote == rhs.auditNote
+            && lhs.auditedEntry == rhs.auditedEntry
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(citeKey)
+        hasher.combine(firewallClass)
+        hasher.combine(insertable)
+        hasher.combine(reasons)
+        hasher.combine(sources)
+        hasher.combine(fields)
+        hasher.combine(findings)
+        hasher.combine(auditNote)
+        hasher.combine(auditedEntry)
+    }
+
+    public func checkInRunExpiry(at referenceDate: Date) -> StoredFirewallVerdictFreshness? {
+        if !sources.isEmpty && sources.allSatisfy({ $0.origin == .replay }),
+           let evaluatedAt
+        {
+            guard firewallClass != .unverified else { return nil }
+            let ttl = (firewallClass == .notFound)
+                ? BibliographyEntry.notFoundVerdictTTLSeconds
+                : BibliographyEntry.validVerdictTTLSeconds
+            let evalDayStart = BibliographyEntry.parseUTCDayStart(BibliographyEntry.formatUTCDay(evaluatedAt)) ?? evaluatedAt
+            if referenceDate.timeIntervalSince(evalDayStart) > ttl {
+                let dayLabel = auditedEntry.firewallVerifiedAtUTC ?? BibliographyEntry.formatUTCDay(evaluatedAt)
+                return .expired(
+                    previousClass: firewallClass,
+                    source: auditedEntry.firewallVerifiedSource ?? "",
+                    fetchedAtUTC: dayLabel
+                )
+            }
+            return nil
+        }
+        if case .expired(let prev, let src, let dayStr) = auditedEntry.evaluateFirewallFreshness(at: referenceDate) {
+            return .expired(previousClass: prev, source: src, fetchedAtUTC: dayStr)
+        }
+        return nil
     }
 }
 
@@ -1536,7 +1615,8 @@ public struct CitationVerificationFirewall: Sendable {
                 fields: updatedFields,
                 findings: updatedFindings,
                 auditNote: verdict.auditNote,
-                auditedEntry: verdict.auditedEntry
+                auditedEntry: verdict.auditedEntry,
+                evaluatedAt: verdict.evaluatedAt
             )
         }
         return changed ? firewall.summarizeVerdicts(updatedVerdicts) : report
@@ -1573,9 +1653,7 @@ public struct CitationVerificationFirewall: Sendable {
             : offline.reasons
 
         if let inRun = inRunVerdictsByKey[entry.citeKey] {
-            let isPureReplayInRun = !inRun.sources.isEmpty && inRun.sources.allSatisfy { $0.origin == .replay }
-            if !isPureReplayInRun,
-               case .expired(_, _, let dayStr) = inRun.auditedEntry.evaluateFirewallFreshness(at: now) {
+            if case .expired(_, _, let dayStr) = inRun.checkInRunExpiry(at: now) {
                 if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
                     return (offline.firewallClass, offline.auditNote, offline.reasons)
                 }
@@ -1663,9 +1741,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         // 1. Verdict computed in the current run (e.g. `cite`, `scholar_cite_key`, or `verifyCitationsOnline`)
         if let inRunVerdict = verifiedVerdicts[trimmedKey] {
-            let isPureReplayInRun = !inRunVerdict.sources.isEmpty && inRunVerdict.sources.allSatisfy { $0.origin == .replay }
-            if !isPureReplayInRun,
-               case .expired(_, _, let fetchedAtUTC) = inRunVerdict.auditedEntry.evaluateFirewallFreshness(at: now) {
+            if case .expired(_, _, let fetchedAtUTC) = inRunVerdict.checkInRunExpiry(at: now) {
                 if offlineCheck.firewallClass == .notFound || offlineCheck.firewallClass == .retracted {
                     throw ScholarOSError.unverifiedCitationBlocked(
                         citeKey: entry.citeKey,
@@ -6213,7 +6289,8 @@ public struct CitationVerificationFirewall: Sendable {
             fields: fields,
             findings: findings,
             auditNote: summary,
-            auditedEntry: updated
+            auditedEntry: updated,
+            evaluatedAt: clock.currentDate()
         )
     }
 

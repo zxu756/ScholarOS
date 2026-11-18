@@ -1272,7 +1272,8 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                             fields: oldVerdict.fields,
                             findings: oldVerdict.findings,
                             auditNote: oldVerdict.auditNote,
-                            auditedEntry: renamedEntry
+                            auditedEntry: renamedEntry,
+                            evaluatedAt: oldVerdict.evaluatedAt
                         )
                     }
                     if let idx = st.orderedBibliographyKeys.firstIndex(of: oldKey) {

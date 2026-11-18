@@ -864,7 +864,8 @@ struct ProjectStoreAndTrackChangesTests {
             )
         }
 
-        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-16")).addingTimeInterval(8 * 3600)
+        // Tests/Fixtures/registry was recorded on 2026-11-15 (S75 populates firewallVerifiedAtUTC from recorded fetchedAt)
+        let initialUTC = try #require(BibliographyEntry.parseUTCDayStart("2026-11-15")).addingTimeInterval(8 * 3600)
         let clock = StoreDialableClock(initialUTCDate: initialUTC)
 
         // 2. Open legacy v4 DB via ScholarProjectDatabase -> migrates cleanly to v5 without error; legacy VERIFIED is treated as unchecked!
@@ -935,7 +936,7 @@ struct ProjectStoreAndTrackChangesTests {
         clock.advance(by: 29 * 86_400)
         let allowedAt29d = try reopened.validateCitationKeyForInsertion("real_lecun")
         #expect(allowedAt29d.firewallClass == .verified)
-        #expect(allowedAt29d.firewallVerifiedAtUTC == "2026-11-16")
+        #expect(allowedAt29d.firewallVerifiedAtUTC == "2026-11-15")
         #expect(try reopened.computeProjectStats().verifiedCitationCount == 1)
 
         clock.advance(by: 2 * 86_400) // +31d total -> expired!
@@ -945,7 +946,7 @@ struct ProjectStoreAndTrackChangesTests {
             Issue.record("Expected persisted v5 VERIFIED row to expire past 30 days")
         } catch let ScholarOSError.unverifiedCitationBlocked(_, status, reasonZH) {
             #expect(status == "UNVERIFIED")
-            #expect(reasonZH.contains("结论是 2026-11-16 取得的，已过期，需要重新核查"))
+            #expect(reasonZH.contains("结论是 2026-11-15 取得的，已过期，需要重新核查"))
         }
     }
 }
