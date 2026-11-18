@@ -6807,6 +6807,188 @@ struct PluginSDKMCPAndShellTests {
             "MCP with CLI --lang zh must match CLI diagnostics --json --lang zh byte-for-byte"
         )
     }
+
+    // MARK: - 18. M3 Stage 01: S74/S82 Replay Argument Rejection, S75 Replay Markers & Date, S78 Protocol
+
+    private func buildSelfConsistentFakeReplayDirectory(in parentDir: URL) throws -> URL {
+        let srcDir = repositoryRoot.appendingPathComponent("Benchmarks/citations/recordings", isDirectory: true)
+        let dstDir = parentDir.appendingPathComponent("fake-replay", isDirectory: true)
+        try FileManager.default.createDirectory(at: dstDir, withIntermediateDirectories: true)
+
+        let manifestData = try Data(contentsOf: srcDir.appendingPathComponent("manifest.json"))
+        let manifestObj = try #require(JSONSerialization.jsonObject(with: manifestData) as? [String: Any])
+        let rawItems = try #require(manifestObj["items"] as? [[String: Any]])
+        let wantedSlugs: Set<String> = [
+            "crossref_doi_10.1109_66.728565_22703beb17",
+            "openalex_doi_10.1109_66.728565_c9f0c4accb"
+        ]
+        let fakeTitle = "A completely invented paper about quantum lichen yield"
+
+        func sha256Hex(_ data: Data) -> String {
+            SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
+
+        var mutatedItems: [[String: Any]] = []
+        var metaHashes: [String: String] = [:]
+
+        for item in rawItems {
+            guard let slug = item["slug"] as? String, wantedSlugs.contains(slug),
+                  let rawFile = item["raw_file"] as? String,
+                  let service = item["service"] as? String else {
+                continue
+            }
+            let rawPayloadData = try Data(contentsOf: srcDir.appendingPathComponent(rawFile))
+            var payload = try #require(JSONSerialization.jsonObject(with: rawPayloadData) as? [String: Any])
+            if service == "crossref" {
+                var msg = try #require(payload["message"] as? [String: Any])
+                msg["title"] = [fakeTitle]
+                var authors = try #require(msg["author"] as? [[String: Any]])
+                if !authors.isEmpty {
+                    authors[0]["family"] = "Inventa"
+                }
+                msg["author"] = authors
+                payload["message"] = msg
+            } else {
+                payload["title"] = fakeTitle
+                payload["display_name"] = fakeTitle
+            }
+            let newBody = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            try newBody.write(to: dstDir.appendingPathComponent(rawFile))
+
+            var updatedItem = item
+            updatedItem["sha256"] = sha256Hex(newBody)
+            updatedItem["byte_length"] = newBody.count
+
+            let metaName = "\(slug).meta.json"
+            let metaData = try JSONSerialization.data(withJSONObject: updatedItem, options: [.prettyPrinted, .sortedKeys])
+            try metaData.write(to: dstDir.appendingPathComponent(metaName))
+            metaHashes[metaName] = sha256Hex(metaData)
+            mutatedItems.append(updatedItem)
+        }
+
+        var newManifest = manifestObj
+        newManifest["items"] = mutatedItems
+        newManifest["count"] = mutatedItems.count
+        newManifest["total_http_requests_sent"] = mutatedItems.count
+        newManifest["meta_files_sha256"] = metaHashes
+        let outManifestData = try JSONSerialization.data(withJSONObject: newManifest, options: [.prettyPrinted, .sortedKeys])
+        try outManifestData.write(to: dstDir.appendingPathComponent("manifest.json"))
+        return dstDir
+    }
+
+    @Test("M3 Stage 01 (S74 & S82): tools/list strips registryReplayPath from schemas and descriptions; passing registryReplayPath or any unknown argument returns structured ERR_INVALID_ARGUMENT without running verification")
+    func m3Stage01S74AndS82StripRegistryReplayPathAndRejectUnknownArgumentsStructured() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s74")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let env = ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path]
+
+        // 1. tools/list: no tool inputSchema or description mentions registryReplayPath
+        let probeServer = ScholarMCPServer(isOffline: true, environment: env)
+        let listRaw = try #require(probeServer.handleJSONRPCLine(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
+        let listEnv = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
+        let listRes = try #require(listEnv["result"] as? [String: Any])
+        let tools = try #require(listRes["tools"] as? [[String: Any]])
+        #expect(!tools.isEmpty)
+        for tool in tools {
+            let name = (tool["name"] as? String) ?? "<unnamed>"
+            let desc = (tool["description"] as? String) ?? ""
+            #expect(!desc.contains("registryReplayPath"), "Tool \(name) description must not mention registryReplayPath: \(desc)")
+            if let schema = tool["inputSchema"] as? [String: Any],
+               let props = schema["properties"] as? [String: Any] {
+                #expect(props["registryReplayPath"] == nil, "Tool \(name) inputSchema must not expose registryReplayPath")
+            }
+        }
+
+        // 2. Build self-consistent fake replay directory for invented_2026
+        let fakeReplayDir = try buildSelfConsistentFakeReplayDirectory(in: tempDir)
+        let fakeBib = """
+        @article{invented_2026,
+          author = {Inventa, J. and Ferguson, F.J.},
+          title = {A completely invented paper about quantum lichen yield},
+          journal = {IEEE Transactions on Semiconductor Manufacturing},
+          year = {1998},
+          doi = {10.1109/66.728565}
+        }
+        """
+
+        let sentinelBibFile = tempDir.appendingPathComponent("untouched.bib")
+        let initialBibBytes = Data("% initial untouched bib\n".utf8)
+        try initialBibBytes.write(to: sentinelBibFile)
+        let initialAttrs = try FileManager.default.attributesOfItem(atPath: sentinelBibFile.path)
+        let initialMtime = initialAttrs[.modificationDate] as? Date
+
+        actor TransportSpy {
+            var count = 0
+            func bump() { count += 1 }
+        }
+        let spy = TransportSpy()
+        let failTransport = ClosureRegistrySession { req in
+            await spy.bump()
+            throw RegistryTransportError(kind: .transportError, detail: "Network blocked", url: req.url)
+        }
+
+        let onlineServer = ScholarMCPServer(
+            registryTransport: failTransport,
+            registryClock: .immediate,
+            environment: env
+        )
+
+        // Passing registryReplayPath to scholar_cite_key, scholar_verify_bibliography, scholar_lsp_diagnostics
+        // must fail immediately with structured ERR_INVALID_ARGUMENT and 0 transport requests.
+        let texFile = tempDir.appendingPathComponent("draft.tex")
+        try "\\documentclass{article}\\begin{document}Cite \\cite{invented_2026}.\\end{document}\n"
+            .write(to: texFile, atomically: true, encoding: .utf8)
+
+        let replayInjectionCalls: [(String, [String: Any])] = [
+            ("scholar_cite_key", ["citeKey": "invented_2026", "bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
+            ("scholar_verify_bibliography", ["bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
+            ("scholar_lsp_diagnostics", ["path": texFile.path, "registryReplayPath": fakeReplayDir.path])
+        ]
+
+        for (toolName, args) in replayInjectionCalls {
+            let res = await onlineServer.executeToolCallAsync(name: toolName, arguments: args)
+            #expect(res["isError"] as? Bool == true, "Expected isError=true when passing registryReplayPath to \(toolName), got \(res)")
+            let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            #expect(!text.contains("CITATION_STATUS:VERIFIED"), "S74 bypass: \(toolName) returned VERIFIED on fake replay!")
+            let errObj = try #require(
+                try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                "Expected structured JSON error for \(toolName), got: \(text)"
+            )
+            #expect(errObj["error_code"] as? String == "ERR_INVALID_ARGUMENT")
+            #expect((errObj["category"] as? String)?.isEmpty == false)
+            #expect((errObj["reason"] as? String)?.isEmpty == false)
+            #expect((errObj["reasons"] as? [String])?.isEmpty == false)
+            #expect(errObj["invalid_arguments"] as? [String] == ["registryReplayPath"])
+            #expect(errObj["verdict"] as? String != "VERIFIED")
+        }
+        #expect(await spy.count == 0, "ERR_INVALID_ARGUMENT must reject before any registry lookup")
+
+        // 3. Passing any arbitrary unrecognized argument name also returns structured ERR_INVALID_ARGUMENT with 0 lookups
+        for (toolName, args) in [
+            ("scholar_cite_key", ["citeKey": "invented_2026", "bibtex": fakeBib, "bogusOption": true] as [String: Any]),
+            ("scholar_verify_bibliography", ["bibtex": fakeBib, "unexpectedField": "abc"] as [String: Any]),
+            ("scholar_track_changes_diff", ["original": "a", "revised": "b", "extraParam": 1] as [String: Any])
+        ] {
+            let res = await onlineServer.executeToolCallAsync(name: toolName, arguments: args)
+            #expect(res["isError"] as? Bool == true, "Expected isError=true for unknown arg on \(toolName)")
+            let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let errObj = try #require(try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+            #expect(errObj["error_code"] as? String == "ERR_INVALID_ARGUMENT")
+            #expect((errObj["category"] as? String)?.isEmpty == false)
+            #expect((errObj["reason"] as? String)?.isEmpty == false)
+            #expect((errObj["allowed_arguments"] as? [String])?.isEmpty == false)
+        }
+        #expect(await spy.count == 0)
+
+        // Sentinel .bib file is untouched (bytes, size, mtime)
+        let afterBytes = try Data(contentsOf: sentinelBibFile)
+        let afterAttrs = try FileManager.default.attributesOfItem(atPath: sentinelBibFile.path)
+        #expect(afterBytes == initialBibBytes)
+        #expect((afterAttrs[.modificationDate] as? Date) == initialMtime)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
