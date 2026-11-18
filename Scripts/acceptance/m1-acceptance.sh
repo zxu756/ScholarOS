@@ -1477,6 +1477,10 @@ cite_resp = [r for r in resps if r.get("id") == 2][0]
 res_obj = cite_resp.get("result") or {}
 err_blob = json.dumps(cite_resp, ensure_ascii=False)
 assert res_obj.get("isError") is True and "ERR_UNVERIFIED_CITATION" in err_blob, err_blob
+cite_err = json.loads(res_obj["content"][0]["text"])
+assert cite_err.get("verdict") == "NOT_FOUND", cite_err
+assert "doi_not_registered" in (cite_err.get("reasons") or []), cite_err
+assert any("not trusted" in (f.get("detail") or "").lower() for f in (cite_err.get("findings") or [])), cite_err
 
 print("verify_citations=NOT_FOUND(未采信) diagnostics=ERR_UNVERIFIED_CITATION mcp_scholar_cite_key=ERR_UNVERIFIED_CITATION")
 PY
