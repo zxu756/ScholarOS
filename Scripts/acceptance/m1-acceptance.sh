@@ -1456,33 +1456,45 @@ p_diag = subprocess.run([cli_bin, "diagnostics", tex_path, "--bib", bib_path, "-
 assert p_diag.returncode == 1, (p_diag.returncode, p_diag.stderr)
 assert "ERR_UNVERIFIED_CITATION" in p_diag.stdout, p_diag.stdout
 
-# 3. MCP scholar_cite_key (import into a fresh .scholarproj via scholar_import_bibtex, then call scholar_cite_key)
-proj_dir = os.path.join(scratch, "row18.scholarproj")
-subprocess.run([cli_bin, "init", "--project", proj_dir], env=env, capture_output=True, text=True, check=True)
+# 3. MCP inline bibtex verification (scholar_verify_bibliography & scholar_cite_key on --registry-replay; no nonexistent scholar_import_bibtex)
 raw_bib_str = open(bib_path, encoding="utf-8").read()
 rpc_lines = "\n".join([
-    json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "scholar_import_bibtex", "arguments": {"projectPath": proj_dir, "bibtex": raw_bib_str}}}),
-    json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"projectPath": proj_dir, "citeKey": "fake_tampered"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "scholar_verify_bibliography", "arguments": {"bibtex": raw_bib_str, "lang": "zh"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"citeKey": "fake_tampered", "bibtex": raw_bib_str, "lang": "en"}}}),
 ]) + "\n"
 p_mcp = subprocess.run(
-    [cli_bin, "mcp", "--project", proj_dir, "--registry-replay", reg_dir],
+    [cli_bin, "mcp", "--registry-replay", reg_dir],
     input=rpc_lines,
     env=env,
     capture_output=True,
     text=True,
 )
 assert p_mcp.returncode == 0, p_mcp.stderr
-resps = [json.loads(ln) for ln in p_mcp.stdout.strip().splitlines() if ln.strip()]
-cite_resp = [r for r in resps if r.get("id") == 2][0]
+resps = {r.get("id"): r for r in (json.loads(ln) for ln in p_mcp.stdout.strip().splitlines() if ln.strip())}
+
+vb_res = (resps.get(1) or {}).get("result") or {}
+assert vb_res.get("isError") is False, vb_res
+vb_report = json.loads(vb_res["content"][0]["text"])
+assert vb_report.get("mode") == "REPLAY", vb_report
+vb_v0 = vb_report["verdicts"][0]
+assert vb_v0["citeKey"] == "fake_tampered", vb_v0
+assert vb_v0["firewallClass"] == "NOT_FOUND" and vb_v0["insertable"] is False, vb_v0
+assert "doi_not_registered" in (vb_v0.get("reasons") or []), vb_v0["reasons"]
+assert any("未采信" in (f.get("detail") or "") and "VERIFIED" in (f.get("detail") or "") for f in (vb_v0.get("findings") or [])), vb_v0["findings"]
+
+cite_resp = resps[2]
 res_obj = cite_resp.get("result") or {}
-err_blob = json.dumps(cite_resp, ensure_ascii=False)
-assert res_obj.get("isError") is True and "ERR_UNVERIFIED_CITATION" in err_blob, err_blob
+assert res_obj.get("isError") is True, cite_resp
 cite_err = json.loads(res_obj["content"][0]["text"])
+assert cite_err.get("error_code") == "ERR_UNVERIFIED_CITATION", cite_err
+assert cite_err.get("mode") == "REPLAY", cite_err
+assert cite_err.get("cite_key") == "fake_tampered", cite_err
 assert cite_err.get("verdict") == "NOT_FOUND", cite_err
 assert "doi_not_registered" in (cite_err.get("reasons") or []), cite_err
-assert any("not trusted" in (f.get("detail") or "").lower() for f in (cite_err.get("findings") or [])), cite_err
+assert "cite_key_not_in_bibliography" not in (cite_err.get("reasons") or []), cite_err
+assert any("not trusted" in (f.get("detail") or "").lower() and "verified" in (f.get("detail") or "").lower() for f in (cite_err.get("findings") or [])), cite_err
 
-print("verify_citations=NOT_FOUND(未采信) diagnostics=ERR_UNVERIFIED_CITATION mcp_scholar_cite_key=ERR_UNVERIFIED_CITATION")
+print("verify_citations=NOT_FOUND(未采信) diagnostics=ERR_UNVERIFIED_CITATION mcp_verify_bibliography=NOT_FOUND(doi_not_registered,未采信) mcp_scholar_cite_key=ERR_UNVERIFIED_CITATION(NOT_FOUND,doi_not_registered,not_trusted)")
 PY
 )"
         ROW18_RC=$?
