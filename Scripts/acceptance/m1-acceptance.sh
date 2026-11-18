@@ -1489,7 +1489,7 @@ cite_err = json.loads(res_obj["content"][0]["text"])
 assert cite_err.get("error_code") == "ERR_UNVERIFIED_CITATION", cite_err
 assert cite_err.get("mode") == "REPLAY", cite_err
 assert cite_err.get("cite_key") == "fake_tampered", cite_err
-assert cite_err.get("verdict") == "NOT_FOUND", cite_err
+assert cite_err.get("verdict") == "DRIFT", cite_err
 assert "doi_not_registered" in (cite_err.get("reasons") or []), cite_err
 assert "cite_key_not_in_bibliography" not in (cite_err.get("reasons") or []), cite_err
 assert any("not trusted" in (f.get("detail") or "").lower() and "verified" in (f.get("detail") or "").lower() for f in (cite_err.get("findings") or [])), cite_err
