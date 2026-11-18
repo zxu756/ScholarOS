@@ -1,4 +1,5 @@
 import Foundation
+import ScholarModels
 
 // MARK: - Registry Transport Errors, Responses & Injectable Sessions
 
@@ -823,7 +824,7 @@ public actor RegistryRateLimiter {
 public struct LiveURLSessionRegistryClient: CitationRegistrySession, Sendable {
     public typealias RawDataLoader = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
-    public static let currentVersion: String = "1.4.0"
+    public static let currentVersion: String = ScholarOSVersion.current
     public static let defaultUserAgent: String = "ScholarOS/\(currentVersion)"
     public static let defaultTimeoutInterval: TimeInterval = 15.0
 

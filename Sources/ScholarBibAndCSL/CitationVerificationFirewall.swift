@@ -1573,7 +1573,9 @@ public struct CitationVerificationFirewall: Sendable {
             : offline.reasons
 
         if let inRun = inRunVerdictsByKey[entry.citeKey] {
-            if case .expired(_, _, let dayStr) = inRun.auditedEntry.evaluateFirewallFreshness(at: now) {
+            let isPureReplayInRun = !inRun.sources.isEmpty && inRun.sources.allSatisfy { $0.origin == .replay }
+            if !isPureReplayInRun,
+               case .expired(_, _, let dayStr) = inRun.auditedEntry.evaluateFirewallFreshness(at: now) {
                 if offline.firewallClass == .notFound || offline.firewallClass == .retracted {
                     return (offline.firewallClass, offline.auditNote, offline.reasons)
                 }
@@ -1661,7 +1663,9 @@ public struct CitationVerificationFirewall: Sendable {
 
         // 1. Verdict computed in the current run (e.g. `cite`, `scholar_cite_key`, or `verifyCitationsOnline`)
         if let inRunVerdict = verifiedVerdicts[trimmedKey] {
-            if case .expired(_, _, let fetchedAtUTC) = inRunVerdict.auditedEntry.evaluateFirewallFreshness(at: now) {
+            let isPureReplayInRun = !inRunVerdict.sources.isEmpty && inRunVerdict.sources.allSatisfy { $0.origin == .replay }
+            if !isPureReplayInRun,
+               case .expired(_, _, let fetchedAtUTC) = inRunVerdict.auditedEntry.evaluateFirewallFreshness(at: now) {
                 if offlineCheck.firewallClass == .notFound || offlineCheck.firewallClass == .retracted {
                     throw ScholarOSError.unverifiedCitationBlocked(
                         citeKey: entry.citeKey,
@@ -6187,11 +6191,11 @@ public struct CitationVerificationFirewall: Sendable {
                 }
             }
             updated.firewallVerifiedSource = uniqueNames.joined(separator: ", ")
-            if let cacheRec = respondedSources.first(where: { $0.origin == .cache }),
-               let cachedDay = Optional(Self.shortDateLabel(from: cacheRec.fetchedAt)),
-               BibliographyEntry.parseUTCDayStart(cachedDay) != nil
+            if let recordedOrCachedRec = respondedSources.first(where: { $0.origin == .cache || $0.origin == .replay }),
+               let recordedDay = Optional(Self.shortDateLabel(from: recordedOrCachedRec.fetchedAt)),
+               BibliographyEntry.parseUTCDayStart(recordedDay) != nil
             {
-                updated.firewallVerifiedAtUTC = cachedDay
+                updated.firewallVerifiedAtUTC = recordedDay
             } else {
                 updated.firewallVerifiedAtUTC = BibliographyEntry.formatUTCDay(clock.currentDate())
             }

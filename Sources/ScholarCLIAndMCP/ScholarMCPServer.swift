@@ -119,9 +119,12 @@ public struct ScholarMCPServer: Sendable {
                 "capabilities": ["tools": [String: Any]()],
                 "serverInfo": [
                     "name": "scholaros-mcp",
-                    "version": "1.0.0"
+                    "version": ScholarOSVersion.current
                 ]
             ]
+
+        case "ping":
+            resultPayload = [String: Any]()
 
         case "tools/list":
             resultPayload = ["tools": Self.toolDefinitions]
@@ -189,7 +192,7 @@ public struct ScholarMCPServer: Sendable {
 
         let resultPayload: Any
         switch method {
-        case "initialize", "tools/list":
+        case "initialize", "tools/list", "ping":
             return handleJSONRPCLine(rawLine)
 
         case "tools/call":
@@ -428,14 +431,42 @@ public struct ScholarMCPServer: Sendable {
                 }
 
                 let firewall = CitationVerificationFirewall(clock: registryClock)
+                let citeModeLabel: String
+                switch mode {
+                case .replay:
+                    citeModeLabel = "REPLAY"
+                case .offline:
+                    citeModeLabel = isDemo ? "DEMO" : (isReplayServer && !callOffline ? "REPLAY" : "offline")
+                case .online, .record:
+                    citeModeLabel = "online"
+                }
+
                 guard let targetEntry = byKey[citeKey] else {
-                    let verifiedEntry = try firewall.assertCitationAllowed(
-                        citeKey: citeKey,
-                        in: byKey,
-                        verifiedVerdicts: [:],
-                        language: lang
-                    )
-                    return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
+                    do {
+                        let verifiedEntry = try firewall.assertCitationAllowed(
+                            citeKey: citeKey,
+                            in: byKey,
+                            verifiedVerdicts: [:],
+                            language: lang
+                        )
+                        return formatCiteKeyResult(
+                            verifiedEntry: verifiedEntry,
+                            verdict: nil,
+                            styleRaw: styleRaw,
+                            formatRaw: formatRaw,
+                            modeLabel: citeModeLabel,
+                            isDemo: isDemo
+                        )
+                    } catch let ScholarOSError.unverifiedCitationBlocked(key, status, reason) {
+                        return formatUnverifiedCitationErrorResult(
+                            citeKey: key,
+                            verdictCode: status,
+                            verdict: nil,
+                            missingFromBibliography: true,
+                            reason: reason,
+                            modeLabel: citeModeLabel
+                        )
+                    }
                 }
 
                 let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
@@ -453,13 +484,32 @@ public struct ScholarMCPServer: Sendable {
                 for verdict in verificationResult.report.verdicts {
                     verdicts[verdict.citeKey] = verdict
                 }
-                let verifiedEntry = try firewall.assertCitationAllowed(
-                    citeKey: citeKey,
-                    in: byKey,
-                    verifiedVerdicts: verdicts,
-                    language: lang
-                )
-                return formatCiteKeyResult(verifiedEntry: verifiedEntry, styleRaw: styleRaw, formatRaw: formatRaw, isDemo: isDemo)
+                let matchedVerdict = verdicts[citeKey]
+                do {
+                    let verifiedEntry = try firewall.assertCitationAllowed(
+                        citeKey: citeKey,
+                        in: byKey,
+                        verifiedVerdicts: verdicts,
+                        language: lang
+                    )
+                    return formatCiteKeyResult(
+                        verifiedEntry: verifiedEntry,
+                        verdict: matchedVerdict,
+                        styleRaw: styleRaw,
+                        formatRaw: formatRaw,
+                        modeLabel: citeModeLabel,
+                        isDemo: isDemo
+                    )
+                } catch let ScholarOSError.unverifiedCitationBlocked(key, status, reason) {
+                    return formatUnverifiedCitationErrorResult(
+                        citeKey: key,
+                        verdictCode: status,
+                        verdict: matchedVerdict,
+                        missingFromBibliography: false,
+                        reason: reason,
+                        modeLabel: citeModeLabel
+                    )
+                }
 
             case "scholar_verify_bibliography":
                 let entries: [BibliographyEntry]
@@ -606,10 +656,18 @@ public struct ScholarMCPServer: Sendable {
                     )
                     lsp.applyVerificationReport(verificationResult.report)
                     let diagReport = lsp.diagnosticsReport()
+                    let isErr = diagReport.firewallViolationCount > 0 || diagReport.errorCount > 0
+                    if case .replay = mode {
+                        let diagData = try JSONEncoder().encode(diagReport.diagnostics)
+                        let diagArr = (try? JSONSerialization.jsonObject(with: diagData)) ?? []
+                        let replayObj: [String: Any] = ["mode": "REPLAY", "diagnostics": diagArr]
+                        let outData = try JSONSerialization.data(withJSONObject: replayObj, options: [.sortedKeys, .withoutEscapingSlashes])
+                        return textResult(String(decoding: outData, as: UTF8.self), isError: isErr)
+                    }
                     let data = try JSONEncoder().encode(diagReport.diagnostics)
                     return textResult(
                         String(decoding: data, as: UTF8.self),
-                        isError: diagReport.firewallViolationCount > 0 || diagReport.errorCount > 0
+                        isError: isErr
                     )
                 }
 
@@ -641,10 +699,18 @@ public struct ScholarMCPServer: Sendable {
                 )
                 lsp.applyVerificationReport(verificationResult.report)
                 let diagReport = lsp.diagnosticsReport()
+                let isProjErr = diagReport.firewallViolationCount > 0
+                if case .replay = mode {
+                    let diagData = try JSONEncoder().encode(diagReport.diagnostics)
+                    let diagArr = (try? JSONSerialization.jsonObject(with: diagData)) ?? []
+                    let replayObj: [String: Any] = ["mode": "REPLAY", "diagnostics": diagArr]
+                    let outData = try JSONSerialization.data(withJSONObject: replayObj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: outData, as: UTF8.self), isError: isProjErr)
+                }
                 let data = try JSONEncoder().encode(diagReport.diagnostics)
                 return textResult(
                     String(decoding: data, as: UTF8.self),
-                    isError: diagReport.firewallViolationCount > 0
+                    isError: isProjErr
                 )
 
             default:
@@ -663,11 +729,13 @@ public struct ScholarMCPServer: Sendable {
             let prefix = "[\(scholarErr.errorCodeIdentifier)] "
             let body = scholarErr.errorDescription ?? String(describing: scholarErr)
             let formatted = body.hasPrefix("[") ? body : (prefix + body)
-            return textResult(formatted, isError: true)
+            return wrapErrorTextIfReplay(code: scholarErr.errorCodeIdentifier, message: formatted)
         } catch let replayErr as RegistryReplayError {
-            return textResult("[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)", isError: true)
+            let msg = "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)"
+            return wrapErrorTextIfReplay(code: "ERR_REGISTRY_REPLAY", message: msg)
         } catch {
-            return textResult("[ERR_SCHOLAROS] \(error.localizedDescription)", isError: true)
+            let msg = "[ERR_SCHOLAROS] \(error.localizedDescription)"
+            return wrapErrorTextIfReplay(code: "ERR_SCHOLAROS", message: msg)
         }
     }
 
@@ -706,6 +774,12 @@ public struct ScholarMCPServer: Sendable {
                     limit: arguments["topK"] as? Int ?? 5
                 ).map(\.chunk)
                 let data = try JSONEncoder().encode(hits)
+                if isReplayServer {
+                    let arr = (try? JSONSerialization.jsonObject(with: data)) ?? []
+                    let obj: [String: Any] = ["mode": "REPLAY", "passages": arr]
+                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                }
                 return textResult(String(decoding: data, as: UTF8.self), isError: false)
 
             case "scholar_prisma_agreement":
@@ -740,6 +814,11 @@ public struct ScholarMCPServer: Sendable {
                     summary.pabakScore,
                     qc.gwetsAC1.pointEstimate
                 )
+                if isReplayServer {
+                    let obj: [String: Any] = ["mode": "REPLAY", "summary": text]
+                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                }
                 return textResult(text, isError: false)
 
             case "scholar_editorial_audit":
@@ -756,6 +835,12 @@ public struct ScholarMCPServer: Sendable {
                         bibliography: entries
                     )
                     let data = try JSONEncoder().encode(runSummary.findings)
+                    if isReplayServer {
+                        let arr = (try? JSONSerialization.jsonObject(with: data)) ?? []
+                        let obj: [String: Any] = ["mode": "REPLAY", "findings": arr]
+                        let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                        return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                    }
                     return textResult(String(decoding: data, as: UTF8.self), isError: false)
                 }
                 let opened = try openDatabase(from: arguments)
@@ -771,6 +856,12 @@ public struct ScholarMCPServer: Sendable {
                     bibliography: entries
                 )
                 let data = try JSONEncoder().encode(runSummary.findings)
+                if isReplayServer {
+                    let arr = (try? JSONSerialization.jsonObject(with: data)) ?? []
+                    let obj: [String: Any] = ["mode": "REPLAY", "findings": arr]
+                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                }
                 return textResult(String(decoding: data, as: UTF8.self), isError: false)
 
             case "scholar_track_changes_diff":
@@ -779,6 +870,11 @@ public struct ScholarMCPServer: Sendable {
                 let engine = MyersWordLevelTrackChangesEngine()
                 let report = engine.diff(original: original, revised: revised)
                 let latexdiff = engine.renderLatexdiffMarkup(from: report)
+                if isReplayServer {
+                    let obj: [String: Any] = ["mode": "REPLAY", "latexdiff": latexdiff]
+                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                }
                 return textResult(latexdiff, isError: false)
 
             case "scholar_citation_gaps":
@@ -793,10 +889,17 @@ public struct ScholarMCPServer: Sendable {
                     maxRecommendations: 5
                 )
                 let data = try JSONEncoder().encode(gaps)
+                if isReplayServer {
+                    let arr = (try? JSONSerialization.jsonObject(with: data)) ?? []
+                    let obj: [String: Any] = ["mode": "REPLAY", "recommendations": arr]
+                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
+                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
+                }
                 return textResult(String(decoding: data, as: UTF8.self), isError: false)
 
             default:
-                return textResult("[ERR_SCHOLAROS] Unknown MCP tool '\(name)'", isError: true)
+                let msg = "[ERR_SCHOLAROS] Unknown MCP tool '\(name)'"
+                return wrapErrorTextIfReplay(code: "ERR_SCHOLAROS", message: msg)
             }
         } catch let scholarErr as ScholarOSError {
             if case .invalidCLIArguments(let detail) = scholarErr {
@@ -811,9 +914,10 @@ public struct ScholarMCPServer: Sendable {
             let prefix = "[\(scholarErr.errorCodeIdentifier)] "
             let body = scholarErr.errorDescription ?? String(describing: scholarErr)
             let formatted = body.hasPrefix("[") ? body : (prefix + body)
-            return textResult(formatted, isError: true)
+            return wrapErrorTextIfReplay(code: scholarErr.errorCodeIdentifier, message: formatted)
         } catch {
-            return textResult("[ERR_SCHOLAROS] \(error.localizedDescription)", isError: true)
+            let msg = "[ERR_SCHOLAROS] \(error.localizedDescription)"
+            return wrapErrorTextIfReplay(code: "ERR_SCHOLAROS", message: msg)
         }
     }
 
@@ -862,10 +966,79 @@ public struct ScholarMCPServer: Sendable {
         )
     }
 
+    private func wrapErrorTextIfReplay(code: String, message: String) -> [String: Any] {
+        guard isReplayServer else {
+            return textResult(message, isError: true)
+        }
+        let obj: [String: Any] = [
+            "mode": "REPLAY",
+            "error_code": code,
+            "reason": message
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes]) {
+            return textResult(String(decoding: data, as: UTF8.self), isError: true)
+        }
+        return textResult(message, isError: true)
+    }
+
+    private func formatUnverifiedCitationErrorResult(
+        citeKey: String,
+        verdictCode: String,
+        verdict: CitationFirewallEntryVerdict?,
+        missingFromBibliography: Bool,
+        reason: String,
+        modeLabel: String
+    ) -> [String: Any] {
+        let reasons: [String]
+        if let v = verdict, !v.reasons.isEmpty {
+            reasons = v.reasons
+        } else if missingFromBibliography {
+            reasons = ["cite_key_not_in_bibliography"]
+        } else {
+            reasons = []
+        }
+        let fieldsArr: Any
+        let findingsArr: Any
+        let sourcesArr: Any
+        if let v = verdict {
+            let encoder = JSONEncoder()
+            fieldsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.fields))) ?? []
+            findingsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.findings))) ?? []
+            sourcesArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.sources))) ?? []
+        } else {
+            fieldsArr = [Any]()
+            findingsArr = [Any]()
+            sourcesArr = [Any]()
+        }
+
+        var payload: [String: Any] = [
+            "error_code": "ERR_UNVERIFIED_CITATION",
+            "category": "unverified_citation",
+            "cite_key": citeKey,
+            "verdict": verdictCode,
+            "reasons": reasons,
+            "fields": fieldsArr,
+            "findings": findingsArr,
+            "sources": sourcesArr,
+            "reason": reason
+        ]
+        if modeLabel == "REPLAY" || isReplayServer {
+            payload["mode"] = "REPLAY"
+        } else {
+            payload["mode"] = modeLabel
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
+            return textResult(String(decoding: data, as: UTF8.self), isError: true)
+        }
+        return textResult("[ERR_UNVERIFIED_CITATION] Key '\(citeKey)' (\(verdictCode)) rejected by Citation Firewall: \(reason)", isError: true)
+    }
+
     private func formatCiteKeyResult(
         verifiedEntry: BibliographyEntry,
+        verdict: CitationFirewallEntryVerdict?,
         styleRaw: String,
         formatRaw: String,
+        modeLabel: String,
         isDemo: Bool
     ) -> [String: Any] {
         let style: CitationFormatStyle
@@ -877,7 +1050,38 @@ public struct ScholarMCPServer: Sendable {
         default: style = .apa7
         }
         let formatted = CSLCitationFormatterEngine().formatEntry(verifiedEntry, style: style)
-        let snippet = formatRaw == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
+        let formatNormalized = formatRaw == "typst" ? "typst" : "latex"
+        let snippet = formatNormalized == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
+        let effectiveMode = isDemo ? "DEMO" : modeLabel
+
+        var payload: [String: Any] = [
+            "mode": effectiveMode,
+            "status": "CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)",
+            "cite_key": verifiedEntry.citeKey,
+            "verdict": verifiedEntry.firewallClass.rawValue,
+            "format": formatNormalized,
+            "style": style.rawValue,
+            "snippet": snippet,
+            "reference": formatted.bibliographyPlainText
+        ]
+        if effectiveMode == "REPLAY" {
+            payload["replay"] = true
+        }
+        if let v = verdict {
+            let encoder = JSONEncoder()
+            if let srcObj = try? JSONSerialization.jsonObject(with: encoder.encode(v.sources)) {
+                payload["sources"] = srcObj
+            }
+            if let findingsObj = try? JSONSerialization.jsonObject(with: encoder.encode(v.findings)) {
+                payload["findings"] = findingsObj
+            }
+        }
+        if let verifiedAt = verifiedEntry.firewallVerifiedAtUTC {
+            payload["verified_at_utc"] = verifiedAt
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
+            return textResult(String(decoding: data, as: UTF8.self), isError: false)
+        }
         let demoPrefix = isDemo ? "[DEMO]\n" : ""
         let payloadText = """
         \(demoPrefix)[CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)]

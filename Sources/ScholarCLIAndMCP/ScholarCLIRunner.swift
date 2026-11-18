@@ -180,8 +180,8 @@ public struct ScholarCLIRunner: Sendable {
         case "version", "--version":
             return CLIExecutionOutput(
                 stdout: lang.L(
-                    "ScholarOS 1.4.0 (macOS arm64 · LaTeX/BibTeX Parser, CSL Formatter & Citation Audit · 中文/EN)",
-                    "ScholarOS 1.4.0 (macOS arm64 · LaTeX/BibTeX 解析、CSL 引文排版与引文核查 · 中文/EN)"
+                    "ScholarOS \(ScholarOSVersion.current) (macOS arm64 · LaTeX/BibTeX Parser, CSL Formatter & Citation Audit · 中文/EN)",
+                    "ScholarOS \(ScholarOSVersion.current) (macOS arm64 · LaTeX/BibTeX 解析、CSL 引文排版与引文核查 · 中文/EN)"
                 ),
                 exitCode: 0
             )
@@ -1232,6 +1232,15 @@ public struct ScholarCLIRunner: Sendable {
                 registryClock: registryClock,
                 environment: effectiveEnvironment
             )
+            let replayStderrNotice: String
+            if validatedReplaySnapshot != nil {
+                let explicitCacheDir = effectiveEnvironment["SCHOLAR_CACHE_DIR"]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let replayUsesCache = !isOffline && !noCache && (explicitCacheDir?.isEmpty == false)
+                replayStderrNotice = Self.replayBannerLine(usesCache: replayUsesCache, lang: lang)
+            } else {
+                replayStderrNotice = ""
+            }
             if let mcpInputLines {
                 var outLines: [String] = []
                 for line in mcpInputLines {
@@ -1239,7 +1248,11 @@ public struct ScholarCLIRunner: Sendable {
                         outLines.append(resp)
                     }
                 }
-                return CLIExecutionOutput(stdout: outLines.joined(separator: "\n"), exitCode: 0)
+                return CLIExecutionOutput(stdout: outLines.joined(separator: "\n"), stderr: replayStderrNotice, exitCode: 0)
+            }
+            if !replayStderrNotice.isEmpty {
+                fputs("\(replayStderrNotice)\n", stderr)
+                fflush(stderr)
             }
             await server.serveStdio()
             return CLIExecutionOutput(stdout: "", exitCode: 0)
@@ -1843,7 +1856,7 @@ public struct ScholarCLIRunner: Sendable {
         switch lang {
         case .en:
             return """
-            ScholarOS 1.4.0 - Bilingual (中文/EN) LaTeX/BibTeX Analysis, CSL Formatting & Citation Audit CLI
+            ScholarOS \(ScholarOSVersion.current) - Bilingual (中文/EN) LaTeX/BibTeX Analysis, CSL Formatting & Citation Audit CLI
             Global Options:
               --lang zh|en                                           Select output / UI language (or set SCHOLAROS_LANG=zh|en)
 
@@ -1881,7 +1894,7 @@ public struct ScholarCLIRunner: Sendable {
             """
         case .zhHans:
             return """
-            ScholarOS 1.4.0 - 中英双语 (中文/EN) LaTeX/BibTeX 语法分析、CSL 引文格式化与引文核查命令行工具
+            ScholarOS \(ScholarOSVersion.current) - 中英双语 (中文/EN) LaTeX/BibTeX 语法分析、CSL 引文格式化与引文核查命令行工具
             全局选项：
               --lang zh|en                                           指定命令行 / 界面语言（或设置环境变量 SCHOLAROS_LANG=zh|en）
 
