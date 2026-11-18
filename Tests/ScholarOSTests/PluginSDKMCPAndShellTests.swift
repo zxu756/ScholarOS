@@ -6989,6 +6989,180 @@ struct PluginSDKMCPAndShellTests {
         #expect(afterBytes == initialBibBytes)
         #expect((afterAttrs[.modificationDate] as? Date) == initialMtime)
     }
+
+    @Test("M3 Stage 01 (S75): replay MCP server marks all tool results with mode='REPLAY', prints REPLAY notice on stderr, and sets firewallVerifiedAtUTC from recorded fetchedAt (2026-11-16) rather than current date")
+    func m3Stage01S75ReplayModeMarkersStderrBannerAndRecordedFirewallDate() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s75")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
+        let env = ["HOME": isolatedHome.path, "CFFIXED_USER_HOME": isolatedHome.path]
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+
+        // Use a clock well after 2026-11-16 (e.g. 2026-11-25, >1d after 2026-11-16 so NOT_FOUND 1d TTL would also be tested)
+        let futureFormatter = ISO8601DateFormatter()
+        let clockDate = try #require(futureFormatter.date(from: "2026-11-25T12:00:00Z"))
+        let futureClock = ClosureRegistryClock(now: { 0 }, currentDate: { clockDate }, sleep: { _ in })
+
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let rawRecheckBib = try String(contentsOf: recheckBibURL, encoding: .utf8)
+
+        // 1. CLI `scholaros mcp --registry-replay <dir>` writes [REPLAY] notice to stderr on startup
+        let initLine = #"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#
+        let mcpCLIRunner = ScholarCLIRunner(
+            registryClock: futureClock,
+            environment: env,
+            mcpInputLines: [initLine]
+        )
+        let mcpCLIOut = await mcpCLIRunner.runWithExitStatus(
+            arguments: ["mcp", "--registry-replay", registryDir.path, "--lang", "en"]
+        )
+        #expect(mcpCLIOut.exitCode == 0)
+        #expect(mcpCLIOut.stderr.contains("[REPLAY]"), "Expected [REPLAY] startup notice on stderr, got: \(mcpCLIOut.stderr)")
+
+        // 2. Seed a non-demo .scholarproj so project-backed tools can also be invoked on the replay server
+        let bundleURL = tempDir.appendingPathComponent("ReplayCheck.scholarproj")
+        let db = try ScholarProjectDatabase(bundleURL: bundleURL, seedDemoIfEmpty: true, clock: futureClock)
+        db.close()
+
+        let texFile = tempDir.appendingPathComponent("paper.tex")
+        try "\\documentclass{article}\\begin{document}\\section{Intro}Cite \\cite{real_lecun}.\\end{document}\n"
+            .write(to: texFile, atomically: true, encoding: .utf8)
+
+        let replayServer = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: futureClock,
+            environment: env
+        )
+
+        // 3. `scholar_verify_bibliography`: mode == "REPLAY" AND firewallVerifiedAtUTC == "2026-11-16" (NOT "2026-11-25")
+        let verifyRes = await replayServer.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": rawRecheckBib]
+        )
+        #expect(verifyRes["isError"] as? Bool == false)
+        let verifyText = try #require(((verifyRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let verifyObj = try #require(JSONSerialization.jsonObject(with: Data(verifyText.utf8)) as? [String: Any])
+        #expect(verifyObj["mode"] as? String == "REPLAY")
+        let verdicts = try #require(verifyObj["verdicts"] as? [[String: Any]])
+        let lecunVerdict = try #require(verdicts.first { ($0["citeKey"] as? String) == "real_lecun" })
+        let lecunAudited = try #require(lecunVerdict["auditedEntry"] as? [String: Any])
+        #expect(
+            lecunAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16",
+            "Expected recorded date 2026-11-16 on replay auditedEntry, got \(String(describing: lecunAudited["firewallVerifiedAtUTC"]))"
+        )
+        let fakeVerdict = try #require(verdicts.first { ($0["citeKey"] as? String) == "fake_nonsentinel" })
+        #expect(fakeVerdict["firewallClass"] as? String == "NOT_FOUND")
+        let fakeAudited = try #require(fakeVerdict["auditedEntry"] as? [String: Any])
+        #expect(fakeAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16")
+
+        // 4. `scholar_cite_key` on replay server: returns JSON with top-level mode == "REPLAY" (both success and rejection)
+        let citeOK = await replayServer.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib]
+        )
+        #expect(citeOK["isError"] as? Bool == false)
+        let citeOKText = try #require(((citeOK["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let citeOKObj = try #require(
+            try? JSONSerialization.jsonObject(with: Data(citeOKText.utf8)) as? [String: Any],
+            "Expected JSON object with mode='REPLAY' from scholar_cite_key, got: \(citeOKText)"
+        )
+        #expect(citeOKObj["mode"] as? String == "REPLAY")
+        #expect(citeOKText.contains("CITATION_STATUS:VERIFIED"))
+
+        let citeFake = await replayServer.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "fake_nonsentinel", "bibtex": rawRecheckBib]
+        )
+        #expect(citeFake["isError"] as? Bool == true)
+        let citeFakeText = try #require(((citeFake["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let citeFakeObj = try #require(
+            try? JSONSerialization.jsonObject(with: Data(citeFakeText.utf8)) as? [String: Any],
+            "Expected structured JSON error with mode='REPLAY' from scholar_cite_key, got: \(citeFakeText)"
+        )
+        #expect(citeFakeObj["mode"] as? String == "REPLAY")
+        #expect(citeFakeObj["verdict"] as? String == "NOT_FOUND")
+
+        // 5. All other tools on replay server also carry top-level mode == "REPLAY"
+        let otherToolCalls: [(String, [String: Any])] = [
+            ("scholar_lsp_diagnostics", ["path": texFile.path, "bibPath": recheckBibURL.path]),
+            ("scholar_lsp_diagnostics", ["source": "\\section{A}Cite \\cite{real_lecun}.\n", "bibtex": rawRecheckBib]),
+            ("scholar_search_provenance", ["claim": "attention"]),
+            ("scholar_prisma_agreement", [:]),
+            ("scholar_editorial_audit", ["source": "\\section{Test}\nPlain text.\n"]),
+            ("scholar_track_changes_diff", ["original": "Old text.", "revised": "New text."]),
+            ("scholar_citation_gaps", [:])
+        ]
+        for (toolName, args) in otherToolCalls {
+            let res = await replayServer.executeToolCallAsync(name: toolName, arguments: args)
+            let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let obj = try #require(
+                try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+                "Expected JSON object with mode='REPLAY' for \(toolName), got: \(text)"
+            )
+            #expect(obj["mode"] as? String == "REPLAY", "Tool \(toolName) missing mode='REPLAY': \(obj)")
+        }
+    }
+
+    @Test("M3 Stage 01 (S78): ping returns empty object {}, serverInfo.version equals scholaros version output (not hardcoded), invalid JSON returns -32700, and unknown method returns -32601")
+    func m3Stage01S78ProtocolPingVersionMatchingCLIAndJSONRPCErrors() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s78")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let cli = ScholarCLIRunner(environment: env)
+        let cliVersionBanner = try await cli.execute(arguments: ["version"])
+        // Parse "ScholarOS <version> (...)" dynamically without hardcoding "1.4.0"
+        let bannerTokens = cliVersionBanner.split(whereSeparator: \.isWhitespace)
+        #expect(bannerTokens.count >= 2 && bannerTokens[0] == "ScholarOS")
+        let expectedVersion = bannerTokens.count >= 2 ? String(bannerTokens[1]) : ""
+        #expect(!expectedVersion.isEmpty)
+        #expect(expectedVersion != "1.0.0")
+
+        let server = ScholarMCPServer(isOffline: true, environment: env)
+
+        // 1. initialize -> serverInfo.version == CLI version
+        let initRaw = try #require(await server.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#))
+        let initJSON = try #require(JSONSerialization.jsonObject(with: Data(initRaw.utf8)) as? [String: Any])
+        let initResult = try #require(initJSON["result"] as? [String: Any])
+        let serverInfo = try #require(initResult["serverInfo"] as? [String: Any])
+        #expect(
+            serverInfo["version"] as? String == expectedVersion,
+            "Expected serverInfo.version '\(expectedVersion)' to match CLI version, got \(String(describing: serverInfo["version"]))"
+        )
+
+        // 2. ping -> empty object {} (both sync and async, with and without params)
+        for pingLine in [
+            #"{"jsonrpc":"2.0","id":2,"method":"ping"}"#,
+            #"{"jsonrpc":"2.0","id":"ping-str","method":"ping","params":{}}"#
+        ] {
+            let syncReply = try #require(server.handleJSONRPCLine(pingLine))
+            let syncObj = try #require(JSONSerialization.jsonObject(with: Data(syncReply.utf8)) as? [String: Any])
+            #expect(syncObj["error"] == nil, "ping must not return error: \(syncReply)")
+            let syncResult = try #require(syncObj["result"] as? [String: Any])
+            #expect(syncResult.isEmpty, "ping result must be empty object {}, got \(syncResult)")
+
+            let asyncReply = try #require(await server.handleJSONRPCLineAsync(pingLine))
+            let asyncObj = try #require(JSONSerialization.jsonObject(with: Data(asyncReply.utf8)) as? [String: Any])
+            #expect(asyncObj["error"] == nil, "async ping must not return error: \(asyncReply)")
+            let asyncResult = try #require(asyncObj["result"] as? [String: Any])
+            #expect(asyncResult.isEmpty, "async ping result must be empty object {}, got \(asyncResult)")
+        }
+
+        // 3. Invalid JSON -> -32700, unknown method -> -32601
+        let badJSONReply = try #require(await server.handleJSONRPCLineAsync("{not-json"))
+        let badJSONObj = try #require(JSONSerialization.jsonObject(with: Data(badJSONReply.utf8)) as? [String: Any])
+        #expect((badJSONObj["error"] as? [String: Any])?["code"] as? Int == -32700)
+
+        let unknownMethodReply = try #require(await server.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":9,"method":"unknown/method"}"#))
+        let unknownMethodObj = try #require(JSONSerialization.jsonObject(with: Data(unknownMethodReply.utf8)) as? [String: Any])
+        #expect((unknownMethodObj["error"] as? [String: Any])?["code"] as? Int == -32601)
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
