@@ -2,7 +2,7 @@
 
 **English** | **[简体中文](README.zh-CN.md)**
 
-macOS Swift package (`1.4.0`) and bilingual (`--lang en|zh`) command-line tool (`scholaros`) for online citation verification against public scholarly registries, LaTeX/BibTeX parsing, APA 7th / IEEE reference formatting, statistical agreement/meta-analysis library routines, and a stdio JSON-RPC 2.0 MCP server.
+macOS Swift package (`1.4.1`) and bilingual (`--lang en|zh`) command-line tool (`scholaros`) for online citation verification against public scholarly registries, LaTeX/BibTeX parsing, APA 7th / IEEE reference formatting, statistical agreement/meta-analysis library routines, and a stdio JSON-RPC 2.0 MCP server.
 
 > **Fabricated references do not enter your `.bib`.** On a 480-entry mixed benchmark of real, fabricated, mutated, and retracted references, **0** fabricated entries are judged verified (`0/80` in `fabricated_model`; `0/86` across all `truth=fabricated` entries; `0/254` across all non-insertable entries), and the rate at which genuine references in the three real groups are falsely judged non-existent or retracted (`NOT_FOUND` or `RETRACTED`) is **0% (`0/215`)** (`0/220` across all 220 entries of the three real groups; `0/225` across all `truth=real` entries in the benchmark).
 

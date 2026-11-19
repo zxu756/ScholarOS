@@ -1047,11 +1047,11 @@ struct BibCSLAndFirewallTests {
 
     // MARK: - 7. S43 Registry Transport Layer Tests
 
-    @Test("S43 regression: ephemeral session config has nil URLCache, 15s timeout, ScholarOS/1.4.0 User-Agent without @ or mailto, and no politeMailto in Sources")
+    @Test("S43 regression: ephemeral session config has nil URLCache, 15s timeout, ScholarOS/1.4.1 User-Agent without @ or mailto, and no politeMailto in Sources")
     func s43TransportDefaultsUserAgentAndNoPoliteMailtoInSources() async throws {
         let defaultClient = LiveURLSessionRegistryClient()
         #expect(defaultClient.timeoutInterval == 15.0)
-        #expect(LiveURLSessionRegistryClient.defaultUserAgent == "ScholarOS/1.4.0")
+        #expect(LiveURLSessionRegistryClient.defaultUserAgent == "ScholarOS/1.4.1")
 
         let config = try #require(defaultClient.sessionConfiguration)
         #expect(config.urlCache == nil)
@@ -1094,7 +1094,7 @@ struct BibCSLAndFirewallTests {
         #expect(sent.timeoutInterval == 15.0)
         #expect(sent.cachePolicy == .reloadIgnoringLocalCacheData)
         let ua = try #require(sent.value(forHTTPHeaderField: "User-Agent"))
-        #expect(ua == "ScholarOS/1.4.0")
+        #expect(ua == "ScholarOS/1.4.1")
         #expect(!ua.contains("@"))
         #expect(!ua.lowercased().contains("mailto"))
         #expect(!ua.lowercased().contains("http://"))
@@ -1196,7 +1196,7 @@ struct BibCSLAndFirewallTests {
         let protocolClient = LiveURLSessionRegistryClient(protocolClasses: [HeaderStubURLProtocol.self])
         let protoRes = try await protocolClient.send(URLRequest(url: url))
         #expect(protoRes.statusCode == 200)
-        #expect(String(data: protoRes.body, encoding: .utf8) == "ScholarOS/1.4.0")
+        #expect(String(data: protoRes.body, encoding: .utf8) == "ScholarOS/1.4.1")
         #expect(protoRes.headers["Content-Type"] == "application/json")
         #expect(protoRes.headers["x-ratelimit-remaining"] == "990")
         #expect(protoRes.headers["x-ratelimit-cost-usd"] == "0")
@@ -1471,14 +1471,14 @@ struct BibCSLAndFirewallTests {
         let manifest = try await recorder.finalize()
         #expect(manifest.count == 1)
         #expect(manifest.totalHTTPRequestsSent == 1)
-        #expect(manifest.userAgent == "ScholarOS/1.4.0")
+        #expect(manifest.userAgent == "ScholarOS/1.4.1")
 
         let item = try #require(manifest.items.first)
         #expect(item.service == "doi")
         #expect(item.status == 404)
         #expect(item.byteLength == exact404Body.count)
         #expect(item.responseDateHeader == "Sun, 15 Nov 2026 11:00:00 GMT")
-        #expect(item.requestHeaders["User-Agent"] == "ScholarOS/1.4.0")
+        #expect(item.requestHeaders["User-Agent"] == "ScholarOS/1.4.1")
         #expect(item.responseHeaders["Date"] == "Sun, 15 Nov 2026 11:00:00 GMT")
         #expect(item.responseHeaders["x-ratelimit-limit"] == "1000")
         #expect(item.responseHeaders["x-ratelimit-remaining"] == "958")

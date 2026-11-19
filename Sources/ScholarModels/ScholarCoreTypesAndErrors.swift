@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Product Version & Manuscript Languages, Text Spans & Domain Errors
 
 public enum ScholarOSVersion {
-    public static let current: String = "1.4.0"
+    public static let current: String = "1.4.1"
 }
 
 public enum ManuscriptFormat: String, Sendable, Codable, Hashable, CaseIterable {
