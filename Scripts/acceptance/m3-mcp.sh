@@ -2,7 +2,7 @@
 #
 # M3 acceptance verification script (`Scripts/acceptance/m3-mcp.sh`).
 #
-# Stage 01 scope (active rows):
+# Stage 01–02 scope (active rows):
 #   - Row 1:  `tools/list` — Stage 01 verifies 0 tools expose `registryReplayPath` in `inputSchema` or `description`;
 #             new tools (`verify_citation`, `add_verified_bibtex`, `check_manuscript`) & frozen-tool gating deferred to Stages 04–05 (`没跑`)
 #   - Row 10: Caller fake replay (`S74`) — builds a self-consistent fake replay directory on the fly in scratch and verifies
@@ -14,8 +14,11 @@
 #   - Row 17: Protocol (`S78`) — `ping` returns `{}`, `serverInfo.version` dynamically matches `scholaros version`,
 #             malformed JSON returns `-32700`, unknown method returns `-32601`
 #   - Row 19: Unit tests (`S79`) — `swift test --no-parallel` passes (>= 289 tests) both without and with `SCHOLAR_CACHE_DIR`
+#   - Row 20: Non-regression (`S77` / `S81`) — Stage 02 verifies `m1-citation-bench.py --replay`, 480-entry per-entry `{verdict, reasons, insertable}`
+#             & 12-group exit codes vs baseline (plus 206/206 `VERIFIED` carrying `record`), and `m1-acceptance.sh --row 18`;
+#             `Scripts/test.sh milestone 2` & Stage 05 new-tool M1 Row 18/20 updates deferred to Stage 05 (`没跑`)
 #
-# Remaining rows print `没跑` in Stage 01.
+# Remaining rows print `没跑` in Stage 02.
 # Exit code: 0 only when all executed rows PASS and 0 rows are `没跑`; 1 on any FAIL; 2 when 0 FAIL and >= 1 `没跑`.
 #
 # Usage:
@@ -645,12 +648,185 @@ PY
     fi
 
     # ==================================================================
-    # Rows 20–23: Deferred to Stages 05–07
+    # Row 20: Non-regression — Stage 02 runs 480-entry replay parity + m1-citation-bench --replay + M1 Row 18;
+    #         milestone 2 & post-tool-rename M1 Row 18/20 checks deferred to Stage 05
     # ==================================================================
-    for r in 20 21 22 23; do
+    if should_run_row 20; then
+        echo "== [Row 20] Non-regression: m1-citation-bench.py --replay + 480-entry per-entry & 12-group exit parity vs baseline + M1 Row 18 =="
+        set +e
+        R20_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import glob, json, os, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+baseline_path = os.path.join(repo_root, "Scripts", "acceptance", "baselines", "m1-per-entry-v1.3.0.json")
+bench_script = os.path.join(repo_root, "Scripts", "acceptance", "m1-citation-bench.py")
+m1_acc_script = os.path.join(repo_root, "Scripts", "acceptance", "m1-acceptance.sh")
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+entries_dir = os.path.join(repo_root, "Benchmarks", "citations", "entries")
+
+if not os.path.isfile(baseline_path):
+    print(f"  FAIL [Row 20]: missing baseline file {baseline_path}")
+    sys.exit(1)
+
+r20_home = os.path.join(scratch, "r20-home")
+os.makedirs(r20_home, exist_ok=True)
+env = dict(os.environ)
+env["HOME"] = r20_home
+env["CFFIXED_USER_HOME"] = r20_home
+env["SCHOLAR_CLI_BIN"] = cli_bin
+env.pop("SCHOLAR_CACHE_DIR", None)
+env.pop("SCHOLAR_REPORT_DIR", None)
+
+failures = []
+
+# 20a-1. m1-citation-bench.py --replay
+bench_out = os.path.join(scratch, "r20-m1-bench.json")
+p_bench = subprocess.run(
+    [sys.executable, "-I", bench_script, "--replay", "--output", bench_out],
+    env=env,
+    capture_output=True,
+    text=True,
+)
+if p_bench.returncode != 0:
+    failures.append(f"m1-citation-bench.py --replay exited {p_bench.returncode}: {p_bench.stderr.strip()}")
+else:
+    bench_obj = json.loads(open(bench_out, encoding="utf-8").read())
+    evaluated = (bench_obj.get("overall_metrics") or {}).get("total_entries")
+    non_ins_ver = (bench_obj.get("hard_requirements") or {}).get("non_insertable_verified_count")
+    hr_passed = (bench_obj.get("hard_requirements") or {}).get("passed")
+    miss_cnt = bench_obj.get("replay_miss_count")
+    if bench_obj.get("complete") is not True or evaluated != 480 or non_ins_ver != 0 or hr_passed is not True or miss_cnt != 0:
+        failures.append(
+            f"m1-citation-bench.py --replay metrics unexpected: complete={bench_obj.get('complete')}, "
+            f"total_entries={evaluated}, non_insertable_verified={non_ins_ver}, hr_passed={hr_passed}, replay_miss={miss_cnt}"
+        )
+    else:
+        print(
+            f"  [Row 20a-1] PASS: m1-citation-bench.py --replay exit=0, complete=True, total_entries={evaluated}, "
+            f"replay_miss={miss_cnt}, non_insertable_verified={non_ins_ver}"
+        )
+
+# 20a-2. Per-entry 480-item verdicts/reasons/insertable, 12-group exit codes vs baseline, and 206/206 VERIFIED carry record
+per_home = os.path.join(scratch, "r20-per-entry-home")
+os.makedirs(per_home, exist_ok=True)
+per_env = dict(env)
+per_env["HOME"] = per_home
+per_env["CFFIXED_USER_HOME"] = per_home
+
+cur_entries = {}
+cur_exits = []
+verified_total = 0
+verified_with_record = 0
+bib_files = sorted(glob.glob(os.path.join(entries_dir, "*.bib")))
+if len(bib_files) != 12:
+    failures.append(f"expected 12 benchmark .bib files in {entries_dir}, found {len(bib_files)}")
+
+for bib_path in bib_files:
+    grp = os.path.basename(bib_path)[:-4]
+    p_vc = subprocess.run(
+        [cli_bin, "verify-citations", bib_path, "--registry-replay", rec_dir, "--verbose", "--json", "--lang", "en"],
+        env=per_env,
+        capture_output=True,
+        text=True,
+    )
+    cur_exits.append(f"{grp} exit={p_vc.returncode}")
+    if p_vc.returncode == 2:
+        failures.append(f"verify-citations exited 2 on {grp}: {p_vc.stderr.strip()}")
+        continue
+    try:
+        payload = json.loads(p_vc.stdout)
+    except Exception as exc:
+        failures.append(f"invalid JSON from verify-citations on {grp}: {exc}")
+        continue
+    for it in payload.get("verdicts") or []:
+        key = it.get("citeKey")
+        cls = it.get("firewallClass")
+        cur_entries[f"{grp}/{key}"] = {
+            "verdict": cls,
+            "reasons": sorted(it.get("reasons") or []),
+            "insertable": it.get("insertable"),
+        }
+        if cls == "VERIFIED":
+            verified_total += 1
+            rec = it.get("record")
+            if isinstance(rec, dict) and rec.get("source") and rec.get("title"):
+                verified_with_record += 1
+                ct = (rec.get("containerTitle") or "").lower()
+                if "arxiv (cornell university)" in ct:
+                    failures.append(f"{grp}/{key} carried OpenAlex arXiv repository as containerTitle: {rec.get('containerTitle')!r}")
+            else:
+                failures.append(f"VERIFIED entry {grp}/{key} missing valid record object: {rec!r}")
+
+baseline = json.loads(open(baseline_path, encoding="utf-8").read())
+base_entries = baseline.get("entries") or {}
+base_exits = [x for x in (baseline.get("exits") or []) if x]
+
+if len(base_entries) != 480 or len(cur_entries) != 480:
+    failures.append(f"expected 480 entries (baseline={len(base_entries)}, current={len(cur_entries)})")
+
+all_keys = sorted(set(base_entries) | set(cur_entries))
+entry_diffs = []
+for k in all_keys:
+    if base_entries.get(k) != cur_entries.get(k):
+        entry_diffs.append((k, base_entries.get(k), cur_entries.get(k)))
+
+if entry_diffs:
+    for k, old_v, new_v in entry_diffs[:20]:
+        failures.append(f"entry diff {k}: baseline={old_v} vs current={new_v}")
+
+if cur_exits != base_exits:
+    failures.append(f"per-group exits mismatch: baseline={base_exits} vs current={cur_exits}")
+
+if verified_total != 206 or verified_with_record != 206:
+    failures.append(f"expected 206/206 VERIFIED with record, got {verified_with_record}/{verified_total}")
+
+matched_entries = len(all_keys) - len(entry_diffs)
+matched_exits = sum(1 for a, b in zip(cur_exits, base_exits) if a == b)
+if not entry_diffs and cur_exits == base_exits and verified_with_record == 206:
+    print(
+        f"  [Row 20a-2] PASS: entries_matched={matched_entries}/480, group_exits_matched={matched_exits}/{len(base_exits)}, "
+        f"verified_with_record={verified_with_record}/{verified_total}"
+    )
+
+# 20a-3. M1 Row 18 inline MCP verification check (S81)
+m1_tmp = os.path.join(scratch, "r20-m1-tmp")
+os.makedirs(m1_tmp, exist_ok=True)
+m1_env = dict(env)
+m1_env["TMPDIR"] = m1_tmp
+p_m1 = subprocess.run([m1_acc_script, "--row", "18"], env=m1_env, capture_output=True, text=True)
+if p_m1.returncode != 0 or "RESULT [Row 18]: PASS" not in p_m1.stdout:
+    failures.append(f"m1-acceptance.sh --row 18 failed (exit={p_m1.returncode}): {p_m1.stdout[-400:]} {p_m1.stderr[-400:]}")
+else:
+    print("  [Row 20a-3] PASS: m1-acceptance.sh --row 18 exited 0 (RESULT [Row 18]: PASS)")
+
+if failures:
+    for msg in failures:
+        print(f"  FAIL [Row 20]: {msg}")
+    sys.exit(1)
+
+print("  [Row 20b] 没跑: Scripts/test.sh milestone 2 & Stage 05 verify_citation/add_verified_bibtex Row 18/20 switch deferred to Stage 05")
+sys.exit(2)
+PY
+)"
+        R20_RC=$?
+        set -e
+        echo "$R20_OUT"
+        if [[ "$R20_RC" -eq 0 ]]; then
+            record_pass 20 "m1-citation-bench.py --replay, 480-entry parity, milestone 2, and M1 Row 18 all passed"
+        elif [[ "$R20_RC" -eq 2 ]]; then
+            record_skip 20 "Replay half passed (m1-citation-bench --replay, 480/480 entries & 12/12 group exits match baseline, 206/206 VERIFIED carry record, M1 Row 18 PASS); milestone 2 & Stage 05 tool-rename updates deferred to Stage 05 (没跑)"
+        else
+            record_fail 20 "Row 20 480-entry replay parity, m1-citation-bench.py --replay, or M1 Row 18 check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Rows 21–23: Deferred to Stage 07
+    # ==================================================================
+    for r in 21 22 23; do
         if should_run_row "$r"; then
-            echo "== [Row $r] 没跑 — Scheduled for Stages 05–07 =="
-            record_skip "$r" "Scheduled for Stages 05–07 — 没跑"
+            echo "== [Row $r] 没跑 — Scheduled for Stage 07 =="
+            record_skip "$r" "Scheduled for Stage 07 — 没跑"
         fi
     done
 
