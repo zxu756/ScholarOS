@@ -1273,6 +1273,7 @@ public final class ScholarLSPWorkspaceService: @unchecked Sendable {
                             findings: oldVerdict.findings,
                             auditNote: oldVerdict.auditNote,
                             auditedEntry: renamedEntry,
+                            record: oldVerdict.record,
                             evaluatedAt: oldVerdict.evaluatedAt
                         )
                     }

@@ -1000,15 +1000,22 @@ public struct ScholarMCPServer: Sendable {
         let fieldsArr: Any
         let findingsArr: Any
         let sourcesArr: Any
+        let recordVal: Any
         if let v = verdict {
             let encoder = JSONEncoder()
             fieldsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.fields))) ?? []
             findingsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.findings))) ?? []
             sourcesArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.sources))) ?? []
+            if let rec = v.record, let recObj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
+                recordVal = recObj
+            } else {
+                recordVal = NSNull()
+            }
         } else {
             fieldsArr = [Any]()
             findingsArr = [Any]()
             sourcesArr = [Any]()
+            recordVal = NSNull()
         }
 
         var payload: [String: Any] = [
@@ -1020,6 +1027,7 @@ public struct ScholarMCPServer: Sendable {
             "fields": fieldsArr,
             "findings": findingsArr,
             "sources": sourcesArr,
+            "record": recordVal,
             "reason": reason
         ]
         if modeLabel == "REPLAY" || isReplayServer {
@@ -1074,6 +1082,9 @@ public struct ScholarMCPServer: Sendable {
             }
             if let findingsObj = try? JSONSerialization.jsonObject(with: encoder.encode(v.findings)) {
                 payload["findings"] = findingsObj
+            }
+            if let rec = v.record, let recObj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
+                payload["record"] = recObj
             }
         }
         if let verifiedAt = verifiedEntry.firewallVerifiedAtUTC {

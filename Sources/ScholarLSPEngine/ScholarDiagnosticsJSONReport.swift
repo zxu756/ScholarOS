@@ -107,6 +107,7 @@ public struct DiagnosticsCitationVerification: Sendable, Codable, Hashable {
     public let fields: [CitationFieldDiscrepancy]
     public let findings: [FirewallFinding]
     public let insertable: Bool
+    public let record: RegistryWorkRecord?
 
     public init(
         verdict: String,
@@ -114,7 +115,8 @@ public struct DiagnosticsCitationVerification: Sendable, Codable, Hashable {
         sources: [CitationVerdictSourceRecord],
         fields: [CitationFieldDiscrepancy],
         findings: [FirewallFinding] = [],
-        insertable: Bool
+        insertable: Bool,
+        record: RegistryWorkRecord? = nil
     ) {
         self.verdict = verdict
         self.reasons = reasons
@@ -122,6 +124,7 @@ public struct DiagnosticsCitationVerification: Sendable, Codable, Hashable {
         self.fields = fields
         self.findings = findings
         self.insertable = insertable
+        self.record = record
     }
 
     public init(from entryVerdict: CitationFirewallEntryVerdict) {
@@ -131,6 +134,39 @@ public struct DiagnosticsCitationVerification: Sendable, Codable, Hashable {
         self.fields = entryVerdict.fields
         self.findings = entryVerdict.findings
         self.insertable = entryVerdict.insertable
+        self.record = entryVerdict.record
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case verdict
+        case reasons
+        case sources
+        case fields
+        case findings
+        case insertable
+        case record
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.verdict = try c.decode(String.self, forKey: .verdict)
+        self.reasons = try c.decode([String].self, forKey: .reasons)
+        self.sources = try c.decode([CitationVerdictSourceRecord].self, forKey: .sources)
+        self.fields = try c.decode([CitationFieldDiscrepancy].self, forKey: .fields)
+        self.findings = try c.decodeIfPresent([FirewallFinding].self, forKey: .findings) ?? []
+        self.insertable = try c.decode(Bool.self, forKey: .insertable)
+        self.record = try c.decodeIfPresent(RegistryWorkRecord.self, forKey: .record)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(verdict, forKey: .verdict)
+        try c.encode(reasons, forKey: .reasons)
+        try c.encode(sources, forKey: .sources)
+        try c.encode(fields, forKey: .fields)
+        try c.encode(findings, forKey: .findings)
+        try c.encode(insertable, forKey: .insertable)
+        try c.encodeIfPresent(record, forKey: .record)
     }
 }
 

@@ -151,6 +151,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
     public let findings: [FirewallFinding]
     public let auditNote: String
     public let auditedEntry: BibliographyEntry
+    public let record: RegistryWorkRecord?
     public let evaluatedAt: Date?
 
     /// Convenience alias matching `insertable` (not encoded separately in JSON).
@@ -166,6 +167,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         case findings
         case auditNote
         case auditedEntry
+        case record
     }
 
     public init(
@@ -178,6 +180,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         findings: [FirewallFinding],
         auditNote: String,
         auditedEntry: BibliographyEntry,
+        record: RegistryWorkRecord? = nil,
         evaluatedAt: Date? = nil
     ) {
         self.citeKey = citeKey
@@ -189,6 +192,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         self.findings = findings
         self.auditNote = auditNote
         self.auditedEntry = auditedEntry
+        self.record = record
         self.evaluatedAt = evaluatedAt
     }
 
@@ -203,6 +207,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         self.findings = try c.decode([FirewallFinding].self, forKey: .findings)
         self.auditNote = try c.decode(String.self, forKey: .auditNote)
         self.auditedEntry = try c.decode(BibliographyEntry.self, forKey: .auditedEntry)
+        self.record = try c.decodeIfPresent(RegistryWorkRecord.self, forKey: .record)
         self.evaluatedAt = nil
     }
 
@@ -217,6 +222,11 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         try c.encode(findings, forKey: .findings)
         try c.encode(auditNote, forKey: .auditNote)
         try c.encode(auditedEntry, forKey: .auditedEntry)
+        if let record {
+            try c.encode(record, forKey: .record)
+        } else {
+            try c.encodeNil(forKey: .record)
+        }
     }
 
     public static func == (lhs: CitationFirewallEntryVerdict, rhs: CitationFirewallEntryVerdict) -> Bool {
@@ -229,6 +239,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
             && lhs.findings == rhs.findings
             && lhs.auditNote == rhs.auditNote
             && lhs.auditedEntry == rhs.auditedEntry
+            && lhs.record == rhs.record
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -241,6 +252,7 @@ public struct CitationFirewallEntryVerdict: Sendable, Codable, Hashable, Identif
         hasher.combine(findings)
         hasher.combine(auditNote)
         hasher.combine(auditedEntry)
+        hasher.combine(record)
     }
 
     public func checkInRunExpiry(at referenceDate: Date) -> StoredFirewallVerdictFreshness? {
@@ -1616,6 +1628,7 @@ public struct CitationVerificationFirewall: Sendable {
                 findings: updatedFindings,
                 auditNote: verdict.auditNote,
                 auditedEntry: verdict.auditedEntry,
+                record: verdict.record,
                 evaluatedAt: verdict.evaluatedAt
             )
         }
@@ -2268,7 +2281,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: sources,
                 fields: doiVerdict.fields,
                 findings: findings,
-                overrideNote: doiVerdict.auditNote
+                overrideNote: doiVerdict.auditNote,
+                record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
             )
         }
 
@@ -2308,7 +2322,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: sources,
                 fields: doiVerdict.fields,
                 findings: findings,
-                overrideNote: doiVerdict.auditNote
+                overrideNote: doiVerdict.auditNote,
+                record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
             )
         }
 
@@ -2392,7 +2407,8 @@ public struct CitationVerificationFirewall: Sendable {
                         sources: sources,
                         fields: discrepancies,
                         findings: findings,
-                        overrideNote: "[DRIFT] \(driftSummary)"
+                        overrideNote: "[DRIFT] \(driftSummary)",
+                        record: doiVerdict.record
                     )
                 }
 
@@ -2411,7 +2427,8 @@ public struct CitationVerificationFirewall: Sendable {
                     sources: sources,
                     fields: doiVerdict.fields,
                     findings: findings,
-                    overrideNote: doiVerdict.auditNote
+                    overrideNote: doiVerdict.auditNote,
+                    record: doiVerdict.record
                 )
             }
 
@@ -2422,7 +2439,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: sources,
                 fields: doiVerdict.fields,
                 findings: findings,
-                overrideNote: doiVerdict.auditNote
+                overrideNote: doiVerdict.auditNote,
+                record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
             )
 
         case .notFound:
@@ -2466,7 +2484,8 @@ public struct CitationVerificationFirewall: Sendable {
                     sources: sources,
                     fields: discrepancies,
                     findings: findings,
-                    overrideNote: "[DRIFT] \(driftSummary)"
+                    overrideNote: "[DRIFT] \(driftSummary)",
+                    record: doiVerdict.record
                 )
             }
             return buildUpdatedVerdict(
@@ -2476,7 +2495,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: sources,
                 fields: doiVerdict.fields,
                 findings: findings,
-                overrideNote: doiVerdict.auditNote
+                overrideNote: doiVerdict.auditNote,
+                record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
             )
 
         case .unparseable:
@@ -2505,7 +2525,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: sources,
                 fields: doiVerdict.fields,
                 findings: findings,
-                overrideNote: doiVerdict.auditNote
+                overrideNote: doiVerdict.auditNote,
+                record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
             )
         }
     }
@@ -2560,7 +2581,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: doiVerdict.sources,
                 fields: discrepancies,
                 findings: findings,
-                overrideNote: "[DRIFT] \(driftSummary)"
+                overrideNote: "[DRIFT] \(driftSummary)",
+                record: doiVerdict.record
             )
         }
 
@@ -2571,7 +2593,8 @@ public struct CitationVerificationFirewall: Sendable {
             sources: doiVerdict.sources,
             fields: discrepancies,
             findings: findings,
-            overrideNote: doiVerdict.auditNote
+            overrideNote: doiVerdict.auditNote,
+            record: (doiVerdict.firewallClass == .verified || doiVerdict.firewallClass == .drift) ? doiVerdict.record : nil
         )
     }
 
@@ -3163,7 +3186,8 @@ public struct CitationVerificationFirewall: Sendable {
             sources: baseVerdict.sources,
             fields: updatedFields,
             findings: baseVerdict.findings,
-            overrideNote: updatedNote
+            overrideNote: updatedNote,
+            record: baseVerdict.record
         )
     }
 
@@ -3977,15 +4001,14 @@ public struct CitationVerificationFirewall: Sendable {
             )
         }
 
-        sources.append(
-            CitationVerdictSourceRecord(
-                source: "Crossref",
-                url: searchURL.absoluteString,
-                status: searchResponse.statusCode,
-                fetchedAt: resolvedFetchedAt(from: searchResponse),
-                origin: searchResponse.origin
-            )
+        let searchSourceRecord = CitationVerdictSourceRecord(
+            source: "Crossref",
+            url: searchURL.absoluteString,
+            status: searchResponse.statusCode,
+            fetchedAt: resolvedFetchedAt(from: searchResponse),
+            origin: searchResponse.origin
         )
+        sources.append(searchSourceRecord)
 
         guard searchResponse.statusCode == 200 else {
             let code = classifyHTTPFailureStatus(searchResponse.statusCode, response: searchResponse, host: "api.crossref.org")
@@ -4193,7 +4216,8 @@ public struct CitationVerificationFirewall: Sendable {
             sources: sources,
             fields: discrepancies,
             findings: findings,
-            overrideNote: "[DRIFT] \(driftSummary)"
+            overrideNote: "[DRIFT] \(driftSummary)",
+            record: matchedCandidate.hasExtendedMetadata ? matchedCandidate.toRegistryWorkRecord(from: searchSourceRecord) : nil
         )
     }
 
@@ -4238,6 +4262,21 @@ public struct CitationVerificationFirewall: Sendable {
         let venues: [String]
         let shortVenues: [String]
         let retractionField: String?
+        let hasExtendedMetadata: Bool
+        let workType: String?
+        let cleanTitle: String?
+        let cleanSubtitle: String?
+        let authors: [RegistryWorkAuthor]
+        let publicationDates: RegistryPublicationDates
+        let containerTitle: String?
+        let shortContainerTitle: String?
+        let volume: String?
+        let issue: String?
+        let pages: String?
+        let publisher: String?
+        let arxivID: String?
+        let pmid: String?
+        let primaryCategory: String?
 
         init(
             sourceName: String,
@@ -4254,7 +4293,22 @@ public struct CitationVerificationFirewall: Sendable {
             publicationYears: [Int],
             venues: [String],
             shortVenues: [String] = [],
-            retractionField: String?
+            retractionField: String?,
+            hasExtendedMetadata: Bool = false,
+            workType: String? = nil,
+            cleanTitle: String? = nil,
+            cleanSubtitle: String? = nil,
+            authors: [RegistryWorkAuthor] = [],
+            publicationDates: RegistryPublicationDates = RegistryPublicationDates(),
+            containerTitle: String? = nil,
+            shortContainerTitle: String? = nil,
+            volume: String? = nil,
+            issue: String? = nil,
+            pages: String? = nil,
+            publisher: String? = nil,
+            arxivID: String? = nil,
+            pmid: String? = nil,
+            primaryCategory: String? = nil
         ) {
             self.sourceName = sourceName
             self.doi = doi
@@ -4271,6 +4325,53 @@ public struct CitationVerificationFirewall: Sendable {
             self.venues = venues
             self.shortVenues = shortVenues
             self.retractionField = retractionField
+            self.hasExtendedMetadata = hasExtendedMetadata
+            self.workType = workType
+            self.cleanTitle = cleanTitle
+            self.cleanSubtitle = cleanSubtitle
+            self.authors = authors
+            self.publicationDates = publicationDates
+            self.containerTitle = containerTitle
+            self.shortContainerTitle = shortContainerTitle
+            self.volume = volume
+            self.issue = issue
+            self.pages = pages
+            self.publisher = publisher
+            self.arxivID = arxivID
+            self.pmid = pmid
+            self.primaryCategory = primaryCategory
+        }
+
+        func toRegistryWorkRecord(from sourceRecord: CitationVerdictSourceRecord) -> RegistryWorkRecord {
+            let resolvedDates: RegistryPublicationDates
+            if !publicationDates.allYears.isEmpty {
+                resolvedDates = publicationDates
+            } else if let firstYear = publicationYears.first {
+                resolvedDates = RegistryPublicationDates(issued: RegistryPublicationDate(year: firstYear))
+            } else {
+                resolvedDates = RegistryPublicationDates()
+            }
+            return RegistryWorkRecord(
+                source: sourceName,
+                requestURL: sourceRecord.url,
+                fetchedAt: sourceRecord.fetchedAt,
+                origin: sourceRecord.origin,
+                workType: workType,
+                title: cleanTitle ?? title,
+                subtitle: cleanSubtitle ?? subtitle,
+                authors: authors,
+                publicationDates: resolvedDates,
+                containerTitle: containerTitle,
+                shortContainerTitle: shortContainerTitle,
+                volume: volume,
+                issue: issue,
+                pages: pages,
+                publisher: publisher,
+                doi: doi,
+                arxivID: arxivID,
+                pmid: pmid,
+                primaryCategory: primaryCategory
+            )
         }
     }
 
@@ -4922,7 +5023,8 @@ public struct CitationVerificationFirewall: Sendable {
                 sources: allSources,
                 fields: discrepancies,
                 findings: findings,
-                overrideNote: "[DRIFT] \(driftSummary)"
+                overrideNote: "[DRIFT] \(driftSummary)",
+                record: remote.hasExtendedMetadata ? remote.toRegistryWorkRecord(from: primarySource) : nil
             )
         }
 
@@ -4969,7 +5071,8 @@ public struct CitationVerificationFirewall: Sendable {
             sources: allSources,
             fields: verifiedFields,
             findings: findings,
-            overrideNote: verifiedNote
+            overrideNote: verifiedNote,
+            record: remote.hasExtendedMetadata ? remote.toRegistryWorkRecord(from: primarySource) : nil
         )
     }
 
@@ -4987,7 +5090,7 @@ public struct CitationVerificationFirewall: Sendable {
         } else {
             return .unparseable
         }
-        return parseCrossrefWorkObject(message)
+        return parseCrossrefWorkObject(message, includeExtendedRecord: true)
     }
 
     private func parseCrossrefSearchPayload(_ data: Data) -> CrossrefSearchParseOutcome {
@@ -4999,14 +5102,17 @@ public struct CitationVerificationFirewall: Sendable {
         var records: [RemoteWorkRecord] = []
         records.reserveCapacity(items.count)
         for item in items {
-            if case .parsed(let record) = parseCrossrefWorkObject(item) {
+            if case .parsed(let record) = parseCrossrefWorkObject(item, includeExtendedRecord: true) {
                 records.append(record)
             }
         }
         return .parsed(records)
     }
 
-    private func parseCrossrefWorkObject(_ message: [String: Any]) -> RegistryPayloadParseOutcome {
+    private func parseCrossrefWorkObject(
+        _ message: [String: Any],
+        includeExtendedRecord: Bool = true
+    ) -> RegistryPayloadParseOutcome {
         let title: String = {
             if let titles = message["title"] as? [String],
                let first = titles.compactMap({ nonEmptyDecoded($0) }).first {
@@ -5041,6 +5147,7 @@ public struct CitationVerificationFirewall: Sendable {
         var firstAuthorFamilyOnlyWithoutGiven = false
         var firstAuthorIsCorporate = false
         var authorSurnames: [String] = []
+        var fullAuthors: [RegistryWorkAuthor] = []
 
         if let authors = message["author"] as? [[String: Any]], !authors.isEmpty {
             let firstIdx = authors.firstIndex {
@@ -5077,8 +5184,27 @@ public struct CitationVerificationFirewall: Sendable {
                 let item = authors[idx]
                 if let fam = nonEmptyDecoded(item["family"] as? String) {
                     authorSurnames.append(fam)
+                    let cleanFam = Self.cleanRegistryDisplayString(item["family"] as? String) ?? fam
+                    let cleanGiv = Self.cleanRegistryDisplayString(item["given"] as? String)
+                    fullAuthors.append(
+                        RegistryWorkAuthor(
+                            givenName: cleanGiv,
+                            familyName: cleanFam,
+                            name: nil,
+                            isCorporate: false
+                        )
+                    )
                 } else if let name = nonEmptyDecoded(item["name"] as? String) {
                     authorSurnames.append(name)
+                    let cleanCorp = Self.cleanRegistryDisplayString(item["name"] as? String) ?? name
+                    fullAuthors.append(
+                        RegistryWorkAuthor(
+                            givenName: nil,
+                            familyName: nil,
+                            name: cleanCorp,
+                            isCorporate: true
+                        )
+                    )
                 }
             }
         }
@@ -5094,6 +5220,18 @@ public struct CitationVerificationFirewall: Sendable {
         if publicationYears.isEmpty, let yr = extractCrossrefDateYear(message["published"]) {
             publicationYears.append(yr)
         }
+
+        let pubPrintDate = Self.extractCrossrefPublicationDate(message["published-print"])
+        let pubOnlineDate = Self.extractCrossrefPublicationDate(message["published-online"])
+        let rawIssuedDate = Self.extractCrossrefPublicationDate(message["issued"])
+        let fallbackPublishedDate = (pubPrintDate == nil && pubOnlineDate == nil && rawIssuedDate == nil)
+            ? Self.extractCrossrefPublicationDate(message["published"])
+            : nil
+        let pubDates = RegistryPublicationDates(
+            publishedPrint: pubPrintDate,
+            publishedOnline: pubOnlineDate,
+            issued: rawIssuedDate ?? fallbackPublishedDate
+        )
 
         var venues: [String] = []
         if let arr = message["container-title"] as? [String] {
@@ -5135,6 +5273,48 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
+        let cleanTitle: String = {
+            if let titles = message["title"] as? [String],
+               let first = titles.compactMap({ Self.cleanRegistryDisplayString($0) }).first {
+                return first
+            }
+            return Self.cleanRegistryDisplayString(message["title"] as? String) ?? title
+        }()
+        let cleanSubtitle: String? = {
+            if let subs = message["subtitle"] as? [String],
+               let first = subs.compactMap({ Self.cleanRegistryDisplayString($0) }).first {
+                return first
+            }
+            return Self.cleanRegistryDisplayString(message["subtitle"] as? String)
+        }()
+        let cleanContainerTitle: String? = {
+            if let arr = message["container-title"] as? [String],
+               let first = arr.compactMap({ Self.cleanRegistryDisplayString($0) }).first {
+                return first
+            }
+            return Self.cleanRegistryDisplayString(message["container-title"] as? String)
+        }()
+        let cleanShortContainerTitle: String? = {
+            if let arr = message["short-container-title"] as? [String],
+               let first = arr.compactMap({ Self.cleanRegistryDisplayString($0) }).first {
+                return first
+            }
+            return Self.cleanRegistryDisplayString(message["short-container-title"] as? String)
+        }()
+        let workType = Self.cleanRegistryDisplayString(message["type"] as? String)
+        let volume = Self.cleanRegistryDisplayString(message["volume"] as? String)
+        let issue = Self.cleanRegistryDisplayString(message["issue"] as? String)
+            ?? Self.cleanRegistryDisplayString((message["journal-issue"] as? [String: Any])?["issue"] as? String)
+        let pages = Self.cleanRegistryDisplayString(message["page"] as? String)
+            ?? Self.cleanRegistryDisplayString(message["article-number"] as? String)
+        let publisher = Self.cleanRegistryDisplayString(message["publisher"] as? String)
+        let embeddedArXivID: String? = {
+            guard let d = normalizedDOI, d.hasPrefix("10.48550/arxiv.") else { return nil }
+            let raw = String(d.dropFirst("10.48550/arxiv.".count))
+            let v = ScholarlyIdentifierValidator.validateArXivID(raw)
+            return v.isValid ? v.canonicalBaseID : ReferenceIdentifierNormalizer.normalizeArXivID(raw, stripVersion: true)
+        }()
+
         return .parsed(
             RemoteWorkRecord(
                 sourceName: "Crossref",
@@ -5151,7 +5331,22 @@ public struct CitationVerificationFirewall: Sendable {
                 publicationYears: publicationYears,
                 venues: venues,
                 shortVenues: shortVenues,
-                retractionField: retractionField
+                retractionField: retractionField,
+                hasExtendedMetadata: includeExtendedRecord,
+                workType: workType,
+                cleanTitle: cleanTitle,
+                cleanSubtitle: cleanSubtitle,
+                authors: fullAuthors,
+                publicationDates: pubDates,
+                containerTitle: cleanContainerTitle,
+                shortContainerTitle: cleanShortContainerTitle,
+                volume: volume,
+                issue: issue,
+                pages: pages,
+                publisher: publisher,
+                arxivID: embeddedArXivID,
+                pmid: nil,
+                primaryCategory: nil
             )
         )
     }
@@ -5201,7 +5396,7 @@ public struct CitationVerificationFirewall: Sendable {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return .unparseable
         }
-        return parseOpenAlexWorkObject(root)
+        return parseOpenAlexWorkObject(root, includeExtendedRecord: true)
     }
 
     private func parseOpenAlexSearchPayload(_ data: Data) -> CrossrefSearchParseOutcome {
@@ -5212,14 +5407,17 @@ public struct CitationVerificationFirewall: Sendable {
         var records: [RemoteWorkRecord] = []
         records.reserveCapacity(results.count)
         for item in results {
-            if case .parsed(let record) = parseOpenAlexWorkObject(item) {
+            if case .parsed(let record) = parseOpenAlexWorkObject(item, includeExtendedRecord: true) {
                 records.append(record)
             }
         }
         return .parsed(records)
     }
 
-    private func parseOpenAlexWorkObject(_ root: [String: Any]) -> RegistryPayloadParseOutcome {
+    private func parseOpenAlexWorkObject(
+        _ root: [String: Any],
+        includeExtendedRecord: Bool = true
+    ) -> RegistryPayloadParseOutcome {
         guard root["id"] != nil || root["title"] != nil || root["display_name"] != nil else {
             return .unparseable
         }
@@ -5239,12 +5437,25 @@ public struct CitationVerificationFirewall: Sendable {
             publicationYears.append(yr)
         }
 
+        let issuedDate: RegistryPublicationDate? = {
+            if let pubDateStr = nonEmpty(root["publication_date"] as? String),
+               let parsed = Self.parseISODate(pubDateStr) {
+                return parsed
+            }
+            if let yr = publicationYears.first {
+                return RegistryPublicationDate(year: yr)
+            }
+            return nil
+        }()
+        let pubDates = RegistryPublicationDates(issued: issuedDate)
+
         let isRetracted = (root["is_retracted"] as? Bool) ?? false
 
         var firstAuthorDisplay: String?
         var firstAuthorSurname: String?
         var firstAuthorFullName: String?
         var authorSurnames: [String] = []
+        var fullAuthors: [RegistryWorkAuthor] = []
 
         if let authorships = root["authorships"] as? [[String: Any]], !authorships.isEmpty {
             for (idx, item) in authorships.enumerated() {
@@ -5254,6 +5465,9 @@ public struct CitationVerificationFirewall: Sendable {
                 let chosen = rawName ?? displayName
                 if let chosen, let extracted = Self.extractSurnameFromAuthorString(chosen) {
                     authorSurnames.append(extracted)
+                    if let parsedAuthor = Self.splitFullAuthorName(chosen) {
+                        fullAuthors.append(parsedAuthor)
+                    }
                     if idx == 0 {
                         firstAuthorDisplay = extracted
                         firstAuthorSurname = extracted
@@ -5261,6 +5475,9 @@ public struct CitationVerificationFirewall: Sendable {
                     }
                 } else if let fallback = displayName, let extracted = Self.extractSurnameFromAuthorString(fallback) {
                     authorSurnames.append(extracted)
+                    if let parsedAuthor = Self.splitFullAuthorName(fallback) {
+                        fullAuthors.append(parsedAuthor)
+                    }
                     if idx == 0 {
                         firstAuthorDisplay = extracted
                         firstAuthorSurname = extracted
@@ -5272,8 +5489,9 @@ public struct CitationVerificationFirewall: Sendable {
 
         var venues: [String] = []
         var shortVenues: [String] = []
-        if let primaryLoc = root["primary_location"] as? [String: Any],
-           let sourceObj = primaryLoc["source"] as? [String: Any] {
+        let primaryLoc = root["primary_location"] as? [String: Any]
+        let sourceObj = primaryLoc?["source"] as? [String: Any]
+        if let sourceObj {
             if let disp = nonEmptyDecoded(sourceObj["display_name"] as? String) {
                 venues.append(disp)
             }
@@ -5294,6 +5512,58 @@ public struct CitationVerificationFirewall: Sendable {
             venues.append(disp)
         }
 
+        let isArXivRepoSource = Self.isOpenAlexArXivRepositorySource(sourceObj: sourceObj)
+        let cleanTitle = Self.cleanRegistryDisplayString(root["title"] as? String)
+            ?? Self.cleanRegistryDisplayString(root["display_name"] as? String)
+            ?? title
+        let workType = Self.cleanRegistryDisplayString(root["type"] as? String)
+            ?? Self.cleanRegistryDisplayString(root["type_crossref"] as? String)
+
+        let cleanContainerTitle: String? = {
+            if isArXivRepoSource {
+                return nil
+            }
+            if let disp = Self.cleanRegistryDisplayString(sourceObj?["display_name"] as? String) {
+                return disp
+            }
+            if let hvDisp = Self.cleanRegistryDisplayString((root["host_venue"] as? [String: Any])?["display_name"] as? String),
+               !Self.isArXivVenueDisplayName(hvDisp) {
+                return hvDisp
+            }
+            return nil
+        }()
+        let cleanShortContainerTitle: String? = isArXivRepoSource
+            ? nil
+            : Self.cleanRegistryDisplayString(sourceObj?["abbreviated_title"] as? String)
+        let publisher: String? = isArXivRepoSource
+            ? nil
+            : Self.cleanRegistryDisplayString(sourceObj?["host_organization_name"] as? String)
+
+        let biblio = root["biblio"] as? [String: Any]
+        let volume = Self.cleanRegistryDisplayString(biblio?["volume"] as? String)
+        let issue = Self.cleanRegistryDisplayString(biblio?["issue"] as? String)
+        let pages: String? = {
+            let firstPage = Self.cleanRegistryDisplayString(biblio?["first_page"] as? String)
+            let lastPage = Self.cleanRegistryDisplayString(biblio?["last_page"] as? String)
+            if let fp = firstPage, let lp = lastPage {
+                return (fp == lp) ? fp : "\(fp)-\(lp)"
+            }
+            return firstPage ?? lastPage
+        }()
+
+        let oaArXivID = Self.extractOpenAlexArXivID(
+            primaryLocation: primaryLoc,
+            normalizedDOI: normalizedDOI
+        )
+        let oaPMID: String? = {
+            guard let rawPMID = (root["ids"] as? [String: Any])?["pmid"] as? String,
+                  let norm = ReferenceIdentifierNormalizer.normalizePMID(rawPMID) else {
+                return nil
+            }
+            let check = ScholarlyIdentifierValidator.validatePMID(norm)
+            return check.isValid ? check.normalized : nil
+        }()
+
         return .parsed(
             RemoteWorkRecord(
                 sourceName: "OpenAlex",
@@ -5308,7 +5578,21 @@ public struct CitationVerificationFirewall: Sendable {
                 publicationYears: publicationYears,
                 venues: venues,
                 shortVenues: shortVenues,
-                retractionField: isRetracted ? "is_retracted" : nil
+                retractionField: isRetracted ? "is_retracted" : nil,
+                hasExtendedMetadata: includeExtendedRecord,
+                workType: workType,
+                cleanTitle: cleanTitle,
+                authors: fullAuthors,
+                publicationDates: pubDates,
+                containerTitle: cleanContainerTitle,
+                shortContainerTitle: cleanShortContainerTitle,
+                volume: volume,
+                issue: issue,
+                pages: pages,
+                publisher: publisher,
+                arxivID: oaArXivID,
+                pmid: oaPMID,
+                primaryCategory: nil
             )
         )
     }
@@ -5334,7 +5618,8 @@ public struct CitationVerificationFirewall: Sendable {
         }
         let entrySlice = String(xml[entryRange.upperBound..<entryClose.lowerBound])
 
-        if let entryID = extractXMLTagValue("id", in: entrySlice),
+        let rawEntryID = extractXMLTagValue("id", in: entrySlice)
+        if let entryID = rawEntryID,
            entryID.lowercased().contains("arxiv.org/api/errors") {
             return .notFound
         }
@@ -5353,6 +5638,7 @@ public struct CitationVerificationFirewall: Sendable {
         let authorBlocks = extractAllXMLTagValues("author", in: entrySlice)
         var authorSurnames: [String] = []
         var firstAuthorRawName: String?
+        var fullAuthors: [RegistryWorkAuthor] = []
         for block in authorBlocks {
             if let name = nonEmpty(extractXMLTagValue("name", in: block)),
                let sur = Self.extractSurnameFromAuthorString(name) {
@@ -5360,16 +5646,26 @@ public struct CitationVerificationFirewall: Sendable {
                     firstAuthorRawName = name
                 }
                 authorSurnames.append(sur)
+                if let parsedAuthor = Self.splitFullAuthorName(name) {
+                    fullAuthors.append(parsedAuthor)
+                }
             }
         }
         let firstSurname = authorSurnames.first
 
+        let publishedRaw = extractXMLTagValue("published", in: entrySlice)
         var publicationYears: [Int] = []
-        if let published = extractXMLTagValue("published", in: entrySlice),
+        if let published = publishedRaw,
            published.count >= 4,
            let yr = Int(published.prefix(4)) {
             publicationYears.append(yr)
         }
+        let arxivPubDate = Self.parseISODate(publishedRaw)
+            ?? publicationYears.first.map { RegistryPublicationDate(year: $0) }
+        let pubDates = RegistryPublicationDates(
+            publishedOnline: arxivPubDate,
+            issued: arxivPubDate
+        )
 
         var venues: [String] = []
         if let journalRef = extractXMLTagValue("arxiv:journal_ref", in: entrySlice) {
@@ -5395,6 +5691,20 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         let arxivDOI = ReferenceIdentifierNormalizer.normalizeDOI(extractXMLTagValue("arxiv:doi", in: entrySlice))
+        let parsedArXivID: String? = {
+            if let rawEntryID {
+                let check = ScholarlyIdentifierValidator.validateArXivID(rawEntryID)
+                if check.isValid {
+                    return check.canonicalBaseID
+                }
+                if let norm = ReferenceIdentifierNormalizer.normalizeArXivID(rawEntryID, stripVersion: true) {
+                    return norm
+                }
+            }
+            return nil
+        }()
+        let primaryCat = Self.extractXMLTagAttribute(tag: "arxiv:primary_category", attribute: "term", in: entrySlice)
+            ?? Self.extractXMLTagAttribute(tag: "category", attribute: "term", in: entrySlice)
 
         return .parsed(
             RemoteWorkRecord(
@@ -5409,7 +5719,21 @@ public struct CitationVerificationFirewall: Sendable {
                 authorSurnames: authorSurnames,
                 publicationYears: publicationYears,
                 venues: venues,
-                retractionField: retractionField
+                retractionField: retractionField,
+                hasExtendedMetadata: true,
+                workType: "preprint",
+                cleanTitle: Self.cleanRegistryDisplayString(cleanTitle) ?? cleanTitle,
+                authors: fullAuthors,
+                publicationDates: pubDates,
+                containerTitle: nil,
+                shortContainerTitle: nil,
+                volume: nil,
+                issue: nil,
+                pages: nil,
+                publisher: nil,
+                arxivID: parsedArXivID,
+                pmid: nil,
+                primaryCategory: primaryCat
             )
         )
     }
@@ -5462,10 +5786,21 @@ public struct CitationVerificationFirewall: Sendable {
         }
 
         var retractionField: String?
-        if let pubTypes = doc["pubtype"] as? [String],
-           pubTypes.contains(where: { $0.lowercased().contains("retracted publication") }) {
+        let pubTypes = (doc["pubtype"] as? [String]) ?? []
+        if pubTypes.contains(where: { $0.lowercased().contains("retracted publication") }) {
             retractionField = "pubtype (Retracted Publication)"
         }
+
+        let workType: String? = {
+            let cleaned = pubTypes.compactMap { Self.cleanRegistryDisplayString($0) }
+            if let primary = cleaned.first(where: {
+                let lower = $0.lowercased()
+                return !lower.hasPrefix("research support") && !lower.contains("retracted publication")
+            }) {
+                return primary
+            }
+            return cleaned.first
+        }()
 
         var firstAuthorDisplay: String?
         var firstAuthorSurname: String?
@@ -5473,6 +5808,7 @@ public struct CitationVerificationFirewall: Sendable {
         var firstAuthorHasExplicitFamilyField = false
         var firstAuthorIsCorporate = false
         var authorSurnames: [String] = []
+        var fullAuthors: [RegistryWorkAuthor] = []
 
         if let rawAuthors = doc["authors"] as? [[String: Any]], !rawAuthors.isEmpty {
             let primaryAuthors: [[String: Any]] = {
@@ -5488,6 +5824,10 @@ public struct CitationVerificationFirewall: Sendable {
                 let authtype = ((item["authtype"] as? String) ?? "Author").lowercased()
                 if authtype == "collectivename" {
                     authorSurnames.append(name)
+                    let cleanCorp = Self.cleanRegistryDisplayString(name) ?? name
+                    fullAuthors.append(
+                        RegistryWorkAuthor(givenName: nil, familyName: nil, name: cleanCorp, isCorporate: true)
+                    )
                     if idx == 0 {
                         firstAuthorDisplay = name
                         firstAuthorSurname = name
@@ -5498,6 +5838,9 @@ public struct CitationVerificationFirewall: Sendable {
                 } else {
                     let parsed = Self.extractPubMedAuthorSurname(from: name)
                     authorSurnames.append(parsed.surname)
+                    if let fullAu = Self.parsePubMedPersonalAuthor(name) {
+                        fullAuthors.append(fullAu)
+                    }
                     if idx == 0 {
                         firstAuthorDisplay = parsed.surname
                         firstAuthorSurname = parsed.surname
@@ -5518,6 +5861,15 @@ public struct CitationVerificationFirewall: Sendable {
             }
         }
 
+        let printDate = Self.parsePubMedDate(doc["pubdate"] as? String)
+        let onlineDate = Self.parsePubMedDate(doc["epubdate"] as? String)
+        let sortIssuedDate = Self.parseISODate(doc["sortpubdate"] as? String) ?? printDate ?? onlineDate
+        let pubDates = RegistryPublicationDates(
+            publishedPrint: printDate,
+            publishedOnline: onlineDate,
+            issued: sortIssuedDate
+        )
+
         var venues: [String] = []
         for venueKey in ["fulljournalname", "booktitle"] {
             if let v = nonEmpty(doc[venueKey] as? String), !venues.contains(v) {
@@ -5531,6 +5883,26 @@ public struct CitationVerificationFirewall: Sendable {
                 venues.append(src)
             }
         }
+
+        let cleanTitle = Self.cleanRegistryDisplayString(title) ?? title
+        let cleanContainerTitle = Self.cleanRegistryDisplayString(doc["fulljournalname"] as? String)
+            ?? Self.cleanRegistryDisplayString(doc["booktitle"] as? String)
+            ?? Self.cleanRegistryDisplayString(doc["source"] as? String)
+        let cleanShortContainerTitle = Self.cleanRegistryDisplayString(doc["source"] as? String)
+        let volume = Self.cleanRegistryDisplayString(doc["volume"] as? String)
+        let issue = Self.cleanRegistryDisplayString(doc["issue"] as? String)
+        let pages = Self.cleanRegistryDisplayString(doc["pages"] as? String)
+        let publisher = Self.cleanRegistryDisplayString(doc["publishername"] as? String)
+
+        let rawUID = nonEmpty(doc["uid"] as? String) ?? requestedPMID
+        let pmidCheck = ScholarlyIdentifierValidator.validatePMID(rawUID)
+        let resolvedPMID = pmidCheck.isValid ? pmidCheck.normalized : ReferenceIdentifierNormalizer.normalizePMID(rawUID)
+        let embeddedArXivID: String? = {
+            guard let d = normalizedDOI, d.hasPrefix("10.48550/arxiv.") else { return nil }
+            let raw = String(d.dropFirst("10.48550/arxiv.".count))
+            let v = ScholarlyIdentifierValidator.validateArXivID(raw)
+            return v.isValid ? v.canonicalBaseID : ReferenceIdentifierNormalizer.normalizeArXivID(raw, stripVersion: true)
+        }()
 
         return .parsed(
             RemoteWorkRecord(
@@ -5546,9 +5918,114 @@ public struct CitationVerificationFirewall: Sendable {
                 publicationYears: publicationYears,
                 venues: venues,
                 shortVenues: shortVenues,
-                retractionField: retractionField
+                retractionField: retractionField,
+                hasExtendedMetadata: true,
+                workType: workType,
+                cleanTitle: cleanTitle,
+                authors: fullAuthors,
+                publicationDates: pubDates,
+                containerTitle: cleanContainerTitle,
+                shortContainerTitle: cleanShortContainerTitle,
+                volume: volume,
+                issue: issue,
+                pages: pages,
+                publisher: publisher,
+                arxivID: embeddedArXivID,
+                pmid: resolvedPMID,
+                primaryCategory: nil
             )
         )
+    }
+
+    private static func parsePubMedPersonalAuthor(_ rawName: String) -> RegistryWorkAuthor? {
+        guard let cleaned = cleanRegistryDisplayString(rawName) else { return nil }
+        if cleaned.contains(",") {
+            let parts = cleaned.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            let fam = parts.first ?? cleaned
+            let giv = (parts.count >= 2 && !parts[1].isEmpty) ? parts[1] : nil
+            return RegistryWorkAuthor(givenName: giv, familyName: fam.isEmpty ? cleaned : fam, name: nil, isCorporate: false)
+        }
+        var tokens = cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !tokens.isEmpty else { return nil }
+        if tokens.count == 1 {
+            return RegistryWorkAuthor(givenName: nil, familyName: tokens[0], name: nil, isCorporate: false)
+        }
+        let suffixes: Set<String> = ["jr", "jr.", "sr", "sr.", "2nd", "3rd", "4th", "ii", "iii", "iv"]
+        var suffix: String?
+        if tokens.count >= 3, let last = tokens.last, suffixes.contains(last.lowercased()) {
+            suffix = tokens.removeLast()
+        }
+        if tokens.count >= 2, let initials = tokens.last, isPubMedInitialsToken(initials) {
+            tokens.removeLast()
+            var fam = tokens.joined(separator: " ")
+            if let suffix {
+                fam += " \(suffix)"
+            }
+            return RegistryWorkAuthor(givenName: initials, familyName: fam, name: nil, isCorporate: false)
+        }
+        return splitFullAuthorName(cleaned)
+    }
+
+    private static func parsePubMedDate(_ raw: String?) -> RegistryPublicationDate? {
+        guard let s = cleanRegistryDisplayString(raw),
+              let year = extractFourDigitYear(from: s) else {
+            return nil
+        }
+        let monthMap: [String: Int] = [
+            "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+            "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12
+        ]
+        let tokens = s.split(whereSeparator: { $0.isWhitespace || $0 == "-" || $0 == "/" }).map(String.init)
+        var month: Int?
+        var day: Int?
+        if tokens.count >= 2 {
+            let mTok = tokens[1].lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".,"))
+            if let m = monthMap[String(mTok.prefix(3))] {
+                month = m
+                if tokens.count >= 3, let d = Int(tokens[2].trimmingCharacters(in: CharacterSet(charactersIn: ".,"))), (1...31).contains(d) {
+                    day = d
+                }
+            } else if let mInt = Int(mTok), (1...12).contains(mInt) {
+                month = mInt
+                if tokens.count >= 3, let d = Int(tokens[2].prefix(2)), (1...31).contains(d) {
+                    day = d
+                }
+            }
+        }
+        return RegistryPublicationDate(year: year, month: month, day: day, raw: s)
+    }
+
+    private static func extractXMLTagAttribute(tag: String, attribute: String, in xml: String) -> String? {
+        var searchFrom = xml.startIndex
+        let openPrefix = "<\(tag)"
+        while let tagRange = xml.range(of: openPrefix, range: searchFrom..<xml.endIndex) {
+            let afterTag = tagRange.upperBound
+            if afterTag < xml.endIndex {
+                let ch = xml[afterTag]
+                guard ch.isWhitespace || ch == "/" || ch == ">" else {
+                    searchFrom = afterTag
+                    continue
+                }
+            }
+            guard let closeAngle = xml.range(of: ">", range: afterTag..<xml.endIndex) else {
+                return nil
+            }
+            let attrBlob = String(xml[afterTag..<closeAngle.lowerBound])
+            for quote in ["\"", "'"] {
+                let needle = "\(attribute)=\(quote)"
+                if let attrStart = attrBlob.range(of: needle),
+                   let attrEnd = attrBlob.range(of: quote, range: attrStart.upperBound..<attrBlob.endIndex) {
+                    let val = decodeXMLEntities(String(attrBlob[attrStart.upperBound..<attrEnd.lowerBound]))
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !val.isEmpty {
+                        return val
+                    }
+                }
+            }
+            searchFrom = closeAngle.upperBound
+        }
+        return nil
     }
 
     private static func extractPubMedAuthorSurname(from rawName: String) -> (surname: String, hasExplicitFamily: Bool) {
@@ -5622,6 +6099,249 @@ public struct CitationVerificationFirewall: Sendable {
         }
         if let num = firstElem as? NSNumber {
             return num.intValue
+        }
+        return nil
+    }
+
+    private static func extractCrossrefPublicationDate(_ rawDateObj: Any?) -> RegistryPublicationDate? {
+        guard let dateObj = rawDateObj as? [String: Any],
+              let parts = dateObj["date-parts"] as? [[Any]],
+              let firstRow = parts.first,
+              !firstRow.isEmpty else {
+            return nil
+        }
+        func intAt(_ idx: Int) -> Int? {
+            guard idx < firstRow.count else { return nil }
+            if let v = firstRow[idx] as? Int { return v }
+            if let n = firstRow[idx] as? NSNumber { return n.intValue }
+            return nil
+        }
+        guard let year = intAt(0), (1000...2999).contains(year) else {
+            return nil
+        }
+        let rawMonth = intAt(1)
+        let month = rawMonth.flatMap { (1...12).contains($0) ? $0 : nil }
+        let rawDay = intAt(2)
+        let day = (month != nil) ? rawDay.flatMap({ (1...31).contains($0) ? $0 : nil }) : nil
+        return RegistryPublicationDate(year: year, month: month, day: day)
+    }
+
+    private static func parseISODate(_ raw: String?) -> RegistryPublicationDate? {
+        guard let s = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else {
+            return nil
+        }
+        let datePrefix = s.split(whereSeparator: { $0 == "T" || $0 == " " }).first.map(String.init) ?? s
+        let sep: Character = datePrefix.contains("/") ? "/" : "-"
+        let parts = datePrefix.split(separator: sep, omittingEmptySubsequences: false).map(String.init)
+        guard let first = parts.first, first.count == 4, let year = Int(first), (1000...2999).contains(year) else {
+            return nil
+        }
+        var month: Int?
+        var day: Int?
+        if parts.count >= 2, let m = Int(parts[1]), (1...12).contains(m) {
+            month = m
+            if parts.count >= 3, let d = Int(parts[2].prefix(2)), (1...31).contains(d) {
+                day = d
+            }
+        }
+        return RegistryPublicationDate(year: year, month: month, day: day)
+    }
+
+    private static func cleanRegistryDisplayString(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        // Decode up to two entity passes (Crossref occasionally double-encodes `&amp;amp;` in short-container-title)
+        let decodedOnce = decodeHTMLEntities(raw)
+        let decoded = decodedOnce.contains("&") ? decodeHTMLEntities(decodedOnce) : decodedOnce
+
+        // Strip HTML/XML formatting tags cleanly (block/break tags -> space, inline tags -> empty)
+        let chars = Array(decoded)
+        var stripped = ""
+        stripped.reserveCapacity(chars.count)
+        var i = 0
+        while i < chars.count {
+            if chars[i] == "<", i + 1 < chars.count {
+                let next = chars[i + 1]
+                let isOpening = next.isASCII && next.isLetter
+                let isClosing = next == "/" && (i + 2 < chars.count) && chars[i + 2].isASCII && chars[i + 2].isLetter
+                if isOpening || isClosing {
+                    var j = i + 1
+                    var closingIdx: Int?
+                    while j < chars.count {
+                        if chars[j] == ">" {
+                            closingIdx = j
+                            break
+                        }
+                        if chars[j] == "<" {
+                            break
+                        }
+                        j += 1
+                    }
+                    if let closingIdx {
+                        let tagInner = String(chars[(i + 1)..<closingIdx]).lowercased()
+                        let tagName = tagInner
+                            .trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+                            .split(whereSeparator: \.isWhitespace)
+                            .first
+                            .map(String.init) ?? ""
+                        if ["br", "p", "div", "li", "tr", "td", "th"].contains(tagName) {
+                            stripped.append(" ")
+                        }
+                        i = closingIdx + 1
+                        continue
+                    }
+                }
+            }
+            stripped.append(chars[i])
+            i += 1
+        }
+
+        let collapsed = stripped
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
+    }
+
+    private static let unambiguousCorporateKeywords: Set<String> = [
+        "collaboration", "consortium", "committee", "commission",
+        "organization", "organisation", "association", "institute",
+        "institution", "society", "contributors", "council",
+        "ministry", "department", "dept", "university", "college",
+        "hospital", "foundation", "agency", "federation", "academy",
+        "laboratory"
+    ]
+
+    private static let multiWordCorporateKeywords: Set<String> = [
+        "group", "team", "project", "network", "panel", "board", "center", "centre"
+    ]
+
+    private static func isLikelyCorporateAuthorName(_ cleanedName: String) -> Bool {
+        let lowerWords = splitAlphanumericWords(foldLigaturesAndDiacritics(cleanedName))
+        guard !lowerWords.isEmpty else { return false }
+        if lowerWords.contains(where: { unambiguousCorporateKeywords.contains($0) }) {
+            return true
+        }
+        if lowerWords.count >= 2 && lowerWords.contains(where: { multiWordCorporateKeywords.contains($0) }) {
+            return true
+        }
+        return false
+    }
+
+    static func splitFullAuthorName(_ raw: String) -> RegistryWorkAuthor? {
+        guard let cleaned = cleanRegistryDisplayString(raw) else { return nil }
+        if isLikelyCorporateAuthorName(cleaned) {
+            return RegistryWorkAuthor(givenName: nil, familyName: nil, name: cleaned, isCorporate: true)
+        }
+
+        let generationalSuffixes: Set<String> = ["jr", "jr.", "sr", "sr.", "ii", "iii", "iv"]
+
+        if cleaned.contains(",") {
+            let parts = cleaned
+                .split(separator: ",", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard let firstPart = parts.first else { return nil }
+            if parts.count == 1 {
+                return RegistryWorkAuthor(givenName: nil, familyName: firstPart, name: nil, isCorporate: false)
+            }
+            if parts.count == 3 && generationalSuffixes.contains(parts[1].lowercased()) {
+                return RegistryWorkAuthor(
+                    givenName: parts[2],
+                    familyName: "\(firstPart) \(parts[1])",
+                    name: nil,
+                    isCorporate: false
+                )
+            }
+            let given = parts.dropFirst().joined(separator: " ")
+            return RegistryWorkAuthor(
+                givenName: given.isEmpty ? nil : given,
+                familyName: firstPart,
+                name: nil,
+                isCorporate: false
+            )
+        }
+
+        let words = cleaned.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return nil }
+        if words.count == 1 {
+            return RegistryWorkAuthor(givenName: nil, familyName: words[0], name: nil, isCorporate: false)
+        }
+
+        var coreEnd = words.count
+        if words.count >= 3, let last = words.last?.lowercased(), generationalSuffixes.contains(last) {
+            coreEnd = words.count - 1
+        }
+        let particles: Set<String> = ["von", "van", "de", "del", "della", "der", "di", "du", "la", "le", "ten", "ter", "zu"]
+        var surnameStart = coreEnd - 1
+        while surnameStart > 1 {
+            let candidate = words[surnameStart - 1].lowercased()
+            if particles.contains(candidate) {
+                surnameStart -= 1
+            } else {
+                break
+            }
+        }
+        let given = words[0..<surnameStart].joined(separator: " ")
+        let family = words[surnameStart..<words.count].joined(separator: " ")
+        return RegistryWorkAuthor(
+            givenName: given.isEmpty ? nil : given,
+            familyName: family,
+            name: nil,
+            isCorporate: false
+        )
+    }
+
+    private static func isArXivVenueDisplayName(_ name: String) -> Bool {
+        let lower = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return lower == "arxiv" || lower.hasPrefix("arxiv (") || lower.hasPrefix("arxiv:")
+    }
+
+    private static func isOpenAlexArXivRepositorySource(sourceObj: [String: Any]?) -> Bool {
+        guard let sourceObj else { return false }
+        if let srcID = (sourceObj["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+           srcID == "https://openalex.org/s4306400194" {
+            return true
+        }
+        if let disp = cleanRegistryDisplayString(sourceObj["display_name"] as? String),
+           isArXivVenueDisplayName(disp) {
+            return true
+        }
+        return false
+    }
+
+    private static func extractOpenAlexArXivID(
+        primaryLocation: [String: Any]?,
+        normalizedDOI: String?
+    ) -> String? {
+        if let d = normalizedDOI, d.hasPrefix("10.48550/arxiv.") {
+            let suffix = String(d.dropFirst("10.48550/arxiv.".count))
+            let check = ScholarlyIdentifierValidator.validateArXivID(suffix)
+            if check.isValid {
+                return check.canonicalBaseID
+            }
+            if let norm = ReferenceIdentifierNormalizer.normalizeArXivID(suffix, stripVersion: true) {
+                return norm
+            }
+        }
+        if let locID = (primaryLocation?["id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           locID.lowercased().hasPrefix("pmh:oai:arxiv.org:") {
+            let rawID = String(locID.dropFirst("pmh:oai:arxiv.org:".count))
+            let check = ScholarlyIdentifierValidator.validateArXivID(rawID)
+            if check.isValid {
+                return check.canonicalBaseID
+            }
+            if let norm = ReferenceIdentifierNormalizer.normalizeArXivID(rawID, stripVersion: true) {
+                return norm
+            }
+        }
+        if let landing = (primaryLocation?["landing_page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           landing.lowercased().contains("arxiv.org/abs/") || landing.lowercased().contains("arxiv.org/pdf/") {
+            let check = ScholarlyIdentifierValidator.validateArXivID(landing)
+            if check.isValid {
+                return check.canonicalBaseID
+            }
+            if let norm = ReferenceIdentifierNormalizer.normalizeArXivID(landing, stripVersion: true) {
+                return norm
+            }
         }
         return nil
     }
@@ -6244,7 +6964,8 @@ public struct CitationVerificationFirewall: Sendable {
         sources: [CitationVerdictSourceRecord],
         fields: [CitationFieldDiscrepancy],
         findings: [FirewallFinding],
-        overrideNote: String? = nil
+        overrideNote: String? = nil,
+        record: RegistryWorkRecord? = nil
     ) -> CitationFirewallEntryVerdict {
         let baseSummary = overrideNote ?? summarizeFindings(findings, assignedClass: assignedClass)
         let summary: String
@@ -6290,6 +7011,7 @@ public struct CitationVerificationFirewall: Sendable {
             findings: findings,
             auditNote: summary,
             auditedEntry: updated,
+            record: record,
             evaluatedAt: clock.currentDate()
         )
     }

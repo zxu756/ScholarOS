@@ -5461,4 +5461,340 @@ struct BibCSLAndFirewallTests {
         let oaVenueRemote = try #require(oaDisplayDrift.fields.first { $0.field == "venue" })
         #expect(oaVenueRemote.remoteValue == "Materials & Design 'Letters'")
     }
+
+    // MARK: - 15. M3 Stage 02 RegistryWorkRecord & Verdict Record Attachment (S77)
+
+    @Test("M3 Stage 02 (S77): all 206 VERIFIED benchmark entries carry non-nil record aligned on title, year, and first author; registry DRIFT entries carry record; legacy JSON without record decodes cleanly")
+    func m3Stage02All206VerifiedAndDriftVerdictsCarryAlignedRecord() async throws {
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+        let firewall = CitationVerificationFirewall()
+
+        let groups = [
+            "audit_manual", "real_clean", "real_human", "real_typo",
+            "fabricated_model", "mut_doi_swap", "mut_doi_missing",
+            "mut_title", "mut_author", "mut_year1", "mut_year3", "retracted"
+        ]
+
+        var totalVerified = 0
+        var verifiedBySource: [String: Int] = [:]
+        var driftWithRecord = 0
+
+        for grp in groups {
+            let entries = try loadBenchmarkEntries(group: grp)
+            let entriesByKey = Dictionary(uniqueKeysWithValues: entries.map { ($0.citeKey, $0) })
+            let result = try await CitationVerificationFirewall.verifyBibliography(
+                entries: entries,
+                mode: .replay(snapshot: snapshot),
+                noCache: true,
+                environment: [:],
+                language: .en
+            )
+            for verdict in result.report.verdicts {
+                if verdict.firewallClass == .verified {
+                    totalVerified += 1
+                    let localEntry = try #require(entriesByKey[verdict.citeKey])
+                    let rec = try #require(
+                        verdict.record,
+                        "Expected non-nil record on VERIFIED \(grp)/\(verdict.citeKey)"
+                    )
+                    verifiedBySource[rec.source, default: 0] += 1
+                    #expect(["Crossref", "OpenAlex", "arXiv", "PubMed"].contains(rec.source))
+                    #expect(!rec.requestURL.isEmpty)
+                    #expect(rec.fetchedAt.hasPrefix("2026-11-16"))
+                    #expect(rec.origin == .replay)
+
+                    // 1. Title (with optional subtitle) matches local entry title
+                    let titleCmp = firewall.compareTitle(
+                        localTitle: localEntry.title,
+                        remoteSubtitle: rec.subtitle,
+                        remoteTitle: rec.title,
+                        sourceName: rec.source
+                    )
+                    #expect(
+                        titleCmp.discrepancy == nil,
+                        "Record title mismatch on \(grp)/\(verdict.citeKey): local='\(localEntry.title)' vs record='\(rec.title)' sub='\(String(describing: rec.subtitle))'"
+                    )
+
+                    // 2. Publication year matches local entry year
+                    let localYear = try #require(localEntry.year)
+                    #expect(
+                        rec.publicationYears.contains(localYear),
+                        "Record years \(rec.publicationYears) missing local year \(localYear) on \(grp)/\(verdict.citeKey)"
+                    )
+
+                    // 3. First author aligns with local first author
+                    let namedLocal = localEntry.authors.filter {
+                        let g = $0.givenName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let f = $0.familyName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        return !(g.isEmpty && (f == "others" || f == "et al." || f == "et al"))
+                    }
+                    if let firstLocal = namedLocal.first {
+                        let firstRecAuthor = try #require(
+                            rec.authors.first,
+                            "Expected non-empty record.authors on \(grp)/\(verdict.citeKey)"
+                        )
+                        #expect(!firstRecAuthor.displayName.isEmpty)
+                        let localFullFolded = ReferenceIdentifierNormalizer.normalizeTitle(firstLocal.description)
+                        let recFullFolded = ReferenceIdentifierNormalizer.normalizeTitle(firstRecAuthor.displayName)
+                        let localFamFolded = ReferenceIdentifierNormalizer.normalizeTitle(firstLocal.familyName)
+                        let recFamFolded = ReferenceIdentifierNormalizer.normalizeTitle(firstRecAuthor.familyName ?? firstRecAuthor.name ?? "")
+                        let authorAligned = (!localFamFolded.isEmpty && (localFamFolded == recFamFolded || recFamFolded.hasSuffix(localFamFolded) || localFullFolded == recFamFolded))
+                            || (!localFullFolded.isEmpty && localFullFolded == recFullFolded)
+                            || (firstLocal.familyName.trimmingCharacters(in: .whitespacesAndNewlines) == (firstRecAuthor.familyName ?? ""))
+                        #expect(
+                            authorAligned,
+                            "First author mismatch on \(grp)/\(verdict.citeKey): local='\(firstLocal.description)' vs record='\(firstRecAuthor.displayName)'"
+                        )
+                    }
+                } else if verdict.firewallClass == .drift {
+                    if verdict.record != nil {
+                        driftWithRecord += 1
+                    }
+                }
+            }
+        }
+
+        #expect(totalVerified == 206)
+        #expect(driftWithRecord == 184, "Expected all 184 registry-matched DRIFT benchmark entries to carry record, got \(driftWithRecord)")
+
+        // Backward-compatible decoding of legacy verdict JSON lacking `record` key
+        let sampleEntry = BibliographyEntry(
+            citeKey: "legacy_key",
+            kind: .article,
+            title: "Sample Title",
+            authors: [BibAuthor(givenName: "Ada", familyName: "Lovelace")],
+            year: 2020,
+            venue: "Nature"
+        )
+        let legacyVerdict = CitationFirewallEntryVerdict(
+            citeKey: "legacy_key",
+            firewallClass: .verified,
+            insertable: true,
+            reasons: ["verified_match"],
+            sources: [],
+            fields: [],
+            findings: [],
+            auditNote: "[VERIFIED] legacy",
+            auditedEntry: sampleEntry
+        )
+        let encodedData = try JSONEncoder().encode(legacyVerdict)
+        var rawDict = try #require(JSONSerialization.jsonObject(with: encodedData) as? [String: Any])
+        rawDict.removeValue(forKey: "record")
+        let strippedData = try JSONSerialization.data(withJSONObject: rawDict)
+        let decodedLegacy = try JSONDecoder().decode(CitationFirewallEntryVerdict.self, from: strippedData)
+        #expect(decodedLegacy.citeKey == "legacy_key")
+        #expect(decodedLegacy.record == nil)
+    }
+
+    @Test("M3 Stage 02 (S77): Crossref, OpenAlex, arXiv, and PubMed single & search records populate full authors, corporate authors, volume/issue/pages, short venues, and suppress OpenAlex 'arXiv (Cornell University)' venue")
+    func m3Stage02FourSourcesAndEdgeCasesRecordFields() async throws {
+        let fixturesReplay = try RegistryReplaySession(directoryURL: Self.recordedRegistryFixturesURL)
+        let benchRecordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let benchReplay = try RegistryReplaySession(directoryURL: benchRecordingsURL)
+        let firewall = CitationVerificationFirewall()
+
+        // 1. Crossref single-work (Tests/Fixtures/registry: LeCun, Bengio, Hinton 2015) — multi-author with given names, vol/issue/pages/publisher
+        let lecunVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "cr_lecun",
+                kind: .article,
+                title: "Deep learning",
+                authors: [
+                    BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                    BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                    BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+                ],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            session: fixturesReplay
+        )
+        #expect(lecunVerdict.firewallClass == .verified)
+        let crRec = try #require(lecunVerdict.record)
+        #expect(crRec.source == "Crossref")
+        #expect(crRec.origin == .replay)
+        #expect(crRec.fetchedAt.hasPrefix("2026-11-15"))
+        #expect(crRec.requestURL == "https://api.crossref.org/works/10.1038/nature14539")
+        #expect(crRec.workType == "journal-article")
+        #expect(crRec.title == "Deep learning")
+        #expect(crRec.subtitle == nil)
+        #expect(crRec.authors.count == 3)
+        #expect(crRec.authors[0] == RegistryWorkAuthor(givenName: "Yann", familyName: "LeCun", isCorporate: false))
+        #expect(crRec.authors[1] == RegistryWorkAuthor(givenName: "Yoshua", familyName: "Bengio", isCorporate: false))
+        #expect(crRec.authors[2] == RegistryWorkAuthor(givenName: "Geoffrey", familyName: "Hinton", isCorporate: false))
+        #expect(crRec.containerTitle == "Nature")
+        #expect(crRec.shortContainerTitle == "Nature")
+        #expect(crRec.volume == "521")
+        #expect(crRec.issue == "7553")
+        #expect(crRec.pages == "436-444")
+        #expect(crRec.publisher == "Springer Science and Business Media LLC")
+        #expect(crRec.doi == "10.1038/nature14539")
+        #expect(crRec.publicationYears.contains(2015))
+
+        // 2. Crossref distinct shortContainerTitle ("A&A"), HTML entity decoding, and subtitle (real_clean_060 & real_human_042)
+        let joysEntries = try loadBenchmarkEntries(group: "real_clean", keys: ["real_clean_060"])
+        let joysVerdict = await firewall.verifyAgainstPublicRegistries(entry: try #require(joysEntries.first), session: benchReplay)
+        #expect(joysVerdict.firewallClass == .verified)
+        let joysRec = try #require(joysVerdict.record)
+        #expect(joysRec.source == "Crossref")
+        #expect(joysRec.title == "JWST Observations of Young protoStars (JOYS)")
+        #expect(joysRec.subtitle == "Outflows and accretion in the high-mass star-forming region IRAS 23385+6053")
+        #expect(joysRec.containerTitle == "Astronomy & Astrophysics")
+        #expect(joysRec.shortContainerTitle == "A&A")
+        #expect(joysRec.volume == "673")
+        #expect(joysRec.pages == "A121")
+        #expect(joysRec.publisher == "EDP Sciences")
+
+        let haltonEntries = try loadBenchmarkEntries(group: "real_human", keys: ["real_human_042"])
+        let haltonVerdict = await firewall.verifyAgainstPublicRegistries(entry: try #require(haltonEntries.first), session: benchReplay)
+        let haltonRec = try #require(haltonVerdict.record)
+        #expect(haltonRec.fullTitle == "Generalized Halton sequences in 2008: A comparative study")
+
+        // 3. Crossref corporate author ("GRAVITY Collaboration", real_human_057)
+        let gravityEntries = try loadBenchmarkEntries(group: "real_human", keys: ["real_human_057"])
+        let gravityVerdict = await firewall.verifyAgainstPublicRegistries(entry: try #require(gravityEntries.first), session: benchReplay)
+        #expect(gravityVerdict.firewallClass == .verified)
+        let gravityRec = try #require(gravityVerdict.record)
+        #expect(gravityRec.authors.first == RegistryWorkAuthor(name: "GRAVITY Collaboration", isCorporate: true))
+        #expect(gravityRec.authors.count > 10)
+        #expect(gravityRec.authors.dropFirst().contains { ($0.givenName?.isEmpty == false) && ($0.familyName?.isEmpty == false) && !$0.isCorporate })
+
+        // 4. OpenAlex single-work (using real fixture payload when Crossref returns 404) & OpenAlex search arXiv-only entry (real_human_049)
+        let oaRawURL = Self.recordedRegistryFixturesURL.appendingPathComponent("openalex_doi_10.1038_nature14539_04360041c9.raw")
+        let oaRawBytes = try Data(contentsOf: oaRawURL)
+        let oaOnlySession = ClosureRegistrySession { request in
+            let urlStr = request.url?.absoluteString ?? ""
+            if urlStr.contains("api.crossref.org") {
+                return RegistryHTTPResponse(statusCode: 404, body: Data("Not found".utf8), origin: .replay, fetchedAt: "2026-11-15T12:00:00Z")
+            }
+            if urlStr.contains("api.openalex.org") {
+                return RegistryHTTPResponse(statusCode: 200, body: oaRawBytes, headers: ["Content-Type": "application/json"], origin: .replay, fetchedAt: "2026-11-15T12:00:01Z")
+            }
+            return RegistryHTTPResponse(statusCode: 404, body: Data(), origin: .replay, fetchedAt: "2026-11-15T12:00:02Z")
+        }
+        let oaSingleVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "oa_lecun",
+                kind: .article,
+                title: "Deep learning",
+                authors: [
+                    BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                    BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                    BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+                ],
+                year: 2015,
+                venue: "Nature",
+                doi: "10.1038/nature14539"
+            ),
+            session: oaOnlySession
+        )
+        #expect(oaSingleVerdict.firewallClass == .verified)
+        let oaRec = try #require(oaSingleVerdict.record)
+        #expect(oaRec.source == "OpenAlex")
+        #expect(oaRec.workType == "review")
+        #expect(oaRec.title == "Deep learning")
+        #expect(oaRec.authors.count == 3)
+        #expect(oaRec.authors[0] == RegistryWorkAuthor(givenName: "Yann", familyName: "LeCun", isCorporate: false))
+        #expect(oaRec.authors[1] == RegistryWorkAuthor(givenName: "Yoshua", familyName: "Bengio", isCorporate: false))
+        #expect(oaRec.authors[2] == RegistryWorkAuthor(givenName: "Geoffrey", familyName: "Hinton", isCorporate: false))
+        #expect(oaRec.containerTitle == "Nature")
+        #expect(oaRec.volume == "521")
+        #expect(oaRec.issue == "7553")
+        #expect(oaRec.pages == "436-444")
+        #expect(oaRec.publisher == "Nature Portfolio")
+        #expect(oaRec.doi == "10.1038/nature14539")
+        #expect(oaRec.pmid == "26017442")
+        #expect(oaRec.publicationDates.issued == RegistryPublicationDate(year: 2015, month: 5, day: 26))
+
+        // OpenAlex search arXiv-only entry: real_human_049 MUST NOT carry "arXiv (Cornell University)" as containerTitle!
+        let rh049Entries = try loadBenchmarkEntries(group: "real_human", keys: ["real_human_049"])
+        let rh049Verdict = await firewall.verifyAgainstPublicRegistries(entry: try #require(rh049Entries.first), session: benchReplay)
+        #expect(rh049Verdict.firewallClass == .verified)
+        let rh049Rec = try #require(rh049Verdict.record)
+        #expect(rh049Rec.source == "OpenAlex")
+        #expect(rh049Rec.workType == "preprint")
+        #expect(rh049Rec.arxivID == "1711.05101")
+        #expect(rh049Rec.containerTitle == nil, "arXiv-only OpenAlex record must NOT emit 'arXiv (Cornell University)' as containerTitle, got \(String(describing: rh049Rec.containerTitle))")
+        #expect(rh049Rec.shortContainerTitle == nil)
+        #expect(rh049Rec.publisher == nil)
+        #expect(rh049Rec.authors == [
+            RegistryWorkAuthor(givenName: "Ilya", familyName: "Loshchilov", isCorporate: false),
+            RegistryWorkAuthor(givenName: "Frank", familyName: "Hutter", isCorporate: false)
+        ])
+
+        // 5. arXiv Atom API (Tests/Fixtures/registry: 1706.03762 Vaswani et al. 2017)
+        let arxivVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "arxiv_vaswani",
+                kind: .misc,
+                title: "Attention Is All You Need",
+                authors: [
+                    BibAuthor(givenName: "Ashish", familyName: "Vaswani"),
+                    BibAuthor(givenName: "Noam", familyName: "Shazeer"),
+                    BibAuthor(givenName: "Niki", familyName: "Parmar"),
+                    BibAuthor(givenName: "Jakob", familyName: "Uszkoreit"),
+                    BibAuthor(givenName: "Llion", familyName: "Jones"),
+                    BibAuthor(givenName: "Aidan N.", familyName: "Gomez"),
+                    BibAuthor(givenName: "Lukasz", familyName: "Kaiser"),
+                    BibAuthor(givenName: "Illia", familyName: "Polosukhin")
+                ],
+                year: 2017,
+                arxivID: "1706.03762"
+            ),
+            session: fixturesReplay
+        )
+        #expect(arxivVerdict.firewallClass == .verified)
+        let arxivRec = try #require(arxivVerdict.record)
+        #expect(arxivRec.source == "arXiv")
+        #expect(arxivRec.workType == "preprint")
+        #expect(arxivRec.title == "Attention Is All You Need")
+        #expect(arxivRec.arxivID == "1706.03762")
+        #expect(arxivRec.primaryCategory == "cs.CL")
+        #expect(arxivRec.containerTitle == nil)
+        #expect(arxivRec.authors.count == 8)
+        #expect(arxivRec.authors[0] == RegistryWorkAuthor(givenName: "Ashish", familyName: "Vaswani", isCorporate: false))
+        #expect(arxivRec.authors[5] == RegistryWorkAuthor(givenName: "Aidan N.", familyName: "Gomez", isCorporate: false))
+        #expect(arxivRec.authors[7] == RegistryWorkAuthor(givenName: "Illia", familyName: "Polosukhin", isCorporate: false))
+        #expect(arxivRec.publicationDates.issued == RegistryPublicationDate(year: 2017, month: 6, day: 12))
+
+        // 6. PubMed E-utilities esummary (Tests/Fixtures/registry: PMID 26017312 Ito et al. 2015)
+        let pubmedVerdict = await firewall.verifyAgainstPublicRegistries(
+            entry: BibliographyEntry(
+                citeKey: "pmid_ito",
+                kind: .article,
+                title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+                authors: [
+                    BibAuthor(givenName: "Hiroshi T.", familyName: "Ito"),
+                    BibAuthor(givenName: "Sheng-Jia", familyName: "Zhang"),
+                    BibAuthor(givenName: "Menno P.", familyName: "Witter"),
+                    BibAuthor(givenName: "Edvard I.", familyName: "Moser"),
+                    BibAuthor(givenName: "May-Britt", familyName: "Moser")
+                ],
+                year: 2015,
+                venue: "Nature",
+                pmid: "26017312"
+            ),
+            session: fixturesReplay
+        )
+        #expect(pubmedVerdict.firewallClass == .verified)
+        let pmRec = try #require(pubmedVerdict.record)
+        #expect(pmRec.source == "PubMed")
+        #expect(pmRec.workType == "Journal Article")
+        #expect(pmRec.title == "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation")
+        #expect(pmRec.pmid == "26017312")
+        #expect(pmRec.doi == "10.1038/nature14396")
+        #expect(pmRec.containerTitle == "Nature")
+        #expect(pmRec.shortContainerTitle == "Nature")
+        #expect(pmRec.volume == "522")
+        #expect(pmRec.issue == "7554")
+        #expect(pmRec.pages == "50-5")
+        #expect(pmRec.authors.count == 5)
+        #expect(pmRec.authors[0] == RegistryWorkAuthor(givenName: "HT", familyName: "Ito", isCorporate: false))
+        #expect(pmRec.authors[4] == RegistryWorkAuthor(givenName: "MB", familyName: "Moser", isCorporate: false))
+        #expect(pmRec.publicationDates.publishedPrint?.year == 2015)
+        #expect(pmRec.publicationDates.publishedOnline?.year == 2015)
+        #expect(pmRec.publicationDates.issued == RegistryPublicationDate(year: 2015, month: 6, day: 4))
+    }
 }

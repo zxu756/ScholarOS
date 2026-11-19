@@ -7212,6 +7212,93 @@ struct PluginSDKMCPAndShellTests {
         let unknownMethodObj = try #require(JSONSerialization.jsonObject(with: Data(unknownMethodReply.utf8)) as? [String: Any])
         #expect((unknownMethodObj["error"] as? [String: Any])?["code"] as? Int == -32601)
     }
+
+    @Test("M3 Stage 02 (S77): CLI verify-citations --json and MCP results expose record on VERIFIED and DRIFT verdicts")
+    func m3Stage02CLIAndMCPJSONOutputsIncludeRecordField() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s77")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let bibText = try String(contentsOf: recheckBibURL, encoding: .utf8)
+
+        // 1. CLI `verify-citations --registry-replay ... --json`
+        let cli = ScholarCLIRunner(environment: env)
+        let cliOut = await cli.runWithExitStatus(
+            arguments: ["verify-citations", recheckBibURL.path, "--registry-replay", registryDir.path, "--json", "--lang", "en"]
+        )
+        #expect(cliOut.exitCode == 1)
+        let cliObj = try #require(JSONSerialization.jsonObject(with: Data(cliOut.stdout.utf8)) as? [String: Any])
+        let cliVerdicts = try #require(cliObj["verdicts"] as? [[String: Any]])
+        let cliVerified = try #require(cliVerdicts.first { ($0["citeKey"] as? String) == "real_lecun" })
+        let cliVerifiedRec = try #require(
+            cliVerified["record"] as? [String: Any],
+            "Expected non-null record dictionary on CLI VERIFIED verdict, got \(String(describing: cliVerified["record"]))"
+        )
+        #expect(cliVerifiedRec["source"] as? String == "Crossref")
+        #expect(cliVerifiedRec["volume"] as? String == "521")
+        #expect(cliVerifiedRec["pages"] as? String == "436-444")
+        let cliRecAuthors = try #require(cliVerifiedRec["authors"] as? [[String: Any]])
+        #expect(cliRecAuthors.count == 3)
+        #expect(cliRecAuthors[0]["givenName"] as? String == "Yann")
+        #expect(cliRecAuthors[0]["familyName"] as? String == "LeCun")
+
+        let cliDrift = try #require(cliVerdicts.first { ($0["citeKey"] as? String) == "wrongyear5" })
+        let cliDriftRec = try #require(
+            cliDrift["record"] as? [String: Any],
+            "Expected non-null record dictionary on CLI DRIFT verdict, got \(String(describing: cliDrift["record"]))"
+        )
+        #expect(cliDriftRec["title"] as? String == "Long Short-Term Memory")
+
+        let cliNotFound = try #require(cliVerdicts.first { ($0["citeKey"] as? String) == "fake_nonsentinel" })
+        #expect(cliNotFound.keys.contains("record"))
+        #expect(cliNotFound["record"] is NSNull)
+
+        // 2. MCP `scholar_verify_bibliography` and `scholar_cite_key`
+        let mcpServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+        let mcpVB = await mcpServer.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": bibText]
+        )
+        #expect(mcpVB["isError"] as? Bool == false)
+        let mcpVBText = try #require(((mcpVB["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let mcpVBObj = try #require(JSONSerialization.jsonObject(with: Data(mcpVBText.utf8)) as? [String: Any])
+        let mcpVerdicts = try #require(mcpVBObj["verdicts"] as? [[String: Any]])
+        let mcpVerified = try #require(mcpVerdicts.first { ($0["citeKey"] as? String) == "real_lecun" })
+        let mcpVerifiedRec = try #require(mcpVerified["record"] as? [String: Any])
+        #expect(mcpVerifiedRec["publisher"] as? String == "Springer Science and Business Media LLC")
+
+        let mcpCiteOK = await mcpServer.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "real_lecun", "bibtex": bibText]
+        )
+        let mcpCiteOKText = try #require(((mcpCiteOK["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let mcpCiteOKObj = try #require(JSONSerialization.jsonObject(with: Data(mcpCiteOKText.utf8)) as? [String: Any])
+        let mcpCiteRec = try #require(
+            mcpCiteOKObj["record"] as? [String: Any],
+            "Expected record in MCP scholar_cite_key JSON output, got \(mcpCiteOKObj)"
+        )
+        #expect(mcpCiteRec["doi"] as? String == "10.1038/nature14539")
+
+        let mcpCiteDrift = await mcpServer.executeToolCallAsync(
+            name: "scholar_cite_key",
+            arguments: ["citeKey": "wrongyear5", "bibtex": bibText]
+        )
+        #expect(mcpCiteDrift["isError"] as? Bool == true)
+        let mcpCiteDriftText = try #require(((mcpCiteDrift["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let mcpCiteDriftObj = try #require(JSONSerialization.jsonObject(with: Data(mcpCiteDriftText.utf8)) as? [String: Any])
+        let mcpCiteDriftRec = try #require(
+            mcpCiteDriftObj["record"] as? [String: Any],
+            "Expected record in MCP scholar_cite_key DRIFT error JSON output, got \(mcpCiteDriftObj)"
+        )
+        #expect(mcpCiteDriftRec["source"] as? String == "Crossref")
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
