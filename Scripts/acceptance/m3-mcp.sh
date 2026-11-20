@@ -2,15 +2,19 @@
 #
 # M3 acceptance verification script (`Scripts/acceptance/m3-mcp.sh`).
 #
-# Stage 01–02 scope (active rows):
-#   - Row 1:  `tools/list` — Stage 01 verifies 0 tools expose `registryReplayPath` in `inputSchema` or `description`;
-#             new tools (`verify_citation`, `add_verified_bibtex`, `check_manuscript`) & frozen-tool gating deferred to Stages 04–05 (`没跑`)
-#   - Row 10: Caller fake replay (`S74`) — builds a self-consistent fake replay directory on the fly in scratch and verifies
-#             existing MCP tools (`scholar_cite_key`, `scholar_verify_bibliography`, `scholar_lsp_diagnostics`) reject `registryReplayPath`
-#             (and unknown argument names) with structured `ERR_INVALID_ARGUMENT`, never grant `VERIFIED` to `invented_2026`, and leave
-#             target `.bib` byte/size/mtime unchanged; new tools deferred to Stage 04 (`没跑`)
+# Stage 01–04 scope (active rows):
+#   - Row 1:  `tools/list` — verifies 0 tools expose `registryReplayPath` and `verify_citation`/`add_verified_bibtex` omit `demo`/`projectPath`;
+#             `check_manuscript` & frozen-tool gating deferred to Stage 05 (`没跑`)
+#   - Rows 2–9: `add_verified_bibtex` firewall rejection (`NOT_FOUND`, `DRIFT`, `UNVERIFIED`, `RETRACTED`, `year_mismatch`),
+#             verified O_APPEND writes + read-back parity, registry-authoritative fields & `changed_fields`, exact 4-case deduplication,
+#             offline rejection (`--offline` & `offline: true`), and network-denied cache-read bypass
+#   - Row 10: Caller fake replay (`S74`) — all tools (including `verify_citation` & `add_verified_bibtex`) reject `registryReplayPath`
+#             with structured `ERR_INVALID_ARGUMENT`, never grant `VERIFIED` to `invented_2026`, and leave `.bib` unchanged
+#   - Row 11: `verify_citation` 480-entry per-entry `{cite_key, verdict, reasons, fields, insertable}` parity vs CLI `verify-citations --json`
 #   - Row 12: Replay markers (`S75`) — `--registry-replay` server prints `[REPLAY]` on stderr, every tool result JSON has top-level
 #             `"mode": "REPLAY"`, and `sources[].fetchedAt` / `firewallVerifiedAtUTC` carry the recording date `2026-11-16`
+#   - Row 13: Write safety — 8 targets via MCP `add_verified_bibtex` (read-only, directory, missing parent, non-.bib, symlink, Latin-1, BIB001, CRLF)
+#   - Row 14: Concurrency — 2 concurrent MCP server processes each appending 20 distinct `VERIFIED` entries (40 total, 0 errors)
 #   - Row 17: Protocol (`S78`) — `ping` returns `{}`, `serverInfo.version` dynamically matches `scholaros version`,
 #             malformed JSON returns `-32700`, unknown method returns `-32601`
 #   - Row 19: Unit tests (`S79`) — `swift test --no-parallel` passes (>= 289 tests) both without and with `SCHOLAR_CACHE_DIR`
@@ -204,10 +208,21 @@ if bad:
     sys.exit(1)
 
 print(f"  [Row 1a] PASS: 0/{len(tools)} tools expose registryReplayPath in inputSchema or description (tools={names})")
+by_name = {t.get("name"): t for t in tools}
+for req_stage4 in ("verify_citation", "add_verified_bibtex"):
+    if req_stage4 not in by_name:
+        print(f"  FAIL [Row 1]: Stage 04 tool {req_stage4!r} missing from tools/list")
+        sys.exit(1)
+    s4_props = ((by_name[req_stage4].get("inputSchema") or {}).get("properties") or {})
+    for forbidden in ("registryReplayPath", "demo", "projectPath"):
+        if forbidden in s4_props:
+            print(f"  FAIL [Row 1]: {req_stage4} exposes forbidden property {forbidden!r}: {s4_props}")
+            sys.exit(1)
+print("  [Row 1b] PASS: verify_citation & add_verified_bibtex present with snake_case schemas and no demo/projectPath/registryReplayPath")
 want_new = {"verify_citation", "add_verified_bibtex", "check_manuscript"}
 missing_new = sorted(want_new - set(names))
 if missing_new:
-    print(f"  [Row 1b] 没跑: new M3 tools not yet implemented in Stage 01 (missing={missing_new})")
+    print(f"  [Row 1c] 没跑: remaining Stage 05 tools/frozen-tool gating not yet implemented (missing={missing_new})")
     sys.exit(2)
 
 sys.exit(0)
@@ -226,14 +241,835 @@ PY
     fi
 
     # ==================================================================
-    # Rows 2–9: Deferred to Stage 04 (add_verified_bibtex / verify_citation)
+    # Row 2: add_verified_bibtex with fab_codex_003 (fabricated, unregistered DOI)
     # ==================================================================
-    for r in 2 3 4 5 6 7 8 9; do
-        if should_run_row "$r"; then
-            echo "== [Row $r] 没跑 — Scheduled for Stage 04 (add_verified_bibtex / verify_citation) =="
-            record_skip "$r" "Scheduled for Stage 04 (add_verified_bibtex / verify_citation) — 没跑"
+    if should_run_row 2; then
+        echo "== [Row 2] add_verified_bibtex on fab_codex_003: isError=true, ERR_UNVERIFIED_CITATION, NOT_FOUND, doi_not_registered, file unchanged =="
+        set +e
+        R2_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    if not m:
+        raise RuntimeError(f"Missing {group}/{key}")
+    return m.group(1) + "\n"
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+target_bib = os.path.join(scratch, "row2-refs.bib")
+open(target_bib, "wb").write(b"% row2 sentinel\n")
+sig_before = file_sig(target_bib)
+
+fab_003 = extract_entry("fabricated_model", "fab_codex_003")
+reqs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": fab_003}}},
+]
+p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+if p.returncode != 0:
+    print(f"  FAIL [Row 2]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+resp = json.loads(p.stdout.strip())["result"]
+if resp.get("isError") is not True:
+    print(f"  FAIL [Row 2]: expected isError=True, got {resp}")
+    sys.exit(1)
+obj = json.loads(resp["content"][0]["text"])
+if (
+    obj.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or obj.get("verdict") != "NOT_FOUND"
+    or "doi_not_registered" not in (obj.get("reasons") or [])
+    or obj.get("cite_key") != "fab_codex_003"
+    or obj.get("action") != f"未改动 {os.path.basename(target_bib)}"
+):
+    print(f"  FAIL [Row 2]: unexpected error payload: {obj}")
+    sys.exit(1)
+
+sig_after = file_sig(target_bib)
+if sig_before != sig_after:
+    print(f"  FAIL [Row 2]: target .bib changed (before={sig_before}, after={sig_after})")
+    sys.exit(1)
+
+print(f"  [Row 2] PASS: fab_codex_003 rejected with ERR_UNVERIFIED_CITATION (verdict=NOT_FOUND, reasons={obj.get('reasons')}), action={obj.get('action')!r}, file unchanged")
+PY
+)"
+        R2_RC=$?
+        set -e
+        echo "$R2_OUT"
+        if [[ "$R2_RC" -eq 0 ]]; then
+            record_pass 2 "add_verified_bibtex rejects fab_codex_003 with ERR_UNVERIFIED_CITATION (NOT_FOUND, doi_not_registered) and leaves .bib unchanged"
+        else
+            record_fail 2 "Row 2 fab_codex_003 rejection check failed"
         fi
-    done
+    fi
+
+    # ==================================================================
+    # Row 3: add_verified_bibtex on fab_codex_001 (DRIFT), fab_codex_002 (UNVERIFIED), retracted_001 (RETRACTED)
+    # ==================================================================
+    if should_run_row 3; then
+        echo "== [Row 3] add_verified_bibtex on fab_codex_001 (DRIFT), fab_codex_002 (UNVERIFIED), retracted_001 (RETRACTED) =="
+        set +e
+        R3_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    if not m:
+        raise RuntimeError(f"Missing {group}/{key}")
+    return m.group(1) + "\n"
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+target_bib = os.path.join(scratch, "row3-refs.bib")
+open(target_bib, "wb").write(b"% row3 sentinel\n")
+sig_before = file_sig(target_bib)
+
+fab_001 = extract_entry("fabricated_model", "fab_codex_001")
+fab_002 = extract_entry("fabricated_model", "fab_codex_002")
+ret_001 = extract_entry("retracted", "retracted_001")
+
+reqs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": fab_001}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": fab_002}}},
+    {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": ret_001}}},
+]
+p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+if p.returncode != 0:
+    print(f"  FAIL [Row 3]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+resps = {obj["id"]: obj["result"] for obj in (json.loads(ln) for ln in p.stdout.splitlines() if ln.strip())}
+for rid in (1, 2, 3):
+    if resps[rid].get("isError") is not True:
+        print(f"  FAIL [Row 3]: call {rid} expected isError=True, got {resps[rid]}")
+        sys.exit(1)
+
+o1 = json.loads(resps[1]["content"][0]["text"])
+fields1 = {f.get("field"): f for f in (o1.get("fields") or [])}
+if (
+    o1.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or o1.get("verdict") != "DRIFT"
+    or not (fields1.get("title") or {}).get("remoteValue")
+    or not (fields1.get("firstAuthor") or {}).get("remoteValue")
+    or o1.get("action") != f"未改动 {os.path.basename(target_bib)}"
+):
+    print(f"  FAIL [Row 3]: fab_codex_001 unexpected payload: {o1}")
+    sys.exit(1)
+
+o2 = json.loads(resps[2]["content"][0]["text"])
+if (
+    o2.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or o2.get("verdict") != "UNVERIFIED"
+    or "no_match_in_search" not in (o2.get("reasons") or [])
+    or o2.get("action") != f"未改动 {os.path.basename(target_bib)}"
+):
+    print(f"  FAIL [Row 3]: fab_codex_002 unexpected payload: {o2}")
+    sys.exit(1)
+
+o3 = json.loads(resps[3]["content"][0]["text"])
+if (
+    o3.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or o3.get("verdict") != "RETRACTED"
+    or o3.get("action") != f"未改动 {os.path.basename(target_bib)}"
+):
+    print(f"  FAIL [Row 3]: retracted_001 unexpected payload: {o3}")
+    sys.exit(1)
+
+if file_sig(target_bib) != sig_before:
+    print("  FAIL [Row 3]: target .bib modified after rejected writes")
+    sys.exit(1)
+
+print("  [Row 3] PASS: fab_codex_001 (DRIFT w/ remote title & firstAuthor), fab_codex_002 (UNVERIFIED no_match_in_search), retracted_001 (RETRACTED) all rejected; file unchanged")
+PY
+)"
+        R3_RC=$?
+        set -e
+        echo "$R3_OUT"
+        if [[ "$R3_RC" -eq 0 ]]; then
+            record_pass 3 "add_verified_bibtex rejects DRIFT (fab_codex_001), UNVERIFIED (fab_codex_002), and RETRACTED (retracted_001) without modifying .bib"
+        else
+            record_fail 3 "Row 3 DRIFT / UNVERIFIED / RETRACTED rejection check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 4: mut_year3_001 (local 2019, Crossref 2022)
+    # ==================================================================
+    if should_run_row 4; then
+        echo "== [Row 4] add_verified_bibtex on mut_year3_001 (local 2019 vs Crossref 2022) =="
+        set +e
+        R4_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+p_bib = os.path.join(repo_root, "Benchmarks", "citations", "entries", "mut_year3.bib")
+m = re.search(r"(@\w+\{mut_year3_001,.*?\n\})", open(p_bib, encoding="utf-8").read(), flags=re.S)
+mut_bib = m.group(1) + "\n"
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+target_bib = os.path.join(scratch, "row4-refs.bib")
+open(target_bib, "wb").write(b"% row4 sentinel\n")
+sig_before = file_sig(target_bib)
+
+req = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": mut_bib}}}
+p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input=json.dumps(req) + "\n", env=env, capture_output=True, text=True)
+if p.returncode != 0:
+    print(f"  FAIL [Row 4]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+res = json.loads(p.stdout.strip())["result"]
+if res.get("isError") is not True:
+    print(f"  FAIL [Row 4]: expected isError=True, got {res}")
+    sys.exit(1)
+
+obj = json.loads(res["content"][0]["text"])
+year_fields = [f for f in (obj.get("fields") or []) if f.get("field") == "year"]
+if (
+    obj.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or obj.get("verdict") != "DRIFT"
+    or not year_fields
+    or year_fields[0].get("remoteValue") != "2022"
+    or year_fields[0].get("source") != "Crossref"
+    or "2022" not in (obj.get("reason") or "")
+    or obj.get("action") != f"未改动 {os.path.basename(target_bib)}"
+):
+    print(f"  FAIL [Row 4]: unexpected payload: {obj}")
+    sys.exit(1)
+
+if file_sig(target_bib) != sig_before:
+    print("  FAIL [Row 4]: target .bib modified")
+    sys.exit(1)
+
+print("  [Row 4] PASS: mut_year3_001 rejected with DRIFT, fields[year]={remoteValue:'2022', source:'Crossref'}, reason mentions 2022, file unchanged")
+PY
+)"
+        R4_RC=$?
+        set -e
+        echo "$R4_OUT"
+        if [[ "$R4_RC" -eq 0 ]]; then
+            record_pass 4 "add_verified_bibtex rejects mut_year3_001 with Crossref remoteValue='2022' in fields and reason, leaving .bib unchanged"
+        else
+            record_fail 4 "Row 4 mut_year3_001 year mismatch check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 5: Append real_clean_001 & audit_001 into empty .bib and CRLF copy of real_human.bib; read back via ScholarOS
+    # ==================================================================
+    if should_run_row 5; then
+        echo "== [Row 5] Append real_clean_001 & audit_001 into empty .bib and CRLF real_human.bib copy; verify prefix, CRLF, and read-back parity =="
+        set +e
+        R5_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    if not m:
+        raise RuntimeError(f"Missing {group}/{key}")
+    return m.group(1) + "\n"
+
+rc001 = extract_entry("real_clean", "real_clean_001")
+au001 = extract_entry("audit_manual", "audit_001")
+
+empty_bib = os.path.join(scratch, "row5-empty.bib")
+open(empty_bib, "wb").write(b"")
+
+rh_src = open(os.path.join(repo_root, "Benchmarks", "citations", "entries", "real_human.bib"), "rb").read()
+rh_crlf_bytes = rh_src.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+rh_copy = os.path.join(scratch, "row5-real_human-crlf.bib")
+open(rh_copy, "wb").write(rh_crlf_bytes)
+
+for label, target_path, expected_initial_count, is_crlf in [
+    ("empty", empty_bib, 0, False),
+    ("real_human_crlf", rh_copy, 100, True),
+]:
+    orig_bytes = open(target_path, "rb").read()
+    orig_ino = os.stat(target_path).st_ino
+
+    reqs = [
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_path, "bibtex": rc001}}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_path, "bibtex": au001}}},
+    ]
+    p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+    if p.returncode != 0:
+        print(f"  FAIL [Row 5/{label}]: mcp exited {p.returncode}: {p.stderr}")
+        sys.exit(1)
+
+    resps = {obj["id"]: obj["result"] for obj in (json.loads(ln) for ln in p.stdout.splitlines() if ln.strip())}
+    records_by_key = {}
+    for rid, exp_key in [(1, "real_clean_001"), (2, "audit_001")]:
+        res = resps[rid]
+        if res.get("isError") is not False:
+            print(f"  FAIL [Row 5/{label}]: expected isError=False on {exp_key}, got {res}")
+            sys.exit(1)
+        obj = json.loads(res["content"][0]["text"])
+        if obj.get("status") != "APPENDED_VERIFIED" or obj.get("cite_key") != exp_key or obj.get("mode") != "REPLAY":
+            print(f"  FAIL [Row 5/{label}]: unexpected APPENDED_VERIFIED payload on {exp_key}: {obj}")
+            sys.exit(1)
+        rec = obj.get("record")
+        if not isinstance(rec, dict):
+            print(f"  FAIL [Row 5/{label}]: missing record in APPENDED_VERIFIED response on {exp_key}: {obj}")
+            sys.exit(1)
+        records_by_key[exp_key] = rec
+
+    after_bytes = open(target_path, "rb").read()
+    after_ino = os.stat(target_path).st_ino
+    if after_ino != orig_ino:
+        print(f"  FAIL [Row 5/{label}]: inode changed ({orig_ino} -> {after_ino})")
+        sys.exit(1)
+    if not after_bytes.startswith(orig_bytes) or len(after_bytes) <= len(orig_bytes):
+        print(f"  FAIL [Row 5/{label}]: original bytes are not a strict prefix of updated file")
+        sys.exit(1)
+
+    if is_crlf:
+        appended_slice = after_bytes[len(orig_bytes):]
+        lf_indices = [i for i, b in enumerate(appended_slice) if b == 0x0A]
+        if not lf_indices or any(i == 0 or appended_slice[i - 1] != 0x0D for i in lf_indices):
+            print(f"  FAIL [Row 5/{label}]: appended slice in CRLF file contains bare LF")
+            sys.exit(1)
+
+    # Read back via ScholarOS BibTeX reader (verify-citations --offline --json)
+    p_rb = subprocess.run([cli_bin, "verify-citations", target_path, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+    if p_rb.returncode not in (0, 1, 3):
+        print(f"  FAIL [Row 5/{label}]: verify-citations read-back exited {p_rb.returncode}: {p_rb.stderr}")
+        sys.exit(1)
+    rb_obj = json.loads(p_rb.stdout)
+    if (rb_obj.get("unverifiedByReason") or {}).get("parse_error", 0) != 0 or "[BIB001]" in p_rb.stderr:
+        print(f"  FAIL [Row 5/{label}]: BibTeX parse errors after append: stderr={p_rb.stderr}")
+        sys.exit(1)
+    verdicts = rb_obj.get("verdicts") or []
+    if len(verdicts) != expected_initial_count + 2:
+        print(f"  FAIL [Row 5/{label}]: expected {expected_initial_count + 2} entries, got {len(verdicts)}")
+        sys.exit(1)
+
+    by_key = {v["citeKey"]: v["auditedEntry"] for v in verdicts}
+    for key in ("real_clean_001", "audit_001"):
+        if key not in by_key:
+            print(f"  FAIL [Row 5/{label}]: missing {key} in read-back entries")
+            sys.exit(1)
+        ae = by_key[key]
+        rec = records_by_key[key]
+        rec_years = {
+            d["year"]
+            for k in ("published-print", "published-online", "issued")
+            for d in [rec.get("publicationDates", {}).get(k)]
+            if isinstance(d, dict) and "year" in d
+        }
+        rec_authors = [(a.get("givenName") or "", a.get("familyName") or a.get("name") or "") for a in (rec.get("authors") or [])]
+        ae_authors = [(a.get("givenName") or "", a.get("familyName") or "") for a in (ae.get("authors") or [])]
+        norm_pages = lambda s: (s or "").replace("--", "-")
+        if (
+            ae.get("title") != rec.get("title")
+            or ae.get("year") not in rec_years
+            or ae_authors != rec_authors
+            or ae.get("venue") != (rec.get("containerTitle") or "")
+            or ae.get("volume") != rec.get("volume")
+            or ae.get("issue") != rec.get("issue")
+            or norm_pages(ae.get("pages")) != norm_pages(rec.get("pages"))
+            or (ae.get("doi") or "").lower() != (rec.get("doi") or "").lower()
+        ):
+            print(f"  FAIL [Row 5/{label}]: read-back mismatch on {key}:\n    auditedEntry={ae}\n    record={rec}")
+            sys.exit(1)
+
+print("  [Row 5] PASS: empty.bib (2 entries) & CRLF real_human.bib (102 entries) appended via O_APPEND; prefix, inode, CRLF, and read-back fields match record")
+PY
+)"
+        R5_RC=$?
+        set -e
+        echo "$R5_OUT"
+        if [[ "$R5_RC" -eq 0 ]]; then
+            record_pass 5 "real_clean_001 and audit_001 appended to empty .bib and CRLF real_human.bib copy with exact prefix, CRLF, and read-back parity"
+        else
+            record_fail 5 "Row 5 verified append and read-back check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 6: Written fields come from registry record (audit_020, real_human_012, real_typo_017, real_human_049)
+    # ==================================================================
+    if should_run_row 6; then
+        echo "== [Row 6] Registry-authoritative fields & changed_fields on audit_020, real_human_012, real_typo_017, real_human_049 =="
+        set +e
+        R6_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    if not m:
+        raise RuntimeError(f"Missing {group}/{key}")
+    return m.group(1) + "\n"
+
+au020 = extract_entry("audit_manual", "audit_020")
+rh012 = extract_entry("real_human", "real_human_012")
+rt017 = extract_entry("real_typo", "real_typo_017")
+rh049 = extract_entry("real_human", "real_human_049")
+
+target_bib = os.path.join(scratch, "row6.bib")
+reqs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": au020}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rh012}}},
+    {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rt017}}},
+    {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rh049}}},
+]
+p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+if p.returncode != 0:
+    print(f"  FAIL [Row 6]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+objs = {}
+for ln in p.stdout.splitlines():
+    if not ln.strip():
+        continue
+    env_obj = json.loads(ln)
+    res = env_obj["result"]
+    if res.get("isError") is not False:
+        print(f"  FAIL [Row 6]: id={env_obj['id']} failed: {res}")
+        sys.exit(1)
+    objs[env_obj["id"]] = json.loads(res["content"][0]["text"])
+
+# 1. audit_020: Science -> Nature
+o1 = objs[1]
+cf1 = {c["field"]: c for c in o1.get("changed_fields") or []}
+if "{Nature}" not in o1["written_bibtex"] or "{Science}" in o1["written_bibtex"] or cf1.get("journal", {}).get("written") != "Nature":
+    print(f"  FAIL [Row 6]: audit_020 unexpected output: {o1}")
+    sys.exit(1)
+
+# 2. real_human_012: Ind. Eng. Chem. -> Industrial \& Engineering Chemistry Research
+o2 = objs[2]
+cf2 = {c["field"]: c for c in o2.get("changed_fields") or []}
+if r"Industrial \& Engineering Chemistry Research" not in o2["written_bibtex"] or cf2.get("journal", {}).get("written") != "Industrial & Engineering Chemistry Research":
+    print(f"  FAIL [Row 6]: real_human_012 unexpected output: {o2}")
+    sys.exit(1)
+
+# 3. real_typo_017: uppercase DOI -> canonical DOI from record
+o3 = objs[3]
+cf3 = {c["field"]: c for c in o3.get("changed_fields") or []}
+rec_doi = o3["record"]["doi"]
+if f"{{{rec_doi}}}" not in o3["written_bibtex"] or cf3.get("doi", {}).get("written") != rec_doi or cf3.get("doi", {}).get("given") == rec_doi:
+    print(f"  FAIL [Row 6]: real_typo_017 unexpected output: {o3}")
+    sys.exit(1)
+
+# 4. real_human_049: OpenAlex arXiv preprint -> @misc with eprint & archivePrefix, NO journal/booktitle, NO "Cornell"
+o4 = objs[4]
+wb4 = o4["written_bibtex"]
+cf4 = {c["field"]: c for c in o4.get("changed_fields") or []}
+if (
+    not wb4.startswith("@misc{real_human_049,")
+    or "eprint" not in wb4
+    or "archivePrefix" not in wb4
+    or "journal" in wb4
+    or "booktitle" in wb4
+    or "cornell" in wb4.lower()
+    or not o4.get("changed_fields")
+):
+    print(f"  FAIL [Row 6]: real_human_049 unexpected output: {o4}")
+    sys.exit(1)
+
+# Verify BibTeX read-back has 0 parse errors and unescapes \& cleanly
+p_rb = subprocess.run([cli_bin, "verify-citations", target_bib, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+rb = json.loads(p_rb.stdout)
+if (rb.get("unverifiedByReason") or {}).get("parse_error", 0) != 0 or len(rb.get("verdicts") or []) != 4:
+    print(f"  FAIL [Row 6]: read-back parse error or wrong count: {p_rb.stderr}")
+    sys.exit(1)
+by_k = {v["citeKey"]: v["auditedEntry"] for v in rb["verdicts"]}
+if (
+    by_k["audit_020"]["venue"] != "Nature"
+    or by_k["real_human_012"]["venue"] != "Industrial & Engineering Chemistry Research"
+    or by_k["real_typo_017"]["doi"] != rec_doi
+    or by_k["real_human_049"]["venue"] != ""
+):
+    print(f"  FAIL [Row 6]: read-back entries unexpected: {by_k}")
+    sys.exit(1)
+
+print("  [Row 6] PASS: audit_020 (Nature), real_human_012 (Industrial \\& Engineering Chemistry Research), real_typo_017 (canonical DOI), real_human_049 (@misc arXiv, no journal) all verified with changed_fields")
+PY
+)"
+        R6_RC=$?
+        set -e
+        echo "$R6_OUT"
+        if [[ "$R6_RC" -eq 0 ]]; then
+            record_pass 6 "Written BibTeX fields come from registry record with HTML decoding, BibTeX escaping, and changed_fields"
+        else
+            record_fail 6 "Row 6 registry-authoritative fields check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 7: Deduplication — 4 cases (same entry, different key on same paper, existing key on different paper, case-only key difference)
+    # ==================================================================
+    if should_run_row 7; then
+        echo "== [Row 7] Deduplication (4 cases): SKIPPED_DUPLICATE (isError=false), ERR_CITE_KEY_CONFLICT (isError=true), case-insensitive key =="
+        set +e
+        R7_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    if not m:
+        raise RuntimeError(f"Missing {group}/{key}")
+    return m.group(1) + "\n"
+
+def rename_key(bib: str, old_key: str, new_key: str) -> str:
+    return re.sub(rf"^(@\w+\{{){re.escape(old_key)},", rf"\g<1>{new_key},", bib, count=1)
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+rc001 = extract_entry("real_clean", "real_clean_001")
+au001 = extract_entry("audit_manual", "audit_001")
+au024 = extract_entry("audit_manual", "audit_024")
+au026 = extract_entry("audit_manual", "audit_026")
+rh007 = extract_entry("real_human", "real_human_007")
+
+target_bib = os.path.join(scratch, "row7.bib")
+# Seed an identifierless copy of real_clean_001 title+year+firstAuthor in tya_bib and a PMID-only entry in pmid_bib
+# (since add_verified_bibtex enriches audit_026 with PubMed DOI on write, seeding raw audit_026 tests pure PMID matching)
+tya_bib = os.path.join(scratch, "row7-tya.bib")
+open(tya_bib, "w", encoding="utf-8").write(
+    "@article{seeded_tya,\n  author = {Yu, J. and Ferguson, F.J.},\n  title = {Maximum likelihood estimation for failure analysis [IC yield]},\n  year = {1998}\n}\n"
+)
+tya_before = file_sig(tya_bib)
+
+pmid_bib = os.path.join(scratch, "row7-pmid.bib")
+open(pmid_bib, "w", encoding="utf-8").write(au026)
+pmid_before = file_sig(pmid_bib)
+
+# First append real_clean_001 and audit_024 (arXiv-only) into target_bib
+seed_reqs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": au024}}},
+]
+p_seed = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in seed_reqs) + "\n", env=env, capture_output=True, text=True)
+if p_seed.returncode != 0:
+    print(f"  FAIL [Row 7]: seed mcp exited {p_seed.returncode}: {p_seed.stderr}")
+    sys.exit(1)
+
+sig_seeded = file_sig(target_bib)
+
+allowed_matched_on = {"cite_key", "doi", "arxiv", "pmid", "title_year_first_author"}
+
+reqs = [
+    # Case 1: exact same entry again
+    {"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001}}},
+    # Case 2: same paper with different key (DOI, arXiv, PMID, and title+year+firstAuthor)
+    {"jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rename_key(rc001, "real_clean_001", "alt_doi_key")}}},
+    {"jsonrpc": "2.0", "id": 12, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rename_key(au024, "audit_024", "alt_arxiv_key")}}},
+    {"jsonrpc": "2.0", "id": 13, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": pmid_bib, "bibtex": rename_key(au026, "audit_026", "alt_pmid_key")}}},
+    {"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": tya_bib, "bibtex": rename_key(rc001, "real_clean_001", "alt_tya_key")}}},
+    # Case 3: existing key used on a DIFFERENT real paper -> ERR_CITE_KEY_CONFLICT
+    {"jsonrpc": "2.0", "id": 15, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rename_key(au001, "audit_001", "real_clean_001")}}},
+    # Case 4a: key differing only in case on SAME paper -> SKIPPED_DUPLICATE (cite_key)
+    {"jsonrpc": "2.0", "id": 16, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rename_key(rc001, "real_clean_001", "REAL_CLEAN_001")}}},
+    # Case 4b: key differing only in case on DIFFERENT paper -> ERR_CITE_KEY_CONFLICT
+    {"jsonrpc": "2.0", "id": 17, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rename_key(au001, "audit_001", "REAL_CLEAN_001")}}},
+]
+p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+if p.returncode != 0:
+    print(f"  FAIL [Row 7]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+resps = {obj["id"]: obj["result"] for obj in (json.loads(ln) for ln in p.stdout.splitlines() if ln.strip())}
+
+for rid, exp_existing, exp_kind in [
+    (10, "real_clean_001", "cite_key"),
+    (11, "real_clean_001", "doi"),
+    (12, "audit_024", "arxiv"),
+    (13, "audit_026", "pmid"),
+    (14, "seeded_tya", "title_year_first_author"),
+    (16, "real_clean_001", "cite_key"),
+]:
+    r = resps[rid]
+    if r.get("isError") is not False:
+        print(f"  FAIL [Row 7]: id={rid} expected isError=False on SKIPPED_DUPLICATE, got {r}")
+        sys.exit(1)
+    o = json.loads(r["content"][0]["text"])
+    if (
+        o.get("status") != "SKIPPED_DUPLICATE"
+        or o.get("existing_key") != exp_existing
+        or o.get("matched_on") not in allowed_matched_on
+        or o.get("matched_on") != exp_kind
+    ):
+        print(f"  FAIL [Row 7]: id={rid} unexpected SKIPPED_DUPLICATE payload: {o} (expected existing={exp_existing}, matched_on={exp_kind})")
+        sys.exit(1)
+
+for rid in (15, 17):
+    r = resps[rid]
+    if r.get("isError") is not True:
+        print(f"  FAIL [Row 7]: id={rid} expected isError=True on ERR_CITE_KEY_CONFLICT, got {r}")
+        sys.exit(1)
+    o = json.loads(r["content"][0]["text"])
+    if o.get("error_code") != "ERR_CITE_KEY_CONFLICT":
+        print(f"  FAIL [Row 7]: id={rid} expected ERR_CITE_KEY_CONFLICT, got {o}")
+        sys.exit(1)
+
+if file_sig(target_bib) != sig_seeded:
+    print("  FAIL [Row 7]: target_bib changed during duplicate/conflict checks")
+    sys.exit(1)
+if file_sig(tya_bib) != tya_before:
+    print("  FAIL [Row 7]: tya_bib changed during duplicate check")
+    sys.exit(1)
+if file_sig(pmid_bib) != pmid_before:
+    print("  FAIL [Row 7]: pmid_bib changed during duplicate check")
+    sys.exit(1)
+
+print("  [Row 7] PASS: all 4 dedup cases & all 5 matched_on kinds (cite_key, doi, arxiv, pmid, title_year_first_author) + ERR_CITE_KEY_CONFLICT + case-insensitive keys verified; files unchanged")
+PY
+)"
+        R7_RC=$?
+        set -e
+        echo "$R7_OUT"
+        if [[ "$R7_RC" -eq 0 ]]; then
+            record_pass 7 "All 4 deduplication cases (SKIPPED_DUPLICATE, ERR_CITE_KEY_CONFLICT, case-insensitive keys) verified without modifying .bib"
+        else
+            record_fail 7 "Row 7 deduplication check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 8: Offline rejection (--offline server AND per-call offline: true on replay server)
+    # ==================================================================
+    if should_run_row 8; then
+        echo "== [Row 8] Offline rejection: --offline server & per-call offline=true on replay server =="
+        set +e
+        R8_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def extract_entry(group: str, key: str) -> str:
+    p = os.path.join(repo_root, "Benchmarks", "citations", "entries", f"{group}.bib")
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", open(p, encoding="utf-8").read(), flags=re.S)
+    return m.group(1) + "\n"
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+rc001 = extract_entry("real_clean", "real_clean_001")
+au001 = extract_entry("audit_manual", "audit_001")
+ret001 = extract_entry("retracted", "retracted_001")
+
+target_bib = os.path.join(scratch, "row8.bib")
+open(target_bib, "wb").write(b"% row8 sentinel\n")
+sig_before = file_sig(target_bib)
+
+# 1. Server started with --offline
+reqs_srv_offline = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": au001}}},
+    {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": ret001}}},
+]
+p1 = subprocess.run([cli_bin, "mcp", "--offline"], input="\n".join(json.dumps(r) for r in reqs_srv_offline) + "\n", env=env, capture_output=True, text=True)
+if p1.returncode != 0:
+    print(f"  FAIL [Row 8]: mcp --offline exited {p1.returncode}: {p1.stderr}")
+    sys.exit(1)
+
+for ln in p1.stdout.splitlines():
+    if not ln.strip():
+        continue
+    res = json.loads(ln)["result"]
+    if res.get("isError") is not True:
+        print(f"  FAIL [Row 8]: --offline server did not set isError=True: {res}")
+        sys.exit(1)
+    obj = json.loads(res["content"][0]["text"])
+    if obj.get("error_code") != "ERR_UNVERIFIED_CITATION" or obj.get("verdict") != "UNVERIFIED" or obj.get("reasons") != ["offline"]:
+        print(f"  FAIL [Row 8]: --offline server unexpected payload: {obj}")
+        sys.exit(1)
+
+# 2. Replay server with per-call offline: true
+reqs_call_offline = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001, "offline": True}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": au001, "offline": True}}},
+]
+p2 = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs_call_offline) + "\n", env=env, capture_output=True, text=True)
+if p2.returncode != 0:
+    print(f"  FAIL [Row 8]: mcp --registry-replay exited {p2.returncode}: {p2.stderr}")
+    sys.exit(1)
+
+for ln in p2.stdout.splitlines():
+    if not ln.strip():
+        continue
+    res = json.loads(ln)["result"]
+    if res.get("isError") is not True:
+        print(f"  FAIL [Row 8]: per-call offline=True did not set isError=True: {res}")
+        sys.exit(1)
+    obj = json.loads(res["content"][0]["text"])
+    if obj.get("error_code") != "ERR_UNVERIFIED_CITATION" or obj.get("verdict") != "UNVERIFIED" or obj.get("reasons") != ["offline"] or obj.get("mode") != "REPLAY":
+        print(f"  FAIL [Row 8]: per-call offline=True unexpected payload: {obj}")
+        sys.exit(1)
+
+if file_sig(target_bib) != sig_before:
+    print("  FAIL [Row 8]: target .bib modified")
+    sys.exit(1)
+
+print("  [Row 8] PASS: both --offline server and per-call offline=true reject all entries with UNVERIFIED [offline]; file unchanged")
+PY
+)"
+        R8_RC=$?
+        set -e
+        echo "$R8_OUT"
+        if [[ "$R8_RC" -eq 0 ]]; then
+            record_pass 8 "Offline mode (--offline server and per-call offline=true) rejects all writes with UNVERIFIED [offline]"
+        else
+            record_fail 8 "Row 8 offline rejection check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 9: Network-denied sandbox without replay — both empty SCHOLAR_CACHE_DIR and warm VERIFIED SCHOLAR_CACHE_DIR rejected
+    # ==================================================================
+    if should_run_row 9; then
+        echo "== [Row 9] Network-denied sandbox (no replay): add_verified_bibtex rejects with transport_error on both empty and warm VERIFIED cache =="
+        set +e
+        R9_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" "${SCHOLAR_OUTER_NO_NETWORK:-0}" <<'PY'
+import hashlib, json, os, re, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch, outer_no_net = sys.argv[1:6]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+
+p_bib = os.path.join(repo_root, "Benchmarks", "citations", "entries", "real_clean.bib")
+rc001 = re.search(r"(@\w+\{real_clean_001,.*?\n\})", open(p_bib, encoding="utf-8").read(), flags=re.S).group(1) + "\n"
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+target_bib = os.path.join(scratch, "row9.bib")
+open(target_bib, "wb").write(b"% row9 sentinel\n")
+sig_before = file_sig(target_bib)
+
+mcp_net_denied_cmd = (
+    [cli_bin, "mcp"]
+    if outer_no_net == "1"
+    else ["sandbox-exec", "-p", "(version 1)(allow default)(deny network*)", cli_bin, "mcp"]
+)
+
+# 1. Empty SCHOLAR_CACHE_DIR in network-denying sandbox
+empty_cache = os.path.join(scratch, "row9-cache-empty")
+os.makedirs(empty_cache, exist_ok=True)
+env_empty = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home, SCHOLAR_CACHE_DIR=empty_cache)
+
+req_write = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001}}}
+p1 = subprocess.run(mcp_net_denied_cmd, input=json.dumps(req_write) + "\n", env=env_empty, capture_output=True, text=True, timeout=60)
+if p1.returncode != 0:
+    print(f"  FAIL [Row 9/empty]: mcp exited {p1.returncode}: {p1.stderr}")
+    sys.exit(1)
+res1 = json.loads(p1.stdout.strip())["result"]
+obj1 = json.loads(res1["content"][0]["text"])
+if res1.get("isError") is not True or obj1.get("error_code") != "ERR_UNVERIFIED_CITATION" or obj1.get("verdict") != "UNVERIFIED" or "transport_error" not in (obj1.get("reasons") or []):
+    print(f"  FAIL [Row 9/empty]: expected transport_error rejection, got {res1}")
+    sys.exit(1)
+if file_sig(target_bib) != sig_before:
+    print("  FAIL [Row 9/empty]: target .bib modified")
+    sys.exit(1)
+
+# 2. Warm SCHOLAR_CACHE_DIR containing valid VERIFIED cache for real_clean_001
+warm_cache = os.path.join(scratch, "row9-cache-warm")
+os.makedirs(warm_cache, exist_ok=True)
+env_warm = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home, SCHOLAR_CACHE_DIR=warm_cache)
+
+req_warm = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": rc001}}}
+p_warm = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input=json.dumps(req_warm) + "\n", env=env_warm, capture_output=True, text=True, timeout=30)
+if p_warm.returncode != 0 or not os.path.isfile(os.path.join(warm_cache, "registry.sqlite")):
+    print(f"  FAIL [Row 9/warm]: failed to populate warm cache: rc={p_warm.returncode}, stderr={p_warm.stderr}")
+    sys.exit(1)
+
+# Inside network-denying sandbox without replay:
+#   id=1 verify_citation hits cache -> VERIFIED (proving cache is valid!)
+#   id=2 add_verified_bibtex skips cache read -> rejected with transport_error!
+reqs_warm_check = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": rc001}}},
+]
+p2 = subprocess.run(mcp_net_denied_cmd, input="\n".join(json.dumps(r) for r in reqs_warm_check) + "\n", env=env_warm, capture_output=True, text=True, timeout=60)
+if p2.returncode != 0:
+    print(f"  FAIL [Row 9/warm]: mcp exited {p2.returncode}: {p2.stderr}")
+    sys.exit(1)
+
+resps2 = {obj["id"]: obj["result"] for obj in (json.loads(ln) for ln in p2.stdout.splitlines() if ln.strip())}
+vc_warm = json.loads(resps2[1]["content"][0]["text"])
+if resps2[1].get("isError") is not False or vc_warm.get("verdict") != "VERIFIED" or not any(s.get("origin") == "cache" for s in (vc_warm.get("sources") or [])):
+    print(f"  FAIL [Row 9/warm]: warm cache did not yield cached VERIFIED on verify_citation: {vc_warm}")
+    sys.exit(1)
+
+add_warm_res = resps2[2]
+add_warm_obj = json.loads(add_warm_res["content"][0]["text"])
+if (
+    add_warm_res.get("isError") is not True
+    or add_warm_obj.get("error_code") != "ERR_UNVERIFIED_CITATION"
+    or add_warm_obj.get("verdict") != "UNVERIFIED"
+    or "transport_error" not in (add_warm_obj.get("reasons") or [])
+):
+    print(f"  FAIL [Row 9/warm]: add_verified_bibtex did not reject with transport_error when warm cache was present: {add_warm_res}")
+    sys.exit(1)
+
+if file_sig(target_bib) != sig_before:
+    print("  FAIL [Row 9/warm]: target .bib modified")
+    sys.exit(1)
+
+print("  [Row 9] PASS: network-denied server rejected add_verified_bibtex with transport_error on both empty cache and verified-hit warm cache; file unchanged")
+PY
+)"
+        R9_RC=$?
+        set -e
+        echo "$R9_OUT"
+        if [[ "$R9_RC" -eq 0 ]]; then
+            record_pass 9 "Network-denied server rejects add_verified_bibtex (transport_error) with both empty and warm VERIFIED cache"
+        else
+            record_fail 9 "Row 9 network-denied cache-bypass check failed"
+        fi
+    fi
 
     # ==================================================================
     # Row 10: Caller fake replay (S74) — generated on the fly, never committed
@@ -325,10 +1161,21 @@ for mode_label, srv_args in [("offline", ["--offline"]), ("replay", ["--registry
         {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"citeKey": "invented_2026", "bibtex": fake_bib}}},
         {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "scholar_verify_bibliography", "arguments": {"bibtex": fake_bib}}},
         {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "scholar_verify_bibliography", "arguments": {"bibtex": fake_bib, "bogusUnknownArg": "x"}}},
+        {"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": fake_bib, "registryReplayPath": fake_rec_dir}}},
+        {"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": fake_bib, "registryReplayPath": fake_rec_dir}}},
+        {"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": fake_bib}}},
+        {"jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": fake_bib}}},
     ]
     resps = call_mcp(srv_args, reqs)
 
-    for rid, tname in [(2, "scholar_cite_key"), (3, "scholar_verify_bibliography"), (4, "scholar_lsp_diagnostics"), (7, "scholar_verify_bibliography(unknownArg)")]:
+    for rid, tname in [
+        (2, "scholar_cite_key"),
+        (3, "scholar_verify_bibliography"),
+        (4, "scholar_lsp_diagnostics"),
+        (7, "scholar_verify_bibliography(unknownArg)"),
+        (8, "verify_citation"),
+        (9, "add_verified_bibtex"),
+    ]:
         res = (resps.get(rid) or {}).get("result") or {}
         if res.get("isError") is not True:
             print(f"  FAIL [Row 10/{mode_label}]: {tname} did not set isError=True: {res}")
@@ -349,7 +1196,7 @@ for mode_label, srv_args in [("offline", ["--offline"]), ("replay", ["--registry
             print(f"  FAIL [Row 10/{mode_label}]: {tname} missing category/reason/reasons: {err_obj}")
             sys.exit(1)
 
-    # Without registryReplayPath, invented_2026 must NEVER be VERIFIED
+    # Without registryReplayPath, invented_2026 must NEVER be VERIFIED or written
     cite_clean = (resps.get(5) or {}).get("result") or {}
     if cite_clean.get("isError") is not True:
         print(f"  FAIL [Row 10/{mode_label}]: scholar_cite_key on invented_2026 succeeded unexpectedly: {cite_clean}")
@@ -358,18 +1205,21 @@ for mode_label, srv_args in [("offline", ["--offline"]), ("replay", ["--registry
     if vb_clean.get("verifiedCount") != 0 or vb_clean["verdicts"][0]["firewallClass"] == "VERIFIED":
         print(f"  FAIL [Row 10/{mode_label}]: scholar_verify_bibliography granted VERIFIED to invented_2026: {vb_clean}")
         sys.exit(1)
+    vc_clean = json.loads(((resps[10]["result"]["content"])[0])["text"])
+    if vc_clean.get("verdict") == "VERIFIED" or vc_clean.get("insertable") is True:
+        print(f"  FAIL [Row 10/{mode_label}]: verify_citation granted VERIFIED to invented_2026: {vc_clean}")
+        sys.exit(1)
+    add_clean = (resps.get(11) or {}).get("result") or {}
+    if add_clean.get("isError") is not True:
+        print(f"  FAIL [Row 10/{mode_label}]: add_verified_bibtex on invented_2026 succeeded unexpectedly: {add_clean}")
+        sys.exit(1)
 
 sig_after = file_sig(target_bib)
 if sig_before != sig_after:
     print(f"  FAIL [Row 10]: target.bib changed (before={sig_before}, after={sig_after})")
     sys.exit(1)
 
-tool_names = {t.get("name") for t in ((resps.get(1) or {}).get("result") or {}).get("tools") or []}
-print("  [Row 10a] PASS: existing tools reject fake replay & unknown args with structured ERR_INVALID_ARGUMENT, invented_2026 gets 0 VERIFIED, file unchanged")
-if not {"verify_citation", "add_verified_bibtex"}.issubset(tool_names):
-    print("  [Row 10b] 没跑: verify_citation & add_verified_bibtex deferred to Stage 04")
-    sys.exit(2)
-
+print("  [Row 10] PASS: verify_citation, add_verified_bibtex & existing tools reject fake replay with ERR_INVALID_ARGUMENT, invented_2026 never VERIFIED, file unchanged")
 sys.exit(0)
 PY
 )"
@@ -386,11 +1236,163 @@ PY
     fi
 
     # ==================================================================
-    # Row 11: Deferred to Stage 04 (verify_citation 480-entry parity)
+    # Row 11: verify_citation on all 480 benchmark entries vs CLI verify-citations --registry-replay --json
     # ==================================================================
     if should_run_row 11; then
-        echo "== [Row 11] 没跑 — Scheduled for Stage 04 (verify_citation 480-entry parity) =="
-        record_skip 11 "Scheduled for Stage 04 (verify_citation 480-entry parity) — 没跑"
+        echo "== [Row 11] verify_citation on 480 benchmark entries vs CLI verify-citations --registry-replay --json (0 diffs) =="
+        set +e
+        R11_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
+import glob, json, os, re, subprocess, sys, time
+
+repo_root, cli_bin, sbox_home = sys.argv[1:4]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+entries_dir = os.path.join(repo_root, "Benchmarks", "citations", "entries")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+def split_bib_entries(text: str):
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        at = text.find("@", i)
+        if at == -1:
+            break
+        line_start = text.rfind("\n", 0, at) + 1
+        if "%" in text[line_start:at]:
+            eol = text.find("\n", at)
+            i = n if eol == -1 else eol + 1
+            continue
+        m = re.match(r"@([A-Za-z]+)\s*([{(])", text[at:])
+        if not m:
+            i = at + 1
+            continue
+        etype = m.group(1).lower()
+        open_ch = m.group(2)
+        close_ch = "}" if open_ch == "{" else ")"
+        pos = at + m.end()
+        depth = 1
+        in_quotes = False
+        while pos < n and depth > 0:
+            ch = text[pos]
+            if ch == "\\" and pos + 1 < n:
+                pos += 2
+                continue
+            if ch == '"' and depth == 1:
+                in_quotes = not in_quotes
+            elif not in_quotes:
+                if ch == open_ch:
+                    depth += 1
+                elif ch == close_ch:
+                    depth -= 1
+            pos += 1
+        raw_entry = text[at:pos]
+        if etype not in ("comment", "preamble", "string"):
+            km = re.match(r"@\w+\s*[{(]\s*([^,\s]+)\s*,", raw_entry)
+            key = km.group(1) if km else ""
+            out.append((key, raw_entry))
+        i = pos
+    return out
+
+bib_files = sorted(glob.glob(os.path.join(entries_dir, "*.bib")))
+if len(bib_files) != 12:
+    print(f"  FAIL [Row 11]: expected 12 benchmark .bib files, got {len(bib_files)}")
+    sys.exit(1)
+
+cli_by_id = {}
+mcp_reqs = []
+req_id_to_item = {}
+next_id = 1
+
+for bib_path in bib_files:
+    grp = os.path.basename(bib_path)[:-4]
+    p_cli = subprocess.run(
+        [cli_bin, "verify-citations", bib_path, "--registry-replay", rec_dir, "--json", "--lang", "en"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if p_cli.returncode == 2:
+        print(f"  FAIL [Row 11]: CLI verify-citations exited 2 on {grp}: {p_cli.stderr}")
+        sys.exit(1)
+    cli_obj = json.loads(p_cli.stdout)
+    for v in cli_obj.get("verdicts") or []:
+        cli_by_id[f"{grp}/{v['citeKey']}"] = {
+            "cite_key": v["citeKey"],
+            "verdict": v["firewallClass"],
+            "reasons": v["reasons"],
+            "fields": v["fields"],
+            "insertable": v["insertable"],
+        }
+
+    for key, raw_entry in split_bib_entries(open(bib_path, encoding="utf-8").read()):
+        mcp_reqs.append({
+            "jsonrpc": "2.0",
+            "id": next_id,
+            "method": "tools/call",
+            "params": {"name": "verify_citation", "arguments": {"bibtex": raw_entry, "lang": "en"}},
+        })
+        req_id_to_item[next_id] = f"{grp}/{key}"
+        next_id += 1
+
+if len(cli_by_id) != 480 or len(mcp_reqs) != 480:
+    print(f"  FAIL [Row 11]: expected 480 items (cli={len(cli_by_id)}, mcp={len(mcp_reqs)})")
+    sys.exit(1)
+
+raw_in = "\n".join(json.dumps(r) for r in mcp_reqs) + "\n"
+t0 = time.monotonic()
+p_mcp = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input=raw_in, env=env, capture_output=True, text=True)
+elapsed_s = time.monotonic() - t0
+if p_mcp.returncode != 0:
+    print(f"  FAIL [Row 11]: mcp exited {p_mcp.returncode}: {p_mcp.stderr}")
+    sys.exit(1)
+
+mcp_by_id = {}
+for ln in p_mcp.stdout.splitlines():
+    if not ln.strip():
+        continue
+    env_obj = json.loads(ln)
+    rid = env_obj["id"]
+    res = env_obj["result"]
+    if res.get("isError") is not False:
+        print(f"  FAIL [Row 11]: verify_citation set isError!=False on {req_id_to_item[rid]}: {res}")
+        sys.exit(1)
+    payload = json.loads(res["content"][0]["text"])
+    if payload.get("mode") != "REPLAY":
+        print(f"  FAIL [Row 11]: missing mode='REPLAY' on {req_id_to_item[rid]}")
+        sys.exit(1)
+    mcp_by_id[req_id_to_item[rid]] = {
+        "cite_key": payload.get("cite_key"),
+        "verdict": payload.get("verdict"),
+        "reasons": payload.get("reasons"),
+        "fields": payload.get("fields"),
+        "insertable": payload.get("insertable"),
+    }
+
+if len(mcp_by_id) != 480:
+    print(f"  FAIL [Row 11]: expected 480 MCP responses, got {len(mcp_by_id)}")
+    sys.exit(1)
+
+diffs = []
+for k in sorted(cli_by_id):
+    if cli_by_id[k] != mcp_by_id.get(k):
+        diffs.append((k, cli_by_id[k], mcp_by_id.get(k)))
+
+if diffs:
+    for k, a, b in diffs[:10]:
+        print(f"  FAIL [Row 11]: diff on {k}:\n    CLI={a}\n    MCP={b}")
+    sys.exit(1)
+
+print(f"  [Row 11] PASS: 480/480 verify_citation calls match CLI verify-citations --json with 0 differences (elapsed={elapsed_s:.3f}s)")
+PY
+)"
+        R11_RC=$?
+        set -e
+        echo "$R11_OUT"
+        if [[ "$R11_RC" -eq 0 ]]; then
+            record_pass 11 "verify_citation matches CLI verify-citations --json across all 480 benchmark entries with 0 differences"
+        else
+            record_fail 11 "Row 11 verify_citation 480-entry parity check failed"
+        fi
     fi
 
     # ==================================================================
@@ -428,6 +1430,7 @@ open(bib_path, "w", encoding="utf-8").write(real_clean_001)
 open(tex_path, "w", encoding="utf-8").write("\\documentclass{article}\\begin{document}\\section{Intro}Cite \\cite{real_clean_001}.\\end{document}\n")
 subprocess.run([cli_bin, "init", "--project", proj_path, "--seed-demo"], env=env, capture_output=True, text=True, check=True)
 
+r12_write_bib = os.path.join(scratch, "r12-write.bib")
 reqs = [
     {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
     {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"citeKey": "real_clean_001", "bibtex": real_clean_001}}},
@@ -439,6 +1442,9 @@ reqs = [
     {"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "scholar_editorial_audit", "arguments": {"source": "\\section{Intro}\nPlain text.\n"}}},
     {"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "scholar_track_changes_diff", "arguments": {"original": "Old.", "revised": "New."}}},
     {"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "scholar_citation_gaps", "arguments": {"projectPath": proj_path}}},
+    {"jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": real_clean_001}}},
+    {"jsonrpc": "2.0", "id": 12, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": r12_write_bib, "bibtex": real_clean_001}}},
+    {"jsonrpc": "2.0", "id": 13, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": r12_write_bib, "bibtex": fab_codex_003}}},
 ]
 raw_in = "\n".join(json.dumps(r) for r in reqs) + "\n"
 proc = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input=raw_in, env=env, capture_output=True, text=True)
@@ -452,7 +1458,7 @@ if "[REPLAY]" not in proc.stderr:
 
 resps = {obj.get("id"): obj for obj in (json.loads(ln) for ln in proc.stdout.splitlines() if ln.strip())}
 
-for rid in range(2, 11):
+for rid in range(2, 14):
     res = (resps.get(rid) or {}).get("result") or {}
     txt = ((res.get("content") or [{}])[0]).get("text") or ""
     try:
@@ -484,7 +1490,16 @@ for s in v0.get("sources") or []:
         print(f"  FAIL [Row 12]: unexpected source provenance on real_clean_001: {s}")
         sys.exit(1)
 
-print("  [Row 12] PASS: stderr=[REPLAY], all 8 tools carry mode='REPLAY', sources.fetchedAt & firewallVerifiedAtUTC == 2026-11-16")
+add_ok = json.loads(resps[12]["result"]["content"][0]["text"])
+if add_ok.get("status") != "APPENDED_VERIFIED" or not (add_ok.get("sources") or []):
+    print(f"  FAIL [Row 12]: add_verified_bibtex unexpected payload: {add_ok}")
+    sys.exit(1)
+for s in add_ok.get("sources") or []:
+    if not (s.get("fetchedAt") or "").startswith("2026-11-16") or s.get("origin") != "replay":
+        print(f"  FAIL [Row 12]: add_verified_bibtex source fetchedAt != 2026-11-16: {s}")
+        sys.exit(1)
+
+print("  [Row 12] PASS: stderr=[REPLAY], all tools (incl. verify_citation & add_verified_bibtex) carry mode='REPLAY', sources.fetchedAt & firewallVerifiedAtUTC == 2026-11-16")
 PY
 )"
         R12_RC=$?
@@ -498,12 +1513,284 @@ PY
     fi
 
     # ==================================================================
-    # Rows 13–16: Deferred to Stages 03–05
+    # Row 13: Write safety — 8 targets via MCP add_verified_bibtex
     # ==================================================================
-    for r in 13 14 15 16; do
+    if should_run_row 13; then
+        echo "== [Row 13] Write safety via MCP add_verified_bibtex: 8 targets (read-only, dir, missing parent, non-.bib, symlink, Latin-1, BIB001, CRLF) =="
+        set +e
+        R13_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import hashlib, json, os, re, shutil, stat, subprocess, sys
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+env = dict(os.environ, HOME=sbox_home, CFFIXED_USER_HOME=sbox_home)
+env.pop("SCHOLAR_CACHE_DIR", None)
+
+p_bib = os.path.join(repo_root, "Benchmarks", "citations", "entries", "real_clean.bib")
+rc001 = re.search(r"(@\w+\{real_clean_001,.*?\n\})", open(p_bib, encoding="utf-8").read(), flags=re.S).group(1) + "\n"
+
+r13_dir = os.path.join(scratch, "r13")
+os.makedirs(r13_dir, exist_ok=True)
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.lstat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns, st.st_ino)
+
+valid_seed = b"@article{seed2020,\n  author = {Doe, Jane},\n  title = {Seed},\n  year = 2020\n}\n"
+
+# 1. Read-only .bib
+ro_bib = os.path.join(r13_dir, "readonly.bib")
+open(ro_bib, "wb").write(valid_seed)
+os.chmod(ro_bib, 0o444)
+ro_before = file_sig(ro_bib)
+
+# 2. Directory named dir.bib
+dir_bib = os.path.join(r13_dir, "dir.bib")
+os.makedirs(dir_bib, exist_ok=True)
+
+# 3. File in non-existent parent directory
+missing_parent = os.path.join(r13_dir, "missing_parent_dir")
+missing_bib = os.path.join(missing_parent, "refs.bib")
+
+# 4. Non-.bib extension
+txt_target = os.path.join(r13_dir, "refs.txt")
+
+# 5. Symlink pointing to .bib
+real_target = os.path.join(r13_dir, "real_target.bib")
+open(real_target, "wb").write(valid_seed)
+real_before = file_sig(real_target)
+sym_bib = os.path.join(r13_dir, "symlink.bib")
+os.symlink(real_target, sym_bib)
+
+# 6. Latin-1 encoded .bib
+latin1_bib = os.path.join(r13_dir, "latin1.bib")
+open(latin1_bib, "wb").write("@article{s1926,\n  author = {Schr\u00f6dinger, E.},\n  title = {Q},\n  year = 1926\n}\n".encode("latin-1"))
+latin1_before = file_sig(latin1_bib)
+
+# 7. BIB001 broken syntax .bib
+broken_bib = os.path.join(r13_dir, "broken.bib")
+open(broken_bib, "wb").write(b"@article{ok1,\n  author = {Doe, Jane},\n  title = {OK},\n  year = 2020\n}\n\n@article{bad2,\n  title = {Unclosed\n")
+broken_before = file_sig(broken_bib)
+
+# 8. CRLF .bib copy
+crlf_fixture = os.path.join(repo_root, "Tests", "Fixtures", "crlf-two-entries.bib")
+crlf_bib = os.path.join(r13_dir, "crlf.bib")
+shutil.copyfile(crlf_fixture, crlf_bib)
+crlf_orig_bytes = open(crlf_bib, "rb").read()
+crlf_before = file_sig(crlf_bib)
+
+reqs = [
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": ro_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": dir_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": missing_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": txt_target, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": sym_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": latin1_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": broken_bib, "bibtex": rc001}}},
+    {"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": crlf_bib, "bibtex": rc001}}},
+]
+
+try:
+    p = subprocess.run([cli_bin, "mcp", "--registry-replay", rec_dir], input="\n".join(json.dumps(r) for r in reqs) + "\n", env=env, capture_output=True, text=True)
+finally:
+    os.chmod(ro_bib, 0o644)
+
+if p.returncode != 0:
+    print(f"  FAIL [Row 13]: mcp exited {p.returncode}: {p.stderr}")
+    sys.exit(1)
+
+resps = {obj["id"]: obj["result"] for obj in (json.loads(ln) for ln in p.stdout.splitlines() if ln.strip())}
+
+expected_errors = [
+    (1, "ERR_BIB_PATH"),
+    (2, "ERR_BIB_PATH"),
+    (3, "ERR_BIB_PATH"),
+    (4, "ERR_BIB_PATH"),
+    (5, "ERR_BIB_PATH"),
+    (6, "ERR_BIB_ENCODING"),
+    (7, "ERR_BIB_SYNTAX"),
+]
+for rid, exp_code in expected_errors:
+    r = resps[rid]
+    if r.get("isError") is not True:
+        print(f"  FAIL [Row 13]: target #{rid} expected isError=True, got {r}")
+        sys.exit(1)
+    o = json.loads(r["content"][0]["text"])
+    if o.get("error_code") != exp_code:
+        print(f"  FAIL [Row 13]: target #{rid} expected {exp_code}, got {o}")
+        sys.exit(1)
+
+if os.path.exists(missing_parent):
+    print("  FAIL [Row 13]: missing parent directory was created!")
+    sys.exit(1)
+if os.path.exists(txt_target):
+    print("  FAIL [Row 13]: non-.bib file was created!")
+    sys.exit(1)
+if file_sig(ro_bib)[:2] != ro_before[:2]:
+    print("  FAIL [Row 13]: read-only .bib bytes changed!")
+    sys.exit(1)
+for lbl, pth, bef in [("symlink_target", real_target, real_before), ("latin1", latin1_bib, latin1_before), ("bib001", broken_bib, broken_before)]:
+    aft = file_sig(pth)
+    if aft != bef:
+        print(f"  FAIL [Row 13]: {lbl} changed (before={bef}, after={aft})")
+        sys.exit(1)
+
+# Target 8: CRLF succeeds, original bytes are exact prefix, appended bytes use CRLF, inode unchanged
+r8 = resps[8]
+o8 = json.loads(r8["content"][0]["text"])
+if r8.get("isError") is not False or o8.get("status") != "APPENDED_VERIFIED":
+    print(f"  FAIL [Row 13]: CRLF target failed: {r8}")
+    sys.exit(1)
+crlf_after_bytes = open(crlf_bib, "rb").read()
+crlf_after = file_sig(crlf_bib)
+if crlf_after[3] != crlf_before[3] or not crlf_after_bytes.startswith(crlf_orig_bytes):
+    print("  FAIL [Row 13]: CRLF inode changed or original bytes not prefix")
+    sys.exit(1)
+appended = crlf_after_bytes[len(crlf_orig_bytes):]
+lfs = [i for i, b in enumerate(appended) if b == 0x0A]
+if not lfs or any(i == 0 or appended[i - 1] != 0x0D for i in lfs):
+    print("  FAIL [Row 13]: CRLF appended slice contains bare LF")
+    sys.exit(1)
+
+p_rb = subprocess.run([cli_bin, "verify-citations", crlf_bib, "--offline", "--json", "--lang", "en"], env=env, capture_output=True, text=True)
+rb = json.loads(p_rb.stdout)
+if len(rb.get("verdicts") or []) != 3 or (rb.get("unverifiedByReason") or {}).get("parse_error", 0) != 0:
+    print(f"  FAIL [Row 13]: CRLF read-back failed: {p_rb.stderr}")
+    sys.exit(1)
+
+print("  [Row 13] PASS: 5 path targets -> ERR_BIB_PATH (no dir created), Latin-1 -> ERR_BIB_ENCODING, BIB001 -> ERR_BIB_SYNTAX, CRLF -> APPENDED_VERIFIED w/ prefix & CRLF preserved")
+PY
+)"
+        R13_RC=$?
+        set -e
+        echo "$R13_OUT"
+        if [[ "$R13_RC" -eq 0 ]]; then
+            record_pass 13 "All 8 write-safety targets enforced via MCP add_verified_bibtex with zero unintended file modification"
+        else
+            record_fail 13 "Row 13 MCP write-safety check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 14: Concurrency — 2 concurrent MCP server processes each appending 20 distinct VERIFIED entries
+    # ==================================================================
+    if should_run_row 14; then
+        echo "== [Row 14] Concurrency: 2 simultaneous MCP server processes each appending 20 distinct VERIFIED entries to shared.bib =="
+        set +e
+        R14_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$WORK_SCRATCH" <<'PY'
+import json, os, re, subprocess, sys, threading
+
+repo_root, cli_bin, sbox_home, scratch = sys.argv[1:5]
+rec_dir = os.path.join(repo_root, "Benchmarks", "citations", "recordings")
+
+rc_text = open(os.path.join(repo_root, "Benchmarks", "citations", "entries", "real_clean.bib"), encoding="utf-8").read()
+entries_40 = []
+for idx in range(1, 41):
+    key = f"real_clean_{idx:03d}"
+    m = re.search(rf"(@\w+\{{{re.escape(key)},.*?\n\}})", rc_text, flags=re.S)
+    if not m:
+        print(f"  FAIL [Row 14]: missing {key} in real_clean.bib")
+        sys.exit(1)
+    entries_40.append((key, m.group(1) + "\n"))
+
+shared_bib = os.path.join(scratch, "row14-shared.bib")
+open(shared_bib, "wb").write(b"")
+
+home_a = os.path.join(scratch, "r14-home-a")
+home_b = os.path.join(scratch, "r14-home-b")
+os.makedirs(home_a, exist_ok=True)
+os.makedirs(home_b, exist_ok=True)
+env_a = dict(os.environ, HOME=home_a, CFFIXED_USER_HOME=home_a)
+env_b = dict(os.environ, HOME=home_b, CFFIXED_USER_HOME=home_b)
+env_a.pop("SCHOLAR_CACHE_DIR", None)
+env_b.pop("SCHOLAR_CACHE_DIR", None)
+
+def build_input(slice_items):
+    reqs = [
+        {"jsonrpc": "2.0", "id": i + 1, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": shared_bib, "bibtex": bib}}}
+        for i, (_, bib) in enumerate(slice_items)
+    ]
+    return "\n".join(json.dumps(r) for r in reqs) + "\n"
+
+in_a = build_input(entries_40[:20])
+in_b = build_input(entries_40[20:])
+
+# Start BOTH server OS processes before feeding concurrent requests
+proc_a = subprocess.Popen([cli_bin, "mcp", "--registry-replay", rec_dir], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env_a)
+proc_b = subprocess.Popen([cli_bin, "mcp", "--registry-replay", rec_dir], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env_b)
+
+results = {}
+def communicate_worker(tag, proc, payload):
+    out, err = proc.communicate(payload, timeout=120)
+    results[tag] = (proc.returncode, out, err)
+
+t_a = threading.Thread(target=communicate_worker, args=("A", proc_a, in_a))
+t_b = threading.Thread(target=communicate_worker, args=("B", proc_b, in_b))
+t_a.start()
+t_b.start()
+t_a.join()
+t_b.join()
+
+for tag in ("A", "B"):
+    rc, out, err = results[tag]
+    if rc != 0:
+        print(f"  FAIL [Row 14]: server {tag} exited {rc}: {err}")
+        sys.exit(1)
+    lines = [json.loads(ln) for ln in out.splitlines() if ln.strip()]
+    if len(lines) != 20:
+        print(f"  FAIL [Row 14]: server {tag} returned {len(lines)} responses, expected 20")
+        sys.exit(1)
+    for item in lines:
+        res = item["result"]
+        obj = json.loads(res["content"][0]["text"])
+        if res.get("isError") is not False or obj.get("status") != "APPENDED_VERIFIED":
+            print(f"  FAIL [Row 14]: server {tag} write failed: {res}")
+            sys.exit(1)
+
+# Read back shared.bib via ScholarOS CLI and diagnostics (--no-verify) to confirm 40 unique entries & 0 BIB001/BIB002
+p_rb = subprocess.run([cli_bin, "verify-citations", shared_bib, "--offline", "--json", "--lang", "en"], env=env_a, capture_output=True, text=True)
+rb = json.loads(p_rb.stdout)
+verdicts = rb.get("verdicts") or []
+keys_found = [v["citeKey"] for v in verdicts]
+expected_keys = [k for k, _ in entries_40]
+
+tex_check = os.path.join(scratch, "r14-check.tex")
+open(tex_check, "w", encoding="utf-8").write("\\documentclass{article}\\begin{document}\\cite{" + ",".join(expected_keys) + "}\\end{document}\n")
+p_diag = subprocess.run([cli_bin, "diagnostics", tex_check, "--bib", shared_bib, "--no-verify", "--json", "--lang", "en"], env=env_a, capture_output=True, text=True)
+diag_obj = json.loads(p_diag.stdout)
+bib_diags = [d for d in (diag_obj.get("diagnostics") or []) if str(d.get("code", "")).startswith("BIB")]
+
+if (
+    len(verdicts) != 40
+    or sorted(keys_found) != sorted(expected_keys)
+    or (rb.get("unverifiedByReason") or {}).get("parse_error", 0) != 0
+    or p_diag.returncode != 0
+    or bib_diags
+):
+    print(f"  FAIL [Row 14]: shared.bib post-check failed: count={len(verdicts)}, bib_diags={bib_diags}, stderr={p_rb.stderr}")
+    sys.exit(1)
+
+print("  [Row 14] PASS: 2 concurrent MCP servers wrote 20+20=40 distinct VERIFIED entries into shared.bib; 40 unique entries read back with 0 errors")
+PY
+)"
+        R14_RC=$?
+        set -e
+        echo "$R14_OUT"
+        if [[ "$R14_RC" -eq 0 ]]; then
+            record_pass 14 "Two concurrent MCP server processes appended 20+20=40 distinct VERIFIED entries with 0 parse or duplicate errors"
+        else
+            record_fail 14 "Row 14 concurrent MCP server append check failed"
+        fi
+    fi
+
+    # ==================================================================
+    # Rows 15–16: Deferred to Stage 05
+    # ==================================================================
+    for r in 15 16; do
         if should_run_row "$r"; then
-            echo "== [Row $r] 没跑 — Scheduled for Stages 03–05 =="
-            record_skip "$r" "Scheduled for Stages 03–05 — 没跑"
+            echo "== [Row $r] 没跑 — Scheduled for Stage 05 =="
+            record_skip "$r" "Scheduled for Stage 05 — 没跑"
         fi
     done
 
