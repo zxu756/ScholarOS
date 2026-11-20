@@ -1,9 +1,9 @@
 diff --git a/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift b/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
 --- a/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
 +++ b/Sources/ScholarBibAndCSL/CitationVerificationFirewall.swift
-@@ -5592,6 +5592,10 @@ public struct CitationVerificationFirewall: Sendable {
-         findings: [FirewallFinding],
-         overrideNote: String? = nil
+@@ -6967,6 +6967,10 @@
+         overrideNote: String? = nil,
+         record: RegistryWorkRecord? = nil
      ) -> CitationFirewallEntryVerdict {
 +        // MUTATION (M1 acceptance row 21b): retain offline evaluate(entry) verdict on transport_error.
 +        if assignedClass == .unverified && reasons.contains(CitationUnverifiedReasonCode.transportError.rawValue) {
