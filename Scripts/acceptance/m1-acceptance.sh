@@ -1407,19 +1407,20 @@ PY
     fi
 
     # ==================================================================
-    # Row 18: Untrusted x-firewall-class = {VERIFIED} ignored & blocked in verify-citations, diagnostics, and MCP scholar_cite_key
+    # Row 18: Untrusted x-firewall-class = {VERIFIED} ignored & blocked in verify-citations, diagnostics, and MCP verify_citation / add_verified_bibtex
     # ==================================================================
     if should_run_row 18; then
-        echo "== [Row 18] Fabricated DOI with x-firewall-class={VERIFIED}: verify-citations, diagnostics, and MCP scholar_cite_key =="
+        echo "== [Row 18] Fabricated DOI with x-firewall-class={VERIFIED}: verify-citations, diagnostics, and MCP verify_citation / add_verified_bibtex =="
         set +e
         ROW18_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$WORK_SCRATCH" <<'PY'
-import json, os, subprocess, sys
+import hashlib, json, os, subprocess, sys
 
 repo_root, cli_bin, scratch = sys.argv[1], sys.argv[2], sys.argv[3]
 reg_dir = os.path.join(repo_root, "Tests", "Fixtures", "registry")
 
 bib_path = os.path.join(scratch, "row18.bib")
 tex_path = os.path.join(scratch, "row18.tex")
+target_bib = os.path.join(scratch, "row18-target.bib")
 with open(bib_path, "w", encoding="utf-8") as bf:
     bf.write("""@article{fake_tampered,
   author = {Whitfield, Eleanor and Patel, Raj},
@@ -1432,6 +1433,15 @@ with open(bib_path, "w", encoding="utf-8") as bf:
 """)
 with open(tex_path, "w", encoding="utf-8") as tf:
     tf.write("\\documentclass{article}\n\\begin{document}\n\\section{Intro}\nSee \\cite{fake_tampered}.\n\\end{document}\n")
+with open(target_bib, "wb") as tbf:
+    tbf.write(b"% row18 untouched target bib\n")
+
+def file_sig(path: str):
+    raw = open(path, "rb").read()
+    st = os.stat(path)
+    return (hashlib.sha256(raw).hexdigest(), st.st_size, st.st_mtime_ns)
+
+sig_before = file_sig(target_bib)
 
 env = dict(os.environ)
 hdir = os.path.join(scratch, "row18-home")
@@ -1456,11 +1466,13 @@ p_diag = subprocess.run([cli_bin, "diagnostics", tex_path, "--bib", bib_path, "-
 assert p_diag.returncode == 1, (p_diag.returncode, p_diag.stderr)
 assert "ERR_UNVERIFIED_CITATION" in p_diag.stdout, p_diag.stdout
 
-# 3. MCP inline bibtex verification (scholar_verify_bibliography & scholar_cite_key on --registry-replay; no nonexistent scholar_import_bibtex)
+# 3. MCP inline bibtex verification via verify_citation & add_verified_bibtex (--registry-replay; zh & en; file unchanged)
 raw_bib_str = open(bib_path, encoding="utf-8").read()
 rpc_lines = "\n".join([
-    json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "scholar_verify_bibliography", "arguments": {"bibtex": raw_bib_str, "lang": "zh"}}}),
-    json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"citeKey": "fake_tampered", "bibtex": raw_bib_str, "lang": "en"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": raw_bib_str, "lang": "zh"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "verify_citation", "arguments": {"bibtex": raw_bib_str, "lang": "en"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": raw_bib_str, "lang": "zh"}}}),
+    json.dumps({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "add_verified_bibtex", "arguments": {"bib_file": target_bib, "bibtex": raw_bib_str, "lang": "en"}}}),
 ]) + "\n"
 p_mcp = subprocess.run(
     [cli_bin, "mcp", "--registry-replay", reg_dir],
@@ -1472,29 +1484,38 @@ p_mcp = subprocess.run(
 assert p_mcp.returncode == 0, p_mcp.stderr
 resps = {r.get("id"): r for r in (json.loads(ln) for ln in p_mcp.stdout.strip().splitlines() if ln.strip())}
 
-vb_res = (resps.get(1) or {}).get("result") or {}
-assert vb_res.get("isError") is False, vb_res
-vb_report = json.loads(vb_res["content"][0]["text"])
-assert vb_report.get("mode") == "REPLAY", vb_report
-vb_v0 = vb_report["verdicts"][0]
-assert vb_v0["citeKey"] == "fake_tampered", vb_v0
-assert vb_v0["firewallClass"] == "NOT_FOUND" and vb_v0["insertable"] is False, vb_v0
-assert "doi_not_registered" in (vb_v0.get("reasons") or []), vb_v0["reasons"]
-assert any("未采信" in (f.get("detail") or "") and "VERIFIED" in (f.get("detail") or "") for f in (vb_v0.get("findings") or [])), vb_v0["findings"]
+for rid, want_zh in [(1, True), (2, False)]:
+    vc_res = (resps.get(rid) or {}).get("result") or {}
+    assert vc_res.get("isError") is False, vc_res
+    vc_obj = json.loads(vc_res["content"][0]["text"])
+    assert vc_obj.get("mode") == "REPLAY", vc_obj
+    assert vc_obj.get("cite_key") == "fake_tampered", vc_obj
+    assert vc_obj.get("verdict") == "NOT_FOUND" and vc_obj.get("insertable") is False, vc_obj
+    assert "doi_not_registered" in (vc_obj.get("reasons") or []), vc_obj
+    if want_zh:
+        assert any("未采信" in (f.get("detail") or "") and "VERIFIED" in (f.get("detail") or "") for f in (vc_obj.get("findings") or [])), vc_obj
+    else:
+        assert any("not trusted" in (f.get("detail") or "").lower() and "verified" in (f.get("detail") or "").lower() for f in (vc_obj.get("findings") or [])), vc_obj
 
-cite_resp = resps[2]
-res_obj = cite_resp.get("result") or {}
-assert res_obj.get("isError") is True, cite_resp
-cite_err = json.loads(res_obj["content"][0]["text"])
-assert cite_err.get("error_code") == "ERR_UNVERIFIED_CITATION", cite_err
-assert cite_err.get("mode") == "REPLAY", cite_err
-assert cite_err.get("cite_key") == "fake_tampered", cite_err
-assert cite_err.get("verdict") == "NOT_FOUND", cite_err
-assert "doi_not_registered" in (cite_err.get("reasons") or []), cite_err
-assert "cite_key_not_in_bibliography" not in (cite_err.get("reasons") or []), cite_err
-assert any("not trusted" in (f.get("detail") or "").lower() and "verified" in (f.get("detail") or "").lower() for f in (cite_err.get("findings") or [])), cite_err
+for rid, want_zh in [(3, True), (4, False)]:
+    add_res = (resps.get(rid) or {}).get("result") or {}
+    assert add_res.get("isError") is True, add_res
+    add_err = json.loads(add_res["content"][0]["text"])
+    assert add_err.get("error_code") == "ERR_UNVERIFIED_CITATION", add_err
+    assert add_err.get("mode") == "REPLAY", add_err
+    assert add_err.get("cite_key") == "fake_tampered", add_err
+    assert add_err.get("verdict") == "NOT_FOUND", add_err
+    assert "doi_not_registered" in (add_err.get("reasons") or []), add_err
+    assert add_err.get("action") == "未改动 row18-target.bib", add_err
+    if want_zh:
+        assert any("未采信" in (f.get("detail") or "") and "VERIFIED" in (f.get("detail") or "") for f in (add_err.get("findings") or [])), add_err
+    else:
+        assert any("not trusted" in (f.get("detail") or "").lower() and "verified" in (f.get("detail") or "").lower() for f in (add_err.get("findings") or [])), add_err
 
-print("verify_citations=NOT_FOUND(未采信) diagnostics=ERR_UNVERIFIED_CITATION mcp_verify_bibliography=NOT_FOUND(doi_not_registered,未采信) mcp_scholar_cite_key=ERR_UNVERIFIED_CITATION(NOT_FOUND,doi_not_registered,not_trusted)")
+sig_after = file_sig(target_bib)
+assert sig_after == sig_before, (sig_before, sig_after)
+
+print("verify_citations=NOT_FOUND(未采信) diagnostics=ERR_UNVERIFIED_CITATION mcp_verify_citation=NOT_FOUND(doi_not_registered,未采信,not_trusted) mcp_add_verified_bibtex=ERR_UNVERIFIED_CITATION(NOT_FOUND,doi_not_registered,未采信,not_trusted,file_unchanged)")
 PY
 )"
         ROW18_RC=$?

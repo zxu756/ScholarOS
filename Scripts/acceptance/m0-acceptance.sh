@@ -309,7 +309,7 @@ run_named_unit_test() {
     scholaros init --project "$KAPPA_PROJ" --seed-demo >/dev/null
     PRISMA_JSON="$(scholaros prisma-stats --project "$KAPPA_PROJ")"
     MCP_KAPPA_REQ="$(printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"scholar_prisma_agreement","arguments":{"projectPath":"%s"}}}\n' "$KAPPA_PROJ")"
-    MCP_KAPPA_RAW="$(printf '%s\n' "$MCP_KAPPA_REQ" | scholaros mcp --project "$KAPPA_PROJ" --offline)"
+    MCP_KAPPA_RAW="$(printf '%s\n' "$MCP_KAPPA_REQ" | scholaros mcp --project "$KAPPA_PROJ" --offline --experimental-tools)"
     KAPPA_CHECK="$(python3 - "$PRISMA_JSON" "$MCP_KAPPA_RAW" <<'PY'
 import json, re, sys
 prisma = json.loads(sys.argv[1])

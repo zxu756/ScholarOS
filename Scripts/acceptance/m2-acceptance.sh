@@ -17,7 +17,7 @@
 #   - Row 12: S64 citation/cross-ref command tables, S65 optional arguments, S66 normalized keys & `CITE_KEY_CASE`, S67 parser constructs (`parser-commands`), and Latin-1 / Windows-1252 root/child files (`ENC001`)
 #   - Row 13: Unique-key `ERR_UNVERIFIED_CITATION` (`3` keys cited twice each under `--offline` -> `3` diagnostics, `category == "citation"`, `0` structure ERRORs, exit `3`)
 #   - Row 14: Fabricated DOI with `x-firewall-class = {VERIFIED}` under `diagnostics --registry-replay` (`ERR_UNVERIFIED_CITATION`, `未采信` / `not trusted` in `findings`, exit `1`, and `m1-acceptance.sh --row 18` passes)
-#   - Row 15: MCP `scholar_lsp_diagnostics` with `path` across all 11 benchmark manuscripts — byte-for-byte identical JSON to CLI `--json`
+#   - Row 15: MCP `check_manuscript` (`detail: "full"`) across all 11 benchmark manuscripts — byte-for-byte identical JSON to CLI `--json`
 #   - Row 16: M1 480-entry citation benchmark `--replay` + per-entry verdicts & per-group exit codes vs `Scripts/acceptance/baselines/m1-per-entry-v1.3.0.json`
 #   - Row 17: Read-only `git apply --check` across all 5 `m2-*.patch` mutation files (`SKIP / 没跑`; full clone/apply/revert run via `Scripts/acceptance/m2-mutations.sh`)
 #   - Row 18: Wall-clock timing check for `m2-acceptance.sh` (<= 60 s debug build) and `hard-inputs.sh` (<= 1 s)
@@ -2035,10 +2035,10 @@ PY
     fi
 
     # ==================================================================
-    # Row 15: MCP scholar_lsp_diagnostics(path:) across all 11 manuscripts — byte-for-byte identical to CLI --json
+    # Row 15: MCP check_manuscript(path:, detail: "full") across all 11 manuscripts — byte-for-byte identical to CLI --json
     # ==================================================================
     if should_run_row 15; then
-        echo "== [Row 15] MCP scholar_lsp_diagnostics(path:) 对 11 篇基准论文：返回对象与 CLI --json 逐字节相同 =="
+        echo "== [Row 15] MCP check_manuscript(path:, detail: \"full\") 对 11 篇基准论文：返回对象与 CLI --json 逐字节相同 =="
         set +e
         ROW15_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" "$RUN1_DIR" <<'PY'
 import csv, json, os, subprocess, sys
@@ -2092,8 +2092,8 @@ for idx, row in enumerate(rows, start=1):
             "id": idx,
             "method": "tools/call",
             "params": {
-                "name": "scholar_lsp_diagnostics",
-                "arguments": {"path": main_tex},
+                "name": "check_manuscript",
+                "arguments": {"path": main_tex, "detail": "full"},
             },
         })
     )
@@ -2153,7 +2153,7 @@ zh_req = json.dumps({
     "jsonrpc": "2.0",
     "id": 101,
     "method": "tools/call",
-    "params": {"name": "scholar_lsp_diagnostics", "arguments": {"path": zh_tex}},
+    "params": {"name": "check_manuscript", "arguments": {"path": zh_tex, "detail": "full"}},
 }) + "\n"
 p_mcp_zh = subprocess.run(
     [cli_bin, "mcp", "--offline", "--lang", "zh"],
@@ -2180,9 +2180,9 @@ PY
         set -e
         echo "$ROW15_OUT"
         if [[ "$ROW15_RC" -eq 0 ]]; then
-            record_pass 15 "MCP scholar_lsp_diagnostics(path:) returns JSON byte-for-byte identical to CLI --json across all 11 benchmark manuscripts (EN & ZH)"
+            record_pass 15 "MCP check_manuscript(path:, detail: full) returns JSON byte-for-byte identical to CLI --json across all 11 benchmark manuscripts (EN & ZH)"
         else
-            record_fail 15 "Row 15 MCP scholar_lsp_diagnostics(path:) vs CLI --json byte-for-byte parity check failed"
+            record_fail 15 "Row 15 MCP check_manuscript(path:, detail: full) vs CLI --json byte-for-byte parity check failed"
         fi
     fi
 
