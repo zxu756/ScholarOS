@@ -405,6 +405,12 @@ public struct ScholarMCPServer: Sendable {
         }
         do {
             switch name {
+            case "verify_citation":
+                return await executeVerifyCitation(arguments: arguments)
+
+            case "add_verified_bibtex":
+                return await executeAddVerifiedBibTeX(arguments: arguments)
+
             case "scholar_cite_key":
                 let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
@@ -743,7 +749,11 @@ public struct ScholarMCPServer: Sendable {
         if let argErr = validateToolArguments(toolName: name, arguments: arguments) {
             return argErr
         }
-        if name == "scholar_verify_bibliography" || name == "scholar_lsp_diagnostics" || name == "scholar_cite_key" {
+        if name == "scholar_verify_bibliography"
+            || name == "scholar_lsp_diagnostics"
+            || name == "scholar_cite_key"
+            || name == "verify_citation"
+            || name == "add_verified_bibtex" {
             final class Box: @unchecked Sendable {
                 var value: [String: Any] = [:]
             }
@@ -1102,6 +1112,629 @@ public struct ScholarMCPServer: Sendable {
         return textResult(payloadText, isError: false)
     }
 
+    // MARK: - M3 Stage 04: `verify_citation` & `add_verified_bibtex`
+
+    private func bibFileDisplayName(_ bibFilePath: String) -> String {
+        let trimmed = bibFilePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "<bib_file>" }
+        let last = (trimmed as NSString).lastPathComponent
+        if last.isEmpty || last == "/" {
+            return trimmed
+        }
+        return last
+    }
+
+    private func untouchedFileAction(for bibFilePath: String) -> String {
+        "未改动 \(bibFileDisplayName(bibFilePath))"
+    }
+
+    private func jsonTextResult(_ payload: [String: Any], isError: Bool, fallback: String) -> [String: Any] {
+        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
+            return textResult(String(decoding: data, as: UTF8.self), isError: isError)
+        }
+        return textResult(fallback, isError: isError)
+    }
+
+    private func validateOptionalCommonArguments(
+        toolName: String,
+        arguments: [String: Any],
+        bibFileForAction: String?
+    ) -> [String: Any]? {
+        let lang = resolvedLanguage(arguments: arguments)
+        if let rawOffline = arguments["offline"], !(rawOffline is NSNull) {
+            if !(rawOffline is Bool) || CFGetTypeID(rawOffline as CFTypeRef) != CFBooleanGetTypeID() {
+                var res = invalidArgumentResult(
+                    toolName: toolName,
+                    invalidArguments: ["offline"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'offline' for '\(toolName)' must be a boolean.",
+                        "工具 '\(toolName)' 的参数 'offline' 必须是布尔值。"
+                    ),
+                    language: lang
+                )
+                if let bibFileForAction {
+                    res = patchActionInErrorResult(res, action: untouchedFileAction(for: bibFileForAction))
+                }
+                return res
+            }
+        }
+        if let rawLang = arguments["lang"], !(rawLang is NSNull) {
+            if !(rawLang is String) {
+                var res = invalidArgumentResult(
+                    toolName: toolName,
+                    invalidArguments: ["lang"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'lang' for '\(toolName)' must be a string.",
+                        "工具 '\(toolName)' 的参数 'lang' 必须是字符串。"
+                    ),
+                    language: lang
+                )
+                if let bibFileForAction {
+                    res = patchActionInErrorResult(res, action: untouchedFileAction(for: bibFileForAction))
+                }
+                return res
+            }
+        }
+        return nil
+    }
+
+    private func patchActionInErrorResult(_ result: [String: Any], action: String) -> [String: Any] {
+        guard let txt = ((result["content"] as? [[String: Any]])?.first)?["text"] as? String,
+              let data = txt.data(using: .utf8),
+              var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return result
+        }
+        obj["action"] = action
+        return jsonTextResult(obj, isError: true, fallback: txt)
+    }
+
+    private func invalidBibTeXResult(
+        reasons: [String],
+        reason: String,
+        bibFilePath: String?,
+        language: ScholarLanguage
+    ) -> [String: Any] {
+        let action: String
+        if let bibFilePath {
+            action = untouchedFileAction(for: bibFilePath)
+        } else {
+            action = language.L(
+                "No verification performed. Pass a BibTeX string containing exactly 1 valid entry.",
+                "未执行文献核查。请传入恰好包含 1 条合法条目的 BibTeX 字符串。"
+            )
+        }
+        var payload: [String: Any] = [
+            "error_code": "ERR_INVALID_BIBTEX",
+            "category": "invalid_bibtex",
+            "reasons": reasons,
+            "reason": reason,
+            "action": action
+        ]
+        if isReplayServer {
+            payload["mode"] = "REPLAY"
+        }
+        return jsonTextResult(
+            payload,
+            isError: true,
+            fallback: "{\"error_code\":\"ERR_INVALID_BIBTEX\"}"
+        )
+    }
+
+    private enum SingleBibTeXParseOutcome {
+        case valid(entry: BibliographyEntry, unmappedFields: [String: String])
+        case invalid(errorResult: [String: Any])
+    }
+
+    private func parseExactSingleBibTeXEntry(
+        rawBib: String,
+        bibFilePath: String?,
+        language: ScholarLanguage
+    ) -> SingleBibTeXParseOutcome {
+        if rawBib.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: ["empty_bibtex"],
+                    reason: language.L(
+                        "Expected exactly 1 BibTeX entry, but 'bibtex' is empty (0 entries).",
+                        "参数 'bibtex' 必须恰好包含 1 条 BibTeX 条目，当前为空（0 条）。"
+                    ),
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        let doc = BibTeXCodec().parseDocumentRecovering(rawBib)
+        if let firstErr = doc.errors.first {
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: ["bibtex_syntax_error"],
+                    reason: language.L(
+                        "BibTeX syntax error at line \(firstErr.line): \(firstErr.message)",
+                        "BibTeX 第 \(firstErr.line) 行语法错误：\(firstErr.message)"
+                    ),
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        if doc.diagnostics.contains(where: { $0.code == "BIB002" }) {
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: ["multiple_entries"],
+                    reason: language.L(
+                        "Expected exactly 1 BibTeX entry, but multiple entries (duplicate cite key) were provided.",
+                        "参数 'bibtex' 必须恰好包含 1 条 BibTeX 条目，但传入了多条条目（含重复引用键）。"
+                    ),
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        if doc.entries.isEmpty {
+            let reasonCode: String
+            let reasonMsg: String
+            if (try? BibTeXCodec().parseDocument(rawBib)) == nil {
+                reasonCode = "bibtex_syntax_error"
+                reasonMsg = language.L(
+                    "Input is not valid BibTeX (0 valid entries found).",
+                    "传入文本不是合法的 BibTeX（共解析出 0 条有效条目）。"
+                )
+            } else {
+                reasonCode = "empty_bibtex"
+                reasonMsg = language.L(
+                    "Expected exactly 1 BibTeX entry, got 0 entries.",
+                    "参数 'bibtex' 必须恰好包含 1 条 BibTeX 条目，实际为 0 条。"
+                )
+            }
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: [reasonCode],
+                    reason: reasonMsg,
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        if doc.entries.count > 1 {
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: ["multiple_entries"],
+                    reason: language.L(
+                        "Expected exactly 1 BibTeX entry, got \(doc.entries.count) entries.",
+                        "参数 'bibtex' 必须恰好包含 1 条 BibTeX 条目，实际收到 \(doc.entries.count) 条。"
+                    ),
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        let entry = doc.entries[0]
+        if entry.parseError || entry.citeKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .invalid(
+                errorResult: invalidBibTeXResult(
+                    reasons: ["bibtex_syntax_error"],
+                    reason: language.L(
+                        "BibTeX entry has missing citation key or syntax error.",
+                        "BibTeX 条目缺少引用键或存在语法错误。"
+                    ),
+                    bibFilePath: bibFilePath,
+                    language: language
+                )
+            )
+        }
+
+        let unmapped = doc.unmappedFieldsByCiteKey[entry.citeKey]
+            ?? doc.unmappedFieldsByCiteKey[entry.citeKey.lowercased()]
+            ?? [:]
+        return .valid(entry: entry, unmappedFields: unmapped)
+    }
+
+    private func executeVerifyCitation(arguments: [String: Any]) async -> [String: Any] {
+        let lang = resolvedLanguage(arguments: arguments)
+        guard let rawBibAny = arguments["bibtex"], !(rawBibAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "verify_citation",
+                invalidArguments: ["bibtex"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'bibtex' for 'verify_citation'.",
+                    "工具 'verify_citation' 缺少必填字符串参数 'bibtex'。"
+                ),
+                language: lang
+            )
+        }
+        guard let rawBib = rawBibAny as? String else {
+            return invalidArgumentResult(
+                toolName: "verify_citation",
+                invalidArguments: ["bibtex"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'bibtex' for 'verify_citation' must be a string.",
+                    "工具 'verify_citation' 的参数 'bibtex' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+        if let optErr = validateOptionalCommonArguments(
+            toolName: "verify_citation",
+            arguments: arguments,
+            bibFileForAction: nil
+        ) {
+            return optErr
+        }
+
+        let entry: BibliographyEntry
+        switch parseExactSingleBibTeXEntry(rawBib: rawBib, bibFilePath: nil, language: lang) {
+        case .invalid(let errRes):
+            return errRes
+        case .valid(let parsedEntry, _):
+            entry = parsedEntry
+        }
+
+        let callOffline = (arguments["offline"] as? Bool == true)
+        do {
+            let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+            let modeLabel: String
+            if isReplayServer {
+                modeLabel = "REPLAY"
+            } else if case .offline = mode {
+                modeLabel = "offline"
+            } else {
+                modeLabel = "online"
+            }
+
+            let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                entries: [entry],
+                mode: mode,
+                noCache: noCache || isOffline || callOffline,
+                skipCacheRead: false,
+                environment: effectiveEnvironment,
+                clock: registryClock,
+                sharedRateLimiter: sharedRateLimiter,
+                sharedStandardCache: sharedStandardCache,
+                sharedReplayExplicitCache: sharedReplayExplicitCache,
+                language: lang
+            )
+            guard let verdict = verificationResult.report.verdicts.first else {
+                var errPayload: [String: Any] = [
+                    "error_code": "ERR_SCHOLAROS",
+                    "category": "internal_error",
+                    "reason": "Citation verification produced no verdict."
+                ]
+                if isReplayServer { errPayload["mode"] = "REPLAY" }
+                return jsonTextResult(errPayload, isError: true, fallback: "{\"error_code\":\"ERR_SCHOLAROS\"}")
+            }
+
+            let encoder = JSONEncoder()
+            let sourcesObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.sources))) ?? []
+            let fieldsObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.fields))) ?? []
+            let findingsObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.findings))) ?? []
+            let recordObj: Any
+            if let rec = verdict.record, let obj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
+                recordObj = obj
+            } else {
+                recordObj = NSNull()
+            }
+
+            let payload: [String: Any] = [
+                "mode": modeLabel,
+                "cite_key": verdict.citeKey,
+                "verdict": verdict.firewallClass.rawValue,
+                "reasons": verdict.reasons,
+                "sources": sourcesObj,
+                "fields": fieldsObj,
+                "insertable": verdict.insertable,
+                "record": recordObj,
+                "findings": findingsObj
+            ]
+            return jsonTextResult(
+                payload,
+                isError: false,
+                fallback: "{\"cite_key\":\"\(verdict.citeKey)\",\"verdict\":\"\(verdict.firewallClass.rawValue)\"}"
+            )
+        } catch let replayErr as RegistryReplayError {
+            var payload: [String: Any] = [
+                "error_code": "ERR_REGISTRY_REPLAY",
+                "category": "registry_replay",
+                "reasons": ["replay_recording_missing_or_corrupt"],
+                "reason": "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)"
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)")
+        } catch {
+            var payload: [String: Any] = [
+                "error_code": "ERR_SCHOLAROS",
+                "category": "execution_error",
+                "reason": error.localizedDescription
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "[ERR_SCHOLAROS] \(error.localizedDescription)")
+        }
+    }
+
+    private func executeAddVerifiedBibTeX(arguments: [String: Any]) async -> [String: Any] {
+        let lang = resolvedLanguage(arguments: arguments)
+        let candidateBibFileString = arguments["bib_file"] as? String
+
+        guard let rawBibFileAny = arguments["bib_file"], !(rawBibFileAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "add_verified_bibtex",
+                invalidArguments: ["bib_file"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'bib_file' for 'add_verified_bibtex'.",
+                    "工具 'add_verified_bibtex' 缺少必填字符串参数 'bib_file'。"
+                ),
+                language: lang
+            )
+        }
+        guard let bibFilePath = rawBibFileAny as? String else {
+            return invalidArgumentResult(
+                toolName: "add_verified_bibtex",
+                invalidArguments: ["bib_file"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'bib_file' for 'add_verified_bibtex' must be a string.",
+                    "工具 'add_verified_bibtex' 的参数 'bib_file' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+
+        guard let rawBibAny = arguments["bibtex"], !(rawBibAny is NSNull) else {
+            let base = invalidArgumentResult(
+                toolName: "add_verified_bibtex",
+                invalidArguments: ["bibtex"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'bibtex' for 'add_verified_bibtex'.",
+                    "工具 'add_verified_bibtex' 缺少必填字符串参数 'bibtex'。"
+                ),
+                language: lang
+            )
+            return patchActionInErrorResult(base, action: untouchedFileAction(for: bibFilePath))
+        }
+        guard let rawBib = rawBibAny as? String else {
+            let base = invalidArgumentResult(
+                toolName: "add_verified_bibtex",
+                invalidArguments: ["bibtex"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'bibtex' for 'add_verified_bibtex' must be a string.",
+                    "工具 'add_verified_bibtex' 的参数 'bibtex' 必须是字符串。"
+                ),
+                language: lang
+            )
+            return patchActionInErrorResult(base, action: untouchedFileAction(for: bibFilePath))
+        }
+
+        if let optErr = validateOptionalCommonArguments(
+            toolName: "add_verified_bibtex",
+            arguments: arguments,
+            bibFileForAction: candidateBibFileString
+        ) {
+            return optErr
+        }
+
+        let entry: BibliographyEntry
+        let unmappedFields: [String: String]
+        switch parseExactSingleBibTeXEntry(rawBib: rawBib, bibFilePath: bibFilePath, language: lang) {
+        case .invalid(let errRes):
+            return errRes
+        case .valid(let parsedEntry, let parsedUnmapped):
+            entry = parsedEntry
+            unmappedFields = parsedUnmapped
+        }
+
+        let actionText = untouchedFileAction(for: bibFilePath)
+        let callOffline = (arguments["offline"] as? Bool == true)
+
+        // Settled #6 & Row 8: server started with --offline OR single call passing offline: true is rejected immediately.
+        if isOffline || callOffline {
+            var payload: [String: Any] = [
+                "error_code": "ERR_UNVERIFIED_CITATION",
+                "category": "unverified_citation",
+                "mode": isReplayServer ? "REPLAY" : "offline",
+                "cite_key": entry.citeKey,
+                "verdict": CitationFirewallClass.unverified.rawValue,
+                "reasons": [CitationUnverifiedReasonCode.offline.rawValue],
+                "fields": [Any](),
+                "findings": [Any](),
+                "sources": [Any](),
+                "record": NSNull(),
+                "reason": lang.L(
+                    "Lookup not performed [UNVERIFIED, reason: offline]: online registry verification is required before writing to .bib, and offline mode was requested.",
+                    "尚未完成外部核查 [UNVERIFIED，原因码：offline]：写入 .bib 前必须向外部注册库核查，离线模式下拒绝写入。"
+                ),
+                "action": actionText
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_UNVERIFIED_CITATION\"}")
+        }
+
+        do {
+            let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+            let modeLabel = isReplayServer ? "REPLAY" : "online"
+
+            // Settled #6: bypass reading from cache on write (`skipCacheRead: true`), while still storing freshly fetched responses into cache (`noCache: noCache`).
+            let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                entries: [entry],
+                mode: mode,
+                noCache: noCache,
+                skipCacheRead: true,
+                environment: effectiveEnvironment,
+                clock: registryClock,
+                sharedRateLimiter: sharedRateLimiter,
+                sharedStandardCache: sharedStandardCache,
+                sharedReplayExplicitCache: sharedReplayExplicitCache,
+                language: lang
+            )
+
+            guard let verdict = verificationResult.report.verdicts.first else {
+                var errPayload: [String: Any] = [
+                    "error_code": "ERR_IO",
+                    "category": "internal_error",
+                    "reason": "Citation verification produced no verdict.",
+                    "action": actionText
+                ]
+                if isReplayServer { errPayload["mode"] = "REPLAY" }
+                return jsonTextResult(errPayload, isError: true, fallback: "{\"error_code\":\"ERR_IO\"}")
+            }
+
+            let encoder = JSONEncoder()
+            let sourcesObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.sources))) ?? []
+            let fieldsObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.fields))) ?? []
+            let findingsObj = (try? JSONSerialization.jsonObject(with: encoder.encode(verdict.findings))) ?? []
+            let recordObj: Any
+            if let rec = verdict.record, let obj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
+                recordObj = obj
+            } else {
+                recordObj = NSNull()
+            }
+
+            guard verdict.firewallClass == .verified,
+                  verdict.insertable,
+                  !verdict.sources.isEmpty,
+                  let verifiedRecord = verdict.record else {
+                let firewall = CitationVerificationFirewall(clock: registryClock)
+                let rejectionReason = firewall.formatInRunRejectionReason(for: verdict, language: lang)
+                let payload: [String: Any] = [
+                    "error_code": "ERR_UNVERIFIED_CITATION",
+                    "category": "unverified_citation",
+                    "mode": modeLabel,
+                    "cite_key": verdict.citeKey,
+                    "verdict": verdict.firewallClass.rawValue,
+                    "reasons": verdict.reasons,
+                    "fields": fieldsObj,
+                    "findings": findingsObj,
+                    "sources": sourcesObj,
+                    "record": recordObj,
+                    "reason": rejectionReason,
+                    "action": actionText
+                ]
+                return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_UNVERIFIED_CITATION\"}")
+            }
+
+            do {
+                let outcome = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                    toBibFileAtPath: bibFilePath,
+                    citeKey: entry.citeKey,
+                    record: verifiedRecord,
+                    localEntry: entry,
+                    localUnmappedFields: unmappedFields
+                )
+                switch outcome {
+                case .appendedVerified(let generated):
+                    let changedFieldsObj = (try? JSONSerialization.jsonObject(with: encoder.encode(generated.changedFields))) ?? []
+                    let okPayload: [String: Any] = [
+                        "status": "APPENDED_VERIFIED",
+                        "cite_key": generated.citeKey,
+                        "verdict": CitationFirewallClass.verified.rawValue,
+                        "mode": modeLabel,
+                        "written_bibtex": generated.bibtex,
+                        "changed_fields": changedFieldsObj,
+                        "sources": sourcesObj,
+                        "record": recordObj
+                    ]
+                    return jsonTextResult(okPayload, isError: false, fallback: "{\"status\":\"APPENDED_VERIFIED\"}")
+
+                case .skippedDuplicate(let existingKey, let matchedOn):
+                    let dupPayload: [String: Any] = [
+                        "status": "SKIPPED_DUPLICATE",
+                        "mode": modeLabel,
+                        "cite_key": entry.citeKey,
+                        "verdict": CitationFirewallClass.verified.rawValue,
+                        "existing_key": existingKey,
+                        "matched_on": matchedOn.rawValue,
+                        "sources": sourcesObj
+                    ]
+                    return jsonTextResult(dupPayload, isError: false, fallback: "{\"status\":\"SKIPPED_DUPLICATE\"}")
+                }
+            } catch let writeErr as VerifiedBibTeXWriteError {
+                return formatVerifiedBibTeXWriteError(writeErr, bibFilePath: bibFilePath, modeLabel: modeLabel)
+            }
+        } catch let replayErr as RegistryReplayError {
+            var payload: [String: Any] = [
+                "error_code": "ERR_REGISTRY_REPLAY",
+                "category": "registry_replay",
+                "reasons": ["replay_recording_missing_or_corrupt"],
+                "reason": "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)",
+                "action": actionText
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)")
+        } catch {
+            var payload: [String: Any] = [
+                "error_code": "ERR_IO",
+                "category": "io_error",
+                "reason": error.localizedDescription,
+                "action": actionText
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_IO\"}")
+        }
+    }
+
+    private func formatVerifiedBibTeXWriteError(
+        _ err: VerifiedBibTeXWriteError,
+        bibFilePath: String,
+        modeLabel: String
+    ) -> [String: Any] {
+        let code = err.errorCode
+        let actionText = untouchedFileAction(for: bibFilePath)
+        var payload: [String: Any] = [
+            "error_code": code,
+            "bib_file": bibFilePath,
+            "reason": err.errorDescription ?? String(describing: err),
+            "action": actionText
+        ]
+        if isReplayServer || modeLabel == "REPLAY" {
+            payload["mode"] = "REPLAY"
+        } else {
+            payload["mode"] = modeLabel
+        }
+        switch err {
+        case .invalidPath:
+            payload["category"] = "bib_path"
+            payload["reasons"] = ["invalid_bib_path"]
+        case .encodingError:
+            payload["category"] = "bib_encoding"
+            payload["reasons"] = ["invalid_utf8_encoding"]
+        case .syntaxError(_, let line, let startLine, let citeKey, _):
+            payload["category"] = "bib_syntax"
+            payload["reasons"] = ["bibtex_syntax_error"]
+            payload["line"] = line
+            payload["start_line"] = startLine
+            payload["cite_key"] = citeKey ?? NSNull()
+        case .citeKeyConflict(let citeKey, let existingKey, _):
+            payload["category"] = "cite_key_conflict"
+            payload["reasons"] = ["cite_key_conflict"]
+            payload["cite_key"] = citeKey
+            payload["existing_key"] = existingKey
+        case .ioError:
+            payload["category"] = "io_error"
+            payload["reasons"] = ["io_error"]
+        }
+        return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"\(code)\"}")
+    }
+
     private func textResult(_ text: String, isError: Bool) -> [String: Any] {
         [
             "content": [
@@ -1113,6 +1746,33 @@ public struct ScholarMCPServer: Sendable {
 
     public static var toolDefinitions: [[String: Any]] {
         [
+        [
+            "name": "verify_citation",
+            "description": "Verify a single BibTeX entry through the shared 5-class Citation Verification Firewall. Requires exactly one BibTeX entry; returns structured JSON with mode, cite_key, verdict, reasons, sources, fields, insertable, record, and findings.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bibtex": ["type": "string"],
+                    "offline": ["type": "boolean"],
+                    "lang": ["type": "string"]
+                ],
+                "required": ["bibtex"]
+            ]
+        ],
+        [
+            "name": "add_verified_bibtex",
+            "description": "Verify a single BibTeX entry in-process (bypassing cache read) and append canonical registry-backed BibTeX to a .bib file under exclusive flock + O_APPEND only when verdict is VERIFIED and insertable is true.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bib_file": ["type": "string"],
+                    "bibtex": ["type": "string"],
+                    "offline": ["type": "boolean"],
+                    "lang": ["type": "string"]
+                ],
+                "required": ["bib_file", "bibtex"]
+            ]
+        ],
         [
             "name": "scholar_cite_key",
             "description": "Citation insertion check. Verifies the target entry through the shared Citation Verification Firewall (online by default unless offline: true is passed or server started with --offline / --registry-replay) and returns formatted \\cite{key} or #cite(<key>) ONLY if VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",

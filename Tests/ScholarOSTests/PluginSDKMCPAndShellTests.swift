@@ -557,14 +557,16 @@ struct PluginSDKMCPAndShellTests {
         let initResult = try #require(initJSON["result"] as? [String: Any])
         #expect(initResult["protocolVersion"] as? String == "2024-11-05")
 
-        // 2. tools/list exposes all 8 academic tools
+        // 2. tools/list exposes the 8 existing academic tools plus verify_citation & add_verified_bibtex (10 tools in Stage 04)
         let listReq = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
         let listRaw = try #require(server.handleJSONRPCLine(listReq))
         let listJSON = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
         let listResult = try #require(listJSON["result"] as? [String: Any])
         let tools = try #require(listResult["tools"] as? [[String: Any]])
-        #expect(tools.count == 8)
+        #expect(tools.count == 10)
         let names = Set(tools.compactMap { $0["name"] as? String })
+        #expect(names.contains("verify_citation"))
+        #expect(names.contains("add_verified_bibtex"))
         #expect(names.contains("scholar_cite_key"))
         #expect(names.contains("scholar_verify_bibliography"))
         #expect(names.contains("scholar_prisma_agreement"))
@@ -7298,6 +7300,533 @@ struct PluginSDKMCPAndShellTests {
             "Expected record in MCP scholar_cite_key DRIFT error JSON output, got \(mcpCiteDriftObj)"
         )
         #expect(mcpCiteDriftRec["source"] as? String == "Crossref")
+    }
+
+    // MARK: - M3 Stage 04: `verify_citation` and `add_verified_bibtex` MCP Tools
+
+    private func fileStateSnapshot(_ path: String) throws -> (bytes: Data, size: Int64, mtimeSec: Int, mtimeNsec: Int) {
+        var st = Darwin.stat()
+        guard Darwin.lstat(path, &st) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        let bytes = try Data(contentsOf: URL(fileURLWithPath: path))
+        return (bytes, st.st_size, st.st_mtimespec.tv_sec, st.st_mtimespec.tv_nsec)
+    }
+
+    private func decodeToolTextJSON(_ res: [String: Any]) throws -> [String: Any] {
+        let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        return try #require(
+            try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
+            "Expected JSON object in MCP tool text, got: \(text)"
+        )
+    }
+
+    @Test("M3 Stage 04: tools/list exposes verify_citation and add_verified_bibtex with snake_case schemas and rejects unknown/forbidden arguments without touching .bib")
+    func m3Stage04ToolsListAndUnknownArgumentsRejectedOnVerifyCitationAndAddVerifiedBibTeX() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s04-args")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+
+        let targetBib = tempDir.appendingPathComponent("refs.bib")
+        try Data("% sentinel\n".utf8).write(to: targetBib)
+        let beforeSnap = try fileStateSnapshot(targetBib.path)
+
+        let listRaw = try #require(await replayServer.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
+        let listObj = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
+        let tools = try #require((listObj["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+
+        let verifyDef = try #require(tools.first { ($0["name"] as? String) == "verify_citation" }, "tools/list missing verify_citation")
+        let verifySchema = try #require(verifyDef["inputSchema"] as? [String: Any])
+        let verifyProps = try #require(verifySchema["properties"] as? [String: Any])
+        #expect(verifyProps.keys.sorted() == ["bibtex", "lang", "offline"])
+        #expect((verifySchema["required"] as? [String]) == ["bibtex"])
+
+        let addDef = try #require(tools.first { ($0["name"] as? String) == "add_verified_bibtex" }, "tools/list missing add_verified_bibtex")
+        let addSchema = try #require(addDef["inputSchema"] as? [String: Any])
+        let addProps = try #require(addSchema["properties"] as? [String: Any])
+        #expect(addProps.keys.sorted() == ["bib_file", "bibtex", "lang", "offline"])
+        #expect((addSchema["required"] as? [String])?.sorted() == ["bib_file", "bibtex"])
+
+        let lecunBib = "@article{real_lecun, author = {LeCun, Yann and Bengio, Yoshua and Hinton, Geoffrey}, title = {Deep learning}, journal = {Nature}, year = {2015}, volume = {521}, pages = {436--444}, doi = {10.1038/nature14539}}"
+
+        let forbiddenCalls: [(String, [String: Any])] = [
+            ("verify_citation", ["bibtex": lecunBib, "registryReplayPath": registryDir.path]),
+            ("verify_citation", ["bibtex": lecunBib, "demo": true]),
+            ("verify_citation", ["bibtex": lecunBib, "projectPath": tempDir.path]),
+            ("verify_citation", ["bibtex": lecunBib, "unknown_param": 1]),
+            ("verify_citation", [:]),
+            ("verify_citation", ["bibtex": 123]),
+            ("add_verified_bibtex", ["bib_file": targetBib.path, "bibtex": lecunBib, "registryReplayPath": registryDir.path]),
+            ("add_verified_bibtex", ["bib_file": targetBib.path, "bibtex": lecunBib, "demo": true]),
+            ("add_verified_bibtex", ["bib_file": targetBib.path, "bibtex": lecunBib, "projectPath": tempDir.path]),
+            ("add_verified_bibtex", ["bib_file": targetBib.path, "bibtex": lecunBib, "citeKey": "real_lecun"]),
+            ("add_verified_bibtex", ["bibtex": lecunBib]),
+            ("add_verified_bibtex", ["bib_file": targetBib.path])
+        ]
+
+        for (toolName, args) in forbiddenCalls {
+            let res = await replayServer.executeToolCallAsync(name: toolName, arguments: args)
+            #expect(res["isError"] as? Bool == true, "Expected isError=true on \(toolName) with \(args)")
+            let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let obj = try #require(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+            #expect(obj["error_code"] as? String == "ERR_INVALID_ARGUMENT", "Expected ERR_INVALID_ARGUMENT on \(toolName) \(args), got \(obj)")
+            #expect(obj["mode"] as? String == "REPLAY")
+        }
+
+        let afterSnap = try fileStateSnapshot(targetBib.path)
+        #expect(afterSnap == beforeSnap)
+    }
+
+    @Test("M3 Stage 04: verify_citation enforces exact single-entry BibTeX (ERR_INVALID_BIBTEX on 0/2/malformed), sets isError only on tool execution failure, and matches shared firewall")
+    func m3Stage04VerifyCitationSingleEntryRuleIsErrorRuleAndReplayParity() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s04-vc")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let server = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+
+        let recheckLines = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        ).components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+
+        let lecunLine = try #require(recheckLines.first { $0.contains("{real_lecun,") })
+        let wrongYearLine = try #require(recheckLines.first { $0.contains("{wrongyear5,") })
+        let fakeLine = try #require(recheckLines.first { $0.contains("{fake_nonsentinel,") })
+        let wakefieldLine = try #require(recheckLines.first { $0.contains("{retracted_wakefield,") })
+
+        // 1. 0 entries, 2 entries (distinct & duplicate key), and syntax error -> isError == true, ERR_INVALID_BIBTEX
+        let invalidBibCases: [String] = [
+            "",
+            "   \n\t  ",
+            "% comment only\n@string{j = \"Nature\"}\n",
+            "\(lecunLine)\n\(wrongYearLine)\n",
+            "\(lecunLine)\n\(lecunLine)\n",
+            "@article{broken_entry,\n  author = {Doe, Jane},\n  title = {Unclosed brace\n"
+        ]
+        for badBib in invalidBibCases {
+            let res = await server.executeToolCallAsync(name: "verify_citation", arguments: ["bibtex": badBib])
+            #expect(res["isError"] as? Bool == true, "Expected isError=true for invalid bibtex: \(badBib)")
+            let txt = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let obj = try #require(JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any])
+            #expect(obj["error_code"] as? String == "ERR_INVALID_BIBTEX", "Expected ERR_INVALID_BIBTEX, got \(obj)")
+            #expect(obj["mode"] as? String == "REPLAY")
+        }
+
+        // 2. Missing replay recording -> tool failed to complete -> isError == true
+        let unrecordedBib = "@article{unrecorded_999, author = {Doe, Jane}, title = {Unrecorded Paper}, journal = {J}, year = {2024}, doi = {10.5555/unrecorded.9999}}"
+        let missRes = await server.executeToolCallAsync(name: "verify_citation", arguments: ["bibtex": unrecordedBib])
+        #expect(missRes["isError"] as? Bool == true)
+        let missTxt = try #require(((missRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let missObj = try #require(JSONSerialization.jsonObject(with: Data(missTxt.utf8)) as? [String: Any])
+        #expect(missObj["error_code"] as? String == "ERR_REGISTRY_REPLAY")
+        #expect(missObj["mode"] as? String == "REPLAY")
+
+        // 3. All 5 normal verdict classes have isError == false and carry all 9 required keys
+        let validCases: [(bib: String, offline: Bool, expectedKey: String, expectedVerdict: String, expectedInsertable: Bool, expectRecord: Bool)] = [
+            (lecunLine, false, "real_lecun", "VERIFIED", true, true),
+            (wrongYearLine, false, "wrongyear5", "DRIFT", false, true),
+            (fakeLine, false, "fake_nonsentinel", "NOT_FOUND", false, false),
+            (wakefieldLine, false, "retracted_wakefield", "RETRACTED", false, false),
+            (lecunLine, true, "real_lecun", "UNVERIFIED", false, false)
+        ]
+
+        let requiredTopKeys: Set<String> = [
+            "mode", "cite_key", "verdict", "reasons", "sources", "fields", "insertable", "record", "findings"
+        ]
+
+        for c in validCases {
+            var args: [String: Any] = ["bibtex": c.bib]
+            if c.offline { args["offline"] = true }
+            let res = await server.executeToolCallAsync(name: "verify_citation", arguments: args)
+            #expect(res["isError"] as? Bool == false, "Expected isError=false on normal verdict \(c.expectedVerdict) for \(c.expectedKey)")
+            let txt = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let obj = try #require(JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any])
+            #expect(requiredTopKeys.isSubset(of: Set(obj.keys)), "Missing required keys on \(c.expectedKey): \(obj.keys)")
+            #expect(obj["mode"] as? String == "REPLAY")
+            #expect(obj["cite_key"] as? String == c.expectedKey)
+            #expect(obj["verdict"] as? String == c.expectedVerdict)
+            #expect(obj["insertable"] as? Bool == c.expectedInsertable)
+            if c.expectRecord {
+                #expect(obj["record"] is [String: Any], "Expected record dictionary on \(c.expectedKey), got \(String(describing: obj["record"]))")
+            } else {
+                #expect(obj["record"] is NSNull, "Expected null record on \(c.expectedKey), got \(String(describing: obj["record"]))")
+            }
+            if c.offline {
+                #expect(obj["reasons"] as? [String] == ["offline"])
+            }
+        }
+    }
+
+    @Test("M3 Stage 04: add_verified_bibtex rejects offline server & per-call offline, bypasses cache read on write while still storing fresh responses into cache")
+    func m3Stage04AddVerifiedBibTeXOfflineRejectionAndWriteSkipsCacheRead() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s04-cache")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let fixedDate = Date(timeIntervalSince1970: 1_794_873_600) // 2026-11-17T00:00:00Z
+        let fastClock = ClosureRegistryClock(now: { 0 }, currentDate: { fixedDate }, sleep: { _ in })
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+
+        let recheckLines = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib"),
+            encoding: .utf8
+        ).components(separatedBy: .newlines)
+        let lecunBib = try #require(recheckLines.first { $0.contains("{real_lecun,") })
+        let wakefieldBib = try #require(recheckLines.first { $0.contains("{retracted_wakefield,") })
+
+        let targetBib = tempDir.appendingPathComponent("refs.bib")
+        try Data("% initial\n".utf8).write(to: targetBib)
+        let initialSnap = try fileStateSnapshot(targetBib.path)
+
+        // 1a. Server started with --offline -> always rejects with UNVERIFIED [offline]
+        let offlineEnv = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let offlineServer = ScholarMCPServer(isOffline: true, registryClock: fastClock, environment: offlineEnv)
+        for bib in [lecunBib, wakefieldBib] {
+            let res = await offlineServer.executeToolCallAsync(
+                name: "add_verified_bibtex",
+                arguments: ["bib_file": targetBib.path, "bibtex": bib]
+            )
+            #expect(res["isError"] as? Bool == true)
+            let txt = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
+            let obj = try #require(JSONSerialization.jsonObject(with: Data(txt.utf8)) as? [String: Any])
+            #expect(obj["error_code"] as? String == "ERR_UNVERIFIED_CITATION")
+            #expect(obj["verdict"] as? String == "UNVERIFIED")
+            #expect(obj["reasons"] as? [String] == ["offline"])
+            #expect(obj["action"] as? String == "未改动 refs.bib")
+            #expect(try fileStateSnapshot(targetBib.path) == initialSnap)
+        }
+
+        // 1b. Replay server with per-call offline: true -> rejects with mode == REPLAY, verdict == UNVERIFIED, reasons == [offline]
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: fastClock,
+            environment: offlineEnv
+        )
+        let perCallOfflineRes = await replayServer.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": targetBib.path, "bibtex": lecunBib, "offline": true]
+        )
+        #expect(perCallOfflineRes["isError"] as? Bool == true)
+        let perCallTxt = try #require(((perCallOfflineRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        let perCallObj = try #require(JSONSerialization.jsonObject(with: Data(perCallTxt.utf8)) as? [String: Any])
+        #expect(perCallObj["mode"] as? String == "REPLAY")
+        #expect(perCallObj["error_code"] as? String == "ERR_UNVERIFIED_CITATION")
+        #expect(perCallObj["verdict"] as? String == "UNVERIFIED")
+        #expect(perCallObj["reasons"] as? [String] == ["offline"])
+        #expect(perCallObj["action"] as? String == "未改动 refs.bib")
+        #expect(try fileStateSnapshot(targetBib.path) == initialSnap)
+
+        // 2a. Pre-populate valid VERIFIED cache for real_lecun via replay + explicit SCHOLAR_CACHE_DIR
+        let cacheDir1 = tempDir.appendingPathComponent("cache-populated", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDir1, withIntermediateDirectories: true)
+        let cachedEnv1 = [
+            "HOME": tempDir.path,
+            "CFFIXED_USER_HOME": tempDir.path,
+            "SCHOLAR_CACHE_DIR": cacheDir1.path
+        ]
+        let warmServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: fastClock,
+            environment: cachedEnv1
+        )
+        let warmRes = await warmServer.executeToolCallAsync(name: "verify_citation", arguments: ["bibtex": lecunBib])
+        #expect(warmRes["isError"] as? Bool == false)
+        #expect(FileManager.default.fileExists(atPath: cacheDir1.appendingPathComponent("registry.sqlite").path))
+
+        // Online server with disconnected transport + warm cacheDir1:
+        // verify_citation reads cache (VERIFIED, 0 transport calls), whereas add_verified_bibtex skips cache read and rejects (transport_error)!
+        final class RequestCounter: @unchecked Sendable {
+            private let lock = NSLock()
+            var count = 0
+            func increment() {
+                lock.lock()
+                count += 1
+                lock.unlock()
+            }
+        }
+        let disconnectedCounter = RequestCounter()
+        let disconnectedTransport = ClosureRegistrySession { _ in
+            disconnectedCounter.increment()
+            throw URLError(.notConnectedToInternet)
+        }
+        let disconnectedServer = ScholarMCPServer(
+            registryTransport: disconnectedTransport,
+            registryClock: fastClock,
+            environment: cachedEnv1
+        )
+
+        let cachedVerifyRes = await disconnectedServer.executeToolCallAsync(
+            name: "verify_citation",
+            arguments: ["bibtex": lecunBib]
+        )
+        #expect(cachedVerifyRes["isError"] as? Bool == false)
+        let cachedVerifyObj = try decodeToolTextJSON(cachedVerifyRes)
+        #expect(cachedVerifyObj["verdict"] as? String == "VERIFIED")
+        #expect(disconnectedCounter.count == 0, "verify_citation should hit valid cache with 0 transport calls")
+
+        let writeOnDisconnectedRes = await disconnectedServer.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": targetBib.path, "bibtex": lecunBib]
+        )
+        #expect(writeOnDisconnectedRes["isError"] as? Bool == true)
+        #expect(disconnectedCounter.count > 0, "add_verified_bibtex must bypass cache read and attempt live registry query")
+        let disWriteObj = try decodeToolTextJSON(writeOnDisconnectedRes)
+        #expect(disWriteObj["error_code"] as? String == "ERR_UNVERIFIED_CITATION")
+        #expect(disWriteObj["verdict"] as? String == "UNVERIFIED")
+        #expect(disWriteObj["reasons"] as? [String] == ["transport_error"])
+        #expect(disWriteObj["action"] as? String == "未改动 refs.bib")
+        #expect(try fileStateSnapshot(targetBib.path) == initialSnap)
+
+        // 2b. Fresh empty cacheDir2 + mock online transport serving real_lecun Crossref & OpenAlex 200 payloads:
+        // add_verified_bibtex queries transport AND writes fresh responses into cacheDir2/registry.sqlite!
+        let crossrefRaw = try Data(contentsOf: registryDir.appendingPathComponent("crossref_doi_10.1038_nature14539_2019f44854.raw"))
+        let openAlexRaw = try Data(contentsOf: registryDir.appendingPathComponent("openalex_doi_10.1038_nature14539_04360041c9.raw"))
+        let liveCounter = RequestCounter()
+        let liveMockTransport = ClosureRegistrySession { req in
+            liveCounter.increment()
+            let urlStr = req.url?.absoluteString ?? ""
+            if urlStr.contains("api.crossref.org") {
+                return RegistryHTTPResponse(statusCode: 200, body: crossrefRaw, headers: [:], origin: .network, fetchedAt: "2026-11-17T00:00:00Z")
+            }
+            if urlStr.contains("api.openalex.org") {
+                return RegistryHTTPResponse(statusCode: 200, body: openAlexRaw, headers: [:], origin: .network, fetchedAt: "2026-11-17T00:00:00Z")
+            }
+            throw URLError(.badURL)
+        }
+        let cacheDir2 = tempDir.appendingPathComponent("cache-empty-at-start", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDir2, withIntermediateDirectories: true)
+        let cachedEnv2 = [
+            "HOME": tempDir.path,
+            "CFFIXED_USER_HOME": tempDir.path,
+            "SCHOLAR_CACHE_DIR": cacheDir2.path
+        ]
+        let liveMockServer = ScholarMCPServer(
+            registryTransport: liveMockTransport,
+            registryClock: fastClock,
+            environment: cachedEnv2
+        )
+        let freshTargetBib = tempDir.appendingPathComponent("fresh.bib")
+        let liveAddRes = await liveMockServer.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": freshTargetBib.path, "bibtex": lecunBib]
+        )
+        #expect(liveAddRes["isError"] as? Bool == false)
+        let liveAddObj = try decodeToolTextJSON(liveAddRes)
+        #expect(liveAddObj["status"] as? String == "APPENDED_VERIFIED")
+        #expect(liveCounter.count == 2)
+
+        let storedCache = RegistryResponseCache(
+            fileURL: cacheDir2.appendingPathComponent("registry.sqlite"),
+            clock: fastClock
+        )
+        let crossrefLookupURL = try #require(URL(string: "https://api.crossref.org/works/10.1038/nature14539"))
+        #expect(storedCache.lookup(for: crossrefLookupURL) != nil, "add_verified_bibtex must still store freshly fetched responses into cache")
+    }
+
+    @Test("M3 Stage 04: add_verified_bibtex returns exact APPENDED_VERIFIED, SKIPPED_DUPLICATE, ERR_CITE_KEY_CONFLICT, ERR_UNVERIFIED_CITATION, and path/encoding/syntax error payloads while keeping file bytes unchanged on every error")
+    func m3Stage04AddVerifiedBibTeXOutcomesErrorsAndByteInvariance() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s04-outcomes")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        let benchRecDir = repositoryRoot.appendingPathComponent("Benchmarks/citations/recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: benchRecDir)
+        let server = ScholarMCPServer(
+            defaultRegistryReplayPath: benchRecDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+
+        func extractBenchEntry(group: String, key: String) throws -> String {
+            let fileURL = repositoryRoot
+                .appendingPathComponent("Benchmarks/citations/entries", isDirectory: true)
+                .appendingPathComponent("\(group).bib")
+            let text = try String(contentsOf: fileURL, encoding: .utf8)
+            let pattern = "(@\\w+\\{\(NSRegularExpression.escapedPattern(for: key)),[\\s\\S]*?\\n\\})"
+            let rx = try NSRegularExpression(pattern: pattern)
+            let ns = text as NSString
+            let m = try #require(rx.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)))
+            return ns.substring(with: m.range(at: 1))
+        }
+
+        let fab003 = try extractBenchEntry(group: "fabricated_model", key: "fab_codex_003")
+        let mutYear3 = try extractBenchEntry(group: "mut_year3", key: "mut_year3_001")
+        let audit020 = try extractBenchEntry(group: "audit_manual", key: "audit_020")
+        let realClean001 = try extractBenchEntry(group: "real_clean", key: "real_clean_001")
+
+        let refsBib = tempDir.appendingPathComponent("refs.bib")
+        try Data("% header comment\n".utf8).write(to: refsBib)
+        let headerSnap = try fileStateSnapshot(refsBib.path)
+
+        // 1. 0 and 2 entries -> ERR_INVALID_BIBTEX, file unchanged
+        for badBib in ["", "\(audit020)\n\n\(realClean001)\n"] {
+            let res = await server.executeToolCallAsync(
+                name: "add_verified_bibtex",
+                arguments: ["bib_file": refsBib.path, "bibtex": badBib]
+            )
+            #expect(res["isError"] as? Bool == true)
+            let obj = try decodeToolTextJSON(res)
+            #expect(obj["error_code"] as? String == "ERR_INVALID_BIBTEX")
+            #expect(obj["action"] as? String == "未改动 refs.bib")
+            #expect(try fileStateSnapshot(refsBib.path) == headerSnap)
+        }
+
+        // 2. ERR_UNVERIFIED_CITATION on NOT_FOUND (fab_codex_003) and DRIFT (mut_year3_001) -> file unchanged
+        let fabRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": fab003]
+        )
+        #expect(fabRes["isError"] as? Bool == true)
+        let fabObj = try decodeToolTextJSON(fabRes)
+        #expect(fabObj["error_code"] as? String == "ERR_UNVERIFIED_CITATION")
+        #expect(fabObj["mode"] as? String == "REPLAY")
+        #expect(fabObj["cite_key"] as? String == "fab_codex_003")
+        #expect(fabObj["verdict"] as? String == "NOT_FOUND")
+        #expect((fabObj["reasons"] as? [String])?.contains("doi_not_registered") == true)
+        #expect(fabObj["fields"] is [[String: Any]])
+        #expect((fabObj["reason"] as? String)?.isEmpty == false)
+        #expect(fabObj["action"] as? String == "未改动 refs.bib")
+        #expect(try fileStateSnapshot(refsBib.path) == headerSnap)
+
+        let driftRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": mutYear3]
+        )
+        #expect(driftRes["isError"] as? Bool == true)
+        let driftObj = try decodeToolTextJSON(driftRes)
+        #expect(driftObj["error_code"] as? String == "ERR_UNVERIFIED_CITATION")
+        #expect(driftObj["cite_key"] as? String == "mut_year3_001")
+        #expect(driftObj["verdict"] as? String == "DRIFT")
+        let driftFields = try #require(driftObj["fields"] as? [[String: Any]])
+        let yearDisc = try #require(driftFields.first { ($0["field"] as? String) == "year" })
+        #expect(yearDisc["remoteValue"] as? String == "2022")
+        #expect(yearDisc["source"] as? String == "Crossref")
+        #expect((driftObj["reason"] as? String)?.contains("2022") == true)
+        #expect(driftObj["action"] as? String == "未改动 refs.bib")
+        #expect(try fileStateSnapshot(refsBib.path) == headerSnap)
+
+        // 3. APPENDED_VERIFIED on audit_020 (local journal Science -> remote Nature)
+        let addRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": audit020]
+        )
+        #expect(addRes["isError"] as? Bool == false)
+        let addObj = try decodeToolTextJSON(addRes)
+        #expect(addObj["status"] as? String == "APPENDED_VERIFIED")
+        #expect(addObj["cite_key"] as? String == "audit_020")
+        #expect(addObj["verdict"] as? String == "VERIFIED")
+        #expect(addObj["mode"] as? String == "REPLAY")
+        let writtenBib = try #require(addObj["written_bibtex"] as? String)
+        #expect(writtenBib.contains("journal = {Nature}"))
+        let changedFields = try #require(addObj["changed_fields"] as? [[String: Any]])
+        #expect(changedFields.contains {
+            ($0["field"] as? String) == "journal"
+                && ($0["given"] as? String) == "Science"
+                && ($0["written"] as? String) == "Nature"
+                && ($0["source"] as? String) == "Crossref"
+        })
+        let addSources = try #require(addObj["sources"] as? [[String: Any]])
+        #expect(!addSources.isEmpty)
+        for s in addSources {
+            #expect((s["fetchedAt"] as? String)?.hasPrefix("2026-11-16") == true)
+        }
+        #expect(addObj["record"] is [String: Any])
+
+        let afterAppendSnap = try fileStateSnapshot(refsBib.path)
+        #expect(afterAppendSnap.bytes.prefix(headerSnap.bytes.count) == headerSnap.bytes)
+
+        // 4. SKIPPED_DUPLICATE (same key, and different key on same paper) -> isError == false, file unchanged
+        let dupSameKeyRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": audit020]
+        )
+        #expect(dupSameKeyRes["isError"] as? Bool == false)
+        let dupSameKeyObj = try decodeToolTextJSON(dupSameKeyRes)
+        #expect(dupSameKeyObj["status"] as? String == "SKIPPED_DUPLICATE")
+        #expect(dupSameKeyObj["mode"] as? String == "REPLAY")
+        #expect(dupSameKeyObj["existing_key"] as? String == "audit_020")
+        #expect(dupSameKeyObj["matched_on"] as? String == "cite_key")
+        #expect(try fileStateSnapshot(refsBib.path) == afterAppendSnap)
+
+        let audit020AltKey = audit020.replacingOccurrences(of: "@article{audit_020,", with: "@article{audit_020_alt,")
+        let dupDiffKeyRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": audit020AltKey]
+        )
+        #expect(dupDiffKeyRes["isError"] as? Bool == false)
+        let dupDiffKeyObj = try decodeToolTextJSON(dupDiffKeyRes)
+        #expect(dupDiffKeyObj["status"] as? String == "SKIPPED_DUPLICATE")
+        #expect(dupDiffKeyObj["existing_key"] as? String == "audit_020")
+        #expect(dupDiffKeyObj["matched_on"] as? String == "doi")
+        #expect(try fileStateSnapshot(refsBib.path) == afterAppendSnap)
+
+        // 5. ERR_CITE_KEY_CONFLICT (case-insensitive existing key AUDIT_020 used for a different real paper)
+        let conflictBib = realClean001.replacingOccurrences(of: "@article{real_clean_001,", with: "@article{AUDIT_020,")
+        let conflictRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": refsBib.path, "bibtex": conflictBib]
+        )
+        #expect(conflictRes["isError"] as? Bool == true)
+        let conflictObj = try decodeToolTextJSON(conflictRes)
+        #expect(conflictObj["error_code"] as? String == "ERR_CITE_KEY_CONFLICT")
+        #expect(conflictObj["action"] as? String == "未改动 refs.bib")
+        #expect(try fileStateSnapshot(refsBib.path) == afterAppendSnap)
+
+        // 6. ERR_BIB_PATH, ERR_BIB_ENCODING, ERR_BIB_SYNTAX & sync executeToolCall routing
+        let txtTarget = tempDir.appendingPathComponent("not_bib.txt")
+        let pathErrRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": txtTarget.path, "bibtex": realClean001]
+        )
+        #expect(pathErrRes["isError"] as? Bool == true)
+        let pathErrObj = try decodeToolTextJSON(pathErrRes)
+        #expect(pathErrObj["error_code"] as? String == "ERR_BIB_PATH")
+        #expect(!FileManager.default.fileExists(atPath: txtTarget.path))
+
+        let latin1Bib = tempDir.appendingPathComponent("latin1.bib")
+        let latin1Data = try #require("@article{s1926,\n  author = {Schr\u{00F6}dinger, E.},\n  title = {Q},\n  year = 1926\n}\n".data(using: .isoLatin1))
+        try latin1Data.write(to: latin1Bib)
+        let latin1Before = try fileStateSnapshot(latin1Bib.path)
+        let encErrRes = await server.executeToolCallAsync(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": latin1Bib.path, "bibtex": realClean001]
+        )
+        #expect(encErrRes["isError"] as? Bool == true)
+        let encErrObj = try decodeToolTextJSON(encErrRes)
+        #expect(encErrObj["error_code"] as? String == "ERR_BIB_ENCODING")
+        #expect(encErrObj["action"] as? String == "未改动 latin1.bib")
+        #expect(try fileStateSnapshot(latin1Bib.path) == latin1Before)
+
+        let brokenBib = tempDir.appendingPathComponent("broken.bib")
+        try Data("@article{bad1,\n  author = {Doe, Jane},\n  title = {Unclosed\n".utf8).write(to: brokenBib)
+        let brokenBefore = try fileStateSnapshot(brokenBib.path)
+        let synErrRes = server.executeToolCall(
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": brokenBib.path, "bibtex": realClean001]
+        )
+        #expect(synErrRes["isError"] as? Bool == true)
+        let synErrObj = try decodeToolTextJSON(synErrRes)
+        #expect(synErrObj["error_code"] as? String == "ERR_BIB_SYNTAX")
+        #expect(synErrObj["action"] as? String == "未改动 broken.bib")
+        #expect(try fileStateSnapshot(brokenBib.path) == brokenBefore)
     }
 }
 

@@ -826,6 +826,7 @@ public struct CitationVerificationFirewall: Sendable {
     public let rateLimiter: RegistryRateLimiter?
     public let openAlexBudgetScope: OpenAlexSearchBudgetScope?
     public let cache: RegistryResponseCache?
+    public let skipCacheRead: Bool
     public let requestObserver: RegistryRequestObserver?
     public let clock: any RegistryClock
 
@@ -838,6 +839,7 @@ public struct CitationVerificationFirewall: Sendable {
         rateLimiter: RegistryRateLimiter? = nil,
         openAlexBudgetScope: OpenAlexSearchBudgetScope? = nil,
         cache: RegistryResponseCache? = nil,
+        skipCacheRead: Bool = false,
         requestObserver: RegistryRequestObserver? = nil,
         clock: any RegistryClock = SystemRegistryClock()
     ) {
@@ -849,6 +851,7 @@ public struct CitationVerificationFirewall: Sendable {
         self.rateLimiter = rateLimiter
         self.openAlexBudgetScope = openAlexBudgetScope
         self.cache = cache
+        self.skipCacheRead = skipCacheRead
         self.requestObserver = requestObserver
         self.clock = clock
     }
@@ -1362,6 +1365,7 @@ public struct CitationVerificationFirewall: Sendable {
         entries: [BibliographyEntry],
         mode: BibliographyVerificationMode,
         noCache: Bool = false,
+        skipCacheRead: Bool = false,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         clock: any RegistryClock = SystemRegistryClock(),
         sharedRateLimiter: RegistryRateLimiter? = nil,
@@ -1406,6 +1410,7 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: limiter,
                 openAlexBudgetScope: budgetScope,
                 cache: cache,
+                skipCacheRead: skipCacheRead,
                 requestObserver: requestObserver,
                 clock: clock
             )
@@ -1442,7 +1447,7 @@ public struct CitationVerificationFirewall: Sendable {
                         warningHandler: cacheWarningHandler
                     )
                 }
-                replayUsesCache = true
+                replayUsesCache = !skipCacheRead
             } else {
                 replayCache = nil
                 replayUsesCache = false
@@ -1457,6 +1462,7 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: RegistryRateLimiter(clock: replayLimiterClock),
                 openAlexBudgetScope: OpenAlexSearchBudgetScope(),
                 cache: replayCache,
+                skipCacheRead: skipCacheRead,
                 requestObserver: requestObserver,
                 clock: clock
             )
@@ -1497,6 +1503,7 @@ public struct CitationVerificationFirewall: Sendable {
                 rateLimiter: limiter,
                 openAlexBudgetScope: budgetScope,
                 cache: cache,
+                skipCacheRead: skipCacheRead,
                 requestObserver: requestObserver,
                 clock: clock
             )
@@ -1829,7 +1836,7 @@ public struct CitationVerificationFirewall: Sendable {
         }
     }
 
-    private func formatInRunRejectionReason(
+    public func formatInRunRejectionReason(
         for verdict: CitationFirewallEntryVerdict,
         language: ScholarLanguage
     ) -> String {
@@ -2019,6 +2026,7 @@ public struct CitationVerificationFirewall: Sendable {
         for url: URL,
         source: String
     ) -> RegistryHTTPResponse? {
+        if skipCacheRead { return nil }
         guard let cache else { return nil }
         let t0 = cache.clock.now()
         guard let hit = cache.lookup(for: url) else { return nil }
@@ -3258,7 +3266,7 @@ public struct CitationVerificationFirewall: Sendable {
 
         // Pre-flight cache check so cached OpenAlex fallback or cached doi.org responseCode=100
         // resolves with 0 transport requests without re-fetching uncached 404 upstream steps.
-        if cache != nil {
+        if cache != nil && !skipCacheRead {
             if let crossrefURL = RegistryURLBuilder.crossrefWorkURL(doi: normalizedDOI),
                let cachedCrossref = lookupCachedResponse(for: crossrefURL, source: "Crossref"),
                cachedCrossref.statusCode == 200,
