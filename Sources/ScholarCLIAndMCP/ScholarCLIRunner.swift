@@ -1175,7 +1175,7 @@ public struct ScholarCLIRunner: Sendable {
                 rest,
                 subcommand: subcommand,
                 valueFlags: ["--project", "--registry-replay"],
-                boolFlags: ["--demo", "--offline", "--no-cache"],
+                boolFlags: ["--demo", "--offline", "--no-cache", "--experimental-tools"],
                 maxPositionals: 0,
                 lang: lang
             )
@@ -1186,6 +1186,7 @@ public struct ScholarCLIRunner: Sendable {
             let allowDemo = parsed.bools.contains("--demo")
             let isOffline = parsed.bools.contains("--offline")
             let noCache = parsed.bools.contains("--no-cache")
+            let enableExperimentalTools = parsed.bools.contains("--experimental-tools")
             let replayPath = parsed.values["--registry-replay"]?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let replayPath, replayPath.isEmpty {
                 throw ScholarOSError.invalidCLIArguments(
@@ -1227,6 +1228,7 @@ public struct ScholarCLIRunner: Sendable {
                 defaultRegistryReplaySnapshot: validatedReplaySnapshot,
                 isOffline: isOffline,
                 noCache: noCache,
+                enableExperimentalTools: enableExperimentalTools,
                 defaultLanguage: lang,
                 registryTransport: registryTransport,
                 registryClock: registryClock,
@@ -1887,8 +1889,8 @@ public struct ScholarCLIRunner: Sendable {
               audit-editorial --project <dir.scholarproj> | --demo   Run JavaScriptCore editorial plugins
               export-bundle [<dir>] --project <dir> | --demo         Export flattened submission bundle
               export-html [<out.html>] --project <dir> | --demo      Export bilingual HTML audit dossier
-              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <dir>] [--no-cache]
-                                                                     Start JSON-RPC 2.0 MCP server on stdio
+              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <dir>] [--no-cache] [--experimental-tools]
+                                                                     Start JSON-RPC 2.0 MCP server on stdio (--experimental-tools exposes frozen domain tools)
               --demo                                                 Launch macOS GUI in explicit DEMO mode
               --export-screenshots <output-dir> [--lang zh|en]       Render 2x Retina screenshots & demo HTML dossier
             """
@@ -1925,8 +1927,8 @@ public struct ScholarCLIRunner: Sendable {
               audit-editorial --project <dir.scholarproj> | --demo   运行 JavaScriptCore 审稿插件
               export-bundle [<dir>] --project <dir> | --demo         导出展平的投稿归档目录
               export-html [<out.html>] --project <dir> | --demo      导出中英双语 HTML 审计简报
-              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <目录>] [--no-cache]
-                                                                     在标准输入输出启动 JSON-RPC 2.0 MCP 服务端
+              mcp [--project <dir.scholarproj>] [--demo] [--offline | --registry-replay <目录>] [--no-cache] [--experimental-tools]
+                                                                     在标准输入输出启动 JSON-RPC 2.0 MCP 服务端（--experimental-tools 额外启用冻结功能工具）
               --demo                                                 以显式演示模式 (DEMO) 启动 macOS 桌面窗口
               --export-screenshots <output-dir> [--lang zh|en]       渲染 2x Retina 演示截图与双语演示 HTML 简报
             """

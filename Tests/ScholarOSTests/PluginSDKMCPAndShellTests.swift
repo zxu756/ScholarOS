@@ -557,25 +557,35 @@ struct PluginSDKMCPAndShellTests {
         let initResult = try #require(initJSON["result"] as? [String: Any])
         #expect(initResult["protocolVersion"] as? String == "2024-11-05")
 
-        // 2. tools/list exposes the 8 existing academic tools plus verify_citation & add_verified_bibtex (10 tools in Stage 04)
+        // 2. tools/list exposes the 4 active M3 tools by default (and 9 when enableExperimentalTools is true)
         let listReq = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
         let listRaw = try #require(server.handleJSONRPCLine(listReq))
         let listJSON = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
         let listResult = try #require(listJSON["result"] as? [String: Any])
         let tools = try #require(listResult["tools"] as? [[String: Any]])
-        #expect(tools.count == 10)
+        #expect(tools.count == 4)
         let names = Set(tools.compactMap { $0["name"] as? String })
-        #expect(names.contains("verify_citation"))
-        #expect(names.contains("add_verified_bibtex"))
-        #expect(names.contains("scholar_cite_key"))
-        #expect(names.contains("scholar_verify_bibliography"))
-        #expect(names.contains("scholar_prisma_agreement"))
+        #expect(names == ["verify_citation", "add_verified_bibtex", "check_manuscript", "scholar_verify_bibliography"])
+        #expect(!names.contains("scholar_cite_key"))
+        #expect(!names.contains("scholar_lsp_diagnostics"))
+
+        let expServer = ScholarMCPServer(
+            isOffline: true,
+            enableExperimentalTools: true,
+            environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+        )
+        let expRaw = try #require(expServer.handleJSONRPCLine(listReq))
+        let expJSON = try #require(JSONSerialization.jsonObject(with: Data(expRaw.utf8)) as? [String: Any])
+        let expTools = try #require((expJSON["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+        #expect(expTools.count == 9)
+        let expNames = Set(expTools.compactMap { $0["name"] as? String })
+        #expect(expNames.contains("scholar_prisma_agreement"))
 
         // Notifications without id return nil per JSON-RPC 2.0
         #expect(server.handleJSONRPCLine(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#) == nil)
     }
 
-    @Test("MCP scholar_cite_key returns isError: true + ERR_UNVERIFIED_CITATION on missing project or hallucinated key and succeeds on verified record")
+    @Test("MCP add_verified_bibtex rejects offline/hallucinated entries with ERR_UNVERIFIED_CITATION and appends verified record while deleted scholar_cite_key returns -32602")
     func mcpServerCiteKeyBlocksHallucinationAndAllowsVerifiedRecord() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-cite")
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -587,7 +597,15 @@ struct PluginSDKMCPAndShellTests {
             firewallClass: .verified,
             auditNote: "Verified against registry"
         )
+        let seededEntries = try db.listBibliographyEntries()
         db.close()
+
+        let codec = BibTeXCodec()
+        let vaswaniEntry = try #require(seededEntries.first { $0.citeKey == "vaswani2017attention" })
+        let smithEntry = try #require(seededEntries.first { $0.citeKey == "smith2025hallucinated" })
+        let vaswaniBib = codec.serialize([vaswaniEntry])
+        let smithBib = codec.serialize([smithEntry])
+        let outBibURL = tempDir.appendingPathComponent("verified.bib")
 
         let isolatedHome = tempDir.appendingPathComponent("home", isDirectory: true)
         try FileManager.default.createDirectory(at: isolatedHome, withIntermediateDirectories: true)
@@ -598,9 +616,22 @@ struct PluginSDKMCPAndShellTests {
             isOffline: true,
             environment: isolatedEnv
         )
-        let okReq = #"""
-        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention","style":"ieee"}}}
-        """#
+        // Deleted `scholar_cite_key` returns JSON-RPC error -32602
+        let legacyReq = #"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"vaswani2017attention"}}}"#
+        let legacyRaw = try #require(offlineServer.handleJSONRPCLine(legacyReq))
+        let legacyEnv = try #require(JSONSerialization.jsonObject(with: Data(legacyRaw.utf8)) as? [String: Any])
+        #expect((legacyEnv["error"] as? [String: Any])?["code"] as? Int == -32602)
+
+        let okReqObj: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": [
+                "name": "add_verified_bibtex",
+                "arguments": ["bib_file": outBibURL.path, "bibtex": vaswaniBib]
+            ]
+        ]
+        let okReq = String(decoding: try JSONSerialization.data(withJSONObject: okReqObj), as: UTF8.self)
 
         // 0. Stored SQLite `.verified` status alone is NOT trusted without in-run verification (M1 item 8 / S42/S48).
         let offlineRaw = try #require(offlineServer.handleJSONRPCLine(okReq))
@@ -618,9 +649,16 @@ struct PluginSDKMCPAndShellTests {
         )
 
         // 1. Hallucinated key via full JSON-RPC tools/call envelope -> isError: true + ERR_UNVERIFIED_CITATION
-        let blockedReq = #"""
-        {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"smith2025hallucinated","style":"apa7"}}}
-        """#
+        let blockedReqObj: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/call",
+            "params": [
+                "name": "add_verified_bibtex",
+                "arguments": ["bib_file": outBibURL.path, "bibtex": smithBib]
+            ]
+        ]
+        let blockedReq = String(decoding: try JSONSerialization.data(withJSONObject: blockedReqObj), as: UTF8.self)
         let blockedRaw = try #require(await server.handleJSONRPCLineAsync(blockedReq))
         let blockedEnv = try #require(JSONSerialization.jsonObject(with: Data(blockedRaw.utf8)) as? [String: Any])
         let blockedResult = try #require(blockedEnv["result"] as? [String: Any])
@@ -630,29 +668,29 @@ struct PluginSDKMCPAndShellTests {
         #expect(blockedText.contains("ERR_UNVERIFIED_CITATION"))
         #expect(blockedText.contains("smith2025hallucinated"))
 
-        // 2. In-run verified record via JSON-RPC tools/call -> isError: false + CITATION_STATUS:VERIFIED
+        // 2. In-run verified record via JSON-RPC tools/call -> isError: false + APPENDED_VERIFIED
         let okRaw = try #require(await server.handleJSONRPCLineAsync(okReq))
         let okEnv = try #require(JSONSerialization.jsonObject(with: Data(okRaw.utf8)) as? [String: Any])
         let okResult = try #require(okEnv["result"] as? [String: Any])
         #expect(okResult["isError"] as? Bool == false)
         let okContent = try #require((okResult["content"] as? [[String: Any]])?.first)
         let okText = try #require(okContent["text"] as? String)
-        #expect(okText.contains("CITATION_STATUS:VERIFIED"))
+        #expect(okText.contains("APPENDED_VERIFIED"))
         #expect(okText.contains("Attention Is All You Need"))
     }
 
-    @Test("MCP server requires explicit project/demo target and executes provenance search, PRISMA agreement, LSP diagnostics, diff, and citation gaps")
+    @Test("MCP server requires explicit project/demo target and executes provenance search, PRISMA agreement, check_manuscript, diff, and citation gaps under --experimental-tools")
     func mcpServerExecutesRemainingDomainTools() throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-mcp-domain")
         defer { try? FileManager.default.removeItem(at: tempDir) }
         let isolatedEnv = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
 
         // Without default project or allowDemoMode, omitting projectPath fails rather than silently loading demo data
-        let strictServer = ScholarMCPServer(isOffline: true, environment: isolatedEnv)
+        let strictServer = ScholarMCPServer(isOffline: true, enableExperimentalTools: true, environment: isolatedEnv)
         let missingTarget = strictServer.executeToolCall(name: "scholar_prisma_agreement", arguments: [:])
         #expect(missingTarget["isError"] as? Bool == true)
 
-        let server = ScholarMCPServer(allowDemoMode: true, isOffline: true, environment: isolatedEnv)
+        let server = ScholarMCPServer(allowDemoMode: true, isOffline: true, enableExperimentalTools: true, environment: isolatedEnv)
 
         let prov = server.executeToolCall(name: "scholar_search_provenance", arguments: ["claim": "FlashAttention speedup", "demo": true])
         #expect(prov["isError"] as? Bool == false)
@@ -674,16 +712,23 @@ struct PluginSDKMCPAndShellTests {
         let gaps = server.executeToolCall(name: "scholar_citation_gaps", arguments: ["demo": true])
         #expect(gaps["isError"] as? Bool == false)
 
-        // LSP diagnostics marks isError: true when inline source cites smith2025hallucinated against demo bib
-        let badLSP = server.executeToolCall(
-            name: "scholar_lsp_diagnostics",
-            arguments: ["source": "\\section{Test}\nBad \\cite{smith2025hallucinated}.\n", "demo": true]
+        // check_manuscript sets isError: false when checking a valid manuscript and reports CITE404 in structure_errors
+        let texURL = tempDir.appendingPathComponent("check_domain.tex")
+        try "\\documentclass{article}\\begin{document}\\section{Test}\nBad \\cite{smith2025hallucinated}.\n\\end{document}\n"
+            .write(to: texURL, atomically: true, encoding: .utf8)
+        let checkRes = server.executeToolCall(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "offline": true]
         )
-        #expect(badLSP["isError"] as? Bool == true)
+        #expect(checkRes["isError"] as? Bool == false)
+        let checkText = ((checkRes["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(checkText.contains("CITE404"))
 
-        // Unknown tool returns isError: true
+        // Unknown / deleted tool returns isError: true on executeToolCall and -32602 on JSON-RPC
         let unknown = server.executeToolCall(name: "scholar_nonexistent_tool", arguments: [:])
         #expect(unknown["isError"] as? Bool == true)
+        let deletedLSP = server.executeToolCall(name: "scholar_lsp_diagnostics", arguments: [:])
+        #expect(deletedLSP["isError"] as? Bool == true)
     }
 
     @Test("S20/S23 regression: CLI requires explicit file or --project/--demo, accepts direct .tex/.bib files, and fails non-zero on unverified citations")
@@ -781,6 +826,7 @@ struct PluginSDKMCPAndShellTests {
         let server = ScholarMCPServer(
             defaultProjectBundlePath: bundleURL.path,
             isOffline: true,
+            enableExperimentalTools: true,
             environment: ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
         )
         let mcpResp = server.executeToolCall(
@@ -1719,9 +1765,10 @@ struct PluginSDKMCPAndShellTests {
             isOffline: true,
             environment: isolatedEnv
         )
+        let mcpTargetBib = tempDir.appendingPathComponent("tampered_target.bib")
         let mcpCall = mcp.executeToolCall(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "fake_tampered", "style": "apa7"]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": mcpTargetBib.path, "bibtex": serialized]
         )
         #expect(mcpCall["isError"] as? Bool == true)
         let mcpText = ((mcpCall["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
@@ -4096,18 +4143,34 @@ struct PluginSDKMCPAndShellTests {
         )
         #expect(diagFake.stdout.contains("ERR_UNVERIFIED_CITATION"))
 
-        // 3. MCP scholar_cite_key (mcp --registry-replay): rejects with ERR_UNVERIFIED_CITATION + NOT_FOUND + doi_not_registered
+        // 3. MCP verify_citation & add_verified_bibtex (mcp --registry-replay): NOT_FOUND, doi_not_registered, untrusted finding, file unchanged
         let replaySnapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
         let mcpReplay = ScholarMCPServer(
             defaultRegistryReplayPath: registryDir.path,
             defaultRegistryReplaySnapshot: replaySnapshot,
             environment: isolatedEnv
         )
+        let mcpTargetBib = tempDir.appendingPathComponent("row18_mcp_target.bib")
+        try Data("% row18 sentinel\n".utf8).write(to: mcpTargetBib)
+        let mcpTargetBefore = try Data(contentsOf: mcpTargetBib)
+
+        let mcpVerifyRes = await mcpReplay.executeToolCallAsync(
+            name: "verify_citation",
+            arguments: ["bibtex": tamperedFakeBib, "lang": "zh"]
+        )
+        #expect(mcpVerifyRes["isError"] as? Bool == false)
+        let mcpVerifyObj = try decodeToolTextJSON(mcpVerifyRes)
+        #expect(mcpVerifyObj["verdict"] as? String == "NOT_FOUND")
+        #expect((mcpVerifyObj["reasons"] as? [String])?.contains("doi_not_registered") == true)
+        let mcpVerifyFindings = try #require(mcpVerifyObj["findings"] as? [[String: Any]])
+        #expect(mcpVerifyFindings.contains { (($0["detail"] as? String) ?? "").contains("未采信") })
+
         let mcpFakeRes = await mcpReplay.executeToolCallAsync(
-            name: "scholar_cite_key",
+            name: "add_verified_bibtex",
             arguments: [
-                "citeKey": "fake_nonsentinel",
-                "bibtex": tamperedFakeBib
+                "bib_file": mcpTargetBib.path,
+                "bibtex": tamperedFakeBib,
+                "lang": "en"
             ]
         )
         #expect(mcpFakeRes["isError"] as? Bool == true)
@@ -4115,6 +4178,10 @@ struct PluginSDKMCPAndShellTests {
         #expect(mcpFakeText.contains("ERR_UNVERIFIED_CITATION"))
         #expect(mcpFakeText.contains("NOT_FOUND"))
         #expect(mcpFakeText.contains("doi_not_registered"))
+        let mcpFakeObj = try decodeToolTextJSON(mcpFakeRes)
+        let mcpFakeFindings = try #require(mcpFakeObj["findings"] as? [[String: Any]])
+        #expect(mcpFakeFindings.contains { (($0["detail"] as? String) ?? "").lowercased().contains("not trusted") })
+        #expect(try Data(contentsOf: mcpTargetBib) == mcpTargetBefore)
 
         // 4. CLI cite (--registry-replay): rejects with ERR_UNVERIFIED_CITATION + NOT_FOUND + doi_not_registered
         let citeFakeZH = await runner.runWithExitStatus(
@@ -4126,7 +4193,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(citeFakeZH.stderr.contains("NOT_FOUND"))
         #expect(citeFakeZH.stderr.contains("doi_not_registered"))
 
-        // 5. Converse: real_lecun + x-firewall-class = {NOT_FOUND} -> replay yields VERIFIED, cite & scholar_cite_key succeed, findings still note "未采信" + "NOT_FOUND"
+        // 5. Converse: real_lecun + x-firewall-class = {NOT_FOUND} -> replay yields VERIFIED, cite & add_verified_bibtex succeed, findings still note "未采信" + "NOT_FOUND"
         #expect(rawLecunLine.hasSuffix("}"))
         let tamperedLecunBib = String(rawLecunLine.dropLast()) + ", x-firewall-class = {NOT_FOUND}}\n"
         let lecunBibURL = tempDir.appendingPathComponent("row18_lecun.bib")
@@ -4153,15 +4220,15 @@ struct PluginSDKMCPAndShellTests {
         #expect(citeLecun.stdout.contains("Deep learning"))
 
         let mcpLecunSync = mcpReplay.executeToolCall(
-            name: "scholar_cite_key",
+            name: "add_verified_bibtex",
             arguments: [
-                "citeKey": "real_lecun",
+                "bib_file": mcpTargetBib.path,
                 "bibtex": tamperedLecunBib
             ]
         )
         #expect(mcpLecunSync["isError"] as? Bool == false)
         let mcpLecunText = ((mcpLecunSync["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
-        #expect(mcpLecunText.contains("CITATION_STATUS:VERIFIED"))
+        #expect(mcpLecunText.contains("APPENDED_VERIFIED"))
     }
 
     @Test("M1 Stage 09 (S42 items 4-6): CLI cite and MCP scholar_cite_key enforce --offline (0 transport calls, 'offline' not-checked message), default online + cache/--no-cache, distinct UNVERIFIED vs DRIFT/RETRACTED messages, --demo block, and --help flags")
@@ -4224,6 +4291,10 @@ struct PluginSDKMCPAndShellTests {
             }
         }
 
+        let singleLecunBib = try #require(
+            rawRecheckBib.split(separator: "\n").map(String.init).first { $0.contains("{real_lecun,") }
+        )
+        let stage09OutBib = tempDir.appendingPathComponent("stage09_out.bib")
         let mcpOfflineProcess = ScholarMCPServer(
             isOffline: true,
             registryTransport: spyOnlineTransport,
@@ -4231,15 +4302,14 @@ struct PluginSDKMCPAndShellTests {
             environment: isolatedEnv
         )
         let mcpOffRes = mcpOfflineProcess.executeToolCall(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib, "lang": "zh"]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": stage09OutBib.path, "bibtex": singleLecunBib, "lang": "zh"]
         )
         #expect(mcpOffRes["isError"] as? Bool == true)
         let mcpOffText = ((mcpOffRes["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
         #expect(mcpOffText.contains("ERR_UNVERIFIED_CITATION"))
         #expect(mcpOffText.contains("UNVERIFIED"))
         #expect(mcpOffText.contains("offline"))
-        #expect(mcpOffText.contains("并非"))
 
         // Per-call `offline: true` on an online MCP server also sends 0 requests and rejects with `offline`
         let mcpOnlineProcess = ScholarMCPServer(
@@ -4248,13 +4318,13 @@ struct PluginSDKMCPAndShellTests {
             environment: isolatedEnv
         )
         let mcpPerCallOff = await mcpOnlineProcess.executeToolCallAsync(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib, "offline": true]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": stage09OutBib.path, "bibtex": singleLecunBib, "offline": true]
         )
         #expect(mcpPerCallOff["isError"] as? Bool == true)
         let mcpPerCallOffText = ((mcpPerCallOff["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
         #expect(mcpPerCallOffText.contains("offline"))
-        #expect(await spy.calls == 0, "Offline cite / scholar_cite_key must send 0 transport requests")
+        #expect(await spy.calls == 0, "Offline cite / add_verified_bibtex must send 0 transport requests")
 
         // 2. Default online + cache: CLI `cite` with NO flags queries injected online transport, succeeds on real_lecun, caches response, and `--no-cache` bypasses cache
         let onlineCite1 = await runner.runWithExitStatus(
@@ -4279,10 +4349,10 @@ struct PluginSDKMCPAndShellTests {
         #expect(noCacheCite.exitCode == 0)
         #expect(await spy.calls == callsAfterFirstOnline + 2)
 
-        // Default online MCP `scholar_cite_key` (via sync executeToolCall bridge!) also succeeds
+        // Default online MCP `verify_citation` (via sync executeToolCall bridge!) also succeeds
         let mcpDefaultOnline = mcpOnlineProcess.executeToolCall(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib]
+            name: "verify_citation",
+            arguments: ["bibtex": singleLecunBib]
         )
         #expect(mcpDefaultOnline["isError"] as? Bool == false)
 
@@ -6636,17 +6706,18 @@ struct PluginSDKMCPAndShellTests {
         #expect(repZHAfter.contains { $0.contains("[ERROR]") && $0.contains("wrongyear5") && $0.contains("DRIFT") })
     }
 
-    @Test("M2 Stage 07 item 5 (item 7, Settled #4, Row 15): MCP scholar_lsp_diagnostics supports path parameter returning byte-for-byte identical JSON to CLI --json while preserving inline source")
+    @Test("M2 Stage 07 item 5 (item 7, Settled #4, Row 15, updated in M3 Stage 05): MCP check_manuscript(detail: full) returns byte-for-byte identical JSON to CLI --json and rejects legacy inline source")
     func m2Stage07Item5MCPLspDiagnosticsPathByteIdenticalToCLIAndInlineSourcePreserved() async throws {
         let tempDir = try makeTempDirectory(prefix: "scholaros-m2-stage07-item5")
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        // 1. Tool schema advertises `path`
+        // 1. Tool schema advertises `check_manuscript` with `path` and removes `scholar_lsp_diagnostics`
         let diagToolDef = try #require(
-            ScholarMCPServer.toolDefinitions.first { ($0["name"] as? String) == "scholar_lsp_diagnostics" }
+            ScholarMCPServer.toolDefinitions.first { ($0["name"] as? String) == "check_manuscript" }
         )
         let schemaProps = try #require((diagToolDef["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])
-        #expect(schemaProps["path"] != nil, "scholar_lsp_diagnostics inputSchema.properties must advertise 'path'")
+        #expect(schemaProps["path"] != nil, "check_manuscript inputSchema.properties must advertise 'path'")
+        #expect(ScholarMCPServer.toolDefinitions.first { ($0["name"] as? String) == "scholar_lsp_diagnostics" } == nil)
 
         let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
         let runner = ScholarCLIRunner(registryClock: .immediate, environment: env)
@@ -6654,9 +6725,9 @@ struct PluginSDKMCPAndShellTests {
         let multiMain = repositoryRoot.appendingPathComponent("Tests/Fixtures/manuscripts/include-multi/main.tex").path
         let thebibMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2506.06594v1/src/From_Adaptive_Control_Evolving_Control.tex").path
         let bblMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2405.13682v5/src/main.tex").path
-        let dupLabelMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2503.18124v1/src/main.tex").path
+        let dupLabelMain = repositoryRoot.appendingPathComponent("Benchmarks/manuscripts/2503.18124v1//src/main.tex".replacingOccurrences(of: "//", with: "/")).path
 
-        // 2. Offline MCP `scholar_lsp_diagnostics` with `path` matches CLI `diagnostics <path> --offline --json` byte-for-byte
+        // 2. Offline MCP `check_manuscript` with `detail: "full"` matches CLI `diagnostics <path> --offline --json` byte-for-byte
         for targetPath in [multiMain, thebibMain, bblMain, dupLabelMain] {
             let cliRes = await runner.runWithExitStatus(
                 arguments: ["diagnostics", targetPath, "--offline", "--json"]
@@ -6666,8 +6737,8 @@ struct PluginSDKMCPAndShellTests {
                 "id": 1,
                 "method": "tools/call",
                 "params": [
-                    "name": "scholar_lsp_diagnostics",
-                    "arguments": ["path": targetPath]
+                    "name": "check_manuscript",
+                    "arguments": ["path": targetPath, "detail": "full"]
                 ]
             ] as [String: Any])
             let rpcReqLine = String(decoding: rpcReqData, as: UTF8.self)
@@ -6687,11 +6758,11 @@ struct PluginSDKMCPAndShellTests {
             let mcpText = try #require(((resultObj["content"] as? [[String: Any]])?.first)?["text"] as? String)
             #expect(
                 Data(mcpText.utf8) == Data(cliRes.stdout.utf8),
-                "MCP scholar_lsp_diagnostics(path:) must match CLI --json byte-for-byte for \(targetPath)"
+                "MCP check_manuscript(path:, detail: full) must match CLI --json byte-for-byte for \(targetPath)"
             )
         }
 
-        // 3. Replay mode with explicit bibPath also matches CLI --json byte-for-byte
+        // 3. Replay mode with explicit bib_file also matches CLI --json byte-for-byte
         let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
         let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
         let replayTex = tempDir.appendingPathComponent("replay_mcp.tex")
@@ -6709,30 +6780,28 @@ struct PluginSDKMCPAndShellTests {
             environment: env
         )
         let mcpReplayTool = await mcpReplayServer.executeToolCallAsync(
-            name: "scholar_lsp_diagnostics",
-            arguments: ["path": replayTex.path, "bibPath": recheckBibURL.path]
+            name: "check_manuscript",
+            arguments: ["path": replayTex.path, "bib_file": recheckBibURL.path, "detail": "full"]
         )
         #expect(mcpReplayTool["isError"] as? Bool == false)
         let mcpReplayText = try #require(((mcpReplayTool["content"] as? [[String: Any]])?.first)?["text"] as? String)
         #expect(Data(mcpReplayText.utf8) == Data(cliReplay.stdout.utf8))
 
-        // 4. Missing path returns isError=true; legacy inline `source` usage still works
+        // 4. Missing path returns isError=true; removed inline `source` returns ERR_INVALID_ARGUMENT
         let mcpOfflineServer = ScholarMCPServer(isOffline: true, registryClock: .immediate, environment: env)
         let missingRes = await mcpOfflineServer.executeToolCallAsync(
-            name: "scholar_lsp_diagnostics",
+            name: "check_manuscript",
             arguments: ["path": tempDir.appendingPathComponent("does_not_exist.tex").path]
         )
         #expect(missingRes["isError"] as? Bool == true)
 
         let inlineRes = await mcpOfflineServer.executeToolCallAsync(
-            name: "scholar_lsp_diagnostics",
-            arguments: ["source": "\\section{Test}\\label{s}Ref~\\ref{s}.\n"]
+            name: "check_manuscript",
+            arguments: ["path": replayTex.path, "source": "\\section{Test}\\label{s}Ref~\\ref{s}.\n"]
         )
-        #expect(inlineRes["isError"] as? Bool == false)
-        let inlineText = try #require(((inlineRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
-        let rawInlineArr = try JSONSerialization.jsonObject(with: Data(inlineText.utf8))
-        let inlineArr = try #require(rawInlineArr as? [[String: Any]])
-        #expect(inlineArr.isEmpty)
+        #expect(inlineRes["isError"] as? Bool == true)
+        let inlineErrObj = try decodeToolTextJSON(inlineRes)
+        #expect(inlineErrObj["error_code"] as? String == "ERR_INVALID_ARGUMENT")
     }
 
     @Test("M2 Stage 07 item 5 & 6 (Row 14 & Row 15): x-firewall-class={VERIFIED} fabricated DOI under diagnostics --registry-replay emits 1 ERROR ERR_UNVERIFIED_CITATION, records untrusted finding (未采信 / not trusted), exits 1, and MCP scholar_lsp_diagnostics(path:) matches CLI --json byte-for-byte under --lang zh & en")
@@ -6801,10 +6870,11 @@ struct PluginSDKMCPAndShellTests {
             "id": 1,
             "method": "tools/call",
             "params": [
-                "name": "scholar_lsp_diagnostics",
+                "name": "check_manuscript",
                 "arguments": [
                     "path": draftTex.path,
-                    "bibPath": tamperedBib.path
+                    "bib_file": tamperedBib.path,
+                    "detail": "full"
                 ]
             ]
         ] as [String: Any])
@@ -6955,16 +7025,17 @@ struct PluginSDKMCPAndShellTests {
             environment: env
         )
 
-        // Passing registryReplayPath to scholar_cite_key, scholar_verify_bibliography, scholar_lsp_diagnostics
+        // Passing registryReplayPath to verify_citation, add_verified_bibtex, check_manuscript, scholar_verify_bibliography
         // must fail immediately with structured ERR_INVALID_ARGUMENT and 0 transport requests.
         let texFile = tempDir.appendingPathComponent("draft.tex")
         try "\\documentclass{article}\\begin{document}Cite \\cite{invented_2026}.\\end{document}\n"
             .write(to: texFile, atomically: true, encoding: .utf8)
 
         let replayInjectionCalls: [(String, [String: Any])] = [
-            ("scholar_cite_key", ["citeKey": "invented_2026", "bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
+            ("verify_citation", ["bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
+            ("add_verified_bibtex", ["bib_file": sentinelBibFile.path, "bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
             ("scholar_verify_bibliography", ["bibtex": fakeBib, "registryReplayPath": fakeReplayDir.path]),
-            ("scholar_lsp_diagnostics", ["path": texFile.path, "registryReplayPath": fakeReplayDir.path])
+            ("check_manuscript", ["path": texFile.path, "registryReplayPath": fakeReplayDir.path])
         ]
 
         for (toolName, args) in replayInjectionCalls {
@@ -6986,12 +7057,18 @@ struct PluginSDKMCPAndShellTests {
         #expect(await spy.count == 0, "ERR_INVALID_ARGUMENT must reject before any registry lookup")
 
         // 3. Passing any arbitrary unrecognized argument name also returns structured ERR_INVALID_ARGUMENT with 0 lookups
-        for (toolName, args) in [
-            ("scholar_cite_key", ["citeKey": "invented_2026", "bibtex": fakeBib, "bogusOption": true] as [String: Any]),
-            ("scholar_verify_bibliography", ["bibtex": fakeBib, "unexpectedField": "abc"] as [String: Any]),
-            ("scholar_track_changes_diff", ["original": "a", "revised": "b", "extraParam": 1] as [String: Any])
+        let expOnlineServer = ScholarMCPServer(
+            enableExperimentalTools: true,
+            registryTransport: failTransport,
+            registryClock: .immediate,
+            environment: env
+        )
+        for (srv, toolName, args) in [
+            (onlineServer, "verify_citation", ["bibtex": fakeBib, "bogusOption": true] as [String: Any]),
+            (onlineServer, "scholar_verify_bibliography", ["bibtex": fakeBib, "unexpectedField": "abc"] as [String: Any]),
+            (expOnlineServer, "scholar_track_changes_diff", ["original": "a", "revised": "b", "extraParam": 1] as [String: Any])
         ] {
-            let res = await onlineServer.executeToolCallAsync(name: toolName, arguments: args)
+            let res = await srv.executeToolCallAsync(name: toolName, arguments: args)
             #expect(res["isError"] as? Bool == true, "Expected isError=true for unknown arg on \(toolName)")
             let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
             let errObj = try #require(try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
@@ -7112,45 +7189,58 @@ struct PluginSDKMCPAndShellTests {
         let benchAudited = try #require((benchVerdicts.first)?["auditedEntry"] as? [String: Any])
         #expect(benchAudited["firewallVerifiedAtUTC"] as? String == "2026-11-16")
 
-        // 4. `scholar_cite_key` on replay server: returns JSON with top-level mode == "REPLAY" (both success and rejection)
+        // 4. `add_verified_bibtex` and `verify_citation` on replay server: return JSON with top-level mode == "REPLAY" (both success and rejection)
+        let s75Lines = rawRecheckBib.split(separator: "\n").map(String.init)
+        let s75LecunBib = try #require(s75Lines.first { $0.contains("{real_lecun,") })
+        let s75FakeBib = try #require(s75Lines.first { $0.contains("{fake_nonsentinel,") })
+        let s75TargetBib = tempDir.appendingPathComponent("s75_out.bib")
+
         let citeOK = await replayServer.executeToolCallAsync(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "real_lecun", "bibtex": rawRecheckBib]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": s75TargetBib.path, "bibtex": s75LecunBib]
         )
         #expect(citeOK["isError"] as? Bool == false)
         let citeOKText = try #require(((citeOK["content"] as? [[String: Any]])?.first)?["text"] as? String)
         let citeOKObj = try #require(
             try? JSONSerialization.jsonObject(with: Data(citeOKText.utf8)) as? [String: Any],
-            "Expected JSON object with mode='REPLAY' from scholar_cite_key, got: \(citeOKText)"
+            "Expected JSON object with mode='REPLAY' from add_verified_bibtex, got: \(citeOKText)"
         )
         #expect(citeOKObj["mode"] as? String == "REPLAY")
-        #expect(citeOKText.contains("CITATION_STATUS:VERIFIED"))
+        #expect(citeOKObj["status"] as? String == "APPENDED_VERIFIED")
 
         let citeFake = await replayServer.executeToolCallAsync(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "fake_nonsentinel", "bibtex": rawRecheckBib]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": s75TargetBib.path, "bibtex": s75FakeBib]
         )
         #expect(citeFake["isError"] as? Bool == true)
         let citeFakeText = try #require(((citeFake["content"] as? [[String: Any]])?.first)?["text"] as? String)
         let citeFakeObj = try #require(
             try? JSONSerialization.jsonObject(with: Data(citeFakeText.utf8)) as? [String: Any],
-            "Expected structured JSON error with mode='REPLAY' from scholar_cite_key, got: \(citeFakeText)"
+            "Expected structured JSON error with mode='REPLAY' from add_verified_bibtex, got: \(citeFakeText)"
         )
         #expect(citeFakeObj["mode"] as? String == "REPLAY")
         #expect(citeFakeObj["verdict"] as? String == "NOT_FOUND")
 
-        // 5. All other tools on replay server also carry top-level mode == "REPLAY"
-        let otherToolCalls: [(String, [String: Any])] = [
-            ("scholar_lsp_diagnostics", ["path": texFile.path, "bibPath": recheckBibURL.path]),
-            ("scholar_lsp_diagnostics", ["source": "\\section{A}Cite \\cite{real_lecun}.\n", "bibtex": rawRecheckBib]),
-            ("scholar_search_provenance", ["claim": "attention"]),
-            ("scholar_prisma_agreement", [:]),
-            ("scholar_editorial_audit", ["source": "\\section{Test}\nPlain text.\n"]),
-            ("scholar_track_changes_diff", ["original": "Old text.", "revised": "New text."]),
-            ("scholar_citation_gaps", [:])
+        // 5. `check_manuscript` (default & full) and all 5 experimental tools on replay server also carry top-level mode == "REPLAY"
+        let expReplayServer = ScholarMCPServer(
+            defaultProjectBundlePath: bundleURL.path,
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            enableExperimentalTools: true,
+            registryClock: futureClock,
+            environment: env
+        )
+        let otherToolCalls: [(ScholarMCPServer, String, [String: Any])] = [
+            (replayServer, "check_manuscript", ["path": texFile.path, "bib_file": recheckBibURL.path]),
+            (replayServer, "check_manuscript", ["path": texFile.path, "bib_file": recheckBibURL.path, "detail": "full"]),
+            (expReplayServer, "scholar_search_provenance", ["claim": "attention"]),
+            (expReplayServer, "scholar_prisma_agreement", [:]),
+            (expReplayServer, "scholar_editorial_audit", ["source": "\\section{Test}\nPlain text.\n"]),
+            (expReplayServer, "scholar_track_changes_diff", ["original": "Old text.", "revised": "New text."]),
+            (expReplayServer, "scholar_citation_gaps", [:])
         ]
-        for (toolName, args) in otherToolCalls {
-            let res = await replayServer.executeToolCallAsync(name: toolName, arguments: args)
+        for (srv, toolName, args) in otherToolCalls {
+            let res = await srv.executeToolCallAsync(name: toolName, arguments: args)
             let text = try #require(((res["content"] as? [[String: Any]])?.first)?["text"] as? String)
             let obj = try #require(
                 try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
@@ -7258,7 +7348,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(cliNotFound.keys.contains("record"))
         #expect(cliNotFound["record"] is NSNull)
 
-        // 2. MCP `scholar_verify_bibliography` and `scholar_cite_key`
+        // 2. MCP `scholar_verify_bibliography`, `verify_citation`, and `add_verified_bibtex`
         let mcpServer = ScholarMCPServer(
             defaultRegistryReplayPath: registryDir.path,
             defaultRegistryReplaySnapshot: snapshot,
@@ -7276,28 +7366,33 @@ struct PluginSDKMCPAndShellTests {
         let mcpVerifiedRec = try #require(mcpVerified["record"] as? [String: Any])
         #expect(mcpVerifiedRec["publisher"] as? String == "Springer Science and Business Media LLC")
 
+        let s77Lines = bibText.split(separator: "\n").map(String.init)
+        let s77LecunLine = try #require(s77Lines.first { $0.contains("{real_lecun,") })
+        let s77DriftLine = try #require(s77Lines.first { $0.contains("{wrongyear5,") })
+        let s77TargetBib = tempDir.appendingPathComponent("s77_out.bib")
+
         let mcpCiteOK = await mcpServer.executeToolCallAsync(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "real_lecun", "bibtex": bibText]
+            name: "verify_citation",
+            arguments: ["bibtex": s77LecunLine]
         )
         let mcpCiteOKText = try #require(((mcpCiteOK["content"] as? [[String: Any]])?.first)?["text"] as? String)
         let mcpCiteOKObj = try #require(JSONSerialization.jsonObject(with: Data(mcpCiteOKText.utf8)) as? [String: Any])
         let mcpCiteRec = try #require(
             mcpCiteOKObj["record"] as? [String: Any],
-            "Expected record in MCP scholar_cite_key JSON output, got \(mcpCiteOKObj)"
+            "Expected record in MCP verify_citation JSON output, got \(mcpCiteOKObj)"
         )
         #expect(mcpCiteRec["doi"] as? String == "10.1038/nature14539")
 
         let mcpCiteDrift = await mcpServer.executeToolCallAsync(
-            name: "scholar_cite_key",
-            arguments: ["citeKey": "wrongyear5", "bibtex": bibText]
+            name: "add_verified_bibtex",
+            arguments: ["bib_file": s77TargetBib.path, "bibtex": s77DriftLine]
         )
         #expect(mcpCiteDrift["isError"] as? Bool == true)
         let mcpCiteDriftText = try #require(((mcpCiteDrift["content"] as? [[String: Any]])?.first)?["text"] as? String)
         let mcpCiteDriftObj = try #require(JSONSerialization.jsonObject(with: Data(mcpCiteDriftText.utf8)) as? [String: Any])
         let mcpCiteDriftRec = try #require(
             mcpCiteDriftObj["record"] as? [String: Any],
-            "Expected record in MCP scholar_cite_key DRIFT error JSON output, got \(mcpCiteDriftObj)"
+            "Expected record in MCP add_verified_bibtex DRIFT error JSON output, got \(mcpCiteDriftObj)"
         )
         #expect(mcpCiteDriftRec["source"] as? String == "Crossref")
     }
@@ -7827,6 +7922,443 @@ struct PluginSDKMCPAndShellTests {
         #expect(synErrObj["error_code"] as? String == "ERR_BIB_SYNTAX")
         #expect(synErrObj["action"] as? String == "未改动 broken.bib")
         #expect(try fileStateSnapshot(brokenBib.path) == brokenBefore)
+    }
+
+    // MARK: - M3 Stage 05: `check_manuscript`, Legacy Tool Removal/Trimming, and `--experimental-tools`
+
+    @Test("M3 Stage 05: default tools/list exposes only the 4 active tools, deleted and frozen tools return JSON-RPC -32602, and --experimental-tools re-enables the 5 frozen tools")
+    func m3Stage05ToolsListDeletedTools32602AndExperimentalToolsFlag() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s05-tools")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+
+        let defaultServer = ScholarMCPServer(isOffline: true, environment: env)
+
+        // 1. Default tools/list exposes exactly the 4 non-frozen tools
+        let listRaw = try #require(await defaultServer.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
+        let listEnv = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
+        let tools = try #require((listEnv["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+        let defaultNames = Set(tools.compactMap { $0["name"] as? String })
+        let expectedDefault: Set<String> = [
+            "verify_citation",
+            "add_verified_bibtex",
+            "check_manuscript",
+            "scholar_verify_bibliography"
+        ]
+        #expect(tools.count == 4, "Expected 4 default MCP tools, got \(tools.count): \(defaultNames.sorted())")
+        #expect(defaultNames == expectedDefault)
+
+        // 2. Deleted tools, unknown tool, and all 5 frozen tools return JSON-RPC error -32602 by default (sync & async)
+        let disabledOnDefault = [
+            "scholar_cite_key",
+            "scholar_lsp_diagnostics",
+            "scholar_nonexistent_tool",
+            "scholar_search_provenance",
+            "scholar_prisma_agreement",
+            "scholar_editorial_audit",
+            "scholar_track_changes_diff",
+            "scholar_citation_gaps"
+        ]
+        for (idx, tname) in disabledOnDefault.enumerated() {
+            let reqObj: [String: Any] = [
+                "jsonrpc": "2.0",
+                "id": 100 + idx,
+                "method": "tools/call",
+                "params": ["name": tname, "arguments": [String: Any]()]
+            ]
+            let reqLine = String(decoding: try JSONSerialization.data(withJSONObject: reqObj), as: UTF8.self)
+
+            let syncReply = try #require(defaultServer.handleJSONRPCLine(reqLine))
+            let syncJSON = try #require(JSONSerialization.jsonObject(with: Data(syncReply.utf8)) as? [String: Any])
+            let syncErr = syncJSON["error"] as? [String: Any]
+            #expect(syncErr?["code"] as? Int == -32602, "Expected sync -32602 for \(tname) on default server, got: \(syncReply)")
+
+            let asyncReply = try #require(await defaultServer.handleJSONRPCLineAsync(reqLine))
+            let asyncJSON = try #require(JSONSerialization.jsonObject(with: Data(asyncReply.utf8)) as? [String: Any])
+            let asyncErr = asyncJSON["error"] as? [String: Any]
+            #expect(asyncErr?["code"] as? Int == -32602, "Expected async -32602 for \(tname) on default server, got: \(asyncReply)")
+        }
+
+        // 3. CLI `--help` documents `--experimental-tools` in EN & ZH, and `scholaros mcp --experimental-tools` exposes & runs the 5 frozen tools while still rejecting deleted tools with -32602
+        let helpRunner = ScholarCLIRunner(environment: env)
+        let helpEN = try await helpRunner.execute(arguments: ["--help", "--lang", "en"])
+        let helpZH = try await helpRunner.execute(arguments: ["--help", "--lang", "zh"])
+        #expect(helpEN.contains("--experimental-tools"), "EN --help must document --experimental-tools")
+        #expect(helpZH.contains("--experimental-tools"), "ZH --help must document --experimental-tools")
+
+        let expLines: [String] = [
+            #"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#,
+            #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scholar_track_changes_diff","arguments":{"original":"Alpha beta.","revised":"Alpha gamma."}}}"#,
+            #"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"scholar_prisma_agreement","arguments":{"demo":true}}}"#,
+            #"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"scholar_cite_key","arguments":{"citeKey":"x"}}}"#,
+            #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"scholar_lsp_diagnostics","arguments":{"path":"a.tex"}}}"#
+        ]
+        let expRunner = ScholarCLIRunner(environment: env, mcpInputLines: expLines)
+        let expOut = await expRunner.runWithExitStatus(arguments: ["mcp", "--offline", "--demo", "--experimental-tools"])
+        #expect(expOut.exitCode == 0, "scholaros mcp --experimental-tools failed: \(expOut.stderr)")
+        let expReplies = expOut.stdout.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        #expect(expReplies.count == 5)
+        if expReplies.count == 5 {
+            let r1 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[0].utf8)) as? [String: Any])
+            let expTools = try #require((r1["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+            let expNames = Set(expTools.compactMap { $0["name"] as? String })
+            let expectedExp: Set<String> = expectedDefault.union([
+                "scholar_search_provenance",
+                "scholar_prisma_agreement",
+                "scholar_editorial_audit",
+                "scholar_track_changes_diff",
+                "scholar_citation_gaps"
+            ])
+            #expect(expTools.count == 9)
+            #expect(expNames == expectedExp)
+            #expect(!expNames.contains("scholar_cite_key"))
+            #expect(!expNames.contains("scholar_lsp_diagnostics"))
+
+            let r2 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[1].utf8)) as? [String: Any])
+            #expect((r2["result"] as? [String: Any])?["isError"] as? Bool == false)
+
+            let r3 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[2].utf8)) as? [String: Any])
+            #expect((r3["result"] as? [String: Any])?["isError"] as? Bool == false)
+
+            let r4 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[3].utf8)) as? [String: Any])
+            #expect((r4["error"] as? [String: Any])?["code"] as? Int == -32602)
+
+            let r5 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[4].utf8)) as? [String: Any])
+            #expect((r5["error"] as? [String: Any])?["code"] as? Int == -32602)
+        }
+    }
+
+    @Test("M3 Stage 05: scholar_verify_bibliography accepts only bibtex, offline, lang, rejects removed parameters with ERR_INVALID_ARGUMENT, and shares firewall & cache with verify_citation")
+    func m3Stage05ScholarVerifyBibliographyBatchSchemaRemovedArgsAndSharedFirewallCache() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s05-svb")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let cacheDir = tempDir.appendingPathComponent("cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        let env = [
+            "HOME": tempDir.path,
+            "CFFIXED_USER_HOME": tempDir.path,
+            "SCHOLAR_CACHE_DIR": cacheDir.path
+        ]
+
+        let fixedDate = Date(timeIntervalSince1970: 1_794_873_600) // 2026-11-17T00:00:00Z
+        let fastClock = ClosureRegistryClock(now: { 0 }, currentDate: { fixedDate }, sleep: { _ in })
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: fastClock,
+            environment: env
+        )
+
+        // 1. Schema check: only bibtex, offline, lang; required == ["bibtex"]; description mentions batch / read-only
+        let listRaw = try #require(await replayServer.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
+        let listObj = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
+        let tools = try #require((listObj["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+        let svbDef = try #require(tools.first { ($0["name"] as? String) == "scholar_verify_bibliography" })
+        let svbDesc = (svbDef["description"] as? String) ?? ""
+        #expect(svbDesc.lowercased().contains("batch"), "scholar_verify_bibliography description must mention batch verification: \(svbDesc)")
+        #expect(!svbDesc.contains(".scholarproj"), "scholar_verify_bibliography description must not advertise .scholarproj")
+        let svbSchema = try #require(svbDef["inputSchema"] as? [String: Any])
+        let svbProps = try #require(svbSchema["properties"] as? [String: Any])
+        #expect(svbProps.keys.sorted() == ["bibtex", "lang", "offline"])
+        #expect(svbSchema["required"] as? [String] == ["bibtex"])
+
+        let recheckURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+        let rawRecheck = try String(contentsOf: recheckURL, encoding: .utf8)
+        let lecunLine = try #require(rawRecheck.components(separatedBy: .newlines).first { $0.contains("{real_lecun,") })
+
+        // 2. Removed parameters (projectPath, demo, registryReplayPath), missing bibtex, and wrong types -> ERR_INVALID_ARGUMENT
+        let rejectedArgs: [[String: Any]] = [
+            ["bibtex": lecunLine, "projectPath": tempDir.path],
+            ["bibtex": lecunLine, "demo": true],
+            ["bibtex": lecunLine, "registryReplayPath": registryDir.path],
+            ["bibtex": lecunLine, "unknown_param": "x"],
+            [:],
+            ["bibtex": 999],
+            ["bibtex": lecunLine, "offline": "false"]
+        ]
+        for badArgs in rejectedArgs {
+            let res = await replayServer.executeToolCallAsync(name: "scholar_verify_bibliography", arguments: badArgs)
+            #expect(res["isError"] as? Bool == true, "Expected isError=true on scholar_verify_bibliography with \(badArgs)")
+            let obj = try decodeToolTextJSON(res)
+            #expect(obj["error_code"] as? String == "ERR_INVALID_ARGUMENT", "Expected ERR_INVALID_ARGUMENT for \(badArgs), got \(obj)")
+            #expect(obj["mode"] as? String == "REPLAY")
+        }
+
+        // 3. Replay batch parity with verify_citation + shared SQLite cache read on disconnected server
+        let batchRes = await replayServer.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": rawRecheck]
+        )
+        #expect(batchRes["isError"] as? Bool == false)
+        let batchObj = try decodeToolTextJSON(batchRes)
+        #expect(batchObj["mode"] as? String == "REPLAY")
+        let batchVerdicts = try #require(batchObj["verdicts"] as? [[String: Any]])
+        #expect(batchVerdicts.contains { ($0["citeKey"] as? String) == "real_lecun" && ($0["firewallClass"] as? String) == "VERIFIED" })
+
+        let disconnectedTransport = ClosureRegistrySession { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        let cachedOnlineServer = ScholarMCPServer(
+            registryTransport: disconnectedTransport,
+            registryClock: fastClock,
+            environment: env
+        )
+        let cachedSVB = await cachedOnlineServer.executeToolCallAsync(
+            name: "scholar_verify_bibliography",
+            arguments: ["bibtex": lecunLine]
+        )
+        #expect(cachedSVB["isError"] as? Bool == false)
+        let cachedSVBObj = try decodeToolTextJSON(cachedSVB)
+        let cachedSVBFirst = try #require((cachedSVBObj["verdicts"] as? [[String: Any]])?.first)
+        #expect(cachedSVBFirst["firewallClass"] as? String == "VERIFIED", "scholar_verify_bibliography must read warm cache like verify_citation")
+    }
+
+    @Test("M3 Stage 05: check_manuscript returns compact summary by default and byte-identical CLI --json when detail is full across replay, offline, no_verify, and warm cache")
+    func m3Stage05CheckManuscriptSummaryAndFullModesReplayOfflineNoVerifyAndCache() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s05-cm")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let cacheDir = tempDir.appendingPathComponent("cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        let baseEnv = [
+            "HOME": tempDir.path,
+            "CFFIXED_USER_HOME": tempDir.path
+        ]
+        let cachedEnv = [
+            "HOME": tempDir.path,
+            "CFFIXED_USER_HOME": tempDir.path,
+            "SCHOLAR_CACHE_DIR": cacheDir.path
+        ]
+
+        let fixedDate = Date(timeIntervalSince1970: 1_794_873_600) // 2026-11-17T00:00:00Z
+        let fastClock = ClosureRegistryClock(now: { 0 }, currentDate: { fixedDate }, sleep: { _ in })
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let recheckBibURL = repositoryRoot.appendingPathComponent("Fixtures/citations-m0-recheck.bib")
+
+        // Schema check on check_manuscript
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: fastClock,
+            environment: baseEnv
+        )
+        let listRaw = try #require(await replayServer.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
+        let listObj = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
+        let tools = try #require((listObj["result"] as? [String: Any])?["tools"] as? [[String: Any]])
+        let cmDef = try #require(tools.first { ($0["name"] as? String) == "check_manuscript" }, "tools/list missing check_manuscript")
+        let cmSchema = try #require(cmDef["inputSchema"] as? [String: Any])
+        let cmProps = try #require(cmSchema["properties"] as? [String: Any])
+        #expect(cmProps.keys.sorted() == ["bib_file", "detail", "lang", "no_verify", "offline", "path"])
+        #expect(cmSchema["required"] as? [String] == ["path"])
+
+        // Manuscript with 2 structural ERRORs (undefined \ref{sec:missing} and undefined \cite{missing_bib_key}),
+        // 1 VERIFIED citation (real_lecun), 1 DRIFT citation (wrongyear5), and 1 NOT_FOUND citation (fake_nonsentinel).
+        let texURL = tempDir.appendingPathComponent("manuscript.tex")
+        try """
+        \\documentclass{article}
+        \\begin{document}
+        \\section{Intro}\\label{sec:intro}
+        See Section~\\ref{sec:missing} and citations~\\cite{real_lecun, wrongyear5, fake_nonsentinel, missing_bib_key}.
+        \\end{document}
+        """.write(to: texURL, atomically: true, encoding: .utf8)
+
+        let cliRunner = ScholarCLIRunner(registryClock: fastClock, environment: baseEnv)
+
+        // 1. Replay mode: detail == "full" is byte-for-byte identical to CLI diagnostics --registry-replay --json,
+        //    and default summary carries mode=="REPLAY", complete==true, identical counts, structure_errors, and non_verified_citations.
+        let cliReplay = await cliRunner.runWithExitStatus(
+            arguments: ["diagnostics", texURL.path, "--bib", recheckBibURL.path, "--registry-replay", registryDir.path, "--json"]
+        )
+        #expect(cliReplay.exitCode == 1)
+        let cliReplayObj = try #require(JSONSerialization.jsonObject(with: Data(cliReplay.stdout.utf8)) as? [String: Any])
+
+        let fullReplayRes = await replayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path, "detail": "full"]
+        )
+        #expect(fullReplayRes["isError"] as? Bool == false)
+        let fullReplayText = try #require(((fullReplayRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(Data(fullReplayText.utf8) == Data(cliReplay.stdout.utf8), "detail='full' must match CLI diagnostics --json byte-for-byte")
+
+        let sumReplayRes = await replayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path]
+        )
+        #expect(sumReplayRes["isError"] as? Bool == false, "Issues found in manuscript must keep isError=false")
+        let sumReplayText = try #require(((sumReplayRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(Data(sumReplayText.utf8).count < Data(fullReplayText.utf8).count)
+        let sumReplayObj = try #require(JSONSerialization.jsonObject(with: Data(sumReplayText.utf8)) as? [String: Any])
+        #expect(sumReplayObj["mode"] as? String == "REPLAY")
+        #expect(sumReplayObj["complete"] as? Bool == true)
+        #expect(
+            NSDictionary(dictionary: (sumReplayObj["counts"] as? [String: Any]) ?? [:]).isEqual(to: (cliReplayObj["counts"] as? [String: Any]) ?? [:]),
+            "Summary counts must match CLI --json counts"
+        )
+        let structErrs = try #require(sumReplayObj["structure_errors"] as? [[String: Any]])
+        #expect(!structErrs.isEmpty)
+        #expect(structErrs.allSatisfy { ($0["category"] as? String) == "structure" && ($0["severity"] as? String) == "ERROR" })
+        #expect(structErrs.contains { ($0["code"] as? String) == "CITE404" })
+
+        let nonVerified = try #require(sumReplayObj["non_verified_citations"] as? [[String: Any]])
+        let nonVerifiedMap = Dictionary(uniqueKeysWithValues: nonVerified.compactMap { item -> (String, [String: Any])? in
+            guard let k = item["cite_key"] as? String else { return nil }
+            return (k, item)
+        })
+        #expect(nonVerifiedMap["real_lecun"] == nil, "VERIFIED keys must be excluded from non_verified_citations")
+        #expect(nonVerifiedMap["fake_nonsentinel"]?["verdict"] as? String == "NOT_FOUND")
+        #expect((nonVerifiedMap["fake_nonsentinel"]?["reasons"] as? [String])?.contains("doi_not_registered") == true)
+        #expect(nonVerifiedMap["wrongyear5"]?["verdict"] as? String == "DRIFT")
+        #expect((nonVerifiedMap["wrongyear5"]?["reasons"] as? [String])?.contains("year_mismatch") == true)
+
+        // 2. no_verify: true -> 0 transport calls, byte-identical on detail="full", structure-only summary
+        final class TransportSpy: @unchecked Sendable {
+            var count = 0
+        }
+        let spy = TransportSpy()
+        let failTransport = ClosureRegistrySession { _ in
+            spy.count += 1
+            throw URLError(.notConnectedToInternet)
+        }
+        let onlineNoNetServer = ScholarMCPServer(
+            registryTransport: failTransport,
+            registryClock: fastClock,
+            environment: cachedEnv
+        )
+
+        let cliNoVerify = await cliRunner.runWithExitStatus(
+            arguments: ["diagnostics", texURL.path, "--bib", recheckBibURL.path, "--no-verify", "--json"]
+        )
+        let fullNoVerifyRes = await onlineNoNetServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path, "no_verify": true, "detail": "full"]
+        )
+        #expect(fullNoVerifyRes["isError"] as? Bool == false)
+        let fullNoVerifyText = try #require(((fullNoVerifyRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(Data(fullNoVerifyText.utf8) == Data(cliNoVerify.stdout.utf8))
+
+        let sumNoVerifyRes = await onlineNoNetServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path, "no_verify": true]
+        )
+        #expect(sumNoVerifyRes["isError"] as? Bool == false)
+        let sumNoVerifyObj = try decodeToolTextJSON(sumNoVerifyRes)
+        #expect(sumNoVerifyObj["mode"] as? String == "no-verify")
+        #expect(sumNoVerifyObj["complete"] as? Bool == false)
+        #expect((sumNoVerifyObj["non_verified_citations"] as? [[String: Any]])?.isEmpty == true)
+        #expect(spy.count == 0, "no_verify: true must send 0 network requests")
+
+        // 3. offline: true -> 0 transport calls, byte-identical on detail="full" (even when called on replayServer!), summary lists UNVERIFIED [offline]
+        let cliOffline = await cliRunner.runWithExitStatus(
+            arguments: ["diagnostics", texURL.path, "--bib", recheckBibURL.path, "--offline", "--json"]
+        )
+        let fullOfflineRes = await replayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path, "offline": true, "detail": "full"]
+        )
+        #expect(fullOfflineRes["isError"] as? Bool == false)
+        let fullOfflineText = try #require(((fullOfflineRes["content"] as? [[String: Any]])?.first)?["text"] as? String)
+        #expect(Data(fullOfflineText.utf8) == Data(cliOffline.stdout.utf8))
+
+        let sumOfflineRes = await onlineNoNetServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": texURL.path, "bib_file": recheckBibURL.path, "offline": true]
+        )
+        #expect(sumOfflineRes["isError"] as? Bool == false)
+        let sumOfflineObj = try decodeToolTextJSON(sumOfflineRes)
+        #expect(sumOfflineObj["mode"] as? String == "offline")
+        #expect(sumOfflineObj["complete"] as? Bool == false)
+        let offlineNonVer = try #require(sumOfflineObj["non_verified_citations"] as? [[String: Any]])
+        #expect(offlineNonVer.count == 3)
+        #expect(spy.count == 0, "offline: true must send 0 network requests")
+
+        // 4. Default online check_manuscript uses warm SQLite cache
+        let cleanTexURL = tempDir.appendingPathComponent("clean_cached.tex")
+        try "\\documentclass{article}\\begin{document}Cite~\\cite{real_lecun}.\\end{document}\n"
+            .write(to: cleanTexURL, atomically: true, encoding: .utf8)
+        let warmReplayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            registryClock: fastClock,
+            environment: cachedEnv
+        )
+        _ = await warmReplayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": cleanTexURL.path, "bib_file": recheckBibURL.path]
+        )
+        let cachedCMRes = await onlineNoNetServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": cleanTexURL.path, "bib_file": recheckBibURL.path]
+        )
+        #expect(cachedCMRes["isError"] as? Bool == false)
+        let cachedCMObj = try decodeToolTextJSON(cachedCMRes)
+        #expect(cachedCMObj["complete"] as? Bool == true)
+        #expect((cachedCMObj["non_verified_citations"] as? [[String: Any]])?.isEmpty == true)
+        #expect(spy.count == 0, "Default check_manuscript must hit warm SQLite cache without network requests")
+    }
+
+    @Test("M3 Stage 05: check_manuscript rejects unknown/invalid arguments with ERR_INVALID_ARGUMENT and sets isError=true on missing or unreadable paths")
+    func m3Stage05CheckManuscriptInvalidArgumentsAndMissingUnreadablePaths() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s05-cm-err")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+
+        let validTex = tempDir.appendingPathComponent("valid.tex")
+        try "\\documentclass{article}\\begin{document}Hello.\\end{document}\n".write(to: validTex, atomically: true, encoding: .utf8)
+
+        // 1. Unknown, legacy camelCase, or type-invalid arguments -> ERR_INVALID_ARGUMENT
+        let invalidArgCalls: [[String: Any]] = [
+            ["path": validTex.path, "registryReplayPath": registryDir.path],
+            ["path": validTex.path, "demo": true],
+            ["path": validTex.path, "projectPath": tempDir.path],
+            ["path": validTex.path, "bibPath": "refs.bib"],
+            ["path": validTex.path, "noVerify": true],
+            ["path": validTex.path, "source": "\\section{A}"],
+            ["path": validTex.path, "unknown_flag": 1],
+            [:],
+            ["path": "   "],
+            ["path": 123],
+            ["path": validTex.path, "detail": "verbose"],
+            ["path": validTex.path, "detail": true],
+            ["path": validTex.path, "no_verify": "true"],
+            ["path": validTex.path, "no_verify": true, "offline": true]
+        ]
+        for args in invalidArgCalls {
+            let res = await replayServer.executeToolCallAsync(name: "check_manuscript", arguments: args)
+            #expect(res["isError"] as? Bool == true, "Expected isError=true on check_manuscript with \(args)")
+            let obj = try decodeToolTextJSON(res)
+            #expect(obj["error_code"] as? String == "ERR_INVALID_ARGUMENT", "Expected ERR_INVALID_ARGUMENT on \(args), got \(obj)")
+            #expect(obj["mode"] as? String == "REPLAY")
+        }
+
+        // 2. Non-existent manuscript path & directory path -> isError == true
+        let missingPath = tempDir.appendingPathComponent("does_not_exist.tex").path
+        let missingRes = await replayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": missingPath, "no_verify": true]
+        )
+        #expect(missingRes["isError"] as? Bool == true)
+        let missingObj = try decodeToolTextJSON(missingRes)
+        #expect((missingObj["error_code"] as? String)?.isEmpty == false)
+        #expect(missingObj["mode"] as? String == "REPLAY")
+
+        let dirRes = await replayServer.executeToolCallAsync(
+            name: "check_manuscript",
+            arguments: ["path": tempDir.path, "no_verify": true]
+        )
+        #expect(dirRes["isError"] as? Bool == true)
+        let dirObj = try decodeToolTextJSON(dirRes)
+        #expect((dirObj["error_code"] as? String)?.isEmpty == false)
+        #expect(dirObj["mode"] as? String == "REPLAY")
     }
 }
 

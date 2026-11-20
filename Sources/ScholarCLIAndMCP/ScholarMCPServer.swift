@@ -18,6 +18,7 @@ public struct ScholarMCPServer: Sendable {
     public let defaultRegistryReplaySnapshot: RegistryReplaySnapshot?
     public let isOffline: Bool
     public let noCache: Bool
+    public let enableExperimentalTools: Bool
     public let defaultLanguage: ScholarLanguage?
     public let inRunVerdictsByKey: [String: CitationFirewallEntryVerdict]
     public let registryTransport: any CitationRegistrySession
@@ -39,6 +40,7 @@ public struct ScholarMCPServer: Sendable {
         defaultRegistryReplaySnapshot: RegistryReplaySnapshot? = nil,
         isOffline: Bool = false,
         noCache: Bool = false,
+        enableExperimentalTools: Bool = false,
         defaultLanguage: ScholarLanguage? = nil,
         inRunVerdictsByKey: [String: CitationFirewallEntryVerdict] = [:],
         registryTransport: any CitationRegistrySession = LiveURLSessionRegistryClient(
@@ -53,6 +55,7 @@ public struct ScholarMCPServer: Sendable {
         self.defaultRegistryReplaySnapshot = defaultRegistryReplaySnapshot
         self.isOffline = isOffline
         self.noCache = noCache
+        self.enableExperimentalTools = enableExperimentalTools
         self.defaultLanguage = defaultLanguage
         self.inRunVerdictsByKey = inRunVerdictsByKey
         self.registryTransport = registryTransport
@@ -127,11 +130,16 @@ public struct ScholarMCPServer: Sendable {
             resultPayload = [String: Any]()
 
         case "tools/list":
-            resultPayload = ["tools": Self.toolDefinitions]
+            resultPayload = ["tools": activeToolDefinitions]
 
         case "tools/call":
             let params = req["params"] as? [String: Any] ?? [:]
-            let toolName = params["name"] as? String ?? ""
+            guard let toolName = params["name"] as? String, !toolName.isEmpty else {
+                return errorEnvelope(id: idVal ?? NSNull(), code: -32602, message: "Invalid params: missing tool name")
+            }
+            guard isToolEnabled(toolName) else {
+                return errorEnvelope(id: idVal ?? NSNull(), code: -32602, message: "Unknown tool: \(toolName)")
+            }
             if let rawArgs = params["arguments"], !(rawArgs is NSNull) {
                 guard let arguments = rawArgs as? [String: Any] else {
                     let lang = resolvedLanguage(arguments: [:])
@@ -197,7 +205,12 @@ public struct ScholarMCPServer: Sendable {
 
         case "tools/call":
             let params = req["params"] as? [String: Any] ?? [:]
-            let toolName = params["name"] as? String ?? ""
+            guard let toolName = params["name"] as? String, !toolName.isEmpty else {
+                return errorEnvelope(id: idVal ?? NSNull(), code: -32602, message: "Invalid params: missing tool name")
+            }
+            guard isToolEnabled(toolName) else {
+                return errorEnvelope(id: idVal ?? NSNull(), code: -32602, message: "Unknown tool: \(toolName)")
+            }
             if let rawArgs = params["arguments"], !(rawArgs is NSNull) {
                 guard let arguments = rawArgs as? [String: Any] else {
                     let lang = resolvedLanguage(arguments: [:])
@@ -287,9 +300,20 @@ public struct ScholarMCPServer: Sendable {
         return nil
     }
 
-    private static var allowedArgumentsByTool: [String: [String]] {
+    public var activeToolDefinitions: [[String: Any]] {
+        if enableExperimentalTools {
+            return Self.defaultToolDefinitions + Self.experimentalToolDefinitions
+        }
+        return Self.defaultToolDefinitions
+    }
+
+    public func isToolEnabled(_ toolName: String) -> Bool {
+        activeToolDefinitions.contains { ($0["name"] as? String) == toolName }
+    }
+
+    private var allowedArgumentsByTool: [String: [String]] {
         var map: [String: [String]] = [:]
-        for def in toolDefinitions {
+        for def in activeToolDefinitions {
             guard let name = def["name"] as? String else { continue }
             let props = (def["inputSchema"] as? [String: Any])?["properties"] as? [String: Any] ?? [:]
             map[name] = props.keys.sorted()
@@ -304,7 +328,7 @@ public struct ScholarMCPServer: Sendable {
         customReason: String? = nil,
         language: ScholarLanguage
     ) -> [String: Any] {
-        let allowed = Self.allowedArgumentsByTool[toolName] ?? []
+        let allowed = allowedArgumentsByTool[toolName] ?? []
         let allowedListText = allowed.isEmpty ? "(none)" : allowed.joined(separator: ", ")
         let reasonText: String
         if let customReason {
@@ -347,7 +371,7 @@ public struct ScholarMCPServer: Sendable {
     }
 
     private func validateToolArguments(toolName: String, arguments: [String: Any]) -> [String: Any]? {
-        guard let allowed = Self.allowedArgumentsByTool[toolName] else {
+        guard let allowed = allowedArgumentsByTool[toolName] else {
             return nil
         }
         let allowedSet = Set(allowed)
@@ -400,6 +424,10 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public func executeToolCallAsync(name: String, arguments: [String: Any]) async -> [String: Any] {
+        guard isToolEnabled(name) else {
+            let msg = "[ERR_SCHOLAROS] Unknown MCP tool '\(name)'"
+            return wrapErrorTextIfReplay(code: "ERR_SCHOLAROS", message: msg)
+        }
         if let argErr = validateToolArguments(toolName: name, arguments: arguments) {
             return argErr
         }
@@ -411,313 +439,11 @@ public struct ScholarMCPServer: Sendable {
             case "add_verified_bibtex":
                 return await executeAddVerifiedBibTeX(arguments: arguments)
 
-            case "scholar_cite_key":
-                let citeKey = (arguments["citeKey"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                let styleRaw = (arguments["style"] as? String ?? "apa7").lowercased()
-                let formatRaw = (arguments["manuscriptFormat"] as? String ?? "latex").lowercased()
-                let callOffline = (arguments["offline"] as? Bool == true)
-                let lang = resolvedLanguage(arguments: arguments)
-
-                let entries: [BibliographyEntry]
-                let isDemo: Bool
-                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
-                    entries = try BibTeXCodec().parse(rawBib)
-                    isDemo = false
-                } else {
-                    let opened = try openDatabase(from: arguments)
-                    defer { opened.db.close() }
-                    entries = try opened.db.listBibliographyEntries()
-                    isDemo = opened.isDemo
-                }
-
-                let mode = try resolveVerificationMode(arguments: arguments, isDemo: isDemo)
-                var byKey: [String: BibliographyEntry] = [:]
-                for entry in entries {
-                    byKey[entry.citeKey] = entry
-                }
-
-                let firewall = CitationVerificationFirewall(clock: registryClock)
-                let citeModeLabel: String
-                switch mode {
-                case .replay:
-                    citeModeLabel = "REPLAY"
-                case .offline:
-                    citeModeLabel = isDemo ? "DEMO" : (isReplayServer && !callOffline ? "REPLAY" : "offline")
-                case .online, .record:
-                    citeModeLabel = "online"
-                }
-
-                guard let targetEntry = byKey[citeKey] else {
-                    do {
-                        let verifiedEntry = try firewall.assertCitationAllowed(
-                            citeKey: citeKey,
-                            in: byKey,
-                            verifiedVerdicts: [:],
-                            language: lang
-                        )
-                        return formatCiteKeyResult(
-                            verifiedEntry: verifiedEntry,
-                            verdict: nil,
-                            styleRaw: styleRaw,
-                            formatRaw: formatRaw,
-                            modeLabel: citeModeLabel,
-                            isDemo: isDemo
-                        )
-                    } catch let ScholarOSError.unverifiedCitationBlocked(key, status, reason) {
-                        return formatUnverifiedCitationErrorResult(
-                            citeKey: key,
-                            verdictCode: status,
-                            verdict: nil,
-                            missingFromBibliography: true,
-                            reason: reason,
-                            modeLabel: citeModeLabel
-                        )
-                    }
-                }
-
-                let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
-                    entries: [targetEntry],
-                    mode: mode,
-                    noCache: noCache || isOffline || callOffline || isDemo,
-                    environment: effectiveEnvironment,
-                    clock: registryClock,
-                    sharedRateLimiter: sharedRateLimiter,
-                    sharedStandardCache: sharedStandardCache,
-                    sharedReplayExplicitCache: sharedReplayExplicitCache,
-                    language: lang
-                )
-                var verdicts = inRunVerdictsByKey
-                for verdict in verificationResult.report.verdicts {
-                    verdicts[verdict.citeKey] = verdict
-                }
-                let matchedVerdict = verdicts[citeKey]
-                do {
-                    let verifiedEntry = try firewall.assertCitationAllowed(
-                        citeKey: citeKey,
-                        in: byKey,
-                        verifiedVerdicts: verdicts,
-                        language: lang
-                    )
-                    return formatCiteKeyResult(
-                        verifiedEntry: verifiedEntry,
-                        verdict: matchedVerdict,
-                        styleRaw: styleRaw,
-                        formatRaw: formatRaw,
-                        modeLabel: citeModeLabel,
-                        isDemo: isDemo
-                    )
-                } catch let ScholarOSError.unverifiedCitationBlocked(key, status, reason) {
-                    return formatUnverifiedCitationErrorResult(
-                        citeKey: key,
-                        verdictCode: status,
-                        verdict: matchedVerdict,
-                        missingFromBibliography: false,
-                        reason: reason,
-                        modeLabel: citeModeLabel
-                    )
-                }
+            case "check_manuscript":
+                return await executeCheckManuscript(arguments: arguments)
 
             case "scholar_verify_bibliography":
-                let entries: [BibliographyEntry]
-                let isDemo: Bool
-                if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
-                    entries = try BibTeXCodec().parse(rawBib)
-                    isDemo = false
-                } else {
-                    let opened = try openDatabase(from: arguments)
-                    defer { opened.db.close() }
-                    entries = try opened.db.listBibliographyEntries()
-                    isDemo = opened.isDemo
-                }
-
-                let callOffline = (arguments["offline"] as? Bool == true)
-                let mode = try resolveVerificationMode(arguments: arguments, isDemo: isDemo)
-                let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
-                    entries: entries,
-                    mode: mode,
-                    noCache: noCache || isOffline || callOffline,
-                    environment: effectiveEnvironment,
-                    clock: registryClock,
-                    sharedRateLimiter: sharedRateLimiter,
-                    sharedStandardCache: sharedStandardCache,
-                    sharedReplayExplicitCache: sharedReplayExplicitCache,
-                    language: resolvedLanguage(arguments: arguments)
-                )
-                let data = try verificationResult.encodeAuditJSONData(sortedKeys: true)
-                return textResult(String(decoding: data, as: UTF8.self), isError: false)
-
-            case "scholar_lsp_diagnostics":
-                let callOffline = (arguments["offline"] as? Bool == true)
-                if let rawPathValue = arguments["path"], !(rawPathValue is NSNull) {
-                    guard let manuscriptPath = rawPathValue as? String else {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Argument 'path' for scholar_lsp_diagnostics must be a string."
-                        )
-                    }
-                    guard !manuscriptPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Argument 'path' for scholar_lsp_diagnostics must not be empty."
-                        )
-                    }
-                    if arguments["source"] != nil && !(arguments["source"] is NSNull) {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'path' with inline 'source' in scholar_lsp_diagnostics."
-                        )
-                    }
-                    if let proj = arguments["projectPath"] as? String, !proj.isEmpty {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'path' with 'projectPath' in scholar_lsp_diagnostics."
-                        )
-                    }
-                    if arguments["demo"] as? Bool == true {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'path' with 'demo: true' in scholar_lsp_diagnostics."
-                        )
-                    }
-                    let callNoVerify = (arguments["noVerify"] as? Bool == true)
-                    if callNoVerify && callOffline {
-                        throw ScholarOSError.invalidCLIArguments(
-                            "Cannot combine 'noVerify' with 'offline' in scholar_lsp_diagnostics."
-                        )
-                    }
-
-                    let rawBibPath = (arguments["bibPath"] as? String)?
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    let explicitBibPath = (rawBibPath?.isEmpty == false) ? rawBibPath : nil
-
-                    let lsp = try ScholarLSPWorkspaceService.loadManuscript(
-                        atPath: manuscriptPath,
-                        explicitBibPath: explicitBibPath,
-                        clock: registryClock
-                    )
-
-                    if callNoVerify {
-                        lsp.setSkipCitationVerification(true)
-                        let jsonReport = lsp.buildDiagnosticsJSONReport(mode: "no-verify", verificationReport: nil)
-                        let data = try jsonReport.encodeJSONData(sortedKeys: true)
-                        return textResult(String(decoding: data, as: UTF8.self), isError: false)
-                    }
-
-                    let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
-                    let jsonModeLabel: String
-                    switch mode {
-                    case .offline:
-                        jsonModeLabel = "offline"
-                    case .replay:
-                        jsonModeLabel = "REPLAY"
-                    case .online, .record:
-                        jsonModeLabel = "online"
-                    }
-
-                    let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
-                        entries: lsp.citedBibliographyEntries,
-                        mode: mode,
-                        noCache: noCache || isOffline || callOffline,
-                        environment: effectiveEnvironment,
-                        clock: registryClock,
-                        sharedRateLimiter: sharedRateLimiter,
-                        sharedStandardCache: sharedStandardCache,
-                        sharedReplayExplicitCache: sharedReplayExplicitCache,
-                        language: resolvedLanguage(arguments: arguments)
-                    )
-                    lsp.applyVerificationReport(verificationResult.report)
-                    let jsonReport = lsp.buildDiagnosticsJSONReport(
-                        mode: jsonModeLabel,
-                        verificationReport: verificationResult.report
-                    )
-                    let data = try jsonReport.encodeJSONData(sortedKeys: true)
-                    return textResult(String(decoding: data, as: UTF8.self), isError: false)
-                }
-
-                if let inlineSource = arguments["source"] as? String {
-                    let path = arguments["filePath"] as? String ?? "main.tex"
-                    var entries: [BibliographyEntry] = []
-                    var isDemo = (arguments["demo"] as? Bool == true)
-                    if let rawBib = arguments["bibtex"] as? String, !rawBib.isEmpty {
-                        entries = try BibTeXCodec().parse(rawBib)
-                        isDemo = false
-                    } else if hasExplicitDatabaseTarget(in: arguments) {
-                        let opened = try openDatabase(from: arguments)
-                        defer { opened.db.close() }
-                        entries = try opened.db.listBibliographyEntries()
-                        isDemo = opened.isDemo
-                    }
-                    let lsp = ScholarLSPWorkspaceService(
-                        rootFilePath: path,
-                        files: [path: inlineSource],
-                        bibliography: entries,
-                        clock: registryClock
-                    )
-                    let mode = try resolveVerificationMode(arguments: arguments, isDemo: isDemo)
-                    let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
-                        entries: lsp.citedBibliographyEntries,
-                        mode: mode,
-                        noCache: noCache || isOffline || callOffline,
-                        environment: effectiveEnvironment,
-                        clock: registryClock,
-                        sharedRateLimiter: sharedRateLimiter,
-                        sharedStandardCache: sharedStandardCache,
-                        sharedReplayExplicitCache: sharedReplayExplicitCache,
-                        language: resolvedLanguage(arguments: arguments)
-                    )
-                    lsp.applyVerificationReport(verificationResult.report)
-                    let diagReport = lsp.diagnosticsReport()
-                    let isErr = diagReport.firewallViolationCount > 0 || diagReport.errorCount > 0
-                    if case .replay = mode {
-                        let diagData = try JSONEncoder().encode(diagReport.diagnostics)
-                        let diagArr = (try? JSONSerialization.jsonObject(with: diagData)) ?? []
-                        let replayObj: [String: Any] = ["mode": "REPLAY", "diagnostics": diagArr]
-                        let outData = try JSONSerialization.data(withJSONObject: replayObj, options: [.sortedKeys, .withoutEscapingSlashes])
-                        return textResult(String(decoding: outData, as: UTF8.self), isError: isErr)
-                    }
-                    let data = try JSONEncoder().encode(diagReport.diagnostics)
-                    return textResult(
-                        String(decoding: data, as: UTF8.self),
-                        isError: isErr
-                    )
-                }
-
-                let opened = try openDatabase(from: arguments)
-                defer { opened.db.close() }
-                let entries = try opened.db.listBibliographyEntries()
-                var files: [String: String] = [:]
-                for rec in try opened.db.listManuscriptFiles() {
-                    files[rec.path] = rec.content
-                }
-                let primary = arguments["filePath"] as? String ?? ((try? opened.db.primaryManuscriptFile()) ?? "main.tex")
-                let lsp = ScholarLSPWorkspaceService(
-                    rootFilePath: primary,
-                    files: files,
-                    bibliography: entries,
-                    clock: registryClock
-                )
-                let mode = try resolveVerificationMode(arguments: arguments, isDemo: opened.isDemo)
-                let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
-                    entries: lsp.citedBibliographyEntries,
-                    mode: mode,
-                    noCache: noCache || isOffline || callOffline,
-                    environment: effectiveEnvironment,
-                    clock: registryClock,
-                    sharedRateLimiter: sharedRateLimiter,
-                    sharedStandardCache: sharedStandardCache,
-                    sharedReplayExplicitCache: sharedReplayExplicitCache,
-                    language: resolvedLanguage(arguments: arguments)
-                )
-                lsp.applyVerificationReport(verificationResult.report)
-                let diagReport = lsp.diagnosticsReport()
-                let isProjErr = diagReport.firewallViolationCount > 0
-                if case .replay = mode {
-                    let diagData = try JSONEncoder().encode(diagReport.diagnostics)
-                    let diagArr = (try? JSONSerialization.jsonObject(with: diagData)) ?? []
-                    let replayObj: [String: Any] = ["mode": "REPLAY", "diagnostics": diagArr]
-                    let outData = try JSONSerialization.data(withJSONObject: replayObj, options: [.sortedKeys, .withoutEscapingSlashes])
-                    return textResult(String(decoding: outData, as: UTF8.self), isError: isProjErr)
-                }
-                let data = try JSONEncoder().encode(diagReport.diagnostics)
-                return textResult(
-                    String(decoding: data, as: UTF8.self),
-                    isError: isProjErr
-                )
+                return try await executeScholarVerifyBibliography(arguments: arguments)
 
             default:
                 return executeToolCall(name: name, arguments: arguments)
@@ -746,12 +472,15 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public func executeToolCall(name: String, arguments: [String: Any]) -> [String: Any] {
+        guard isToolEnabled(name) else {
+            let msg = "[ERR_SCHOLAROS] Unknown MCP tool '\(name)'"
+            return wrapErrorTextIfReplay(code: "ERR_SCHOLAROS", message: msg)
+        }
         if let argErr = validateToolArguments(toolName: name, arguments: arguments) {
             return argErr
         }
         if name == "scholar_verify_bibliography"
-            || name == "scholar_lsp_diagnostics"
-            || name == "scholar_cite_key"
+            || name == "check_manuscript"
             || name == "verify_citation"
             || name == "add_verified_bibtex" {
             final class Box: @unchecked Sendable {
@@ -991,125 +720,326 @@ public struct ScholarMCPServer: Sendable {
         return textResult(message, isError: true)
     }
 
-    private func formatUnverifiedCitationErrorResult(
-        citeKey: String,
-        verdictCode: String,
-        verdict: CitationFirewallEntryVerdict?,
-        missingFromBibliography: Bool,
-        reason: String,
-        modeLabel: String
-    ) -> [String: Any] {
-        let reasons: [String]
-        if let v = verdict, !v.reasons.isEmpty {
-            reasons = v.reasons
-        } else if missingFromBibliography {
-            reasons = ["cite_key_not_in_bibliography"]
-        } else {
-            reasons = []
-        }
-        let fieldsArr: Any
-        let findingsArr: Any
-        let sourcesArr: Any
-        let recordVal: Any
-        if let v = verdict {
-            let encoder = JSONEncoder()
-            fieldsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.fields))) ?? []
-            findingsArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.findings))) ?? []
-            sourcesArr = (try? JSONSerialization.jsonObject(with: encoder.encode(v.sources))) ?? []
-            if let rec = v.record, let recObj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
-                recordVal = recObj
-            } else {
-                recordVal = NSNull()
-            }
-        } else {
-            fieldsArr = [Any]()
-            findingsArr = [Any]()
-            sourcesArr = [Any]()
-            recordVal = NSNull()
-        }
+    // MARK: - M3 Stage 05: `scholar_verify_bibliography` (Batch) & `check_manuscript`
 
-        var payload: [String: Any] = [
-            "error_code": "ERR_UNVERIFIED_CITATION",
-            "category": "unverified_citation",
-            "cite_key": citeKey,
-            "verdict": verdictCode,
-            "reasons": reasons,
-            "fields": fieldsArr,
-            "findings": findingsArr,
-            "sources": sourcesArr,
-            "record": recordVal,
-            "reason": reason
-        ]
-        if modeLabel == "REPLAY" || isReplayServer {
-            payload["mode"] = "REPLAY"
-        } else {
-            payload["mode"] = modeLabel
-        }
-        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
-            return textResult(String(decoding: data, as: UTF8.self), isError: true)
-        }
-        return textResult("[ERR_UNVERIFIED_CITATION] Key '\(citeKey)' (\(verdictCode)) rejected by Citation Firewall: \(reason)", isError: true)
+    private struct ManuscriptNonVerifiedCitationSummary: Sendable, Codable, Hashable {
+        let cite_key: String
+        let verdict: String
+        let reasons: [String]
+        let fields: [CitationFieldDiscrepancy]
     }
 
-    private func formatCiteKeyResult(
-        verifiedEntry: BibliographyEntry,
-        verdict: CitationFirewallEntryVerdict?,
-        styleRaw: String,
-        formatRaw: String,
-        modeLabel: String,
-        isDemo: Bool
-    ) -> [String: Any] {
-        let style: CitationFormatStyle
-        switch styleRaw {
-        case "ieee": style = .ieee
-        case "acm": style = .acm
-        case "nature": style = .nature
-        case "vancouver": style = .vancouver
-        default: style = .apa7
-        }
-        let formatted = CSLCitationFormatterEngine().formatEntry(verifiedEntry, style: style)
-        let formatNormalized = formatRaw == "typst" ? "typst" : "latex"
-        let snippet = formatNormalized == "typst" ? formatted.inTextTypst : formatted.inTextLaTeX
-        let effectiveMode = isDemo ? "DEMO" : modeLabel
+    private struct ManuscriptCheckSummaryReport: Sendable, Codable, Hashable {
+        let mode: String
+        let root: String
+        let complete: Bool
+        let counts: DiagnosticsCountsSummary
+        let structure_errors: [DiagnosticsItemRecord]
+        let non_verified_citations: [ManuscriptNonVerifiedCitationSummary]
+    }
 
-        var payload: [String: Any] = [
-            "mode": effectiveMode,
-            "status": "CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)",
-            "cite_key": verifiedEntry.citeKey,
-            "verdict": verifiedEntry.firewallClass.rawValue,
-            "format": formatNormalized,
-            "style": style.rawValue,
-            "snippet": snippet,
-            "reference": formatted.bibliographyPlainText
-        ]
-        if effectiveMode == "REPLAY" {
-            payload["replay"] = true
+    private func executeScholarVerifyBibliography(arguments: [String: Any]) async throws -> [String: Any] {
+        let lang = resolvedLanguage(arguments: arguments)
+        guard let rawBibAny = arguments["bibtex"], !(rawBibAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "scholar_verify_bibliography",
+                invalidArguments: ["bibtex"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'bibtex' for 'scholar_verify_bibliography'.",
+                    "工具 'scholar_verify_bibliography' 缺少必填字符串参数 'bibtex'。"
+                ),
+                language: lang
+            )
         }
-        if let v = verdict {
+        guard let rawBib = rawBibAny as? String else {
+            return invalidArgumentResult(
+                toolName: "scholar_verify_bibliography",
+                invalidArguments: ["bibtex"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'bibtex' for 'scholar_verify_bibliography' must be a string.",
+                    "工具 'scholar_verify_bibliography' 的参数 'bibtex' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+        if let optErr = validateOptionalCommonArguments(
+            toolName: "scholar_verify_bibliography",
+            arguments: arguments,
+            bibFileForAction: nil
+        ) {
+            return optErr
+        }
+
+        let entries = try BibTeXCodec().parse(rawBib)
+        let callOffline = (arguments["offline"] as? Bool == true)
+        let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+        let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+            entries: entries,
+            mode: mode,
+            noCache: noCache || isOffline || callOffline,
+            skipCacheRead: false,
+            environment: effectiveEnvironment,
+            clock: registryClock,
+            sharedRateLimiter: sharedRateLimiter,
+            sharedStandardCache: sharedStandardCache,
+            sharedReplayExplicitCache: sharedReplayExplicitCache,
+            language: lang
+        )
+        let data = try verificationResult.encodeAuditJSONData(sortedKeys: true)
+        return textResult(String(decoding: data, as: UTF8.self), isError: false)
+    }
+
+    private func executeCheckManuscript(arguments: [String: Any]) async -> [String: Any] {
+        let lang = resolvedLanguage(arguments: arguments)
+        guard let rawPathAny = arguments["path"], !(rawPathAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "check_manuscript",
+                invalidArguments: ["path"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'path' for 'check_manuscript'.",
+                    "工具 'check_manuscript' 缺少必填字符串参数 'path'。"
+                ),
+                language: lang
+            )
+        }
+        guard let manuscriptPath = rawPathAny as? String else {
+            return invalidArgumentResult(
+                toolName: "check_manuscript",
+                invalidArguments: ["path"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'path' for 'check_manuscript' must be a string.",
+                    "工具 'check_manuscript' 的参数 'path' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+        if manuscriptPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return invalidArgumentResult(
+                toolName: "check_manuscript",
+                invalidArguments: ["path"],
+                reasons: ["invalid_argument_value"],
+                customReason: lang.L(
+                    "Argument 'path' for 'check_manuscript' must not be empty.",
+                    "工具 'check_manuscript' 的参数 'path' 不能为空。"
+                ),
+                language: lang
+            )
+        }
+
+        var explicitBibPath: String? = nil
+        if let rawBibFileAny = arguments["bib_file"], !(rawBibFileAny is NSNull) {
+            guard let bibFileStr = rawBibFileAny as? String else {
+                return invalidArgumentResult(
+                    toolName: "check_manuscript",
+                    invalidArguments: ["bib_file"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'bib_file' for 'check_manuscript' must be a string.",
+                        "工具 'check_manuscript' 的参数 'bib_file' 必须是字符串。"
+                    ),
+                    language: lang
+                )
+            }
+            if bibFileStr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return invalidArgumentResult(
+                    toolName: "check_manuscript",
+                    invalidArguments: ["bib_file"],
+                    reasons: ["invalid_argument_value"],
+                    customReason: lang.L(
+                        "Argument 'bib_file' for 'check_manuscript' must not be empty.",
+                        "工具 'check_manuscript' 的参数 'bib_file' 不能为空。"
+                    ),
+                    language: lang
+                )
+            }
+            explicitBibPath = bibFileStr
+        }
+
+        if let rawNoVerify = arguments["no_verify"], !(rawNoVerify is NSNull) {
+            if !(rawNoVerify is Bool) || CFGetTypeID(rawNoVerify as CFTypeRef) != CFBooleanGetTypeID() {
+                return invalidArgumentResult(
+                    toolName: "check_manuscript",
+                    invalidArguments: ["no_verify"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'no_verify' for 'check_manuscript' must be a boolean.",
+                        "工具 'check_manuscript' 的参数 'no_verify' 必须是布尔值。"
+                    ),
+                    language: lang
+                )
+            }
+        }
+
+        if let optErr = validateOptionalCommonArguments(
+            toolName: "check_manuscript",
+            arguments: arguments,
+            bibFileForAction: nil
+        ) {
+            return optErr
+        }
+
+        var emitFull = false
+        if let rawDetailAny = arguments["detail"], !(rawDetailAny is NSNull) {
+            guard let detailStr = rawDetailAny as? String else {
+                return invalidArgumentResult(
+                    toolName: "check_manuscript",
+                    invalidArguments: ["detail"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'detail' for 'check_manuscript' must be 'summary' or 'full'.",
+                        "工具 'check_manuscript' 的参数 'detail' 必须是字符串 'summary' 或 'full'。"
+                    ),
+                    language: lang
+                )
+            }
+            switch detailStr {
+            case "summary":
+                emitFull = false
+            case "full":
+                emitFull = true
+            default:
+                return invalidArgumentResult(
+                    toolName: "check_manuscript",
+                    invalidArguments: ["detail"],
+                    reasons: ["invalid_argument_value"],
+                    customReason: lang.L(
+                        "Unsupported value '\(detailStr)' for 'detail' in 'check_manuscript'. Allowed values: 'summary', 'full'.",
+                        "工具 'check_manuscript' 的参数 'detail' 取值 '\(detailStr)' 不受支持。允许的取值：'summary'、'full'。"
+                    ),
+                    language: lang
+                )
+            }
+        }
+
+        let callNoVerify = (arguments["no_verify"] as? Bool == true)
+        let callOffline = (arguments["offline"] as? Bool == true)
+        if callNoVerify && callOffline {
+            return invalidArgumentResult(
+                toolName: "check_manuscript",
+                invalidArguments: ["no_verify", "offline"],
+                reasons: ["invalid_argument_combination"],
+                customReason: lang.L(
+                    "Cannot combine 'no_verify: true' with 'offline: true' in 'check_manuscript'.",
+                    "工具 'check_manuscript' 不能同时指定 'no_verify: true' 与 'offline: true'。"
+                ),
+                language: lang
+            )
+        }
+
+        do {
+            let lsp = try ScholarLSPWorkspaceService.loadManuscript(
+                atPath: manuscriptPath,
+                explicitBibPath: explicitBibPath,
+                clock: registryClock
+            )
+
+            let jsonReport: ScholarDiagnosticsJSONReport
+            if callNoVerify {
+                lsp.setSkipCitationVerification(true)
+                jsonReport = lsp.buildDiagnosticsJSONReport(mode: "no-verify", verificationReport: nil)
+            } else {
+                let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+                let jsonModeLabel: String
+                switch mode {
+                case .offline:
+                    jsonModeLabel = "offline"
+                case .replay:
+                    jsonModeLabel = "REPLAY"
+                case .online, .record:
+                    jsonModeLabel = "online"
+                }
+
+                let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                    entries: lsp.citedBibliographyEntries,
+                    mode: mode,
+                    noCache: noCache || isOffline || callOffline,
+                    skipCacheRead: false,
+                    environment: effectiveEnvironment,
+                    clock: registryClock,
+                    sharedRateLimiter: sharedRateLimiter,
+                    sharedStandardCache: sharedStandardCache,
+                    sharedReplayExplicitCache: sharedReplayExplicitCache,
+                    language: lang
+                )
+                lsp.applyVerificationReport(verificationResult.report)
+                jsonReport = lsp.buildDiagnosticsJSONReport(
+                    mode: jsonModeLabel,
+                    verificationReport: verificationResult.report
+                )
+            }
+
+            if emitFull {
+                let fullData = try jsonReport.encodeJSONData(sortedKeys: true)
+                return textResult(String(decoding: fullData, as: UTF8.self), isError: false)
+            }
+
+            let structureErrors = jsonReport.diagnostics.filter {
+                $0.category == .structure && $0.severity == .error
+            }
+            let nonVerifiedCitations = jsonReport.citations.compactMap { item -> ManuscriptNonVerifiedCitationSummary? in
+                guard let verif = item.verification,
+                      verif.verdict != CitationFirewallClass.verified.rawValue else {
+                    return nil
+                }
+                return ManuscriptNonVerifiedCitationSummary(
+                    cite_key: item.key,
+                    verdict: verif.verdict,
+                    reasons: verif.reasons,
+                    fields: verif.fields
+                )
+            }
+            let summaryReport = ManuscriptCheckSummaryReport(
+                mode: jsonReport.mode,
+                root: jsonReport.root,
+                complete: jsonReport.complete,
+                counts: jsonReport.counts,
+                structure_errors: structureErrors,
+                non_verified_citations: nonVerifiedCitations
+            )
             let encoder = JSONEncoder()
-            if let srcObj = try? JSONSerialization.jsonObject(with: encoder.encode(v.sources)) {
-                payload["sources"] = srcObj
+            encoder.outputFormatting = [.sortedKeys]
+            let summaryData = try encoder.encode(summaryReport)
+            return textResult(String(decoding: summaryData, as: UTF8.self), isError: false)
+        } catch let scholarErr as ScholarOSError {
+            let code = scholarErr.errorCodeIdentifier
+            let body = scholarErr.errorDescription ?? String(describing: scholarErr)
+            var payload: [String: Any] = [
+                "error_code": code,
+                "category": "manuscript_io",
+                "reasons": ["manuscript_load_failed"],
+                "reason": body
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
             }
-            if let findingsObj = try? JSONSerialization.jsonObject(with: encoder.encode(v.findings)) {
-                payload["findings"] = findingsObj
+            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"\(code)\"}")
+        } catch let replayErr as RegistryReplayError {
+            var payload: [String: Any] = [
+                "error_code": "ERR_REGISTRY_REPLAY",
+                "category": "registry_replay",
+                "reasons": ["replay_recording_missing_or_corrupt"],
+                "reason": "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)"
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
             }
-            if let rec = v.record, let recObj = try? JSONSerialization.jsonObject(with: encoder.encode(rec)) {
-                payload["record"] = recObj
+            return jsonTextResult(payload, isError: true, fallback: "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)")
+        } catch {
+            var payload: [String: Any] = [
+                "error_code": "ERR_IO",
+                "category": "manuscript_io",
+                "reasons": ["manuscript_load_failed"],
+                "reason": error.localizedDescription
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
             }
+            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_IO\"}")
         }
-        if let verifiedAt = verifiedEntry.firewallVerifiedAtUTC {
-            payload["verified_at_utc"] = verifiedAt
-        }
-        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .withoutEscapingSlashes]) {
-            return textResult(String(decoding: data, as: UTF8.self), isError: false)
-        }
-        let demoPrefix = isDemo ? "[DEMO]\n" : ""
-        let payloadText = """
-        \(demoPrefix)[CITATION_STATUS:\(verifiedEntry.firewallClass.rawValue)]
-        Snippet: \(snippet)
-        Reference (\(style.rawValue)): \(formatted.bibliographyPlainText)
-        """
-        return textResult(payloadText, isError: false)
     }
 
     // MARK: - M3 Stage 04: `verify_citation` & `add_verified_bibtex`
@@ -1745,6 +1675,10 @@ public struct ScholarMCPServer: Sendable {
     }
 
     public static var toolDefinitions: [[String: Any]] {
+        defaultToolDefinitions
+    }
+
+    public static var defaultToolDefinitions: [[String: Any]] {
         [
         [
             "name": "verify_citation",
@@ -1774,56 +1708,39 @@ public struct ScholarMCPServer: Sendable {
             ]
         ],
         [
-            "name": "scholar_cite_key",
-            "description": "Citation insertion check. Verifies the target entry through the shared Citation Verification Firewall (online by default unless offline: true is passed or server started with --offline / --registry-replay) and returns formatted \\cite{key} or #cite(<key>) ONLY if VERIFIED; otherwise returns ERR_UNVERIFIED_CITATION.",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "citeKey": ["type": "string"],
-                    "style": ["type": "string"],
-                    "manuscriptFormat": ["type": "string"],
-                    "bibtex": ["type": "string"],
-                    "projectPath": ["type": "string"],
-                    "offline": ["type": "boolean"],
-                    "lang": ["type": "string"],
-                    "demo": ["type": "boolean"]
-                ],
-                "required": ["citeKey"]
-            ]
-        ],
-        [
-            "name": "scholar_verify_bibliography",
-            "description": "Verify a BibTeX string or .scholarproj bibliography through the 5-class Citation Verification Firewall (queries public registries online by default; pass offline: true to skip network and cache for one call).",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "bibtex": ["type": "string"],
-                    "projectPath": ["type": "string"],
-                    "offline": ["type": "boolean"],
-                    "lang": ["type": "string"],
-                    "demo": ["type": "boolean"]
-                ]
-            ]
-        ],
-        [
-            "name": "scholar_lsp_diagnostics",
-            "description": "Run the built-in LaTeX/Typst CST, cross-reference, float-label, and Citation Firewall LSP diagnostics engine. Pass 'path' (manuscript main .tex file) to load multi-file manuscripts via the unified loader and return the scholaros.diagnostics/1 JSON object identical to CLI 'diagnostics <path> --json', or pass inline 'source'.",
+            "name": "check_manuscript",
+            "description": "Load a LaTeX/Typst manuscript from disk via the unified multi-file loader, run structure and cross-reference checks, and verify cited bibliography entries through the shared Citation Verification Firewall (online with SQLite cache by default; pass no_verify: true for structure-only checks or offline: true to skip network and cache). Returns a compact summary by default, or the full scholaros.diagnostics/1 JSON object byte-for-byte identical to CLI 'diagnostics <path> --json' when detail is 'full'.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "path": ["type": "string"],
-                    "bibPath": ["type": "string"],
-                    "noVerify": ["type": "boolean"],
-                    "lang": ["type": "string"],
-                    "source": ["type": "string"],
-                    "bibtex": ["type": "string"],
-                    "filePath": ["type": "string"],
-                    "projectPath": ["type": "string"],
+                    "bib_file": ["type": "string"],
+                    "no_verify": ["type": "boolean"],
                     "offline": ["type": "boolean"],
-                    "demo": ["type": "boolean"]
-                ]
+                    "detail": ["type": "string", "enum": ["summary", "full"]],
+                    "lang": ["type": "string"]
+                ],
+                "required": ["path"]
             ]
         ],
+        [
+            "name": "scholar_verify_bibliography",
+            "description": "Batch-verify a BibTeX string (zero, one, or multiple entries) through the shared 5-class Citation Verification Firewall (queries public registries online with SQLite cache by default; pass offline: true to skip network and cache for one call). Read-only batch verification: never writes or modifies any .bib file.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bibtex": ["type": "string"],
+                    "offline": ["type": "boolean"],
+                    "lang": ["type": "string"]
+                ],
+                "required": ["bibtex"]
+            ]
+        ]
+        ]
+    }
+
+    public static var experimentalToolDefinitions: [[String: Any]] {
+        [
         [
             "name": "scholar_search_provenance",
             "description": "Search indexed PDF passages via SQLite FTS5 BM25 to compare manuscript claims against bounding-box passages.",
