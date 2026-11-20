@@ -104,12 +104,16 @@ with open(src_path, encoding="utf-8") as f:
 
 re_recursive_driver = re.compile(r"^\s*Scripts/test\.sh\s+(milestone\s+\d+|release)(?:\s|$)")
 re_online_cmd = re.compile(r"^\s*SCHOLAR_ONLINE=1\s+(.+)$")
+re_client_reg = re.compile(r"^\s*(claude|codex|opencode)\s+mcp\s+")
 
 for raw in lines:
     stripped = raw.rstrip("\n")
     if re_recursive_driver.match(stripped):
         msg = shlex.quote(f"[SKIP-RECURSIVE] verified top-level suite driver: {stripped.strip()}")
         print(f"test -x Scripts/test.sh && echo {msg}")
+    elif re_client_reg.match(stripped):
+        msg = shlex.quote(f"[SKIP-CLIENT] client registration command verified by m3-clients.sh: {stripped.strip()}")
+        print(f"echo {msg}")
     elif re_online_cmd.match(stripped):
         msg = shlex.quote(f"[SKIP-ONLINE] 没跑 — online command skipped in offline/sandboxed README replay: {stripped.strip()}")
         print(
@@ -193,6 +197,58 @@ PY
         echo "FAIL: README bash blocks must include 'SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live'"
         exit 1
     fi
+    if grep -E '(^|[|;&[:space:]])(ScholarOS|scholaros)[[:space:]]+mcp([[:space:]]|$)' "$WORK/README.md.commands.txt" | grep -v -E '^[[:space:]]*(claude|codex|opencode)[[:space:]]+mcp[[:space:]]' | grep -v -E -- '(--offline|--registry-replay)'; then
+        echo "FAIL: every direct 'scholaros mcp' / 'ScholarOS mcp' command in README bash blocks must pass --offline or --registry-replay"
+        exit 1
+    fi
+    if ! grep -q -E 'tools/list.*scholaros[[:space:]]+mcp[[:space:]]+--offline' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a piped 'tools/list' replay against 'scholaros mcp --offline'"
+        exit 1
+    fi
+    if ! grep -q -E 'scholaros[[:space:]]+mcp[[:space:]]+--registry-replay[[:space:]]+Tests/Fixtures/registry' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'scholaros mcp --registry-replay Tests/Fixtures/registry' example"
+        exit 1
+    fi
+    python3 -I - "$REPO_ROOT/README.md" "$REPO_ROOT/README.zh-CN.md" <<'PY'
+import json, re, sys
+
+def check_doc(path):
+    txt = open(path, encoding="utf-8").read()
+    for removed in ("scholar_cite_key", "scholar_lsp_diagnostics"):
+        if removed in txt:
+            raise SystemExit(f"FAIL: {path} still mentions removed MCP tool {removed}")
+    for note in ("/opt/homebrew/bin/scholaros", "tool_timeout_sec"):
+        if note not in txt:
+            raise SystemExit(f"FAIL: {path} missing required client note {note}")
+    blocks = re.findall(r"```([a-zA-Z0-9_-]*)\n(.*?)```", txt, flags=re.DOTALL)
+    sh_cmds = [
+        ln.strip()
+        for lang, b in blocks if lang in ("sh", "bash", "")
+        for ln in b.splitlines()
+        if ln.strip().startswith("claude mcp add ")
+    ]
+    toml_blocks = [
+        "\n".join(ln.strip() for ln in b.splitlines() if ln.strip() and not ln.strip().startswith("#"))
+        for lang, b in blocks if lang == "toml" and "[mcp_servers.scholaros]" in b
+    ]
+    json_blocks = [
+        json.loads(b.strip())
+        for lang, b in blocks if lang == "json" and '"scholaros"' in b and '"mcp"' in b
+    ]
+    if sh_cmds != ["claude mcp add --scope user scholaros -- scholaros mcp"]:
+        raise SystemExit(f"FAIL: {path} Claude registration snippet mismatch: {sh_cmds!r}")
+    if toml_blocks != ['[mcp_servers.scholaros]\ncommand = "scholaros"\nargs = ["mcp"]']:
+        raise SystemExit(f"FAIL: {path} Codex TOML registration snippet mismatch: {toml_blocks!r}")
+    if json_blocks != [{"mcp": {"servers": {"scholaros": {"type": "local", "command": ["scholaros", "mcp"]}}}}]:
+        raise SystemExit(f"FAIL: {path} OpenCode JSON registration snippet mismatch: {json_blocks!r}")
+    return (sh_cmds, toml_blocks, json_blocks)
+
+en_reg = check_doc(sys.argv[1])
+zh_reg = check_doc(sys.argv[2])
+if en_reg != zh_reg:
+    raise SystemExit("FAIL: README.md and README.zh-CN.md MCP client registration snippets differ")
+print("mcp_client_registration_snippets_consistent=true")
+PY
     echo "verify_citations_and_m1_repro_examples_present=true"
     echo ""
 
@@ -252,6 +308,24 @@ PY
             echo "FAIL: replaying $README_FILE did not emit expected --no-verify notice from diagnostics --no-verify"
             exit 1
         fi
+        for REQUIRED_TOOL in verify_citation add_verified_bibtex check_manuscript scholar_verify_bibliography; do
+            if ! grep -q -F "\"name\":\"$REQUIRED_TOOL\"" "$WORK/$README_FILE.replay.out"; then
+                echo "FAIL: replaying $README_FILE did not emit MCP tool '$REQUIRED_TOOL' in tools/list output"
+                exit 1
+            fi
+        done
+        for REMOVED_TOOL in scholar_cite_key scholar_lsp_diagnostics; do
+            if grep -q -F "$REMOVED_TOOL" "$WORK/$README_FILE.replay.out"; then
+                echo "FAIL: replaying $README_FILE unexpectedly emitted removed MCP tool '$REMOVED_TOOL'"
+                exit 1
+            fi
+        done
+        for EXPECTED_MCP_MARKER in ERR_UNVERIFIED_CITATION APPENDED_VERIFIED non_verified_citations; do
+            if ! grep -q -F "$EXPECTED_MCP_MARKER" "$WORK/$README_FILE.replay.out"; then
+                echo "FAIL: replaying $README_FILE did not emit expected MCP write-gate/check_manuscript marker '$EXPECTED_MCP_MARKER'"
+                exit 1
+            fi
+        done
         echo ""
     done
 
