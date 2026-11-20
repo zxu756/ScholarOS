@@ -5797,4 +5797,912 @@ struct BibCSLAndFirewallTests {
         #expect(pmRec.publicationDates.publishedOnline?.year == 2015)
         #expect(pmRec.publicationDates.issued == RegistryPublicationDate(year: 2015, month: 6, day: 4))
     }
+
+    // MARK: - 16. M3 Stage 03 Verified BibTeX Generation, Exact Deduplication & Locked O_APPEND Writer
+
+    @Test("M3 Stage 03: generate BibTeX for all 206 VERIFIED benchmark entries, verify BibTeXCodec round-trip fidelity, escaping, HTML decoding, UTF-8 preservation, dropped caller fields, and Row 6 cases + changed_fields")
+    func m3Stage03GenerateAll206VerifiedEntriesAndRow6Cases() async throws {
+        let recordingsURL = Self.benchmarkCitationsURL.appendingPathComponent("recordings", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: recordingsURL)
+        let firewall = CitationVerificationFirewall()
+        let codec = BibTeXCodec()
+
+        let groups = [
+            "audit_manual", "real_clean", "real_human", "real_typo",
+            "fabricated_model", "mut_doi_swap", "mut_doi_missing",
+            "mut_title", "mut_author", "mut_year1", "mut_year3", "retracted"
+        ]
+
+        var verifiedCount = 0
+        var generatedByKey: [String: (local: BibliographyEntry, record: RegistryWorkRecord, generated: GeneratedVerifiedBibTeX)] = [:]
+
+        for grp in groups {
+            let sourcePath = Self.benchmarkCitationsURL
+                .appendingPathComponent("entries", isDirectory: true)
+                .appendingPathComponent("\(grp).bib")
+            let rawSource = try String(contentsOf: sourcePath, encoding: .utf8)
+            let rawDoc = try codec.parseDocument(rawSource)
+            let entries = rawDoc.entries
+            let entriesByKey = Dictionary(uniqueKeysWithValues: entries.map { ($0.citeKey, $0) })
+
+            let result = try await CitationVerificationFirewall.verifyBibliography(
+                entries: entries,
+                mode: .replay(snapshot: snapshot),
+                noCache: true,
+                environment: [:],
+                language: .en
+            )
+
+            for verdict in result.report.verdicts where verdict.firewallClass == .verified {
+                verifiedCount += 1
+                let localEntry = try #require(entriesByKey[verdict.citeKey])
+                let rec = try #require(verdict.record)
+                let unmapped = rawDoc.unmappedFieldsByCiteKey[verdict.citeKey] ?? [:]
+
+                let generated = VerifiedBibTeXWriter.generateEntry(
+                    citeKey: localEntry.citeKey,
+                    record: rec,
+                    localEntry: localEntry,
+                    localUnmappedFields: unmapped
+                )
+                generatedByKey["\(grp)/\(verdict.citeKey)"] = (localEntry, rec, generated)
+
+                #expect(generated.citeKey == localEntry.citeKey)
+                #expect(!generated.bibtex.isEmpty, "Empty generated BibTeX on \(grp)/\(verdict.citeKey)")
+
+                // Read back via M2 BibTeXCodec
+                let parsedDoc = codec.parseDocumentRecovering(generated.bibtex)
+                #expect(
+                    parsedDoc.errors.isEmpty,
+                    "Generated BibTeX had BIB001 errors on \(grp)/\(verdict.citeKey): \(parsedDoc.errors)\n\(generated.bibtex)"
+                )
+                #expect(parsedDoc.entries.count == 1, "Expected 1 entry on \(grp)/\(verdict.citeKey), got \(parsedDoc.entries.count)")
+                let roundTrip = try #require(parsedDoc.entries.first)
+
+                // Cite key matches caller-supplied key
+                #expect(roundTrip.citeKey == localEntry.citeKey)
+
+                // Title matches record (including subtitle)
+                let titleCmp = firewall.compareTitle(
+                    localTitle: roundTrip.title,
+                    remoteSubtitle: rec.subtitle,
+                    remoteTitle: rec.title,
+                    sourceName: rec.source
+                )
+                #expect(
+                    titleCmp.discrepancy == nil,
+                    "Round-trip title mismatch on \(grp)/\(verdict.citeKey): got '\(roundTrip.title)' vs record '\(rec.fullTitle)'"
+                )
+                if !rec.fullTitle.contains("\\") {
+                    #expect(
+                        roundTrip.title == rec.fullTitle,
+                        "Expected exact fullTitle '\(rec.fullTitle)' on \(grp)/\(verdict.citeKey), got '\(roundTrip.title)'"
+                    )
+                }
+
+                // All authors (family + given, or braced corporate full name) match record
+                #expect(
+                    roundTrip.authors.count == rec.authors.count,
+                    "Author count mismatch on \(grp)/\(verdict.citeKey): got \(roundTrip.authors.count) vs \(rec.authors.count)"
+                )
+                #expect(!roundTrip.authorsTruncated)
+                for (auIdx, recAu) in rec.authors.enumerated() where auIdx < roundTrip.authors.count {
+                    let rtAu = roundTrip.authors[auIdx]
+                    if recAu.isCorporate {
+                        let expectedCorp = recAu.name ?? recAu.familyName ?? ""
+                        #expect(rtAu.givenName.isEmpty)
+                        #expect(rtAu.familyName == expectedCorp)
+                        let escapedCorp = VerifiedBibTeXWriter.escapeBibTeXSpecialCharacters(
+                            VerifiedBibTeXWriter.decodeHTMLEntities(expectedCorp)
+                        )
+                        #expect(
+                            generated.bibtex.contains("{\(escapedCorp)}"),
+                            "Corporate author '\(expectedCorp)' must be enclosed in braces in \(grp)/\(verdict.citeKey)"
+                        )
+                    } else {
+                        #expect(rtAu.familyName == (recAu.familyName ?? ""))
+                        #expect(rtAu.givenName == (recAu.givenName ?? ""))
+                    }
+                }
+
+                // Year matches the publicationDate in record that aligned with localEntry.year
+                let expectedYear = try #require(localEntry.year)
+                #expect(roundTrip.year == expectedYear)
+
+                // Venue & entry type mapping
+                let isArXivOnly = (rec.source.lowercased() == "arxiv")
+                    || (rec.arxivID != nil && (rec.workType?.lowercased() == "preprint" || rec.workType?.lowercased() == "posted-content" || rec.containerTitle == nil))
+                if isArXivOnly {
+                    #expect(roundTrip.venue.isEmpty, "arXiv-only entry \(grp)/\(verdict.citeKey) must not write journal/booktitle, got '\(roundTrip.venue)'")
+                    #expect(!generated.bibtex.lowercased().contains("arxiv (cornell university)"))
+                    #expect(!generated.bibtex.contains("\n  journal"))
+                    #expect(!generated.bibtex.contains("\n  booktitle"))
+                } else if generated.entryType == "book" {
+                    #expect(roundTrip.kind == .book)
+                    #expect(roundTrip.venue.isEmpty)
+                } else if generated.entryType == "inproceedings" || generated.entryType == "incollection" {
+                    #expect(roundTrip.venue == (rec.containerTitle ?? ""))
+                    if rec.containerTitle != nil {
+                        #expect(generated.bibtex.contains("booktitle"))
+                        #expect(!generated.bibtex.contains("\n  journal "))
+                    }
+                } else if generated.entryType == "article" {
+                    #expect(roundTrip.venue == (rec.containerTitle ?? ""))
+                }
+
+                // Volume, issue (number), pages, publisher
+                #expect(roundTrip.volume == rec.volume, "Volume mismatch on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.issue == rec.issue, "Issue mismatch on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.pages == rec.pages, "Pages mismatch on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.publisher == rec.publisher, "Publisher mismatch on \(grp)/\(verdict.citeKey)")
+
+                // Identifiers: doi, eprint (+ archivePrefix + primaryClass), pmid
+                #expect(roundTrip.doi == rec.doi, "DOI mismatch on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.arxivID == rec.arxivID, "arXiv ID mismatch on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.pmid == rec.pmid, "PMID mismatch on \(grp)/\(verdict.citeKey)")
+                if let arxivID = rec.arxivID, !arxivID.isEmpty {
+                    #expect(generated.bibtex.contains("eprint"))
+                    #expect(generated.bibtex.contains("archivePrefix"))
+                    if let primCat = rec.primaryCategory, !primCat.isEmpty {
+                        #expect(generated.bibtex.contains("primaryClass"))
+                        #expect(parsedDoc.unmappedFieldsByCiteKey[localEntry.citeKey]?["primaryclass"] == primCat)
+                    }
+                }
+
+                // Caller-only fields (url, abstract, file, x-firewall-*) must never be written
+                #expect(roundTrip.url == nil, "Caller URL must be dropped on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.abstractText == nil, "Caller abstract must be dropped on \(grp)/\(verdict.citeKey)")
+                #expect(roundTrip.attachedPDFPath == nil)
+                #expect(roundTrip.untrustedDeclaredFirewallClass == nil)
+            }
+        }
+
+        #expect(verifiedCount == 206)
+
+        // Row 6 Case 1: audit_020 (local journal = Science, Crossref = Nature)
+        let audit020 = try #require(generatedByKey["audit_manual/audit_020"])
+        #expect(audit020.generated.bibtex.contains("journal"))
+        #expect(audit020.generated.bibtex.contains("{Nature}"))
+        #expect(!audit020.generated.bibtex.contains("{Science}"))
+        #expect(audit020.generated.changedFields.contains {
+            $0.field == "journal" && $0.given == "Science" && $0.written == "Nature" && $0.source == "Crossref"
+        })
+
+        // Row 6 Case 2: real_human_012 (local Ind. Eng. Chem., Crossref Industrial & Engineering Chemistry Research -> \& escaped)
+        let rh012 = try #require(generatedByKey["real_human/real_human_012"])
+        #expect(rh012.generated.bibtex.contains("{Industrial \\& Engineering Chemistry Research}"))
+        let rh012Parsed = try #require(codec.parseDocument(rh012.generated.bibtex).entries.first)
+        #expect(rh012Parsed.venue == "Industrial & Engineering Chemistry Research")
+        #expect(rh012.generated.changedFields.contains {
+            $0.field == "journal"
+                && $0.given == "Ind. Eng. Chem."
+                && $0.written == "Industrial & Engineering Chemistry Research"
+                && $0.source == "Crossref"
+        })
+
+        // Row 6 Case 3: real_typo_017 (local uppercase DOI -> Crossref lowercase DOI)
+        let rt017 = try #require(generatedByKey["real_typo/real_typo_017"])
+        #expect(rt017.generated.bibtex.contains("{10.1016/j.eswa.2024.123738}"))
+        #expect(!rt017.generated.bibtex.contains("10.1016/J.ESWA.2024.123738"))
+        #expect(rt017.generated.changedFields.contains {
+            $0.field == "doi"
+                && $0.given == "10.1016/J.ESWA.2024.123738"
+                && $0.written == "10.1016/j.eswa.2024.123738"
+                && $0.source == "Crossref"
+        })
+
+        // Row 6 Case 4: real_human_049 (OpenAlex arXiv preprint -> eprint + archivePrefix, NO journal/booktitle, NO "arXiv (Cornell University)")
+        let rh049 = try #require(generatedByKey["real_human/real_human_049"])
+        #expect(rh049.generated.entryType == "misc")
+        #expect(rh049.generated.bibtex.contains("eprint"))
+        #expect(rh049.generated.bibtex.contains("{1711.05101}"))
+        #expect(rh049.generated.bibtex.contains("archivePrefix"))
+        #expect(rh049.generated.bibtex.contains("{arXiv}"))
+        #expect(!rh049.generated.bibtex.contains("journal"))
+        #expect(!rh049.generated.bibtex.contains("booktitle"))
+        #expect(!rh049.generated.bibtex.lowercased().contains("cornell"))
+        #expect(rh049.generated.changedFields.contains {
+            $0.field == "booktitle"
+                && $0.given == "International Conference on Learning Representations"
+                && $0.written == nil
+        })
+        #expect(rh049.generated.changedFields.contains {
+            $0.field == "eprint" && $0.given == nil && $0.written == "1711.05101"
+        })
+
+        // Also check arXiv Atom record (audit_021) writes eprint, archivePrefix, AND primaryClass, and suppresses synthetic "arXiv (Cornell University)"
+        let audit021 = try #require(generatedByKey["audit_manual/audit_021"])
+        #expect(audit021.generated.bibtex.contains("eprint"))
+        #expect(audit021.generated.bibtex.contains("archivePrefix"))
+        #expect(audit021.generated.bibtex.contains("primaryClass"))
+        #expect(audit021.generated.bibtex.contains("{cs.CL}"))
+        #expect(!audit021.generated.bibtex.contains("journal"))
+
+        // Explicit check: HTML entity decoding + & % $ # _ escaping + UTF-8 non-ASCII preservation + OpenAlex "arXiv (Cornell University)" guard
+        let specialRec = RegistryWorkRecord(
+            source: "Crossref",
+            requestURL: "https://api.crossref.org/works/10.1000/test_1",
+            fetchedAt: "2026-11-16T00:00:00Z",
+            origin: .replay,
+            workType: "journal-article",
+            title: "100% &amp; $50 #1_test for Schrödinger&#x2019;s α-model",
+            authors: [
+                RegistryWorkAuthor(givenName: "Jürgen", familyName: "Schmidhuber", isCorporate: false),
+                RegistryWorkAuthor(name: "R&amp;D_Lab 100%", isCorporate: true)
+            ],
+            publicationDates: RegistryPublicationDates(
+                publishedPrint: RegistryPublicationDate(year: 2025),
+                publishedOnline: RegistryPublicationDate(year: 2024)
+            ),
+            containerTitle: " R&amp;D % Journal $1 #2_3 ",
+            volume: "12",
+            issue: "3_suppl",
+            pages: "10-20",
+            publisher: "Springer &amp; Sons",
+            doi: "10.1000/test_1"
+        )
+        let specialLocal = BibliographyEntry(
+            citeKey: "Custom_Key_2024",
+            kind: .article,
+            title: "Old title",
+            authors: [BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber")],
+            year: 2024,
+            venue: "Old Venue",
+            url: "https://example.com/drop-me",
+            abstractText: "Drop this abstract"
+        )
+        let specialGen = VerifiedBibTeXWriter.generateEntry(
+            citeKey: "Custom_Key_2024",
+            record: specialRec,
+            localEntry: specialLocal,
+            localUnmappedFields: ["keywords": "ml, ai", "month": "may"]
+        )
+        #expect(specialGen.bibtex.hasPrefix("@article{Custom_Key_2024,"))
+        #expect(specialGen.bibtex.contains("100\\% \\& \\$50 \\#1\\_test for Schrödinger’s α-model"))
+        #expect(specialGen.bibtex.contains("Schmidhuber, Jürgen and {R\\&D\\_Lab 100\\%}"))
+        #expect(specialGen.bibtex.contains("10.1000/test_1"))
+        #expect(!specialGen.bibtex.contains("drop-me"))
+        #expect(!specialGen.bibtex.contains("keywords"))
+        let specialParsedDoc = try codec.parseDocument(specialGen.bibtex)
+        let specialParsed = try #require(specialParsedDoc.entries.first)
+        #expect(specialParsed.year == 2024)
+        #expect(specialParsed.title == "100% & $50 #1_test for Schrödinger’s α-model")
+        #expect(specialParsed.venue == "R&D % Journal $1 #2_3")
+        #expect(specialParsed.issue == "3_suppl")
+        #expect(specialParsed.doi == "10.1000/test_1")
+        #expect(specialParsed.authors.count == 2)
+        #expect(specialParsed.authors[0] == BibAuthor(givenName: "Jürgen", familyName: "Schmidhuber"))
+        #expect(specialParsed.authors[1] == BibAuthor(givenName: "", familyName: "R&D_Lab 100%"))
+    }
+
+    @Test("M3 Stage 03: exact deduplication checks case-insensitive cite key, normalized DOI, arXiv ID, PMID, and exact (title + year + firstAuthor) without Jaro-Winkler")
+    func m3Stage03DeduplicationAllFourSignalsAndConflictRules() throws {
+        let existing: [BibliographyEntry] = [
+            BibliographyEntry(
+                citeKey: "LeCun2015",
+                kind: .article,
+                title: "Deep learning",
+                authors: [
+                    BibAuthor(givenName: "Yann", familyName: "LeCun"),
+                    BibAuthor(givenName: "Yoshua", familyName: "Bengio"),
+                    BibAuthor(givenName: "Geoffrey", familyName: "Hinton")
+                ],
+                year: 2015,
+                venue: "Nature",
+                doi: "https://doi.org/10.1038/NATURE14539."
+            ),
+            BibliographyEntry(
+                citeKey: "Vaswani2017",
+                kind: .preprint,
+                title: "Attention Is All You Need",
+                authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+                year: 2017,
+                arxivID: "arXiv:1706.03762v5"
+            ),
+            BibliographyEntry(
+                citeKey: "Ito2015",
+                kind: .article,
+                title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+                authors: [BibAuthor(givenName: "Hiroshi T.", familyName: "Ito")],
+                year: 2015,
+                venue: "Nature",
+                pmid: "PMID: 0026017312"
+            ),
+            BibliographyEntry(
+                citeKey: "Knuth1968",
+                kind: .book,
+                title: "The {Art} of Computer Programming, Volume 1: Fundamental Algorithms",
+                authors: [BibAuthor(givenName: "Donald E.", familyName: "Knuth")],
+                year: 1968,
+                publisher: "Addison-Wesley"
+            )
+        ]
+
+        // 1a. Same key + same paper -> SKIPPED_DUPLICATE (matchedOn: .citeKey)
+        let sameKeySamePaper = BibliographyEntry(
+            citeKey: "lecun2015", // case-insensitive match with LeCun2015
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            doi: "10.1038/nature14539"
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: sameKeySamePaper, existingEntries: existing)
+                == .skippedDuplicate(existingKey: "LeCun2015", matchedOn: .citeKey)
+        )
+
+        // 1b. Same key (case-insensitive) + DIFFERENT paper -> ERR_CITE_KEY_CONFLICT
+        let sameKeyDifferentPaper = BibliographyEntry(
+            citeKey: "LECUN2015",
+            kind: .article,
+            title: "Residual Learning for Image Recognition",
+            authors: [BibAuthor(givenName: "Kaiming", familyName: "He")],
+            year: 2016,
+            doi: "10.1109/cvpr.2016.90"
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: sameKeyDifferentPaper, existingEntries: existing)
+                == .citeKeyConflict(citeKey: "LECUN2015", existingKey: "LeCun2015")
+        )
+
+        // 2. Different key + normalized DOI match -> SKIPPED_DUPLICATE (matchedOn: .doi)
+        let diffKeySameDOI = BibliographyEntry(
+            citeKey: "dl_nature_2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            doi: "10.1038/nature14539"
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: diffKeySameDOI, existingEntries: existing)
+                == .skippedDuplicate(existingKey: "LeCun2015", matchedOn: .doi)
+        )
+
+        // 3. Different key + normalized arXiv ID match (version stripped) -> SKIPPED_DUPLICATE (matchedOn: .arxiv)
+        let diffKeySameArXiv = BibliographyEntry(
+            citeKey: "transformer_2017",
+            kind: .preprint,
+            title: "Attention Is All You Need",
+            authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+            year: 2017,
+            arxivID: "1706.03762"
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: diffKeySameArXiv, existingEntries: existing)
+                == .skippedDuplicate(existingKey: "Vaswani2017", matchedOn: .arxiv)
+        )
+
+        // 4. Different key + normalized PMID match -> SKIPPED_DUPLICATE (matchedOn: .pmid)
+        let diffKeySamePMID = BibliographyEntry(
+            citeKey: "navigation_2015",
+            kind: .article,
+            title: "A prefrontal-thalamo-hippocampal circuit for goal-directed spatial navigation",
+            authors: [BibAuthor(givenName: "HT", familyName: "Ito")],
+            year: 2015,
+            pmid: "26017312"
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: diffKeySamePMID, existingEntries: existing)
+                == .skippedDuplicate(existingKey: "Ito2015", matchedOn: .pmid)
+        )
+
+        // 5. Different key + exact normalized (title + year + firstAuthor) match -> SKIPPED_DUPLICATE (matchedOn: .titleYearFirstAuthor)
+        let diffKeySameTYA = BibliographyEntry(
+            citeKey: "taocp_vol1",
+            kind: .book,
+            title: "the art of computer programming volume 1 fundamental algorithms",
+            authors: [BibAuthor(givenName: "D.", familyName: "Knuth")],
+            year: 1968
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: diffKeySameTYA, existingEntries: existing)
+                == .skippedDuplicate(existingKey: "Knuth1968", matchedOn: .titleYearFirstAuthor)
+        )
+
+        // 6. Negative check (NO Jaro-Winkler!): "Attention is not all you need" vs "Attention Is All You Need" must NOT be duplicate!
+        let nearTitleNotDuplicate = BibliographyEntry(
+            citeKey: "dong2021attention",
+            kind: .inproceedings,
+            title: "Attention is not all you need",
+            authors: [BibAuthor(givenName: "Ashish", familyName: "Vaswani")],
+            year: 2017
+        )
+        #expect(
+            VerifiedBibTeXWriter.checkDuplicate(candidate: nearTitleNotDuplicate, existingEntries: existing)
+                == .allowAppend
+        )
+    }
+
+    @Test("M3 Stage 03 (Row 13 library part): locked O_APPEND writer enforces 8 path/encoding/syntax/CRLF targets, preserves prefix & inode, and appends newline when missing")
+    func m3Stage03AppendWriterEightTargetsLineEndingsInodeAndRollback() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent("scholaros-m3s03-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        let lecunRec = RegistryWorkRecord(
+            source: "Crossref",
+            requestURL: "https://api.crossref.org/works/10.1038/nature14539",
+            fetchedAt: "2026-11-16T02:39:27Z",
+            origin: .replay,
+            workType: "journal-article",
+            title: "Deep learning",
+            authors: [
+                RegistryWorkAuthor(givenName: "Yann", familyName: "LeCun", isCorporate: false),
+                RegistryWorkAuthor(givenName: "Yoshua", familyName: "Bengio", isCorporate: false),
+                RegistryWorkAuthor(givenName: "Geoffrey", familyName: "Hinton", isCorporate: false)
+            ],
+            publicationDates: RegistryPublicationDates(
+                publishedPrint: RegistryPublicationDate(year: 2015, month: 5, day: 28)
+            ),
+            containerTitle: "Nature",
+            volume: "521",
+            issue: "7553",
+            pages: "436-444",
+            publisher: "Springer Science and Business Media LLC",
+            doi: "10.1038/nature14539"
+        )
+        let lecunLocal = BibliographyEntry(
+            citeKey: "lecun2015",
+            kind: .article,
+            title: "Deep learning",
+            authors: [BibAuthor(givenName: "Yann", familyName: "LeCun")],
+            year: 2015,
+            venue: "Science",
+            doi: "10.1038/nature14539"
+        )
+
+        func fileInodeAndMtime(_ path: String) throws -> (ino: UInt64, mtimeSec: Int, mtimeNsec: Int, bytes: Data) {
+            var st = Darwin.stat()
+            guard Darwin.lstat(path, &st) == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            return (st.st_ino, st.st_mtimespec.tv_sec, st.st_mtimespec.tv_nsec, data)
+        }
+
+        // Target 1: Read-only .bib file -> ERR_BIB_PATH, bytes unchanged
+        let readOnlyBib = tempRoot.appendingPathComponent("readonly.bib")
+        let initialValidBib = Data("@article{existing2020,\n  title = {Existing},\n  author = {Doe, Jane},\n  year = 2020\n}\n".utf8)
+        try initialValidBib.write(to: readOnlyBib)
+        try fm.setAttributes([.posixPermissions: 0o444], ofItemAtPath: readOnlyBib.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: readOnlyBib.path) }
+        let roBefore = try fileInodeAndMtime(readOnlyBib.path)
+        #expect(throws: VerifiedBibTeXWriteError.self) {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: readOnlyBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+        }
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: readOnlyBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_PATH")
+        }
+        let roAfter = try fileInodeAndMtime(readOnlyBib.path)
+        #expect(roAfter.bytes == roBefore.bytes)
+
+        // Target 2: Directory (even named dir.bib) -> ERR_BIB_PATH
+        let dirBib = tempRoot.appendingPathComponent("folder.bib", isDirectory: true)
+        try fm.createDirectory(at: dirBib, withIntermediateDirectories: false)
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: dirBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected directory target to throw ERR_BIB_PATH")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_PATH")
+        }
+
+        // Target 3: File inside non-existent parent directory -> ERR_BIB_PATH, parent NOT created
+        let missingParentDir = tempRoot.appendingPathComponent("does_not_exist_dir", isDirectory: true)
+        let missingParentBib = missingParentDir.appendingPathComponent("refs.bib")
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: missingParentBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected missing parent directory to throw ERR_BIB_PATH")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_PATH")
+        }
+        #expect(!fm.fileExists(atPath: missingParentDir.path))
+
+        // Target 4: Extension not .bib -> ERR_BIB_PATH, file not created
+        let txtFile = tempRoot.appendingPathComponent("refs.txt")
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: txtFile.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected non-.bib extension to throw ERR_BIB_PATH")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_PATH")
+        }
+        #expect(!fm.fileExists(atPath: txtFile.path))
+
+        // Target 5: Symlink pointing to a .bib file -> ERR_BIB_PATH, target .bib untouched
+        let realTargetBib = tempRoot.appendingPathComponent("real_target.bib")
+        try initialValidBib.write(to: realTargetBib)
+        let symlinkBib = tempRoot.appendingPathComponent("symlink_refs.bib")
+        try fm.createSymbolicLink(at: symlinkBib, withDestinationURL: realTargetBib)
+        let realBefore = try fileInodeAndMtime(realTargetBib.path)
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: symlinkBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected symlink to .bib to throw ERR_BIB_PATH")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_PATH")
+        }
+        let realAfter = try fileInodeAndMtime(realTargetBib.path)
+        #expect(realAfter.bytes == realBefore.bytes)
+        #expect(realAfter.mtimeSec == realBefore.mtimeSec && realAfter.mtimeNsec == realBefore.mtimeNsec)
+
+        // Target 6: Latin-1 (ISO-8859-1) encoded .bib -> ERR_BIB_ENCODING, file bytes & mtime unchanged
+        let latin1Bib = tempRoot.appendingPathComponent("latin1.bib")
+        let latin1String = "@article{schrodinger1926,\n  author = {Schr\u{00F6}dinger, Erwin},\n  title = {Quantisierung als Eigenwertproblem},\n  year = 1926\n}\n"
+        let latin1Data = try #require(latin1String.data(using: .isoLatin1))
+        #expect(String(data: latin1Data, encoding: .utf8) == nil)
+        try latin1Data.write(to: latin1Bib)
+        let latin1Before = try fileInodeAndMtime(latin1Bib.path)
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: latin1Bib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected Latin-1 .bib to throw ERR_BIB_ENCODING")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_BIB_ENCODING")
+        }
+        let latin1After = try fileInodeAndMtime(latin1Bib.path)
+        #expect(latin1After.bytes == latin1Before.bytes)
+        #expect(latin1After.mtimeSec == latin1Before.mtimeSec && latin1After.mtimeNsec == latin1Before.mtimeNsec)
+
+        // Target 7: .bib with BIB001 syntax error -> ERR_BIB_SYNTAX carrying line number, file bytes & mtime unchanged
+        let brokenBib = tempRoot.appendingPathComponent("broken_bib001.bib")
+        let brokenContent = """
+        @article{good_one,
+          author = {Doe, Jane},
+          title = {Valid First Entry},
+          year = 2021
+        }
+
+        @article{broken_two,
+          author = {Smith, John},
+          title = {Unclosed brace at EOF
+        """
+        try Data(brokenContent.utf8).write(to: brokenBib)
+        let brokenBefore = try fileInodeAndMtime(brokenBib.path)
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                toBibFileAtPath: brokenBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal
+            )
+            Issue.record("Expected BIB001 .bib to throw ERR_BIB_SYNTAX")
+        } catch let VerifiedBibTeXWriteError.syntaxError(_, line, startLine, _, _) {
+            #expect(startLine == 7)
+            #expect(line >= 7)
+        } catch {
+            Issue.record("Expected VerifiedBibTeXWriteError.syntaxError, got \(error)")
+        }
+        let brokenAfter = try fileInodeAndMtime(brokenBib.path)
+        #expect(brokenAfter.bytes == brokenBefore.bytes)
+        #expect(brokenAfter.mtimeSec == brokenBefore.mtimeSec && brokenAfter.mtimeNsec == brokenBefore.mtimeNsec)
+
+        // Target 8: CRLF .bib -> succeeds, original bytes are exact prefix, appended bytes use CRLF, inode unchanged, 0 parse errors
+        let crlfFixtureURL = Self.recordedRegistryFixturesURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("crlf-two-entries.bib")
+        let crlfBib = tempRoot.appendingPathComponent("crlf_copy.bib")
+        try fm.copyItem(at: crlfFixtureURL, to: crlfBib)
+        let crlfBefore = try fileInodeAndMtime(crlfBib.path)
+        let crlfOutcome = try VerifiedBibTeXWriter.appendVerifiedEntry(
+            toBibFileAtPath: crlfBib.path,
+            citeKey: "lecun2015",
+            record: lecunRec,
+            localEntry: lecunLocal
+        )
+        guard case .appendedVerified(let crlfGen) = crlfOutcome else {
+            Issue.record("Expected .appendedVerified on CRLF .bib, got \(crlfOutcome)")
+            return
+        }
+        #expect(crlfGen.changedFields.contains { $0.field == "journal" && $0.given == "Science" && $0.written == "Nature" })
+        let crlfAfter = try fileInodeAndMtime(crlfBib.path)
+        #expect(crlfAfter.ino == crlfBefore.ino, "Inode must not change on O_APPEND write")
+        #expect(crlfAfter.bytes.count > crlfBefore.bytes.count)
+        #expect(crlfAfter.bytes.prefix(crlfBefore.bytes.count) == crlfBefore.bytes, "Original bytes must be exact prefix")
+        let appendedSlice = Array(crlfAfter.bytes.dropFirst(crlfBefore.bytes.count))
+        for idx in appendedSlice.indices where appendedSlice[idx] == 0x0A {
+            #expect(idx > 0 && appendedSlice[idx - 1] == 0x0D, "Found bare LF at appended byte \(idx) in CRLF file")
+        }
+        let crlfTextAfter = try #require(String(data: crlfAfter.bytes, encoding: .utf8))
+        let crlfParsed = BibTeXCodec().parseDocumentRecovering(crlfTextAfter)
+        #expect(crlfParsed.errors.isEmpty)
+        #expect(crlfParsed.entries.count == 3)
+        #expect(crlfParsed.entries.last?.citeKey == "lecun2015")
+
+        // Additional: file missing trailing newline -> prepends newline, preserves prefix & inode, 0 parse errors; re-appending skips duplicate
+        let noNewlineBib = tempRoot.appendingPathComponent("no_trailing_nl.bib")
+        let noNLBytes = Data("@article{first2020,\n  author = {Doe, Jane},\n  title = {No Trailing Newline},\n  year = 2020\n}".utf8)
+        #expect(noNLBytes.last != 0x0A)
+        try noNLBytes.write(to: noNewlineBib)
+        let noNLBefore = try fileInodeAndMtime(noNewlineBib.path)
+        let noNLOutcome = try VerifiedBibTeXWriter.appendVerifiedEntry(
+            toBibFileAtPath: noNewlineBib.path,
+            citeKey: "lecun2015",
+            record: lecunRec,
+            localEntry: lecunLocal
+        )
+        guard case .appendedVerified = noNLOutcome else {
+            Issue.record("Expected .appendedVerified on no-trailing-newline .bib")
+            return
+        }
+        let noNLAfter = try fileInodeAndMtime(noNewlineBib.path)
+        #expect(noNLAfter.ino == noNLBefore.ino)
+        #expect(noNLAfter.bytes.prefix(noNLBytes.count) == noNLBytes)
+        #expect(noNLAfter.bytes[noNLBytes.count] == 0x0A, "Expected newline byte immediately after unterminated '}'")
+        let noNLParsed = BibTeXCodec().parseDocumentRecovering(try #require(String(data: noNLAfter.bytes, encoding: .utf8)))
+        #expect(noNLParsed.errors.isEmpty)
+        #expect(noNLParsed.entries.count == 2)
+
+        // Re-appending same paper with different key returns SKIPPED_DUPLICATE and leaves bytes untouched
+        let dupOutcome = try VerifiedBibTeXWriter.appendVerifiedEntry(
+            toBibFileAtPath: noNewlineBib.path,
+            citeKey: "lecun_dup_key",
+            record: lecunRec,
+            localEntry: lecunLocal
+        )
+        #expect(dupOutcome == .skippedDuplicate(existingKey: "lecun2015", matchedOn: .doi))
+        let afterDup = try fileInodeAndMtime(noNewlineBib.path)
+        #expect(afterDup.bytes == noNLAfter.bytes)
+
+        // Post-write prefix/length mismatch rollback: truncates file back to exact original length and throws ERR_IO
+        let rollbackBib = tempRoot.appendingPathComponent("rollback_test.bib")
+        try initialValidBib.write(to: rollbackBib)
+        let rbBefore = try fileInodeAndMtime(rollbackBib.path)
+        do {
+            _ = try VerifiedBibTeXWriter.appendVerifiedEntryInternal(
+                toBibFileAtPath: rollbackBib.path,
+                citeKey: "lecun2015",
+                record: lecunRec,
+                localEntry: lecunLocal,
+                postWriteVerificationHook: { fd in
+                    let extra: [UInt8] = [0x25] // append extra '%' so post-write byte count != expected
+                    _ = Darwin.write(fd, extra, 1)
+                }
+            )
+            Issue.record("Expected prefix/length verification failure to throw ERR_IO")
+        } catch let err as VerifiedBibTeXWriteError {
+            #expect(err.errorCode == "ERR_IO")
+        }
+        let rbAfter = try fileInodeAndMtime(rollbackBib.path)
+        #expect(rbAfter.bytes == rbBefore.bytes, "Rollback via ftruncate must restore exact original bytes")
+    }
+
+    @Test("M3 Stage 03 (Row 14 library part): two concurrent writers each opening file independently append 20 distinct entries (40 total) with 0 lost/duplicate entries and 0 parse errors")
+    func m3Stage03ConcurrentAppend40EntriesZeroCorruption() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent("scholaros-m3s03-conc-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        let targetBib = tempRoot.appendingPathComponent("concurrent40.bib")
+        try Data().write(to: targetBib)
+        var initialStat = Darwin.stat()
+        #expect(Darwin.lstat(targetBib.path, &initialStat) == 0)
+        let initialInode = initialStat.st_ino
+
+        func makeWorkItem(worker: String, index: Int) -> (String, RegistryWorkRecord, BibliographyEntry) {
+            let key = "\(worker)_entry_\(String(format: "%02d", index))"
+            let doi = "10.1000/\(worker).\(index)"
+            let title = "Concurrent Verification Paper \(worker.uppercased()) Number \(index)"
+            let family = "Author\(worker.uppercased())\(index)"
+            let rec = RegistryWorkRecord(
+                source: "Crossref",
+                requestURL: "https://api.crossref.org/works/\(doi)",
+                fetchedAt: "2026-11-16T00:00:00Z",
+                origin: .replay,
+                workType: "journal-article",
+                title: title,
+                authors: [RegistryWorkAuthor(givenName: "Alice", familyName: family, isCorporate: false)],
+                publicationDates: RegistryPublicationDates(publishedPrint: RegistryPublicationDate(year: 2024)),
+                containerTitle: "Journal of Concurrent Systems & Testing",
+                volume: "\(index)",
+                issue: "1",
+                pages: "\(index * 10)-\(index * 10 + 9)",
+                publisher: "Concurrency Press",
+                doi: doi
+            )
+            let local = BibliographyEntry(
+                citeKey: key,
+                kind: .article,
+                title: title,
+                authors: [BibAuthor(givenName: "Alice", familyName: family)],
+                year: 2024,
+                venue: "Journal of Concurrent Systems & Testing",
+                doi: doi
+            )
+            return (key, rec, local)
+        }
+
+        let workerAItems = (1...20).map { makeWorkItem(worker: "w1", index: $0) }
+        let workerBItems = (1...20).map { makeWorkItem(worker: "w2", index: $0) }
+
+        // Synchronize start on two dedicated OS threads so both contend simultaneously via separate open() + flock(LOCK_EX)
+        let readySemA = DispatchSemaphore(value: 0)
+        let readySemB = DispatchSemaphore(value: 0)
+        let startGate = DispatchSemaphore(value: 0)
+        let doneGroup = DispatchGroup()
+
+        final class WorkerResultBox: @unchecked Sendable {
+            var outcomes: [VerifiedBibTeXAppendOutcome] = []
+            var caughtError: (any Error)?
+        }
+        let boxA = WorkerResultBox()
+        let boxB = WorkerResultBox()
+        let bibPath = targetBib.path
+
+        doneGroup.enter()
+        let threadA = Thread {
+            readySemA.signal()
+            startGate.wait()
+            do {
+                for (key, rec, local) in workerAItems {
+                    let out = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                        toBibFileAtPath: bibPath,
+                        citeKey: key,
+                        record: rec,
+                        localEntry: local
+                    )
+                    boxA.outcomes.append(out)
+                }
+            } catch {
+                boxA.caughtError = error
+            }
+            doneGroup.leave()
+        }
+
+        doneGroup.enter()
+        let threadB = Thread {
+            readySemB.signal()
+            startGate.wait()
+            do {
+                for (key, rec, local) in workerBItems {
+                    let out = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                        toBibFileAtPath: bibPath,
+                        citeKey: key,
+                        record: rec,
+                        localEntry: local
+                    )
+                    boxB.outcomes.append(out)
+                }
+            } catch {
+                boxB.caughtError = error
+            }
+            doneGroup.leave()
+        }
+
+        threadA.start()
+        threadB.start()
+        readySemA.wait()
+        readySemB.wait()
+        startGate.signal()
+        startGate.signal()
+        doneGroup.wait()
+
+        if let errA = boxA.caughtError {
+            Issue.record("Worker A failed: \(errA)")
+        }
+        if let errB = boxB.caughtError {
+            Issue.record("Worker B failed: \(errB)")
+        }
+        #expect(boxA.outcomes.count == 20)
+        #expect(boxB.outcomes.count == 20)
+
+        var finalStat = Darwin.stat()
+        #expect(Darwin.lstat(bibPath, &finalStat) == 0)
+        #expect(finalStat.st_ino == initialInode)
+
+        let finalText = try String(contentsOf: targetBib, encoding: .utf8)
+        let parsed = BibTeXCodec().parseDocumentRecovering(finalText)
+        #expect(parsed.errors.isEmpty, "Expected 0 BibTeX parse errors after concurrent writes, got \(parsed.errors)")
+        let bib002Diags = parsed.diagnostics.filter { $0.code == "BIB002" }
+        #expect(bib002Diags.isEmpty, "Expected 0 duplicate-key diagnostics, got \(bib002Diags)")
+        #expect(parsed.entries.count == 40)
+
+        let expectedKeys = Set((workerAItems + workerBItems).map(\.0))
+        let actualKeys = Set(parsed.entries.map(\.citeKey))
+        #expect(actualKeys == expectedKeys)
+
+        // Also race two threads on the SAME paper simultaneously to prove flock serializes re-read + dedup + O_APPEND
+        let sharedItem = makeWorkItem(worker: "shared", index: 99)
+        let dupReadyA = DispatchSemaphore(value: 0)
+        let dupReadyB = DispatchSemaphore(value: 0)
+        let dupStart = DispatchSemaphore(value: 0)
+        let dupDone = DispatchGroup()
+        let dupBoxA = WorkerResultBox()
+        let dupBoxB = WorkerResultBox()
+
+        dupDone.enter()
+        Thread {
+            dupReadyA.signal()
+            dupStart.wait()
+            do {
+                let out = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                    toBibFileAtPath: bibPath,
+                    citeKey: "shared_race_a",
+                    record: sharedItem.1,
+                    localEntry: sharedItem.2
+                )
+                dupBoxA.outcomes.append(out)
+            } catch {
+                dupBoxA.caughtError = error
+            }
+            dupDone.leave()
+        }.start()
+
+        dupDone.enter()
+        Thread {
+            dupReadyB.signal()
+            dupStart.wait()
+            do {
+                let out = try VerifiedBibTeXWriter.appendVerifiedEntry(
+                    toBibFileAtPath: bibPath,
+                    citeKey: "shared_race_b",
+                    record: sharedItem.1,
+                    localEntry: sharedItem.2
+                )
+                dupBoxB.outcomes.append(out)
+            } catch {
+                dupBoxB.caughtError = error
+            }
+            dupDone.leave()
+        }.start()
+
+        dupReadyA.wait()
+        dupReadyB.wait()
+        dupStart.signal()
+        dupStart.signal()
+        dupDone.wait()
+
+        #expect(dupBoxA.caughtError == nil && dupBoxB.caughtError == nil)
+        let combinedDupOutcomes = dupBoxA.outcomes + dupBoxB.outcomes
+        let appendedDupCount = combinedDupOutcomes.filter {
+            if case .appendedVerified = $0 { return true }
+            return false
+        }.count
+        let skippedDupCount = combinedDupOutcomes.filter {
+            if case .skippedDuplicate = $0 { return true }
+            return false
+        }.count
+        #expect(appendedDupCount == 1, "Expected exactly 1 thread to append shared paper under flock, got \(combinedDupOutcomes)")
+        #expect(skippedDupCount == 1, "Expected second thread to observe duplicate inside flock, got \(combinedDupOutcomes)")
+        let afterSharedParsed = BibTeXCodec().parseDocumentRecovering(try String(contentsOf: targetBib, encoding: .utf8))
+        #expect(afterSharedParsed.errors.isEmpty)
+        #expect(afterSharedParsed.entries.count == 41)
+    }
 }
