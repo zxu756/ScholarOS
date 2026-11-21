@@ -129,6 +129,8 @@ public struct ScholarCLIRunner: Sendable {
                 desc = "命令行参数错误：\(detail)"
             case .fileNotFound(let path) where cliLang == .zhHans:
                 desc = "未找到文件或工程路径：\(path)"
+            case .pdfExtractionFailure(let detail) where cliLang == .zhHans:
+                desc = "PDF 解析或文字提取失败：\(detail)"
             case .unverifiedCitationBlocked(let key, let status, let reason):
                 if cliLang == .zhHans {
                     desc = "引文键 '\(key)'（\(status)）未通过引用核查：\(reason)"
@@ -1259,6 +1261,109 @@ public struct ScholarCLIRunner: Sendable {
             await server.serveStdio()
             return CLIExecutionOutput(stdout: "", exitCode: 0)
 
+        case "locate-evidence":
+            let parsed = try parseArgs(
+                rest,
+                subcommand: subcommand,
+                valueFlags: ["--claim", "--top-k"],
+                boolFlags: ["--json", "--offline"],
+                maxPositionals: 1,
+                lang: lang
+            )
+            guard let pdfPath = parsed.positionals.first,
+                  !pdfPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Usage: scholaros locate-evidence <paper.pdf> --claim <text> [--top-k <N>] [--json]",
+                        "用法：scholaros locate-evidence <paper.pdf> --claim <文字> [--top-k <N>] [--json]"
+                    )
+                )
+            }
+            guard let rawClaim = parsed.values["--claim"] else {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Missing required option '--claim <text>'. Usage: scholaros locate-evidence <paper.pdf> --claim <text> [--top-k <N>] [--json]",
+                        "缺少必填选项 '--claim <文字>'。用法：scholaros locate-evidence <paper.pdf> --claim <文字> [--top-k <N>] [--json]"
+                    )
+                )
+            }
+            guard !rawClaim.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Option '--claim' must not be empty or whitespace-only.",
+                        "选项 '--claim' 不能为空或仅包含空白字符。"
+                    )
+                )
+            }
+
+            let topK: Int
+            if let rawTopK = parsed.values["--top-k"] {
+                let trimmedTopK = rawTopK.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let parsedTopK = Int(trimmedTopK), parsedTopK >= 1 else {
+                    throw ScholarOSError.invalidCLIArguments(
+                        lang.L(
+                            "Option '--top-k' must be a positive integer (>= 1), got '\(rawTopK)'.",
+                            "选项 '--top-k' 必须是大于等于 1 的正整数，当前为 '\(rawTopK)'。"
+                        )
+                    )
+                }
+                topK = parsedTopK
+            } else {
+                topK = PDFEvidenceCLIAndMCPService.defaultTopK
+            }
+
+            let result = try PDFEvidenceCLIAndMCPService.locateEvidenceInLocalPDF(
+                atPath: pdfPath,
+                claim: rawClaim,
+                topK: topK,
+                language: lang
+            )
+            let emitJSON = parsed.bools.contains("--json")
+            let stdoutText = emitJSON
+                ? try PDFEvidenceCLIAndMCPService.encodeEvidenceLocalizationJSON(result)
+                : PDFEvidenceCLIAndMCPService.formatHumanLocateEvidenceSummary(result, language: lang)
+            return CLIExecutionOutput(
+                stdout: stdoutText,
+                stderr: "",
+                exitCode: result.verdict.cliExitCode
+            )
+
+        case "segment-pdf":
+            let parsed = try parseArgs(
+                rest,
+                subcommand: subcommand,
+                valueFlags: [],
+                boolFlags: ["--json", "--offline"],
+                maxPositionals: 1,
+                lang: lang
+            )
+            guard let pdfPath = parsed.positionals.first,
+                  !pdfPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ScholarOSError.invalidCLIArguments(
+                    lang.L(
+                        "Usage: scholaros segment-pdf <paper.pdf> [--json]",
+                        "用法：scholaros segment-pdf <paper.pdf> [--json]"
+                    )
+                )
+            }
+            let loaded = try PDFEvidenceCLIAndMCPService.loadAndSegmentLocalPDF(
+                atPath: pdfPath,
+                language: lang
+            )
+            let report = PDFEvidenceCLIAndMCPService.buildSegmentationReport(
+                pdfFileName: loaded.pdfFileName,
+                chunks: loaded.chunks
+            )
+            let emitJSON = parsed.bools.contains("--json")
+            let stdoutText = emitJSON
+                ? try PDFEvidenceCLIAndMCPService.encodeSegmentationJSON(report)
+                : PDFEvidenceCLIAndMCPService.formatHumanSegmentationSummary(report, language: lang)
+            return CLIExecutionOutput(
+                stdout: stdoutText,
+                stderr: "",
+                exitCode: 0
+            )
+
         default:
             throw ScholarOSError.invalidCLIArguments(
                 lang.L(
@@ -1876,6 +1981,9 @@ public struct ScholarCLIRunner: Sendable {
                 --json                                               Emit structured JSON audit report
               cache clear                                            Remove registry.sqlite (-wal/-shm) in SCHOLAR_CACHE_DIR or ~/Library/Caches/ScholarOS
               format-bib <refs.bib> [--style apa|ieee] [--json]      Format BibTeX entries in APA 7th or IEEE style
+              locate-evidence <paper.pdf> --claim <text> [--top-k <N>] [--json]
+                                                                     Locate matching PDF passages (page & bounding box) and check explicit numbers/units (exit 0 FOUND, 1 NUMERIC_MISMATCH, 3 NOT_FOUND, 2 error)
+              segment-pdf <paper.pdf> [--json]                       Segment local PDF into ordered body, heading, table/figure & margin chunks (exit 0 ok, 2 error)
 
             Project Bundle & Demo Commands (require --project <dir.scholarproj> or explicit --demo):
               init [--project <dir.scholarproj>] [--seed-demo]       Initialize .scholarproj SQLite WAL bundle
@@ -1914,6 +2022,9 @@ public struct ScholarCLIRunner: Sendable {
                 --json                                               输出结构化 JSON 核查报告
               cache clear                                            删除当前生效缓存目录（SCHOLAR_CACHE_DIR 或 ~/Library/Caches/ScholarOS）下的 registry.sqlite
               format-bib <refs.bib> [--style apa|ieee] [--json]      按 APA 7th 或 IEEE 格式输出参考文献列表
+              locate-evidence <paper.pdf> --claim <文字> [--top-k <N>] [--json]
+                                                                     在本地 PDF 中定位相近段落（含页码与位置框）并核对显式数字与单位（退出码：0 找到，1 数字不一致，3 没找到，2 错误）
+              segment-pdf <paper.pdf> [--json]                       对本地 PDF 执行几何分栏与标题/图表/页眉页脚分段导出（退出码：0 成功，2 错误）
 
             工程包与演示命令（必须显式指定 --project <dir.scholarproj> 或 --demo）：
               init [--project <dir.scholarproj>] [--seed-demo]       初始化 .scholarproj SQLite WAL 工程包
