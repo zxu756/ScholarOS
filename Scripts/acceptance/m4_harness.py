@@ -88,23 +88,49 @@ def strip_spaces_and_thousands_commas(text: str) -> str:
     return no_thousands.lower()
 
 
+def extract_normalized_numbers(text: str) -> List[str]:
+    """Extract normalized numeric tokens from a numeric phrase.
+
+    Preserves decimal points, percent signs, and attached 'k' magnitude suffixes ('10k'),
+    while stripping whitespace and thousands-separator commas so noun suffixes need not match.
+
+    Examples:
+      '1,000 training samples' -> ['1000']
+      '1, 006 iterations'      -> ['1006']
+      '5,000 samples'          -> ['5000']
+      '500 samples'            -> ['500']
+      '13.92 %'                -> ['13.92%']
+      '10k tokens'             -> ['10k']
+    """
+    if not isinstance(text, str) or not text.strip():
+        return []
+    no_thousands = re.sub(r"(?<=\d),\s*(?=\d{3}(?!\d))", "", text)
+    compact_pct = re.sub(r"(?<=\d)\s+%", "%", no_thousands)
+    return [
+        m.group(0).lower()
+        for m in re.finditer(r"(?<![\d.])\d+(?:\.\d+)?(?!\.\d)(?:%|[kK](?![A-Za-z]))?", compact_pct)
+    ]
+
+
 def discrepancies_match_ground_truth(
     discrepancies: Sequence[dict],
     ground_truth_numbers: Sequence[str],
 ) -> Tuple[bool, Optional[str]]:
-    """Return (matched, matched_pair_desc) if any `discrepancies[].pdf_text` contains one of `ground_truth_numbers`.
-
-    Comparison strips whitespace and thousands commas per the M4 acceptance specification.
+    """Return (matched, matched_pair_desc) if any `discrepancies[].pdf_text` contains the source number
+    from one of `ground_truth_numbers` (preserving decimal point and '%', stripping spaces and thousands commas;
+    trailing nouns in `ground_truth_numbers` are not required to appear in `pdf_text`).
     """
     if not discrepancies or not ground_truth_numbers:
         return False, None
 
-    norm_targets = [
-        (gt, strip_spaces_and_thousands_commas(gt))
-        for gt in ground_truth_numbers
-        if str(gt).strip()
-    ]
-    if not norm_targets:
+    target_specs: List[Tuple[str, List[str], str]] = []
+    for gt in ground_truth_numbers:
+        s = str(gt).strip()
+        if not s:
+            continue
+        target_specs.append((s, extract_normalized_numbers(s), strip_spaces_and_thousands_commas(s)))
+
+    if not target_specs:
         return False, None
 
     for disc in discrepancies:
@@ -113,9 +139,13 @@ def discrepancies_match_ground_truth(
         pdf_text = disc.get("pdf_text")
         if not isinstance(pdf_text, str) or not pdf_text.strip():
             continue
+        pdf_nums = set(extract_normalized_numbers(pdf_text))
         norm_pdf = strip_spaces_and_thousands_commas(pdf_text)
-        for raw_gt, norm_gt in norm_targets:
-            if norm_gt and norm_gt in norm_pdf:
+        for raw_gt, gt_nums, norm_gt in target_specs:
+            if gt_nums:
+                if all(num in pdf_nums for num in gt_nums):
+                    return True, f"pdf_text={pdf_text!r} contains gt_number={gt_nums!r} (from {raw_gt!r})"
+            elif norm_gt and norm_gt in norm_pdf:
                 return True, f"pdf_text={pdf_text!r} contains gt={raw_gt!r}"
     return False, None
 

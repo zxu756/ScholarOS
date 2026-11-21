@@ -128,6 +128,39 @@ class M4HarnessUnitTests(unittest.TestCase):
         )
         self.assertFalse(unmatched)
 
+        # Spec Row 3: numeric core extracted from ground_truth_numbers (noun need not appear in pdf_text)
+        matched_short_noun, _ = m4h.discrepancies_match_ground_truth(
+            [{"claim_text": "10,000 training samples", "pdf_text": "1,000 training", "reason": "mismatch"}],
+            ["1,000 training samples"],
+        )
+        self.assertTrue(matched_short_noun)
+
+        # Wrong magnitude ("500 samples" vs "5,000 samples", and reverse) must NOT match
+        unmatched_500_vs_5000, _ = m4h.discrepancies_match_ground_truth(
+            [{"claim_text": "50,000 samples", "pdf_text": "500 samples", "reason": "mismatch"}],
+            ["5,000 samples"],
+        )
+        self.assertFalse(unmatched_500_vs_5000)
+
+        unmatched_5000_vs_500, _ = m4h.discrepancies_match_ground_truth(
+            [{"claim_text": "5,000 samples", "pdf_text": "5,000 samples", "reason": "mismatch"}],
+            ["500 samples"],
+        )
+        self.assertFalse(unmatched_5000_vs_500)
+
+        # Decimal & percent sign must both match (13.2% != 3.2%, and 3.2 != 3.2%)
+        unmatched_pct_prefix, _ = m4h.discrepancies_match_ground_truth(
+            [{"claim_text": "13.2%", "pdf_text": "13.2%", "reason": "mismatch"}],
+            ["3.2%"],
+        )
+        self.assertFalse(unmatched_pct_prefix)
+
+        unmatched_missing_pct, _ = m4h.discrepancies_match_ground_truth(
+            [{"claim_text": "13.2%", "pdf_text": "3.2 points", "reason": "mismatch"}],
+            ["3.2%"],
+        )
+        self.assertFalse(unmatched_missing_pct)
+
         mm_spec = {
             "id": "ev_test_mm",
             "paper_id": "2409.19431v3",
