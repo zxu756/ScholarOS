@@ -1520,17 +1520,14 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
     // MARK: - Character-Level Horizontal Clearance Space Recovery
 
-    /// Minimum horizontal glyph clearance, expressed as a fraction of effective horizontal font size,
-    /// required to insert an inter-word space when PDFKit's `PDFSelection.string` omits one.
-    ///
-    /// How this constant is determined:
-    /// - Intra-word positive kerning in Latin/math typefaces stays below ~0.05 * fontSize (<= 50/1000 em).
-    /// - SI number-unit thin spaces (`\,`, e.g. `40 ms`, `2.5 m`) equal 1/6 em (~0.167 * fontSize).
-    /// - Tightly compressed justified inter-word spaces (`\spaceskip` ~2.0–2.5 pt across 10–18.5 pt fonts,
-    ///   including fonts whose tall `/FontBBox` causes PDFKit to swallow spaces) sit at ~0.109–0.25 * fontSize.
-    /// Setting 0.105 (> 2x maximum intra-word kerning) recovers compressed justified word spaces and SI unit
-    /// spaces without splitting kerning pairs.
+    /// Minimum horizontal glyph advance clearance, expressed as a fraction of effective horizontal font size,
+    /// used on tightly justified bimodal lines where PDFKit swallows compressed inter-word spaces (~0.11–0.17 em).
     public static let minimumInterWordGapFontSizeRatio: Double = 0.105
+
+    /// Standard minimum horizontal glyph advance clearance ratio on lines that already carry normal word spaces
+    /// (or short math expressions without compressed justification), staying above intra-word kerning and
+    /// Computer Modern / Latin Modern math-italic corrections (~0.107–0.17 em) while recovering real word spaces.
+    public static let standardInterWordGapFontSizeRatio: Double = 0.180
 
     /// Minimum horizontal clearance ratio required when adjacent glyphs have shifted baselines
     /// (`> 0.18 * fontSize`), preventing spurious spaces before attached subscripts/superscripts (`x_i`, `R^d`).
@@ -1539,6 +1536,36 @@ public struct PDFMultiColumnSegmenter: Sendable {
     /// Minimum horizontal clearance ratio required immediately inside delimiters/hyphens or before closing
     /// punctuation (`.,;:)]}`), preventing spurious spaces inside `whole-body`, `(610)`, `2.5`, or `0.`.
     public static let delimiterPunctuationGapFontSizeRatio: Double = 0.30
+
+    private struct ExtractedSelectionElement {
+        let text: String
+        let isWhitespace: Bool
+        let bounds: CGRect?
+    }
+
+    private static func medianValue(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0.0 }
+        let sorted = values.sorted()
+        let mid = sorted.count / 2
+        if sorted.count % 2 == 1 {
+            return sorted[mid]
+        }
+        return 0.5 * (sorted[mid - 1] + sorted[mid])
+    }
+
+    private static func maxContiguousLetterRun(_ text: String) -> Int {
+        var best = 0
+        var cur = 0
+        for ch in text {
+            if ch.isLetter {
+                cur += 1
+                if cur > best { best = cur }
+            } else {
+                cur = 0
+            }
+        }
+        return best
+    }
 
     private static func reconstructLineText(
         from lineSel: PDFSelection,
@@ -1557,65 +1584,20 @@ public struct PDFMultiColumnSegmenter: Sendable {
         let lb = lineSel.bounds(for: page)
         let minX = Double(lb.minX) - 1.5
         let maxX = Double(lb.maxX) + 1.5
-        let minY = Double(lb.minY)
-        let maxY = Double(lb.maxY)
-        let lineMidY = 0.5 * (minY + maxY)
+        let minY = Double(lb.minY) - 1.5
+        let maxY = Double(lb.maxY) + 1.5
 
-        let lineGlyphs = pageGlyphs.filter { g in
+        let candidates = pageGlyphs.filter { g in
             let vMid = g.visualMidY
-            return g.maxX >= minX && g.minX <= maxX
-                && vMid >= minY && vMid <= maxY
-                && abs(vMid - lineMidY) <= max(0.65 * g.fontSizePt, 0.42 * Double(lb.height))
-        }.sorted { $0.minX < $1.minX }
-
-        guard lineGlyphs.count >= 2 else { return fallbackRaw }
-
-        // Fast path: if no adjacent glyph pair on this line has clearance >= threshold, keep PDFKit's string
-        var hasCandidateGap = false
-        for i in 1..<lineGlyphs.count {
-            let prev = lineGlyphs[i - 1]
-            let cur = lineGlyphs[i]
-            let refFS = max(4.0, min(prev.fontSizePt, cur.fontSizePt))
-            if (cur.minX - prev.maxX) >= minimumInterWordGapFontSizeRatio * refFS {
-                hasCandidateGap = true
-                break
-            }
+            return g.maxX >= minX && g.minX <= maxX && vMid >= minY && vMid <= maxY
         }
-        if !hasCandidateGap {
-            return fallbackRaw
-        }
+        guard candidates.count >= 2 else { return fallbackRaw }
 
         let nRanges = lineSel.numberOfTextRanges(on: page)
         guard nRanges > 0 else { return fallbackRaw }
 
-        func matchGlyphIndex(for subBounds: CGRect) -> Int? {
-            let sx0 = Double(subBounds.minX)
-            let sx1 = Double(subBounds.maxX)
-            let sMid = 0.5 * (sx0 + sx1)
-            var bestIdx: Int? = nil
-            var bestScore = Double.greatestFiniteMagnitude
-            for (idx, g) in lineGlyphs.enumerated() {
-                let overlap = min(sx1, g.maxX) - max(sx0, g.minX)
-                let score: Double
-                if overlap > 0 {
-                    score = abs(g.midX - sMid) - overlap * 2.0
-                } else {
-                    let edgeDist = max(0.0, max(g.minX - sx1, sx0 - g.maxX))
-                    if edgeDist > max(2.5, 0.35 * g.fontSizePt) { continue }
-                    score = edgeDist + abs(g.midX - sMid)
-                }
-                if score < bestScore {
-                    bestScore = score
-                    bestIdx = idx
-                }
-            }
-            return bestIdx
-        }
-
-        var out = ""
-        out.reserveCapacity(fallbackRaw.count + 16)
-        var prevGlyphIdx: Int? = nil
-
+        var elements: [ExtractedSelectionElement] = []
+        elements.reserveCapacity(fallbackRaw.count + 4)
         for r in 0..<nRanges {
             let rng = lineSel.range(at: r, on: page)
             guard rng.location != NSNotFound, rng.location + rng.length <= pageNS.length else { continue }
@@ -1626,37 +1608,227 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 let nextU = max(u + 1, chRange.location + chRange.length)
                 let chStr = pageNS.substring(with: chRange)
                 u = nextU
-
                 if chStr == "\n" || chStr == "\r" { continue }
-                if chStr.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
-                    if !out.isEmpty && !out.hasSuffix(" ") {
-                        out.append(" ")
-                    }
-                    prevGlyphIdx = nil
-                    continue
-                }
-
-                var curGlyphIdx: Int? = nil
-                if let subSel = page.selection(for: chRange) {
+                let isWS = chStr.unicodeScalars.allSatisfy { CharacterSet.whitespacesAndNewlines.contains($0) }
+                var charBounds: CGRect? = nil
+                if !isWS, let subSel = page.selection(for: chRange) {
                     let sb = subSel.bounds(for: page)
                     if sb.width > 0 && sb.height > 0 {
-                        curGlyphIdx = matchGlyphIndex(for: sb)
+                        charBounds = sb
                     }
                 }
+                elements.append(ExtractedSelectionElement(text: chStr, isWhitespace: isWS, bounds: charBounds))
+            }
+        }
+        guard !elements.isEmpty else { return fallbackRaw }
 
-                if let pIdx = prevGlyphIdx, let cIdx = curGlyphIdx, cIdx > pIdx, !out.hasSuffix(" ") {
-                    let gPrev = lineGlyphs[pIdx]
-                    let gCur = lineGlyphs[cIdx]
+        // Isolate the dominant baseline of `lineSel` so multi-row equations, extensible braces (`CMEX10`),
+        // or vertically touching math lines inside a tall `lb` never contaminate horizontal glyph matching.
+        let lineGlyphs: [ScannedPDFGlyph] = {
+            var clusters: [[ScannedPDFGlyph]] = []
+            for g in candidates.sorted(by: { $0.baselineY > $1.baselineY }) {
+                if let idx = clusters.firstIndex(where: { abs($0[0].baselineY - g.baselineY) <= 2.4 }) {
+                    clusters[idx].append(g)
+                } else {
+                    clusters.append([g])
+                }
+            }
+            guard clusters.count > 1 || Double(lb.height) > 13.5 else {
+                return candidates.sorted {
+                    if abs($0.minX - $1.minX) > 0.05 { return $0.minX < $1.minX }
+                    return $0.maxX < $1.maxX
+                }
+            }
+
+            let normalCharMinXs: [Double] = elements.compactMap { el in
+                guard let sb = el.bounds, sb.width <= 24.0 else { return nil }
+                return Double(sb.minX)
+            }
+
+            var bestClusterIdx = 0
+            var bestSupport = -1
+            for (cIdx, cluster) in clusters.enumerated() {
+                var support = 0
+                for sx0 in normalCharMinXs {
+                    if cluster.contains(where: { abs($0.minX - sx0) <= 1.1 }) {
+                        support += 1
+                    }
+                }
+                let score = support * 1000 + cluster.count
+                if score > bestSupport {
+                    bestSupport = score
+                    bestClusterIdx = cIdx
+                }
+            }
+
+            let primaryCluster = clusters[bestClusterIdx]
+            let primaryY = medianValue(primaryCluster.map(\.baselineY))
+            let primaryFS = max(6.0, medianValue(primaryCluster.map(\.fontSizePt)))
+            let maxBaselineBand = max(4.2, 0.48 * primaryFS)
+
+            return candidates.filter { abs($0.baselineY - primaryY) <= maxBaselineBand }.sorted {
+                if abs($0.minX - $1.minX) > 0.05 { return $0.minX < $1.minX }
+                return $0.maxX < $1.maxX
+            }
+        }()
+
+        guard lineGlyphs.count >= 2 else { return fallbackRaw }
+
+        // Fast path: if no adjacent glyph pair on this baseline has clearance >= minimum threshold, keep PDFKit's string
+        var adjacentGlyphRatios: [Double] = []
+        adjacentGlyphRatios.reserveCapacity(lineGlyphs.count - 1)
+        var hasCandidateGap = false
+        for i in 1..<lineGlyphs.count {
+            let prev = lineGlyphs[i - 1]
+            let cur = lineGlyphs[i]
+            let refFS = max(4.0, min(prev.fontSizePt, cur.fontSizePt))
+            let ratio = (cur.minX - prev.maxX) / refFS
+            adjacentGlyphRatios.append(ratio)
+            if ratio >= minimumInterWordGapFontSizeRatio {
+                hasCandidateGap = true
+            }
+        }
+        if !hasCandidateGap {
+            return fallbackRaw
+        }
+
+        // Left-edge-anchored monotonic glyph matching: when PDFKit attaches an unmapped delimiter's box
+        // to the trailing character (`sb.width >> g.width`), `sb.minX` still sits at the character's true left edge.
+        func matchGlyphIndex(for subBounds: CGRect, minIndex: Int) -> Int? {
+            let sx0 = Double(subBounds.minX)
+            let sx1 = Double(subBounds.maxX)
+            var bestIdx: Int? = nil
+            var bestScore = Double.greatestFiniteMagnitude
+            let startIdx = max(0, min(minIndex, lineGlyphs.count - 1))
+            for idx in startIdx..<lineGlyphs.count {
+                let g = lineGlyphs[idx]
+                let gw = max(0.5, g.width)
+                let effSx1 = min(sx1, sx0 + max(gw * 1.35, 3.0))
+                let effMid = 0.5 * (sx0 + effSx1)
+                let overlap = min(effSx1, g.maxX) - max(sx0, g.minX)
+                let leftEdgeErr = abs(g.minX - sx0)
+                let score: Double
+                if overlap > 0 {
+                    score = abs(g.midX - effMid) + 0.5 * leftEdgeErr - overlap * 2.0
+                } else {
+                    let edgeDist = max(0.0, max(g.minX - effSx1, sx0 - g.maxX))
+                    if edgeDist > max(2.2, 0.30 * g.fontSizePt) { continue }
+                    score = edgeDist + abs(g.midX - effMid) + 0.5 * leftEdgeErr
+                }
+                if score < bestScore {
+                    bestScore = score
+                    bestIdx = idx
+                }
+            }
+            return bestIdx
+        }
+
+        var matchedIndices = Array<Int?>(repeating: nil, count: elements.count)
+        var monotonicMinIdx = 0
+        var lastSx0 = -Double.greatestFiniteMagnitude
+        for (i, el) in elements.enumerated() where !el.isWhitespace {
+            guard let sb = el.bounds else { continue }
+            let sx0 = Double(sb.minX)
+            if sx0 < lastSx0 - 1.0 {
+                monotonicMinIdx = 0
+            }
+            if let mIdx = matchGlyphIndex(for: sb, minIndex: monotonicMinIdx) {
+                matchedIndices[i] = mIdx
+                monotonicMinIdx = mIdx
+                lastSx0 = sx0
+            }
+        }
+
+        // Calibrate the line's inter-word threshold from PDFKit's own decoded spaces and the line's bimodal gap distribution
+        var observedSpaceRatios: [Double] = []
+        var alreadySpacedRightGlyphIndices: Set<Int> = []
+        var lastNonWSGlyphIdx: Int? = nil
+        var sawPendingWS = false
+        for (i, el) in elements.enumerated() {
+            if el.isWhitespace {
+                if lastNonWSGlyphIdx != nil { sawPendingWS = true }
+            } else {
+                if sawPendingWS, let pI = lastNonWSGlyphIdx, let cI = matchedIndices[i], cI > pI {
+                    alreadySpacedRightGlyphIndices.insert(cI)
+                    let gP = lineGlyphs[pI]
+                    let gC = lineGlyphs[cI]
+                    let refFS = max(4.0, min(gP.fontSizePt, gC.fontSizePt))
+                    let r = (gC.minX - gP.maxX) / refFS
+                    if r >= 0.08 && r <= 1.25 {
+                        observedSpaceRatios.append(r)
+                    }
+                }
+                sawPendingWS = false
+                if let cI = matchedIndices[i] {
+                    lastNonWSGlyphIdx = cI
+                }
+            }
+        }
+
+        let medianObservedSpace = medianValue(observedSpaceRatios)
+        let baseInterWordRatio: Double = {
+            if !observedSpaceRatios.isEmpty && medianObservedSpace >= 0.185 {
+                return standardInterWordGapFontSizeRatio
+            }
+            let medianAdj = medianValue(adjacentGlyphRatios)
+            let valleyCount = adjacentGlyphRatios.filter { $0 > 0.055 && $0 < 0.100 }.count
+            var swallowedTightPeakCount = 0
+            for (pairIdx, ratio) in adjacentGlyphRatios.enumerated() {
+                let rightGlyphIdx = pairIdx + 1
+                if !alreadySpacedRightGlyphIndices.contains(rightGlyphIdx),
+                   ratio >= minimumInterWordGapFontSizeRatio,
+                   ratio < standardInterWordGapFontSizeRatio {
+                    swallowedTightPeakCount += 1
+                }
+            }
+            let maxLetterRun = maxContiguousLetterRun(fallbackRaw)
+            let isTightBimodalLine =
+                adjacentGlyphRatios.count >= 4
+                && medianAdj <= 0.030
+                && valleyCount == 0
+                && (swallowedTightPeakCount >= 2 || maxLetterRun >= 14)
+            return isTightBimodalLine ? minimumInterWordGapFontSizeRatio : standardInterWordGapFontSizeRatio
+        }()
+
+        var out = ""
+        out.reserveCapacity(fallbackRaw.count + 16)
+        var prevGlyphIdx: Int? = nil
+
+        for (i, el) in elements.enumerated() {
+            if el.isWhitespace {
+                if !out.isEmpty && !out.hasSuffix(" ") {
+                    out.append(" ")
+                }
+                prevGlyphIdx = nil
+                continue
+            }
+
+            let chStr = el.text
+            let curGlyphIdx = matchedIndices[i]
+
+            if let pIdx = prevGlyphIdx, let cIdx = curGlyphIdx, cIdx > pIdx, !out.hasSuffix(" ") {
+                let gPrev = lineGlyphs[pIdx]
+                let gCur = lineGlyphs[cIdx]
+                let prevChar = out.last
+                let curChar = chStr.first
+                let isLetterPair = (prevChar?.isLetter == true && curChar?.isLetter == true)
+
+                // Adjacent letters on the same baseline cannot have an unmapped intervening glyph inside a single word
+                if !isLetterPair || cIdx == pIdx + 1 {
                     let directGap = gCur.minX - gPrev.maxX
                     let refFS = max(4.0, min(gPrev.fontSizePt, gCur.fontSizePt))
                     let baselineDiff = abs(gCur.baselineY - gPrev.baselineY)
 
-                    var minRatio = minimumInterWordGapFontSizeRatio
+                    var minRatio = baseInterWordRatio
                     if baselineDiff > 0.18 * refFS {
                         minRatio = max(minRatio, subscriptSuperscriptGapFontSizeRatio)
                     }
-                    let prevChar = out.last
-                    let curChar = chStr.first
+                    if gPrev.fontID == gCur.fontID,
+                       refFS < 8.5,
+                       prevChar?.isUppercase == true,
+                       curChar?.isUppercase == true {
+                        minRatio = max(minRatio, 0.285)
+                    }
                     if prevChar == "-" || curChar == "-" {
                         minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
                     } else if let c = curChar, ".,;:)]}".contains(c) {
@@ -1664,7 +1836,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     } else if let p = prevChar, "([{".contains(p) {
                         minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
                     } else if prevChar == ",", curChar?.isNumber == true, out.dropLast().last?.isNumber == true {
-                        minRatio = max(minRatio, 0.15)
+                        minRatio = max(minRatio, max(baseInterWordRatio, 0.15))
                     } else if prevChar?.isNumber == true, curChar == "." {
                         minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
                     } else if prevChar == ".", curChar?.isNumber == true {
@@ -1675,11 +1847,11 @@ public struct PDFMultiColumnSegmenter: Sendable {
                         out.append(" ")
                     }
                 }
+            }
 
-                out.append(chStr)
-                if curGlyphIdx != nil {
-                    prevGlyphIdx = curGlyphIdx
-                }
+            out.append(chStr)
+            if curGlyphIdx != nil {
+                prevGlyphIdx = curGlyphIdx
             }
         }
 
@@ -1695,13 +1867,16 @@ private struct ScannedPDFGlyph: Sendable {
     let maxX: Double
     let baselineY: Double
     let fontSizePt: Double
+    let fontID: Int
 
+    var width: Double { maxX - minX }
     var midX: Double { 0.5 * (minX + maxX) }
     var visualMidY: Double { baselineY + 0.30 * fontSizePt }
 }
 
 private final class PDFGlyphRunScanner {
     struct FontMetrics {
+        let fontID: Int
         let isTwoByteCID: Bool
         let hasReliableWidths: Bool
         let defaultWidth: Double
@@ -1727,6 +1902,7 @@ private final class PDFGlyphRunScanner {
     var resourcesStack: [CGPDFDictionaryRef] = []
     var contentStreamStack: [CGPDFContentStreamRef] = []
     var fontCache: [String: FontMetrics] = [:]
+    var nextFontID: Int = 1
     var glyphs: [ScannedPDFGlyph] = []
 
     static func scan(page: PDFPage) -> [ScannedPDFGlyph] {
@@ -1759,14 +1935,16 @@ private final class PDFGlyphRunScanner {
             guard CGPDFDictionaryGetDictionary(fd, name, &fontDict), let f = fontDict else { continue }
             let cacheKey = "\(depth):\(nameStr)"
             if let cached = fontCache[cacheKey] { return cached }
-            let parsed = Self.parseFontMetrics(f)
+            let assignedID = nextFontID
+            nextFontID += 1
+            let parsed = Self.parseFontMetrics(f, fontID: assignedID)
             fontCache[cacheKey] = parsed
             return parsed
         }
         return nil
     }
 
-    private static func parseFontMetrics(_ fontDict: CGPDFDictionaryRef) -> FontMetrics {
+    private static func parseFontMetrics(_ fontDict: CGPDFDictionaryRef, fontID: Int) -> FontMetrics {
         var subtypePtr: UnsafePointer<CChar>?
         let subtype = CGPDFDictionaryGetName(fontDict, "Subtype", &subtypePtr) && subtypePtr != nil
             ? String(cString: subtypePtr!)
@@ -1833,6 +2011,7 @@ private final class PDFGlyphRunScanner {
                     }
                 }
                 return FontMetrics(
+                    fontID: fontID,
                     isTwoByteCID: twoByte,
                     hasReliableWidths: true,
                     defaultWidth: dw,
@@ -1883,6 +2062,7 @@ private final class PDFGlyphRunScanner {
         }
 
         return FontMetrics(
+            fontID: fontID,
             isTwoByteCID: false,
             hasReliableWidths: !wMap.isEmpty || isCourier,
             defaultWidth: missingW,
@@ -1929,7 +2109,8 @@ private final class PDFGlyphRunScanner {
                         minX: x0,
                         maxX: x1,
                         baselineY: Double(p0.y),
-                        fontSizePt: max(1.0, effFontSize)
+                        fontSizePt: max(1.0, effFontSize),
+                        fontID: fm.fontID
                     )
                 )
             }
