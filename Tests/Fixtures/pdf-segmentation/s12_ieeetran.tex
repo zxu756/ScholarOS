@@ -1,0 +1,31 @@
+\documentclass[conference]{IEEEtran}
+\begin{document}
+\title{Roman Numeral Section Heading and Spanning Table Probe}
+\author{\IEEEauthorblockN{Alice Rivera and Bernard Vance}}
+\maketitle
+\markboth{IEEE Transactions on Reproducible Computing, Vol.~9, No.~4, 2026}{Rivera and Vance: Probe}
+\pagestyle{headings}
+
+\begin{abstract}
+We test Roman-numeral section detection and spanning tables in two-column IEEEtran layouts across 368 regression tests.
+\end{abstract}
+
+\section{Introduction}
+IEEEtran formats top-level sections as centered Roman numerals with periods, such as I. INTRODUCTION, which rigid lowercase prefix matchers fail to recognize beyond section II.
+
+\section{Related Work}
+Section II happens to match a hardcoded prefix if casefolded, whereas sections III through V and References do not.
+
+\section{Methodology}
+Our pipeline evaluates 368 regression tests in 14.5 ms without any neural network components.
+
+\section{Experiments}
+Across 1,240 benchmark queries, memory remained 48 MB with 94.2\% precision.
+
+\section{Conclusion}
+Generalizing heading detection to Roman numerals, dotted Arabic numbers, and unnumbered References resolves section tracking.
+
+\begin{thebibliography}{1}
+\bibitem{r1} A.~Rivera, ``Local PDF Grounding,'' 2026.
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,102 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.75in,top=0.95in,bottom=0.95in]{geometry}
+
+\makeatletter
+\def\ps@scholarhdr{%
+  \def\@oddhead{\small Journal of Reproducible Systems, Vol.~14, No.~2, November 2026\hfill Lexical Grounding Study}%
+  \def\@evenhead{\small Journal of Reproducible Systems, Vol.~14, No.~2, November 2026\hfill Lexical Grounding Study}%
+  \def\@oddfoot{\hfill\small Preprint Under Review --- Do Not Distribute --- Page \thepage\hfill}%
+  \def\@evenfoot{\hfill\small Preprint Under Review --- Do Not Distribute --- Page \thepage\hfill}%
+}
+\makeatother
+\pagestyle{scholarhdr}
+
+\title{\textbf{Deterministic Evidence Localization and Quantitative Claim Checking in Two-Column Papers}}
+\author{Alice Rivera \and Bernard Vance}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{scholarhdr}
+
+\begin{abstract}
+Automated manuscript verification tools frequently confuse topical keyword overlap with semantic entailment. We study geometric passage extraction and numeric-unit alignment over two-column scientific documents, evaluating 368 regression tests and 1,240 benchmark queries on local PDF archives.
+\end{abstract}
+
+\section{Introduction}
+Scientific authors routinely cite quantitative findings from multi-column archival PDFs. However, naive extraction pipelines merge running headers with body paragraphs and misclassify section boundaries when numbering or wording deviates from narrow templates.
+
+Our deterministic verifier executes without any neural network components and completes static analysis across 368 regression tests in 14.5 ms on a single CPU core. Unlike probabilistic language models, rule-based lexical matching only locates candidate passages and checks explicit numbers.
+
+\section{Related Work}
+Prior citation checkers validate bibliographic metadata against Crossref and OpenAlex registries, confirming that DOIs and publication years exist. Metadata validation alone cannot detect when an author cites a real paper but transcribes 9,999 tests instead of 368 tests, or writes seconds instead of milliseconds.
+
+Existing PDF indexers also treat single-word hits in SQLite FTS5 disjunction queries as topical grounding, causing unrelated statements that happen to share one common English word to receive positive relevance scores.
+
+\stepcounter{section}
+\section*{3. Methodology}
+We segment each PDF page into positioned text lines using PDFKit selection bounds and partition full-width spanning blocks from left and right columns. Candidate passages are indexed in SQLite FTS5 with Porter stemming and evaluated against explicit numeric-unit pairs.
+
+\begin{table*}[t]
+\centering
+\caption{Cross-column benchmark comparison across document segmentation engines on 50 two-column articles.}
+\vspace{4pt}
+\begin{tabular}{lcccc}
+\hline
+Engine Variant & Header Leak Rate & Section Recall & Column Order Accuracy & Median Latency \\
+\hline
+Baseline XY-Cut Heuristic & 100.0\% & 16.7\% & 71.4\% & 9.2 ms \\
+Poppler pdftotext Layout & 92.0\% & 0.0\% & 64.0\% & 6.8 ms \\
+Proposed Margin-Trimmed XY & 2.0\% & 95.0\% & 98.2\% & 14.5 ms \\
+Ablation Without Table Guard & 4.0\% & 95.0\% & 73.6\% & 13.8 ms \\
+\hline
+\end{tabular}
+\end{table*}
+
+\section{Experimental Evaluation}
+Across 1,240 benchmark queries, memory consumption remained 48 MB while achieving 94.2\% precision and a 3.2x throughput speedup ($p < 0.001$). Dataset preparation required 2.5 hours across 18 distinct conference templates.
+
+On pages dominated by wide spanning tables, leaving fewer than three body lines in either column causes threshold-based column detectors to fall back to single-column vertical sorting, interleaving left and right column phrases.
+
+\section{Conclusion}
+Separating repeating margin furniture and spanning floats from two-column body streams prevents reading-order corruption, while pairing numbers with their governing units or nouns eliminates silent magnitude errors.
+
+\begin{thebibliography}{9}
+\bibitem{rivera2024}
+A.~Rivera and B.~Vance, ``Bounding-box passage indexing for local TeX workflows,'' Proc. Conf. Document Eng., pp.~41--52, 2024.
+
+\bibitem{chen2025}
+M.~Chen, ``Evaluating table-induced column failures in scholarly PDFs,'' Trans. Digital Libraries, vol.~8, no.~3, pp.~112--129, 2025.
+\end{thebibliography}
+
+\newpage
+\begin{table*}[t]
+\centering
+\caption{Extended per-template breakdown across 18 archival layouts dominating the upper two-thirds of Page 3.}
+\vspace{4pt}
+\begin{tabular}{lccccc}
+\hline
+Template Family & Papers & Avg Pages & Header Lines & Spanning Floats & Word Overlap \\
+\hline
+IEEEtran Journal & 4 & 12.0 & 24 & 3.5 & 98.4\% \\
+ICML Two-Column & 4 & 10.5 & 21 & 2.8 & 97.9\% \\
+ACM sigconf & 4 & 11.2 & 22 & 4.0 & 98.1\% \\
+Elsevier cas-dc & 3 & 14.0 & 28 & 3.0 & 97.6\% \\
+ACL Camera Ready & 3 & 9.0 & 18 & 2.3 & 98.6\% \\
+\hline
+\end{tabular}
+\end{table*}
+\noindent LEFT\_COL\_LINE\_1: Short left-column note below wide table.\\
+LEFT\_COL\_LINE\_2: Must precede right column in reading order.
+
+\newpage
+\noindent RIGHT\_COL\_LINE\_1: Short right-column note at same height.\\
+RIGHT\_COL\_LINE\_2: Should never interleave with left column.
+
+\newpage
+\noindent PAGE3\_LEFT\_1: Brief left column note.\\
+PAGE3\_LEFT\_2: Precedes right column.
+
+\newpage
+\noindent PAGE3\_RIGHT\_1: Brief right column note.
+\end{document}
