@@ -349,6 +349,40 @@ class M4HarnessUnitTests(unittest.TestCase):
         self.assertFalse(ev_leak["passed"])
         self.assertEqual(ev_leak["header_footer_leak_count"], 1)
 
+    def test_row6_fixture_configs_includes_all_seven_fixtures(self) -> None:
+        repo_root = HERE.parent.parent
+        configs = m4h.row6_fixture_configs(repo_root)
+        self.assertEqual(len(configs), 7)
+        by_key = {fkey: (fpath, req_refs, forb_subs) for fkey, fpath, req_refs, forb_subs in configs}
+        self.assertEqual(
+            list(by_key.keys()),
+            [
+                "s12_paper",
+                "s12_ieeetran",
+                "s12_acm_refs",
+                "s12_math_columns",
+                "s12_wide_table_fig_cols",
+                "s12_tight_word_spacing",
+                "s12_lm_math_kerning",
+            ],
+        )
+        for fkey, (fpath, _, _) in by_key.items():
+            self.assertTrue(fpath.is_file(), msg=f"Missing fixture PDF for {fkey}: {fpath.name}")
+
+        _, tight_refs, tight_forb = by_key["s12_tight_word_spacing"]
+        self.assertTrue(tight_refs)
+        self.assertEqual(
+            tight_forb,
+            ["Autonomous Planetary Robotics Review", "Vol. 12, No. 4, 2026", "Page 1 of 2", "Page 2 of 2"],
+        )
+
+        _, lm_refs, lm_forb = by_key["s12_lm_math_kerning"]
+        self.assertTrue(lm_refs)
+        self.assertEqual(
+            lm_forb,
+            ["Statistical Risk and Variance Bounds", "Vol. 14, No. 2, 2026", "Page 1 of 2", "Page 2 of 2"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,7 +15,7 @@
 #   - Row 5:  Bounding-box geometry against `expected_pdftotext/*.tsv.gz` (and live `pdftotext -tsv`
 #             comparison when installed): width/height > 0, inside page `mediaBox`, non-full-page, and
 #             >= 80% word coverage after +4pt expansion (PDF bottom-left -> TSV top-left transform)
-#   - Row 6:  `segment-pdf --offline --json` on the 5 benchmark papers + 5 synthetic fixtures:
+#   - Row 6:  `segment-pdf --offline --json` on the 5 benchmark papers + 7 synthetic fixtures:
 #             0 header/footer leaks in `body` chunks, Introduction + References headings recognized,
 #             and left-before-right reading order below spanning tables/figures
 #   - Row 7:  Word multiset overlap against `pdftotext` >= 95% on each of the 5 benchmark papers + timing
@@ -377,10 +377,10 @@ fi
     fi
 
     # ==================================================================
-    # Row 6: PDF segmentation on 5 benchmark papers + 5 synthetic fixtures
+    # Row 6: PDF segmentation on 5 benchmark papers + 7 synthetic fixtures
     # ==================================================================
     if should_run_row 6; then
-        echo "== [Row 6] 5 份评测论文与 5 份合成夹具分段 (页眉页脚不进正文、引言与参考文献识别、通栏表下先左后右) =="
+        echo "== [Row 6] 5 份评测论文与 7 份合成夹具分段 (页眉页脚不进正文、引言与参考文献识别、通栏表下先左后右) =="
         set +e
         python3 -I "$HARNESS_PY" row6 \
             --repo-root "$REPO_ROOT" \
@@ -390,7 +390,7 @@ fi
         R6_RC=$?
         set -e
         cat "$WORK/row6.out"
-        R6_SUMMARY="$(grep -Eo 'benchmark_papers=[0-9]+/5 synthetic_fixtures=[0-9]+/5' "$WORK/row6.out" | tail -n 1 || echo 'benchmark_papers=0/5 synthetic_fixtures=0/5')"
+        R6_SUMMARY="$(grep -Eo 'benchmark_papers=[0-9]+/5 synthetic_fixtures=[0-9]+/7' "$WORK/row6.out" | tail -n 1 || echo 'benchmark_papers=0/5 synthetic_fixtures=0/7')"
         if [[ "$R6_RC" -eq 0 ]]; then
             record_pass 6 "Segmentation verified ($R6_SUMMARY; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)"
         else

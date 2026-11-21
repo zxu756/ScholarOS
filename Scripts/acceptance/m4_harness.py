@@ -15,7 +15,7 @@ judgments for ScholarOS M4 (`04-scholaros.md`, Rows 1-9):
            of `mediaBox`), and `>= 80%` passage word coverage after +4pt expansion, with explicit
            PDF bottom-left <-> `pdftotext -tsv` top-left coordinate conversion.
   - Row 6: PDF segmentation (`segment-pdf --offline --json`) across the 5 benchmark papers and
-           5 synthetic fixtures: 0 repeating margin header/footer leaks in `body` chunks, Introduction +
+           7 synthetic fixtures: 0 repeating margin header/footer leaks in `body` chunks, Introduction +
            References headings recognized, and left-before-right reading order below spanning floats.
   - Row 7: Word multiset recall (`>= 95%` per paper) via `m4_word_overlap` + per-paper segmentation timing.
   - Row 8: MCP `scholaros mcp --offline` (`tools/list` 5 default tools, `locate_evidence` present,
@@ -1264,13 +1264,50 @@ def cmd_row5(
     return 0
 
 
+def row6_fixture_configs(
+    repo_root: pathlib.Path,
+) -> List[Tuple[str, pathlib.Path, bool, List[str]]]:
+    """Return `(key, pdf_path, require_references_heading, forbidden_body_substrings)` for all 7 synthetic fixtures."""
+    return [
+        (
+            "s12_paper",
+            repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_paper.pdf",
+            True,
+            ["Journal of Reproducible Systems", "Lexical Grounding Study", "Preprint Under Review"],
+        ),
+        ("s12_ieeetran", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_ieeetran.pdf", True, []),
+        ("s12_acm_refs", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_acm_refs.pdf", True, []),
+        ("s12_math_columns", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_math_columns.pdf", True, []),
+        (
+            "s12_wide_table_fig_cols",
+            repo_root / "Tests" / "Fixtures" / "pdf-segmentation-02b" / "s12_wide_table_fig_cols.pdf",
+            False,
+            [],
+        ),
+        (
+            # s12_tight_word_spacing.tex has `\tightsec{References}` (line 68) and repeating header/footer (lines 30-33)
+            "s12_tight_word_spacing",
+            repo_root / "Tests" / "Fixtures" / "pdf-segmentation-04b" / "s12_tight_word_spacing.pdf",
+            True,
+            ["Autonomous Planetary Robotics Review", "Vol. 12, No. 4, 2026", "Page 1 of 2", "Page 2 of 2"],
+        ),
+        (
+            # s12_lm_math_kerning.tex has `\section{References}` (line 53) and repeating header/footer (lines 12-15)
+            "s12_lm_math_kerning",
+            repo_root / "Tests" / "Fixtures" / "pdf-segmentation-04c" / "s12_lm_math_kerning.pdf",
+            True,
+            ["Statistical Risk and Variance Bounds", "Vol. 14, No. 2, 2026", "Page 1 of 2", "Page 2 of 2"],
+        ),
+    ]
+
+
 def ensure_segmented_pdfs_cache(
     repo_root: pathlib.Path,
     cli_bin: str,
     sandbox_home: str,
     seg_cache_dir: pathlib.Path,
 ) -> Dict[str, dict]:
-    """Run `scholaros segment-pdf <pdf> --offline --json` on the 5 benchmark papers + 5 synthetic fixtures."""
+    """Run `scholaros segment-pdf <pdf> --offline --json` on the 5 benchmark papers + 7 synthetic fixtures."""
     seg_cache_dir.mkdir(parents=True, exist_ok=True)
     papers = load_papers_tsv(repo_root)
 
@@ -1279,13 +1316,7 @@ def ensure_segmented_pdfs_cache(
         pid = p["paper_id"]
         targets.append((pid, repo_root / "Benchmarks" / "evidence" / "pdfs" / f"{pid}.pdf"))
 
-    fixture_specs = [
-        ("s12_paper", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_paper.pdf"),
-        ("s12_ieeetran", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_ieeetran.pdf"),
-        ("s12_acm_refs", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_acm_refs.pdf"),
-        ("s12_math_columns", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_math_columns.pdf"),
-        ("s12_wide_table_fig_cols", repo_root / "Tests" / "Fixtures" / "pdf-segmentation-02b" / "s12_wide_table_fig_cols.pdf"),
-    ]
+    fixture_specs = [(fkey, fpath) for fkey, fpath, _, _ in row6_fixture_configs(repo_root)]
     targets.extend(fixture_specs)
 
     out_map: Dict[str, dict] = {}
@@ -1353,23 +1384,7 @@ def cmd_row6(
             ok = False
             print(f"  FAIL [Row 6] {pid}: {'; '.join(ev['reasons'])}")
 
-    fixture_configs = [
-        (
-            "s12_paper",
-            repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_paper.pdf",
-            True,
-            ["Journal of Reproducible Systems", "Lexical Grounding Study", "Preprint Under Review"],
-        ),
-        ("s12_ieeetran", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_ieeetran.pdf", True, []),
-        ("s12_acm_refs", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_acm_refs.pdf", True, []),
-        ("s12_math_columns", repo_root / "Tests" / "Fixtures" / "pdf-segmentation" / "s12_math_columns.pdf", True, []),
-        (
-            "s12_wide_table_fig_cols",
-            repo_root / "Tests" / "Fixtures" / "pdf-segmentation-02b" / "s12_wide_table_fig_cols.pdf",
-            False,
-            [],
-        ),
-    ]
+    fixture_configs = row6_fixture_configs(repo_root)
 
     fix_pass = 0
     for fkey, fpath, req_refs, forb_subs in fixture_configs:
@@ -1399,7 +1414,7 @@ def cmd_row6(
             ok = False
             print(f"  FAIL [Row 6] fixture {fkey}: {'; '.join(ev['reasons'])}")
 
-    print(f"  benchmark_papers={bench_pass}/5 synthetic_fixtures={fix_pass}/5")
+    print(f"  benchmark_papers={bench_pass}/5 synthetic_fixtures={fix_pass}/{len(fixture_configs)}")
     return 0 if ok else 1
 
 
