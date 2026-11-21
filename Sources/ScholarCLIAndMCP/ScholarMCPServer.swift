@@ -930,6 +930,24 @@ public struct ScholarMCPServer: Sendable {
             )
         }
 
+        if let mainFileErr = validateReadableManuscriptFile(
+            atPath: manuscriptPath,
+            roleEn: "manuscript file",
+            roleZh: "稿件主文件",
+            language: lang
+        ) {
+            return mainFileErr
+        }
+        if let explicitBibPath,
+           let bibFileErr = validateReadableManuscriptFile(
+               atPath: explicitBibPath,
+               roleEn: "bibliography file",
+               roleZh: "参考文献文件",
+               language: lang
+           ) {
+            return bibFileErr
+        }
+
         do {
             let lsp = try ScholarLSPWorkspaceService.loadManuscript(
                 atPath: manuscriptPath,
@@ -1005,18 +1023,20 @@ public struct ScholarMCPServer: Sendable {
             let summaryData = try encoder.encode(summaryReport)
             return textResult(String(decoding: summaryData, as: UTF8.self), isError: false)
         } catch let scholarErr as ScholarOSError {
-            let code = scholarErr.errorCodeIdentifier
-            let body = scholarErr.errorDescription ?? String(describing: scholarErr)
-            var payload: [String: Any] = [
-                "error_code": code,
-                "category": "manuscript_io",
-                "reasons": ["manuscript_load_failed"],
-                "reason": body
-            ]
-            if isReplayServer {
-                payload["mode"] = "REPLAY"
+            let code: String
+            switch scholarErr {
+            case .fileNotFound:
+                code = "ERR_FILE_NOT_FOUND"
+            default:
+                let rawCode = scholarErr.errorCodeIdentifier
+                code = (rawCode == "ERR_SCHOLAROS") ? "ERR_IO" : rawCode
             }
-            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"\(code)\"}")
+            let body = scholarErr.errorDescription ?? String(describing: scholarErr)
+            return manuscriptIOErrorResult(
+                errorCode: code,
+                reasons: (code == "ERR_FILE_NOT_FOUND") ? ["file_not_found"] : ["manuscript_load_failed"],
+                reason: body
+            )
         } catch let replayErr as RegistryReplayError {
             var payload: [String: Any] = [
                 "error_code": "ERR_REGISTRY_REPLAY",
@@ -1029,17 +1049,95 @@ public struct ScholarMCPServer: Sendable {
             }
             return jsonTextResult(payload, isError: true, fallback: "[ERR_REGISTRY_REPLAY] \(replayErr.localizedDescription)")
         } catch {
-            var payload: [String: Any] = [
-                "error_code": "ERR_IO",
-                "category": "manuscript_io",
-                "reasons": ["manuscript_load_failed"],
-                "reason": error.localizedDescription
-            ]
-            if isReplayServer {
-                payload["mode"] = "REPLAY"
-            }
-            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_IO\"}")
+            return manuscriptIOErrorResult(
+                errorCode: "ERR_IO",
+                reasons: ["manuscript_load_failed"],
+                reason: error.localizedDescription
+            )
         }
+    }
+
+    private func manuscriptIOErrorResult(
+        errorCode: String,
+        reasons: [String],
+        reason: String
+    ) -> [String: Any] {
+        var payload: [String: Any] = [
+            "error_code": errorCode,
+            "category": "manuscript_io",
+            "reasons": reasons,
+            "reason": reason
+        ]
+        if isReplayServer {
+            payload["mode"] = "REPLAY"
+        }
+        return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"\(errorCode)\"}")
+    }
+
+    private func validateReadableManuscriptFile(
+        atPath path: String,
+        roleEn: String,
+        roleZh: String,
+        language: ScholarLanguage
+    ) -> [String: Any]? {
+        var st = Darwin.stat()
+        if stat(path, &st) != 0 {
+            let err = errno
+            if err == ENOENT || err == ENOTDIR {
+                return manuscriptIOErrorResult(
+                    errorCode: "ERR_FILE_NOT_FOUND",
+                    reasons: ["file_not_found"],
+                    reason: language.L(
+                        "File not found (\(roleEn)): \(path)",
+                        "未找到\(roleZh)：\(path)"
+                    )
+                )
+            }
+            return manuscriptIOErrorResult(
+                errorCode: "ERR_IO",
+                reasons: ["io_error"],
+                reason: language.L(
+                    "Cannot access \(roleEn) '\(path)': \(String(cString: Darwin.strerror(err)))",
+                    "无法访问\(roleZh) '\(path)'：\(String(cString: Darwin.strerror(err)))"
+                )
+            )
+        }
+
+        let modeBits = st.st_mode & S_IFMT
+        if modeBits == S_IFDIR {
+            return manuscriptIOErrorResult(
+                errorCode: "ERR_IO",
+                reasons: ["path_is_directory"],
+                reason: language.L(
+                    "Path is a directory, not a readable \(roleEn): \(path)",
+                    "路径是目录而非可读的\(roleZh)：\(path)"
+                )
+            )
+        }
+        if modeBits != S_IFREG {
+            return manuscriptIOErrorResult(
+                errorCode: "ERR_IO",
+                reasons: ["not_regular_file"],
+                reason: language.L(
+                    "Path is not a regular \(roleEn): \(path)",
+                    "路径不是普通文件（\(roleZh)）：\(path)"
+                )
+            )
+        }
+
+        do {
+            _ = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            return manuscriptIOErrorResult(
+                errorCode: "ERR_IO",
+                reasons: ["file_unreadable"],
+                reason: language.L(
+                    "Cannot read \(roleEn) '\(path)': \(error.localizedDescription)",
+                    "无法读取\(roleZh) '\(path)'：\(error.localizedDescription)"
+                )
+            )
+        }
+        return nil
     }
 
     // MARK: - M3 Stage 04: `verify_citation` & `add_verified_bibtex`

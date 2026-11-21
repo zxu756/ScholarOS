@@ -8360,6 +8360,93 @@ struct PluginSDKMCPAndShellTests {
         #expect((dirObj["error_code"] as? String)?.isEmpty == false)
         #expect(dirObj["mode"] as? String == "REPLAY")
     }
+
+    @Test("M3 Stage 07 Item 0: check_manuscript returns ERR_FILE_NOT_FOUND for missing main or explicit bib_file and ERR_IO for directory or unreadable paths")
+    func m3Stage07Item0CheckManuscriptMissingFileVsDirectoryAndUnreadableErrorCodes() async throws {
+        let tempDir = try makeTempDirectory(prefix: "scholaros-m3-s07-cm-errcodes")
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let env = ["HOME": tempDir.path, "CFFIXED_USER_HOME": tempDir.path]
+
+        let registryDir = repositoryRoot.appendingPathComponent("Tests/Fixtures/registry", isDirectory: true)
+        let snapshot = try RegistryReplaySnapshot(directoryURL: registryDir)
+        let replayServer = ScholarMCPServer(
+            defaultRegistryReplayPath: registryDir.path,
+            defaultRegistryReplaySnapshot: snapshot,
+            environment: env
+        )
+        let offlineServer = ScholarMCPServer(
+            isOffline: true,
+            environment: env
+        )
+
+        let validTex = tempDir.appendingPathComponent("valid.tex")
+        try "\\documentclass{article}\\begin{document}Hello.\\end{document}\n".write(to: validTex, atomically: true, encoding: .utf8)
+
+        let subDir = tempDir.appendingPathComponent("subdir", isDirectory: true)
+        try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
+
+        let unreadableTex = tempDir.appendingPathComponent("unreadable.tex")
+        try "\\documentclass{article}\\begin{document}Secret.\\end{document}\n".write(to: unreadableTex, atomically: true, encoding: .utf8)
+        let unreadableBib = tempDir.appendingPathComponent("unreadable.bib")
+        try "@article{k2020, author={Doe, Jane}, title={T}, year={2020}}\n".write(to: unreadableBib, atomically: true, encoding: .utf8)
+
+        chmod(unreadableTex.path, mode_t(0o000))
+        chmod(unreadableBib.path, mode_t(0o000))
+        defer {
+            chmod(unreadableTex.path, mode_t(0o644))
+            chmod(unreadableBib.path, mode_t(0o644))
+        }
+
+        let missingMain = tempDir.appendingPathComponent("no_such_main.tex").path
+        let missingBib = tempDir.appendingPathComponent("no_such_refs.bib").path
+        let danglingLink = tempDir.appendingPathComponent("dangling.tex").path
+        try FileManager.default.createSymbolicLink(atPath: danglingLink, withDestinationPath: missingMain)
+
+        for (isReplay, server) in [(true, replayServer), (false, offlineServer)] {
+            let extraArgs: [String: Any] = isReplay ? ["no_verify": true] : [:]
+
+            func call(_ baseArgs: [String: Any]) async throws -> [String: Any] {
+                var merged = baseArgs
+                for (k, v) in extraArgs { merged[k] = v }
+                let res = await server.executeToolCallAsync(name: "check_manuscript", arguments: merged)
+                #expect(res["isError"] as? Bool == true, "Expected isError=true for \(merged)")
+                let obj = try decodeToolTextJSON(res)
+                if isReplay {
+                    #expect(obj["mode"] as? String == "REPLAY")
+                }
+                return obj
+            }
+
+            // 1. Missing main file -> ERR_FILE_NOT_FOUND
+            let mMainObj = try await call(["path": missingMain])
+            #expect(mMainObj["error_code"] as? String == "ERR_FILE_NOT_FOUND", "Expected ERR_FILE_NOT_FOUND on missing main file, got \(mMainObj)")
+
+            // 2. Dangling symlink main file -> ERR_FILE_NOT_FOUND
+            let mLinkObj = try await call(["path": danglingLink])
+            #expect(mLinkObj["error_code"] as? String == "ERR_FILE_NOT_FOUND", "Expected ERR_FILE_NOT_FOUND on dangling symlink main file, got \(mLinkObj)")
+
+            // 3. Existing main file + missing explicit bib_file -> ERR_FILE_NOT_FOUND
+            let mBibObj = try await call(["path": validTex.path, "bib_file": missingBib])
+            #expect(mBibObj["error_code"] as? String == "ERR_FILE_NOT_FOUND", "Expected ERR_FILE_NOT_FOUND on missing explicit bib_file, got \(mBibObj)")
+
+            // 4. Main path is a directory -> ERR_IO
+            let dMainObj = try await call(["path": subDir.path])
+            #expect(dMainObj["error_code"] as? String == "ERR_IO", "Expected ERR_IO when main path is a directory, got \(dMainObj)")
+
+            // 5. Explicit bib_file is a directory -> ERR_IO
+            let dBibObj = try await call(["path": validTex.path, "bib_file": subDir.path])
+            #expect(dBibObj["error_code"] as? String == "ERR_IO", "Expected ERR_IO when explicit bib_file is a directory, got \(dBibObj)")
+
+            // 6. Unreadable main file & unreadable explicit bib_file -> ERR_IO (when non-root)
+            if geteuid() != 0 {
+                let uMainObj = try await call(["path": unreadableTex.path])
+                #expect(uMainObj["error_code"] as? String == "ERR_IO", "Expected ERR_IO on unreadable main file, got \(uMainObj)")
+
+                let uBibObj = try await call(["path": validTex.path, "bib_file": unreadableBib.path])
+                #expect(uBibObj["error_code"] as? String == "ERR_IO", "Expected ERR_IO on unreadable explicit bib_file, got \(uBibObj)")
+            }
+        }
+    }
 }
 
 @Suite("ZZZ Home Cache Directory Isolation Guard")
