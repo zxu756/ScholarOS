@@ -150,12 +150,34 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 let spanningFloats = tableExtraction.floatBlocks
                 let proseLines = tableExtraction.remainingLines
 
-                // 3. Partition remaining prose/heading lines into spanning vs left vs right streams
+                // 3. Partition remaining prose/heading lines into spanning, gutter-straddling short fragments, left, and right streams
+                let minSpanningFloatY = spanningFloats.map(\.minY).min()
+                let hasLowerColumnProse: Bool = {
+                    guard let floatBottomY = minSpanningFloatY else { return false }
+                    let belowFloat = proseLines.filter { $0.maxY <= floatBottomY + 4.0 && !Self.isSpanningLine($0, midX: midX, pageWidth: pageWidth) }
+                    let hasSubstantialLeft = belowFloat.contains { $0.maxX <= (midX + 10.0) && ($0.width / pageWidth) >= 0.22 }
+                    let hasSubstantialRight = belowFloat.contains { $0.minX >= (midX - 10.0) && ($0.width / pageWidth) >= 0.22 }
+                    return hasSubstantialLeft && hasSubstantialRight
+                }()
+
+                var upperStrayFloatFragments: [PositionedTextLine] = []
                 var spanningProse: [PositionedTextLine] = []
                 var leftProse: [PositionedTextLine] = []
                 var rightProse: [PositionedTextLine] = []
 
                 for line in proseLines {
+                    // Short axis/legend fragments stranded above a spanning float must not distort lower two-column bounds
+                    if let floatBottomY = minSpanningFloatY,
+                       hasLowerColumnProse,
+                       line.minY >= (floatBottomY - 2.0),
+                       (line.width / pageWidth) < 0.26,
+                       Self.detectSectionHeading(line.text) == nil,
+                       !Self.isTableOrFigureCaption(line.text),
+                       Self.alphabeticWordCount(line.text) <= 4 {
+                        upperStrayFloatFragments.append(line)
+                        continue
+                    }
+
                     if Self.isSpanningLine(line, midX: midX, pageWidth: pageWidth) {
                         spanningProse.append(line)
                     } else if line.midX <= midX {
@@ -171,6 +193,19 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
                 let maxLeftMaxX = leftProse.map(\.maxX).max() ?? -.infinity
                 let minRightMinX = rightProse.map(\.minX).min() ?? .infinity
+                let effectiveLeftBound: Double = {
+                    guard leftProse.count >= 4 else { return maxLeftMaxX }
+                    let sortedMaxX = leftProse.map(\.maxX).sorted()
+                    let idx = min(sortedMaxX.count - 1, Int(Double(sortedMaxX.count - 1) * 0.90))
+                    return sortedMaxX[idx]
+                }()
+                let effectiveRightBound: Double = {
+                    guard rightProse.count >= 4 else { return minRightMinX }
+                    let sortedMinX = rightProse.map(\.minX).sorted()
+                    let idx = max(0, Int(Double(sortedMinX.count - 1) * 0.10))
+                    return sortedMinX[idx]
+                }()
+
                 let twoColTopY = max(
                     leftProse.map(\.maxY).max() ?? -.infinity,
                     rightProse.map(\.maxY).max() ?? -.infinity
@@ -186,9 +221,9 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 let hasCleanTwoColumnBothSides =
                     !leftProse.isEmpty
                     && !rightProse.isEmpty
-                    && maxLeftMaxX < (midX + 12.0)
-                    && minRightMinX > (midX - 12.0)
-                    && maxLeftMaxX < minRightMinX
+                    && effectiveLeftBound < (midX + 12.0)
+                    && effectiveRightBound > (midX - 12.0)
+                    && effectiveLeftBound < effectiveRightBound
                     && interleavedSpanningCount * 3 <= (leftProse.count + rightProse.count)
 
                 let hasLeftOnlyTwoColumnStream =
@@ -199,10 +234,17 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
                 let isTwoColumn = hasCleanTwoColumnBothSides || hasLeftOnlyTwoColumnStream
 
+                // Merge any stranded upper float fragments with top floats
+                var allSpanningFloats = spanningFloats
+                if !upperStrayFloatFragments.isEmpty {
+                    let mergedStranded = Self.mergeHorizontalRows(upperStrayFloatFragments)
+                    allSpanningFloats.append(contentsOf: mergedStranded)
+                }
+
                 // Split spanning floats into top floats (above body columns) vs bottom floats
-                let topThresholdY = proseLines.isEmpty ? -.infinity : (twoColTopY - 6.0)
-                let topFloats = spanningFloats.filter { $0.minY >= topThresholdY }
-                let bottomFloats = spanningFloats.filter { $0.minY < topThresholdY }
+                let topThresholdY = (leftProse.isEmpty && rightProse.isEmpty) ? -.infinity : (twoColTopY - 6.0)
+                let topFloats = allSpanningFloats.filter { $0.minY >= topThresholdY }
+                let bottomFloats = allSpanningFloats.filter { $0.minY < topThresholdY }
 
                 func emitProseStream(columnIndex: Int, lines: [PositionedTextLine]) {
                     guard !lines.isEmpty else { return }
@@ -290,7 +332,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     for tf in topFloats.sorted(by: Self.sortTopDown) {
                         appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
                     }
-                    var mergedSingle = proseLines
+                    var mergedSingle = spanningProse + leftProse + rightProse
                     mergedSingle.sort(by: Self.sortTopDown)
                     emitProseStream(columnIndex: 0, lines: mergedSingle)
                     for tf in bottomFloats.sorted(by: Self.sortTopDown) {
@@ -689,6 +731,21 @@ public struct PDFMultiColumnSegmenter: Sendable {
         return false
     }
 
+    private static func alphabeticWordCount(_ text: String) -> Int {
+        text.components(separatedBy: .whitespacesAndNewlines)
+            .filter { tok in
+                tok.unicodeScalars.contains { CharacterSet.letters.contains($0) }
+            }
+            .count
+    }
+
+    private static func isFigureCaptionText(_ raw: String) -> Bool {
+        guard isTableOrFigureCaption(raw) else { return false }
+        let low = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return low.hasPrefix("figure") || low.hasPrefix("fig.") || low.hasPrefix("figs.")
+            || low.hasPrefix("chart") || low.hasPrefix("scheme")
+    }
+
     private static func looksTabularRow(_ text: String, segmentCount: Int) -> Bool {
         if isMathEquationSegment(text) && !hasDenseTabularMetrics(text) {
             return false
@@ -831,6 +888,68 @@ public struct PDFMultiColumnSegmenter: Sendable {
         }
 
         // Mark candidate spanning rows: spanning caption, single gutter-crossing line, or multi-column grid across both sides
+        func rowHasFigureCaption(_ row: HorizontalRow) -> Bool {
+            let captionPieces = coalesceHorizontalSegments(row.lines, maxGapPt: 12.0)
+            return captionPieces.contains { isFigureCaptionText($0.text) }
+        }
+
+        func rowContinuesProseParagraphAbove(_ rIdx: Int, phrases: [PositionedTextLine]) -> Bool {
+            guard rIdx > 0 else { return false }
+            let row = rows[rIdx]
+            let prev = rows[rIdx - 1]
+            let vGap = prev.minY - row.maxY
+            guard vGap >= -2.0 && vGap <= 9.0 else { return false }
+            let prevPhrases = coalesceHorizontalSegments(prev.lines, maxGapPt: 8.0)
+            for p in phrases {
+                let matchesUpperProse = prevPhrases.contains { up in
+                    abs(up.minX - p.minX) <= 10.0
+                        && (up.width / pageWidth) >= 0.28
+                        && alphabeticWordCount(up.text) >= 5
+                        && !looksTabularRow(up.text, segmentCount: 1)
+                }
+                if matchesUpperProse {
+                    return true
+                }
+            }
+            return false
+        }
+
+        // True when a horizontal row consists solely of short chart ticks, axis labels (e.g. "Score (%)"),
+        // legend items, subplot tags ("(a) ..."), or multi-cell fragments — never full column prose or headings.
+        func isChartOrFloatFragmentRow(_ rIdx: Int) -> Bool {
+            let row = rows[rIdx]
+            if rowHasSpanningCaption(row) { return false }
+            let joined = row.segments.map(\.text).joined(separator: " ")
+            if detectSectionHeading(joined) != nil || isBibliographyHeading(joined) || isBibliographyEntryStart(joined) {
+                return false
+            }
+            if isMathEquationSegment(joined) && !hasDenseTabularMetrics(joined) {
+                return false
+            }
+
+            let phrases = coalesceHorizontalSegments(row.lines, maxGapPt: 8.0)
+            if phrases.contains(where: {
+                detectSectionHeading($0.text) != nil || isBibliographyHeading($0.text) || isBibliographyEntryStart($0.text)
+            }) {
+                return false
+            }
+            if rowContinuesProseParagraphAbove(rIdx, phrases: phrases) {
+                return false
+            }
+
+            for phrase in phrases {
+                let widthRatio = phrase.width / pageWidth
+                let words = alphabeticWordCount(phrase.text)
+                if widthRatio >= 0.28 && words >= 5 && !looksTabularRow(phrase.text, segmentCount: 1) {
+                    return false
+                }
+                if words > 5 && !looksTabularRow(phrase.text, segmentCount: phrases.count) {
+                    return false
+                }
+            }
+            return true
+        }
+
         func rowIsSpanningCandidate(_ row: HorizontalRow) -> Bool {
             if rowHasSpanningCaption(row) {
                 return true
@@ -897,7 +1016,92 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 }
             }
 
-            let orderedRows = expandedRowIndices.sorted().map { rows[$0] }
+            // When a spanning figure caption sits below its plot area (or above it), sweep contiguous unconsumed
+            // chart/axis/tick/legend fragment rows (e.g. "Score (%)", numeric ticks, "(a)/(b)", legend boxes)
+            // into the figure block, stopping immediately at any genuine prose line, heading, or prior float.
+            let containsSpanningFigCaption = expandedRowIndices.contains {
+                rowHasSpanningCaption(rows[$0]) && rowHasFigureCaption(rows[$0])
+            }
+            if containsSpanningFigCaption, let minR = expandedRowIndices.min() {
+                var scanUp = minR - 1
+                var prevMaxY = rows[minR].maxY
+                var sweptUpCount = 0
+                while scanUp >= 0 {
+                    let candidateRow = rows[scanUp]
+                    if candidateRow.indices.contains(where: { consumedLineIndices.contains($0) }) {
+                        break
+                    }
+                    let stepGap = candidateRow.minY - prevMaxY
+                    if stepGap > 95.0 {
+                        break
+                    }
+                    guard isChartOrFloatFragmentRow(scanUp) else {
+                        break
+                    }
+                    expandedRowIndices.insert(scanUp)
+                    prevMaxY = candidateRow.maxY
+                    sweptUpCount += 1
+                    scanUp -= 1
+                }
+
+                // If the figure caption was placed above the plot rather than below, sweep downward through chart fragments
+                if sweptUpCount == 0, let maxR = expandedRowIndices.max() {
+                    var scanDown = maxR + 1
+                    var prevMinY = rows[maxR].minY
+                    while scanDown < rows.count {
+                        let candidateRow = rows[scanDown]
+                        if candidateRow.indices.contains(where: { consumedLineIndices.contains($0) }) {
+                            break
+                        }
+                        let stepGap = prevMinY - candidateRow.maxY
+                        if stepGap > 95.0 {
+                            break
+                        }
+                        guard isChartOrFloatFragmentRow(scanDown) else {
+                            break
+                        }
+                        expandedRowIndices.insert(scanDown)
+                        prevMinY = candidateRow.minY
+                        scanDown += 1
+                    }
+                }
+            }
+
+            // Bridge across a multi-column super-header row ONLY when a spanning caption sits immediately above it
+            if !containsSpanningFigCaption, let minR = expandedRowIndices.min(), minR >= 2 {
+                let above = rows[minR - 1]
+                let captionAbove = rows[minR - 2]
+                if !above.indices.contains(where: { consumedLineIndices.contains($0) }),
+                   !captionAbove.indices.contains(where: { consumedLineIndices.contains($0) }),
+                   (above.minY - rows[minR].maxY) <= 18.0,
+                   above.segments.count >= 2,
+                   isChartOrFloatFragmentRow(minR - 1),
+                   (captionAbove.minY - above.maxY) <= 20.0,
+                   rowHasSpanningCaption(captionAbove) {
+                    expandedRowIndices.insert(minR - 1)
+                    expandedRowIndices.insert(minR - 2)
+                }
+            }
+
+            // Absorb wrapped second line of a bottom spanning caption when line 1 did not end a sentence
+            if let maxR = expandedRowIndices.max(),
+               maxR + 1 < rows.count,
+               rowHasSpanningCaption(rows[maxR]) {
+                let capText = rows[maxR].segments.map(\.text).joined(separator: " ")
+                let nextRow = rows[maxR + 1]
+                let nextParts = partitionRowAroundGutter(nextRow)
+                if !endsSentence(capText),
+                   !nextRow.indices.contains(where: { consumedLineIndices.contains($0) }),
+                   (rows[maxR].minY - nextRow.maxY) <= 6.5,
+                   nextParts.right.isEmpty,
+                   nextParts.bridge.isEmpty,
+                   abs(nextRow.minX - rows[maxR].minX) <= 12.0,
+                   detectSectionHeading(nextRow.segments.map(\.text).joined(separator: " ")) == nil {
+                    expandedRowIndices.insert(maxR + 1)
+                }
+            }
+
+            var orderedRows = expandedRowIndices.sorted().map { rows[$0] }
             let rowTexts = orderedRows.map { r in
                 r.segments.map(\.text).joined(separator: " ")
             }
@@ -923,6 +1127,18 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
             guard hasSpanningCaption || (tabularRowCount >= 2 && !startsLikeAbstract) else {
                 continue
+            }
+
+            // Once validated as a genuine spanning table/figure, absorb any immediately adjacent (<= 18 pt) multi-column header row above it
+            if !containsSpanningFigCaption, let minR = expandedRowIndices.min(), minR > 0 {
+                let above = rows[minR - 1]
+                if !above.indices.contains(where: { consumedLineIndices.contains($0) }),
+                   (above.minY - rows[minR].maxY) <= 18.0,
+                   above.segments.count >= 2,
+                   isChartOrFloatFragmentRow(minR - 1) {
+                    expandedRowIndices.insert(minR - 1)
+                    orderedRows = expandedRowIndices.sorted().map { rows[$0] }
+                }
             }
 
             let clusterMinY = orderedRows.map(\.minY).min() ?? 0.0
