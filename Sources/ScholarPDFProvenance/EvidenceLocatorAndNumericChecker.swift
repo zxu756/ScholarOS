@@ -50,7 +50,7 @@ public struct ExtractedQuantitativeBinding: Sendable, Codable, Hashable, Identif
         secondaryUpperValue: Double? = nil,
         headNoun: String? = nil,
         modifiers: Set<String> = [],
-        halfULPTolerance: Double = 0.05,
+        halfULPTolerance: Double = 0.0,
         characterOffset: Int = 0
     ) {
         self.family = family
@@ -62,7 +62,7 @@ public struct ExtractedQuantitativeBinding: Sendable, Codable, Hashable, Identif
         self.secondaryUpperValue = secondaryUpperValue
         self.headNoun = headNoun
         self.modifiers = modifiers
-        self.halfULPTolerance = max(1e-9, halfULPTolerance)
+        self.halfULPTolerance = max(0.0, halfULPTolerance)
         self.characterOffset = characterOffset
     }
 }
@@ -75,19 +75,27 @@ public struct ExtractedQuantitativeBinding: Sendable, Codable, Hashable, Identif
 public struct EvidenceLocatorAndNumericChecker: Sendable {
     public static let defaultMinimumKeywordCoverage: Double = 0.60
     public static let defaultEnableBareNumberNounExtraction: Bool = true
+    public static let defaultPreferCandidatesWithAlignedNumbers: Bool = true
+    public static let defaultRequireSameNounValueAgreement: Bool = true
 
     public let minimumKeywordCoverage: Double
     public let relativeRoundingTolerance: Double
     public let enableBareNumberNounExtraction: Bool
+    public let preferCandidatesWithAlignedNumbers: Bool
+    public let requireSameNounValueAgreement: Bool
 
     public init(
         minimumKeywordCoverage: Double = Self.defaultMinimumKeywordCoverage,
         relativeRoundingTolerance: Double = 0.012,
-        enableBareNumberNounExtraction: Bool = Self.defaultEnableBareNumberNounExtraction
+        enableBareNumberNounExtraction: Bool = Self.defaultEnableBareNumberNounExtraction,
+        preferCandidatesWithAlignedNumbers: Bool = Self.defaultPreferCandidatesWithAlignedNumbers,
+        requireSameNounValueAgreement: Bool = Self.defaultRequireSameNounValueAgreement
     ) {
         self.minimumKeywordCoverage = min(1.0, max(0.01, minimumKeywordCoverage))
         self.relativeRoundingTolerance = max(0.0, relativeRoundingTolerance)
         self.enableBareNumberNounExtraction = enableBareNumberNounExtraction
+        self.preferCandidatesWithAlignedNumbers = preferCandidatesWithAlignedNumbers
+        self.requireSameNounValueAgreement = requireSameNounValueAgreement
     }
 
     // MARK: 1. Public Localization Entry Points
@@ -353,21 +361,28 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
             )
         }
 
-        // Quantitative claim: evaluate explicit number+unit/classifier/noun bindings on passing candidates
+        // Quantitative claim: evaluate explicit number+unit/classifier/noun bindings on ALL passing candidates
         struct EvaluatedCandidate {
             let candidate: ScoredCandidate
             let discrepancies: [EvidenceNumericDiscrepancy]
             let alignedCounterpartCount: Int
+            let sameNounAlignedCount: Int
         }
 
-        let evaluated: [EvaluatedCandidate] = passing.prefix(max(5, maxReturned)).map { cand in
+        let allClaimHeadNouns = Set(claimBindings.compactMap(\.headNoun))
+
+        let evaluated: [EvaluatedCandidate] = passing.map { cand in
             let pdfBindings = extractQuantitativeBindings(from: cand.chunk.passageText)
             var discrepancies: [EvidenceNumericDiscrepancy] = []
             var alignedCount = 0
+            var sameNounCount = 0
             for cb in claimBindings {
-                let outcome = compareBinding(cb, against: pdfBindings)
+                let outcome = compareBinding(cb, against: pdfBindings, allClaimHeadNouns: allClaimHeadNouns)
                 if outcome.hadAlignedCounterpart {
                     alignedCount += 1
+                }
+                if outcome.hadSameNounCounterpart {
+                    sameNounCount += 1
                 }
                 if let disc = outcome.discrepancy {
                     discrepancies.append(disc)
@@ -376,16 +391,53 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
             return EvaluatedCandidate(
                 candidate: cand,
                 discrepancies: discrepancies,
-                alignedCounterpartCount: alignedCount
+                alignedCounterpartCount: alignedCount,
+                sameNounAlignedCount: sameNounCount
             )
         }
 
-        // If a topically passing passage (within 0.15 coverage of best) satisfies ALL quantitative bindings, return FOUND
-        let bestCoverage = evaluated[0].candidate.coverage
-        if let cleanIdx = evaluated.firstIndex(where: {
-            $0.discrepancies.isEmpty && ($0.candidate.coverage + 1e-6 >= bestCoverage - 0.15)
+        // Rank passing candidates: when `preferCandidatesWithAlignedNumbers` is enabled, passages containing
+        // numbers with the same noun or same dimension as the claim's numbers take precedence over numberless
+        // summary passages; only when no passing passage has any aligned number do we fall back to coverage order.
+        let orderedCandidates: [EvaluatedCandidate]
+        if preferCandidatesWithAlignedNumbers {
+            orderedCandidates = evaluated.sorted { a, b in
+                let aHasAligned = a.alignedCounterpartCount > 0
+                let bHasAligned = b.alignedCounterpartCount > 0
+                if aHasAligned != bHasAligned {
+                    return aHasAligned
+                }
+                if a.alignedCounterpartCount != b.alignedCounterpartCount {
+                    return a.alignedCounterpartCount > b.alignedCounterpartCount
+                }
+                if a.sameNounAlignedCount != b.sameNounAlignedCount {
+                    return a.sameNounAlignedCount > b.sameNounAlignedCount
+                }
+                if abs(a.candidate.coverage - b.candidate.coverage) > 1e-6 {
+                    return a.candidate.coverage > b.candidate.coverage
+                }
+                if a.candidate.contentPriorityTier != b.candidate.contentPriorityTier {
+                    return a.candidate.contentPriorityTier > b.candidate.contentPriorityTier
+                }
+                if abs(a.candidate.bm25Score - b.candidate.bm25Score) > 1e-6 {
+                    return a.candidate.bm25Score > b.candidate.bm25Score
+                }
+                return a.candidate.chunk.readingSequence < b.candidate.chunk.readingSequence
+            }
+        } else {
+            orderedCandidates = evaluated
+        }
+
+        // If a top-ranked candidate (within 0.15 coverage of the leading candidate in its alignment tier)
+        // satisfies ALL quantitative bindings, return FOUND.
+        let referenceCoverage = orderedCandidates[0].candidate.coverage
+        let referenceAlignedCount = orderedCandidates[0].alignedCounterpartCount
+        if let cleanIdx = orderedCandidates.firstIndex(where: {
+            $0.discrepancies.isEmpty
+                && (!preferCandidatesWithAlignedNumbers || $0.alignedCounterpartCount == referenceAlignedCount)
+                && ($0.candidate.coverage + 1e-6 >= referenceCoverage - 0.15)
         }) {
-            var reordered = evaluated
+            var reordered = orderedCandidates
             let winner = reordered.remove(at: cleanIdx)
             reordered.insert(winner, at: 0)
             let matches = reordered.prefix(maxReturned).map {
@@ -406,28 +458,9 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
             )
         }
 
-        // Otherwise all passing candidates have >= 1 numeric discrepancy.
-        // Among top-coverage candidates, prefer the one that actually discusses the aligned nouns/units so pdf_text is most informative.
-        let orderedMismatches = evaluated.sorted { a, b in
-            if abs(a.candidate.coverage - b.candidate.coverage) > 0.10 {
-                return a.candidate.coverage > b.candidate.coverage
-            }
-            if a.alignedCounterpartCount != b.alignedCounterpartCount {
-                return a.alignedCounterpartCount > b.alignedCounterpartCount
-            }
-            if abs(a.candidate.coverage - b.candidate.coverage) > 1e-6 {
-                return a.candidate.coverage > b.candidate.coverage
-            }
-            if a.candidate.contentPriorityTier != b.candidate.contentPriorityTier {
-                return a.candidate.contentPriorityTier > b.candidate.contentPriorityTier
-            }
-            if abs(a.candidate.bm25Score - b.candidate.bm25Score) > 1e-6 {
-                return a.candidate.bm25Score > b.candidate.bm25Score
-            }
-            return a.candidate.chunk.readingSequence < b.candidate.chunk.readingSequence
-        }
-
-        let matches = orderedMismatches.prefix(maxReturned).map {
+        // Otherwise all passing candidates have >= 1 numeric discrepancy; `orderedCandidates` already places
+        // the passage containing the aligned source PDF numbers first (or falls back to coverage order if none do).
+        let matches = orderedCandidates.prefix(maxReturned).map {
             EvidencePassageMatch(
                 chunk: $0.candidate.chunk,
                 coverage: $0.candidate.coverage,
@@ -573,27 +606,34 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
             }
         }
 
-        // 3. Sample sizes `N = 1,240`, `n = 48`, `N >= 500`
+        // 3. Sample sizes `N = 1,240`, `n = 1, 000 samples`, `n = 48`, `N >= 500`
         if let nRegex = try? NSRegularExpression(
-            pattern: #"\b([Nn])\s*(<=|>=|<|>|=|≈)\s*(\d{1,3}(?:,\d{3})+|\d+)\b"#
+            pattern: #"\b([Nn])\s*(<=|>=|<|>|=|≈)\s*([1-9]\d{0,2}(?:, ?\d{3})+(?!\d)|\d+)\b"#
         ) {
-            for m in nRegex.matches(in: cleaned, range: fullRange) where claimRangeIfFree(m.range) {
+            for m in nRegex.matches(in: cleaned, range: fullRange) {
                 let opStr = ns.substring(with: m.range(at: 2))
                 let valStr = ns.substring(with: m.range(at: 3))
                 if let val = Self.parseCleanDouble(valStr) {
                     let afterText = ns.substring(from: m.range.location + m.range.length)
-                    let (trailingHead, trailingMods, _) = Self.scanTrailingEnglishNounPhrase(in: afterText)
+                    let (directHead, directMods, directLen) = Self.scanTrailingEnglishNounPhrase(in: afterText)
+                    let (parenHead, parenMods, parenLen) = Self.scanParenOfEnglishNounPhrase(in: afterText)
+                    let trailingHead = directHead ?? parenHead
+                    let trailingMods = directHead != nil ? directMods : parenMods
+                    let extraLen = directHead != nil ? directLen : parenLen
+                    let spanRange = NSRange(location: m.range.location, length: m.range.length + extraLen)
+                    guard claimRangeIfFree(spanRange) else { continue }
+
                     bindings.append(
                         ExtractedQuantitativeBinding(
                             family: .sampleSize,
-                            rawSurfaceText: ns.substring(with: m.range).trimmingCharacters(in: .whitespaces),
+                            rawSurfaceText: ns.substring(with: spanRange).trimmingCharacters(in: .whitespaces),
                             relation: Self.parseOperator(opStr),
                             rawNumericValue: val,
                             canonicalValue: val,
                             canonicalUnit: "count",
                             headNoun: trailingHead ?? "sample_n",
                             modifiers: trailingMods.union(["sample_n"]),
-                            halfULPTolerance: 0.5,
+                            halfULPTolerance: Self.halfULPTolerance(forLiteral: valStr),
                             characterOffset: m.range.location
                         )
                     )
@@ -637,8 +677,10 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
         }
 
         // 5. General number + dimensional/statistical unit OR `[classifier] + noun phrase` (English & Chinese)
+        // Supports PDF-extracted spaced thousands (`30, 000`, `1, 000`) when comma + single space + exactly 3 digits
+        // are not followed by another digit, while never merging `(1, 2)`, `(10, 20)`, `(0, 100)`, or `1, 2000`.
         guard let numRegex = try? NSRegularExpression(
-            pattern: #"(?<![A-Za-z0-9_])([+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"#
+            pattern: #"(?<![A-Za-z0-9_])([+-]?(?:[1-9]\d{0,2}(?:, ?\d{3})+(?!\d)|\d+)(?:\.\d+)?)"#
         ) else {
             return bindings.sorted { $0.characterOffset < $1.characterOffset }
         }
@@ -685,9 +727,12 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
                 continue
             }
 
-            // Skip standalone parenthesized equation labels `(1)`, `(10)` when not followed by a unit
+            // Skip standalone parenthesized equation/tuple labels `(1)`, `(10)`, `(1, 128)` unless followed by `of <noun>` or a unit
             if beforeSub.hasSuffix("(") && afterSub.hasPrefix(")") {
                 let restAfterParen = String(afterSub.dropFirst()).trimmingCharacters(in: .whitespaces)
+                if numStr.contains(", ") && !restAfterParen.lowercased().hasPrefix("of ") {
+                    continue
+                }
                 if restAfterParen.isEmpty || ".,;:".contains(restAfterParen.first!) || restAfterParen.first?.isUppercase == true {
                     continue
                 }
@@ -778,6 +823,40 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
                 continue
             }
 
+            // Parenthesized count followed by `of + <English noun phrase>`:
+            // e.g. `a small dataset (610) of PuzzleScript games` -> binds 610 to `games` (modifier `puzzlescript`)
+            if beforeSub.trimmingCharacters(in: .whitespaces).hasSuffix("(") {
+                let (parenHead, parenMods, parenConsumedLen) = Self.scanParenOfEnglishNounPhrase(in: afterSub)
+                if let parenHead, parenConsumedLen > 0 {
+                    let openParenLoc = (cleaned as NSString).range(
+                        of: "(",
+                        options: .backwards,
+                        range: NSRange(location: max(0, numRange.location - 4), length: min(4, numRange.location))
+                    ).location
+                    let startLoc = openParenLoc != NSNotFound ? openParenLoc : numRange.location
+                    let endLoc = numRange.location + numRange.length + parenConsumedLen
+                    let totalRange = NSRange(location: startLoc, length: endLoc - startLoc)
+                    if claimRangeIfFree(totalRange) {
+                        let surface = ns.substring(with: totalRange).trimmingCharacters(in: .whitespaces)
+                        bindings.append(
+                            ExtractedQuantitativeBinding(
+                                family: .count,
+                                rawSurfaceText: surface,
+                                relation: .equal,
+                                rawNumericValue: rawVal,
+                                canonicalValue: rawVal,
+                                canonicalUnit: "count",
+                                headNoun: parenHead,
+                                modifiers: parenMods,
+                                halfULPTolerance: Self.halfULPTolerance(forLiteral: numStr),
+                                characterOffset: startLoc
+                            )
+                        )
+                        continue
+                    }
+                }
+            }
+
             // English `<number> + <1..3 noun/modifier words>` (e.g. `368 regression tests`, `1,240 benchmark queries`)
             let (enHead, enMods, enConsumedLen) = Self.scanTrailingEnglishNounPhrase(in: afterSub)
             if let enHead, enConsumedLen > 0 {
@@ -816,28 +895,63 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
     private struct BindingComparisonOutcome {
         let discrepancy: EvidenceNumericDiscrepancy?
         let hadAlignedCounterpart: Bool
+        let hadSameNounCounterpart: Bool
     }
 
     private func compareBinding(
         _ claim: ExtractedQuantitativeBinding,
-        against pdfBindings: [ExtractedQuantitativeBinding]
+        against pdfBindings: [ExtractedQuantitativeBinding],
+        allClaimHeadNouns: Set<String> = []
     ) -> BindingComparisonOutcome {
-        // 1. Align by same headNoun / modifier / academic count-noun synonym group first
-        let sameNounPool = pdfBindings.filter { pdf in
-            Self.nounsMatch(claim, pdf) && Self.familiesCompatibleWhenNounMatches(claim.family, pdf.family)
+        let sameNounPool: [ExtractedQuantitativeBinding]
+        if requireSameNounValueAgreement {
+            sameNounPool = Self.selectStratifiedSameNounPool(
+                for: claim,
+                in: pdfBindings,
+                allClaimHeadNouns: allClaimHeadNouns
+            )
+        } else {
+            sameNounPool = []
         }
 
-        // 2. Fall back to same dimensional/statistical family (never across unrelated bare counts)
+        // Fall back to same dimensional/statistical family only when no same-noun binding appeared in the passage
         let sameFamilyPool: [ExtractedQuantitativeBinding]
-        if claim.family == .count {
+        if !requireSameNounValueAgreement {
+            sameFamilyPool = pdfBindings.filter { pdf in
+                Self.familiesCompatibleWhenNounMatches(claim.family, pdf.family)
+                    || Self.familiesCompatibleByDimension(
+                        claim.family,
+                        pdf.family,
+                        claimUnit: claim.canonicalUnit,
+                        pdfUnit: pdf.canonicalUnit
+                    )
+            }
+        } else if claim.family == .count {
             sameFamilyPool = []
         } else {
             sameFamilyPool = pdfBindings.filter { pdf in
-                Self.familiesCompatibleByDimension(claim.family, pdf.family, claimUnit: claim.canonicalUnit, pdfUnit: pdf.canonicalUnit)
+                guard Self.familiesCompatibleByDimension(
+                    claim.family,
+                    pdf.family,
+                    claimUnit: claim.canonicalUnit,
+                    pdfUnit: pdf.canonicalUnit
+                ) else {
+                    return false
+                }
+                // If claim specified a concrete noun and `pdf` explicitly carries a different noun mentioned in the claim, do not steal it
+                if let ch = claim.headNoun,
+                   ch != "sample_n",
+                   let ph = pdf.headNoun,
+                   ph != ch,
+                   allClaimHeadNouns.contains(ph) {
+                    return false
+                }
+                return true
             }
         }
 
-        let pool = !sameNounPool.isEmpty ? sameNounPool : sameFamilyPool
+        let matchedBySameNoun = !sameNounPool.isEmpty
+        let pool = matchedBySameNoun ? sameNounPool : sameFamilyPool
 
         guard !pool.isEmpty else {
             // Missing in passage: if there is a count/number in the passage with no aligned noun, surface the closest passage number as context if available
@@ -850,14 +964,19 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
                         ? "Claim states '\(claim.rawSurfaceText)', whereas passage reports '\(fallbackPDF!)'."
                         : "Claimed quantity '\(claim.rawSurfaceText)' was not found in the matched PDF passage."
                 ),
-                hadAlignedCounterpart: false
+                hadAlignedCounterpart: false,
+                hadSameNounCounterpart: false
             )
         }
 
         // Check if any candidate in `pool` is quantitatively compatible
         for cand in pool {
             if isQuantitativelyCompatible(claim: claim, pdf: cand) {
-                return BindingComparisonOutcome(discrepancy: nil, hadAlignedCounterpart: true)
+                return BindingComparisonOutcome(
+                    discrepancy: nil,
+                    hadAlignedCounterpart: true,
+                    hadSameNounCounterpart: matchedBySameNoun
+                )
             }
         }
 
@@ -881,8 +1000,56 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
                 pdfText: closest.rawSurfaceText,
                 reason: reason
             ),
-            hadAlignedCounterpart: true
+            hadAlignedCounterpart: true,
+            hadSameNounCounterpart: matchedBySameNoun
         )
+    }
+
+    /// Selects the highest-specificity noun match tier so that an exact noun match (`3 layers` vs `4 layers`,
+    /// `3 encoder layers` vs `4 encoder layers`, `3 datasets` vs `4 datasets`) is never masked by another noun's
+    /// value, modifier cross-talk (`4 per-layer attention heads`), or synonym pooling (`4 benchmarks`).
+    private static func selectStratifiedSameNounPool(
+        for claim: ExtractedQuantitativeBinding,
+        in pdfBindings: [ExtractedQuantitativeBinding],
+        allClaimHeadNouns: Set<String>
+    ) -> [ExtractedQuantitativeBinding] {
+        guard let ch = claim.headNoun else { return [] }
+        let familyFiltered = pdfBindings.filter {
+            familiesCompatibleWhenNounMatches(claim.family, $0.family)
+        }
+
+        // Tier 1A: Exact head noun stem + overlapping non-empty modifiers (`4 encoder layers` -> `3 encoder layers`)
+        if !claim.modifiers.isEmpty {
+            let tier1A = familyFiltered.filter { pdf in
+                pdf.headNoun == ch
+                    && !pdf.modifiers.isEmpty
+                    && !claim.modifiers.isDisjoint(with: pdf.modifiers)
+            }
+            if !tier1A.isEmpty { return tier1A }
+        }
+
+        // Tier 1B: Exact head noun stem without conflicting modifiers (`4 layers` -> `3 layers` or `3 multi-head attention layers`)
+        let tier1B = familyFiltered.filter { pdf in
+            pdf.headNoun == ch && (claim.modifiers.isEmpty || pdf.modifiers.isEmpty)
+        }
+        if !tier1B.isEmpty { return tier1B }
+
+        // Tier 1C: Exact head noun stem even when modifiers differ (excluding bindings whose modifier matches another claim binding if any)
+        let tier1C = familyFiltered.filter { pdf in
+            pdf.headNoun == ch
+        }
+        if !tier1C.isEmpty { return tier1C }
+
+        // Tier 2: Count-noun synonym group or non-hyphenated modifier cross-match, ONLY if `pdf.headNoun`
+        // is not already claimed as an exact head noun by another number in the same claim
+        let tier2 = familyFiltered.filter { pdf in
+            guard let ph = pdf.headNoun else { return false }
+            if ph != ch && allClaimHeadNouns.contains(ph) {
+                return false
+            }
+            return nounsMatch(claim, pdf)
+        }
+        return tier2
     }
 
     private func isQuantitativelyCompatible(
@@ -1117,8 +1284,8 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
     private static func stripUnitsAttachedToNumbers(in text: String) -> String {
         var s = text
         let patterns = [
-            #"(?<![A-Za-z0-9_])[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:percentage\s+points?|per\s+cent|req/s|ops/s|tok/s|tokens/s|samples/s|queries/s|%|pp\b|-fold\b|[x×]\b|(?:ns|nanoseconds?|us|μs|µs|microseconds?|ms|milliseconds?|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|bytes?|KiB|MiB|GiB|TiB|KB|MB|GB|TB|RPS|QPS|kHz|MHz|GHz|Hz|GFLOPS|TFLOPS|PFLOPS|FLOPS|Kbps|Mbps|Gbps|bps)\b)"#,
-            #"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*(?:毫秒|微秒|纳秒|分钟|小时|百分点|字节|秒|天|倍)"#
+            #"(?<![A-Za-z0-9_])[+-]?(?:[1-9]\d{0,2}(?:, ?\d{3})+(?!\d)|\d+)(?:\.\d+)?\s*(?:percentage\s+points?|per\s+cent|req/s|ops/s|tok/s|tokens/s|samples/s|queries/s|%|pp\b|-fold\b|[x×]\b|(?:ns|nanoseconds?|us|μs|µs|microseconds?|ms|milliseconds?|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|bytes?|KiB|MiB|GiB|TiB|KB|MB|GB|TB|RPS|QPS|kHz|MHz|GHz|Hz|GFLOPS|TFLOPS|PFLOPS|FLOPS|Kbps|Mbps|Gbps|bps)\b)"#,
+            #"[+-]?(?:[1-9]\d{0,2}(?:, ?\d{3})+(?!\d)|\d+)(?:\.\d+)?\s*(?:毫秒|微秒|纳秒|分钟|小时|百分点|字节|秒|天|倍)"#
         ]
         for pat in patterns {
             if let rx = try? NSRegularExpression(pattern: pat, options: [.caseInsensitive]) {
@@ -1204,11 +1371,70 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
     ]
 
     private static let nounBoundaryStopwords: Set<String> = englishStopwords.union([
-        "in", "on", "of", "to", "by", "as", "at", "an", "be", "is", "or", "we", "it", "if",
-        "achieving", "achieve", "achieves", "achieved", "remained", "remains", "remaining",
-        "required", "requires", "requiring", "completes", "completed", "completing",
-        "reduces", "reduced", "reducing", "maintaining", "maintain", "maintains"
+        // Prepositions, conjunctions, determiners, pronouns, and clause connectors
+        "in", "on", "of", "to", "by", "as", "at", "an", "be", "is", "am", "or", "nor", "but", "yet", "so",
+        "we", "it", "he", "she", "you", "if", "who", "how", "why", "my", "his", "her",
+        "throughout", "amongst", "including", "excluding", "regarding", "concerning", "despite", "unlike",
+        "near", "beyond", "behind", "beneath", "beside", "besides", "alongside", "plus", "minus", "versus", "vs",
+        "whether", "whereas", "although", "though", "because", "since", "unless", "until",
+        // Unambiguous finite verbs & participial clause starters (excluding noun homographs like samples/tests/runs)
+        "achieving", "achieve", "achieves", "achieved",
+        "remained", "remains", "remaining", "remain",
+        "required", "requires", "requiring", "require",
+        "completes", "completed", "completing", "complete",
+        "reduces", "reduced", "reducing", "reduce",
+        "maintaining", "maintain", "maintains", "maintained",
+        "outperform", "outperforms", "outperformed", "outperforming",
+        "exceed", "exceeds", "exceeded", "exceeding",
+        "contain", "contains", "contained", "containing",
+        "consist", "consists", "consisted", "consisting",
+        "comprise", "comprises", "comprised", "comprising",
+        "constitute", "constitutes", "constituted", "constituting",
+        "include", "includes", "included",
+        "exclude", "excludes", "excluded",
+        "cover", "covers", "covered", "covering",
+        "span", "spans", "spanned", "spanning",
+        "indicate", "indicates", "indicated", "indicating",
+        "confirm", "confirms", "confirmed", "confirming",
+        "reveal", "reveals", "revealed", "revealing",
+        "suggest", "suggests", "suggested", "suggesting",
+        "provide", "provides", "provided", "providing",
+        "allow", "allows", "allowed", "allowing",
+        "enable", "enables", "enabled", "enabling",
+        "prevent", "prevents", "prevented", "preventing",
+        "improve", "improves", "improved", "improving",
+        "increase", "increases", "increased", "increasing",
+        "decrease", "decreases", "decreased", "decreasing",
+        "appear", "appears", "appeared", "appearing",
+        "occur", "occurs", "occurred", "occurring",
+        "exist", "exists", "existed", "existing",
+        "differ", "differs", "differed", "differing",
+        "vary", "varies", "varied",
+        "correspond", "corresponds", "corresponded", "corresponding",
+        "belong", "belongs", "belonged", "belonging",
+        "depend", "depends", "depended", "depending",
+        "represent", "represents", "represented", "representing",
+        "denote", "denotes", "denoted", "denoting",
+        "satisfy", "satisfies", "satisfied", "satisfying",
+        "follow", "follows", "followed", "following",
+        "produce", "produces", "produced", "producing",
+        "evaluate", "evaluates", "evaluated", "evaluating"
     ])
+
+    private static let postNominalIrregularParticiples: Set<String> = [
+        "built", "drawn", "taken", "chosen", "written", "given", "made", "known", "shown", "seen", "found",
+        "held", "kept", "driven", "proven", "broken", "spoken", "frozen", "hidden", "sent", "spent", "meant",
+        "dealt", "left", "lost", "sold", "told", "stood", "bought", "brought", "caught", "fought", "sought",
+        "taught", "thought"
+    ]
+
+    private static let postNominalUninflectedParticiplesAfterPlural: Set<String> = [
+        "split", "set", "put", "cut", "cast", "run", "let", "read"
+    ]
+
+    private static let postNominalAdverbs: Set<String> = [
+        "overall", "together", "alone", "apart", "apiece", "respectively"
+    ]
 
     private static let leadingAdjectiveModifiers: Set<String> = [
         "distinct", "different", "separate", "individual", "unique", "single", "multiple",
@@ -1395,20 +1621,58 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
         return (head, mods, consumed)
     }
 
+    private static func isRegularPastParticiple(_ lowerWord: String) -> Bool {
+        guard lowerWord.count >= 4, lowerWord.hasSuffix("ed") else { return false }
+        if lowerWord.hasSuffix("eed") || lowerWord.hasSuffix("bed") || lowerWord.hasSuffix("shed") || lowerWord.hasSuffix("sled") {
+            return false
+        }
+        return true
+    }
+
+    private static func looksPluralCountNoun(_ lowerWord: String) -> Bool {
+        guard lowerWord.count >= 4, lowerWord.hasSuffix("s") else { return false }
+        for nonPluralSuffix in ["ss", "us", "is", "as", "os", "ics", "news", "means"] {
+            if lowerWord.hasSuffix(nonPluralSuffix) { return false }
+        }
+        return true
+    }
+
+    private static func scanParenOfEnglishNounPhrase(
+        in afterSub: String
+    ) -> (headNoun: String?, modifiers: Set<String>, consumedUTF16Length: Int) {
+        let ns = afterSub as NSString
+        guard let prefixRx = try? NSRegularExpression(
+            pattern: #"^\s*\)\s+of(?:\s+(?:the|these|those|our|their|its))?(?=\s+[A-Za-z])"#,
+            options: [.caseInsensitive]
+        ),
+        let pm = prefixRx.firstMatch(in: afterSub, range: NSRange(location: 0, length: ns.length)) else {
+            return (nil, [], 0)
+        }
+        let prefixLen = pm.range.length
+        let remainder = ns.substring(from: prefixLen)
+        let (head, mods, remLen) = scanTrailingEnglishNounPhrase(in: remainder)
+        guard let head, remLen > 0 else {
+            return (nil, [], 0)
+        }
+        return (head, mods, prefixLen + remLen)
+    }
+
     private static func scanTrailingEnglishNounPhrase(
         in afterSub: String
     ) -> (headNoun: String?, modifiers: Set<String>, consumedUTF16Length: Int) {
         let ns = afterSub as NSString
-        guard let wordRegex = try? NSRegularExpression(pattern: #"\G\s+([A-Za-z][A-Za-z0-9-]*)"#) else {
+        guard let firstWordRegex = try? NSRegularExpression(pattern: #"\G(?:\s+|-)([A-Za-z][A-Za-z0-9-]*)"#),
+              let nextWordRegex = try? NSRegularExpression(pattern: #"\G\s+([A-Za-z][A-Za-z0-9-]*)"#) else {
             return (nil, [], 0)
         }
 
         var cursor = 0
-        var collected: [(word: String, stem: String, endOffset: Int, isAdjectiveOnly: Bool)] = []
+        var collected: [(word: String, stem: String, modifierToken: String, endOffset: Int, isModifierOnly: Bool)] = []
 
         while cursor < ns.length && collected.count < 4 {
             let searchRange = NSRange(location: cursor, length: ns.length - cursor)
-            guard let m = wordRegex.firstMatch(in: afterSub, range: searchRange),
+            let activeRegex = cursor == 0 ? firstWordRegex : nextWordRegex
+            guard let m = activeRegex.firstMatch(in: afterSub, range: searchRange),
                   m.range.location == cursor else {
                 break
             }
@@ -1420,27 +1684,51 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
             if low.count < 2 {
                 break
             }
-            let isAdj = leadingAdjectiveModifiers.contains(low)
+
+            let priorHeadCandidates = collected.filter { !$0.isModifierOnly }
+            if !priorHeadCandidates.isEmpty {
+                // Once at least one noun has been collected (`19 datasets ...`, `12 pretrained models ...`),
+                // stop immediately at past participles (`grouped`, `trained`), post-nominal irregular participles,
+                // post-nominal adverbs, or present participles following a plural noun (`tests covering ...`).
+                if isRegularPastParticiple(low) || postNominalIrregularParticiples.contains(low) {
+                    break
+                }
+                if postNominalAdverbs.contains(low) || (low.count >= 5 && low.hasSuffix("ly")) {
+                    break
+                }
+                if let lastNoun = priorHeadCandidates.last, looksPluralCountNoun(lastNoun.word.lowercased()) {
+                    if (low.count >= 5 && low.hasSuffix("ing")) || postNominalUninflectedParticiplesAfterPlural.contains(low) {
+                        break
+                    }
+                }
+            }
+
+            let isAdjOrPreParticiple = leadingAdjectiveModifiers.contains(low)
+                || isRegularPastParticiple(low)
+                || (low.count >= 5 && low.hasSuffix("ly"))
             let stem = stemEnglishWord(low.components(separatedBy: "-").last ?? low)
+            // Keep hyphenated compound modifiers (`multi-head`, `per-layer`) intact so they do not masquerade as bare nouns (`head`, `layer`)
+            let modTok = low.contains("-") ? low : stem
             let endPos = m.range.location + m.range.length
-            collected.append((rawWord, stem, endPos, isAdj))
+            collected.append((rawWord, stem, modTok, endPos, isAdjOrPreParticiple))
             cursor = endPos
 
-            let nonAdjCount = collected.filter { !$0.isAdjectiveOnly }.count
-            if nonAdjCount >= 3 {
+            let nonModCount = collected.filter { !$0.isModifierOnly }.count
+            if nonModCount >= 3 {
                 break
             }
         }
 
-        // Trim trailing pure adjectives if no noun followed them
-        while let last = collected.last, last.isAdjectiveOnly {
+        // Trim trailing pure adjectives or participles if no head noun followed them
+        while let last = collected.last, last.isModifierOnly {
             collected.removeLast()
         }
 
         guard let headItem = collected.last else {
             return (nil, [], 0)
         }
-        let mods = Set(collected.dropLast().filter { !$0.isAdjectiveOnly }.map(\.stem))
+        let mods = Set(collected.dropLast().filter { !$0.isModifierOnly }.map(\.modifierToken))
+            .union(collected.dropLast().filter { $0.isModifierOnly && !leadingAdjectiveModifiers.contains($0.word.lowercased()) }.map(\.modifierToken))
         return (headItem.stem, mods, headItem.endOffset)
     }
 
@@ -1503,17 +1791,22 @@ public struct EvidenceLocatorAndNumericChecker: Sendable {
     }
 
     internal static func parseCleanDouble(_ literal: String) -> Double? {
-        Double(literal.replacingOccurrences(of: ",", with: ""))
+        let clean = literal
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        return Double(clean)
     }
 
     internal static func halfULPTolerance(forLiteral literal: String) -> Double {
-        let clean = literal.replacingOccurrences(of: ",", with: "")
+        let clean = literal
+            .replacingOccurrences(of: ",", with: "")
+            .replacingOccurrences(of: " ", with: "")
         guard let dotIdx = clean.firstIndex(of: ".") else {
-            return 0.5
+            return 0.0
         }
         let fracPart = clean[clean.index(after: dotIdx)...]
         let digits = fracPart.prefix(while: \.isNumber).count
-        guard digits > 0 else { return 0.5 }
+        guard digits > 0 else { return 0.0 }
         return 0.5 * Foundation.pow(10.0, -Double(digits))
     }
 
