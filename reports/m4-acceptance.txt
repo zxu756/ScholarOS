@@ -1,0 +1,127 @@
+# ScholarOS M4 Acceptance Verification Report
+Date: 2026-11-21T13:16:25Z
+Commit: 0164e64
+Binary: .build/debug/ScholarOS
+Mode: --offline (isolated HOME, SCHOLAR_CACHE_DIR unset)
+
+== [Row 1] 命名和输出契约 (locate-evidence --json, --help 中英, MCP locate_evidence, 退出码 0/1/3) ==
+  schema=scholaros.evidence/1 verdicts=[FOUND(exit=0), NUMERIC_MISMATCH(exit=1), NOT_FOUND(exit=3)] entailment_terms_found=0 cli_mcp_probe_parity=3/3
+RESULT [Row 1]: PASS — schema=scholaros.evidence/1, verdicts={FOUND(0),NUMERIC_MISMATCH(1),NOT_FOUND(3)}, 0 entailment/GROUNDED terms
+
+== [Row 2] Benchmarks/evidence/claims.jsonl 10 句有依据的论断 (要求 >= 8/10 FOUND 且页码命中 expected_pages) ==
+  [PASS] ev_001 (2506.06524v1): verdict=FOUND page=2 expected_pages=[2]
+  [PASS] ev_002 (2506.06524v1): verdict=FOUND page=4 expected_pages=[4]
+  [PASS] ev_007 (2409.19431v3): verdict=FOUND page=30 expected_pages=[30]
+  [PASS] ev_008 (2409.19431v3): verdict=FOUND page=31 expected_pages=[31]
+  [PASS] ev_013 (2410.04196v2): verdict=FOUND page=7 expected_pages=[7]
+  [PASS] ev_014 (2410.04196v2): verdict=FOUND page=7 expected_pages=[7, 2]
+  [PASS] ev_019 (2611.15445v1): verdict=FOUND page=7 expected_pages=[7]
+  [PASS] ev_020 (2611.15445v1): verdict=FOUND page=7 expected_pages=[7]
+  [PASS] ev_025 (2610.15486v1): verdict=FOUND page=15 expected_pages=[15]
+  [PASS] ev_026 (2610.15486v1): verdict=FOUND page=19 expected_pages=[19]
+  score=10/10 (required >= 8/10)
+RESULT [Row 2]: PASS — Grounded claims: 10/10 FOUND on expected_pages (threshold >= 8/10)
+
+== [Row 3] Benchmarks/evidence/claims.jsonl 10 句数字不同的论断 (要求 >= 8/10 NUMERIC_MISMATCH、页码对、pdf_text 含原文数字) ==
+  [PASS] ev_003 (2506.06524v1): verdict=NUMERIC_MISMATCH page=2 expected_pages=[2], pdf_text='(610) of PuzzleScript games' contains gt_number=['610'] (from '610')
+  [MISS] ev_004 (2506.06524v1): verdict=NUMERIC_MISMATCH exit=1 page=2 expected_pages=[3] reasons=page=2 not in expected_pages=[3]; discrepancies[].pdf_text=['(610) of PuzzleScript games'] did not contain any ground_truth_numbers=['10 games']
+  [PASS] ev_009 (2409.19431v3): verdict=NUMERIC_MISMATCH page=30 expected_pages=[30], pdf_text='500 samples' contains gt_number=['500'] (from '500 samples')
+  [PASS] ev_010 (2409.19431v3): verdict=NUMERIC_MISMATCH page=31 expected_pages=[31], pdf_text='1,000 training' contains gt_number=['1000'] (from '1,000 training samples')
+  [PASS] ev_015 (2410.04196v2): verdict=NUMERIC_MISMATCH page=7 expected_pages=[7], pdf_text='3.2%' contains gt_number=['3.2%'] (from '3.2%')
+  [PASS] ev_016 (2410.04196v2): verdict=NUMERIC_MISMATCH page=7 expected_pages=[7, 2], pdf_text='19 datasets' contains gt_number=['19'] (from '19 datasets')
+  [PASS] ev_021 (2611.15445v1): verdict=NUMERIC_MISMATCH page=7 expected_pages=[7], pdf_text='20 interactions' contains gt_number=['20'] (from '20 interactions')
+  [PASS] ev_022 (2611.15445v1): verdict=NUMERIC_MISMATCH page=7 expected_pages=[7], pdf_text='3 layers' contains gt_number=['3'] (from '3 layers')
+  [PASS] ev_027 (2610.15486v1): verdict=NUMERIC_MISMATCH page=11 expected_pages=[11], pdf_text='2.5m' contains gt_number=['2.5'] (from '2.5 m')
+  [PASS] ev_028 (2610.15486v1): verdict=NUMERIC_MISMATCH page=15 expected_pages=[15], pdf_text='40ms' contains gt_number=['40'] (from '40 ms')
+  score=9/10 (required >= 8/10)
+RESULT [Row 3]: PASS — Numeric-mismatch claims: 9/10 NUMERIC_MISMATCH with expected_pages & ground_truth_numbers (threshold >= 8/10)
+
+== [Row 4] 10 句未提及论断 + 15 行中英文哨兵 (要求 25/25 NOT_FOUND 且 matches 为空) ==
+  not_mentioned=10/10 sentinel=15/15 total=25/25 (required 25/25, 0 tolerance)
+RESULT [Row 4]: PASS — Not-mentioned & sentinels: 25/25 NOT_FOUND with empty matches (0 tolerance)
+
+== [Row 5] 位置框几何真实性 (对照 expected_pdftotext/*.tsv.gz，外扩 4pt 覆盖段落 >= 80% 词) ==
+  pdftotext_live_check=ran (pdftotext version 26.10.0, diffs_vs_stored=0/5, authoritative=expected_pdftotext/*.tsv.gz)
+  coord_transform: PDF mediaBox bottom-left (x, y, w, h) -> pdftotext -tsv top-left (left=x, top=H-(y+h), right=x+w, bottom=H-y), expanded by +4.0pt on all 4 sides
+  [PASS] ev_001 (2506.06524v1 p.2): word_cov=100.0% (107/107), area_ratio=6.7%
+  [PASS] ev_002 (2506.06524v1 p.4): word_cov=100.0% (120/120), area_ratio=7.3%
+  [PASS] ev_003 (2506.06524v1 p.2): word_cov=100.0% (81/81), area_ratio=5.4%
+  [PASS] ev_007 (2409.19431v3 p.30): word_cov=100.0% (80/80), area_ratio=5.1%
+  [PASS] ev_008 (2409.19431v3 p.31): word_cov=100.0% (171/171), area_ratio=10.0%
+  [PASS] ev_009 (2409.19431v3 p.30): word_cov=100.0% (80/80), area_ratio=5.1%
+  [PASS] ev_010 (2409.19431v3 p.31): word_cov=100.0% (171/171), area_ratio=10.0%
+  [PASS] ev_013 (2410.04196v2 p.7): word_cov=100.0% (54/54), area_ratio=3.9%
+  [PASS] ev_014 (2410.04196v2 p.7): word_cov=100.0% (145/145), area_ratio=10.9%
+  [PASS] ev_015 (2410.04196v2 p.7): word_cov=100.0% (54/54), area_ratio=3.9%
+  [PASS] ev_016 (2410.04196v2 p.7): word_cov=100.0% (145/145), area_ratio=10.9%
+  [PASS] ev_019 (2611.15445v1 p.7): word_cov=100.0% (221/221), area_ratio=13.2%
+  [PASS] ev_020 (2611.15445v1 p.7): word_cov=100.0% (221/221), area_ratio=13.2%
+  [PASS] ev_021 (2611.15445v1 p.7): word_cov=100.0% (221/221), area_ratio=13.2%
+  [PASS] ev_022 (2611.15445v1 p.7): word_cov=100.0% (221/221), area_ratio=13.2%
+  [PASS] ev_025 (2610.15486v1 p.15): word_cov=100.0% (102/102), area_ratio=7.7%
+  [PASS] ev_026 (2610.15486v1 p.19): word_cov=100.0% (102/102), area_ratio=7.0%
+  [PASS] ev_027 (2610.15486v1 p.11): word_cov=100.0% (163/163), area_ratio=13.0%
+  [PASS] ev_028 (2610.15486v1 p.15): word_cov=100.0% (102/102), area_ratio=7.7%
+  boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
+RESULT [Row 5]: PASS — Bounding boxes verified: boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
+
+== [Row 6] 5 份评测论文与 5 份合成夹具分段 (页眉页脚不进正文、引言与参考文献识别、通栏表下先左后右) ==
+  [PASS] 2506.06524v1: chunks=68 headings=8 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] 2409.19431v3: chunks=938 headings=18 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] 2410.04196v2: chunks=337 headings=11 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] 2611.15445v1: chunks=202 headings=18 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] 2610.15486v1: chunks=366 headings=36 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_paper: chunks=32 headings=7 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_ieeetran: chunks=15 headings=6 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_acm_refs: chunks=28 headings=6 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_math_columns: chunks=30 headings=8 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_wide_table_fig_cols: chunks=18 headings=4 hf_leaks=0 intro=True refs=False col_order_ok=True
+  benchmark_papers=5/5 synthetic_fixtures=5/5
+RESULT [Row 6]: PASS — Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=5/5; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
+
+== [Row 7] 提取文字与 pdftotext 词重合率 (5 份评测论文每份 >= 95%，记录百分比与耗时) ==
+  [PASS] 2506.06524v1: word_overlap=99.91% (3293/3296 words) segment_time=300.0ms ref=live_pdftotext
+  [PASS] 2409.19431v3: word_overlap=97.69% (20279/20759 words) segment_time=2359.2ms ref=live_pdftotext
+  [PASS] 2410.04196v2: word_overlap=96.87% (10333/10667 words) segment_time=1213.4ms ref=live_pdftotext
+  [PASS] 2611.15445v1: word_overlap=98.67% (6814/6906 words) segment_time=784.7ms ref=live_pdftotext
+  [PASS] 2610.15486v1: word_overlap=98.55% (15163/15386 words) segment_time=2121.9ms ref=live_pdftotext
+  papers_passed=5/5 min_word_overlap=96.87% (required >= 95.00%)
+RESULT [Row 7]: PASS — Word overlap verified (papers_passed=5/5 min_word_overlap=96.87%, required >= 95.00%)
+
+== [Row 8] MCP tools/list 与全部 45 行逐条调用对照 CLI --json ==
+  default_tools=5 has_locate_evidence=True has_scholar_search_provenance=False unknown_arg=ERR_INVALID_ARGUMENT cli_vs_mcp_diffs=0/45
+RESULT [Row 8]: PASS — MCP default_tools=5, locate_evidence present, scholar_search_provenance removed, cli_vs_mcp_diffs=0/45, ERR_INVALID_ARGUMENT verified
+
+== [Row 9] 错误处理 (文件不存在、非 PDF 字节、空白 PDF、空论断 -> 退出码 2、--json stdout 为空、stderr 写明原因) ==
+  error_cases_passed=9/9 (all exit=2, --json stdout_bytes=0, stderr non-empty)
+RESULT [Row 9]: PASS — Error handling verified (error_cases_passed=9/9, exit=2, --json stdout empty, stderr non-empty)
+
+== [Row 10] 变异补丁静态核验 (5 个 m4-*.patch git apply --check；完整副本编译重跑由 Scripts/acceptance/m4-mutations.sh 执行) ==
+  [OK] Scripts/acceptance/mutations/m4-01-disable-header-footer-strip.patch passed git apply --check
+  [OK] Scripts/acceptance/mutations/m4-02-lower-keyword-threshold-005.patch passed git apply --check
+  [OK] Scripts/acceptance/mutations/m4-03-disable-same-noun-agreement.patch passed git apply --check
+  [OK] Scripts/acceptance/mutations/m4-04-mcp-skip-numeric-check.patch passed git apply --check
+  [OK] Scripts/acceptance/mutations/m4-05-full-page-bounding-box.patch passed git apply --check
+SKIP: 没跑 — 5 个 m4-*.patch 补丁已通过 git apply --check 校验；临时副本打补丁、编译与逐行验红由 Scripts/acceptance/m4-mutations.sh 单独运行
+RESULT [Row 10]: SKIP (没跑) — All 5 m4-*.patch files verified clean with git apply --check; run Scripts/acceptance/m4-mutations.sh standalone
+
+== [Row 11] 卫生检查 (真实 ~/Library 无新增 ScholarOS 条目、临时目录清理、git diff --exit-code Benchmarks/) ==
+  scratch_cleaned=true tmp_clean=true real_library_scholaros_untouched=true benchmarks_diff_exit=0 reports_untouched=true elapsed=169.17s
+RESULT [Row 11]: PASS — Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=169.17s)
+
+========================================================================
+M4 Acceptance Summary:
+  Row  1 | PASS       | schema=scholaros.evidence/1, verdicts={FOUND(0),NUMERIC_MISMATCH(1),NOT_FOUND(3)}, 0 entailment/GROUNDED terms
+  Row  2 | PASS       | Grounded claims: 10/10 FOUND on expected_pages (threshold >= 8/10)
+  Row  3 | PASS       | Numeric-mismatch claims: 9/10 NUMERIC_MISMATCH with expected_pages & ground_truth_numbers (threshold >= 8/10)
+  Row  4 | PASS       | Not-mentioned & sentinels: 25/25 NOT_FOUND with empty matches (0 tolerance)
+  Row  5 | PASS       | Bounding boxes verified: boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
+  Row  6 | PASS       | Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=5/5; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
+  Row  7 | PASS       | Word overlap verified (papers_passed=5/5 min_word_overlap=96.87%, required >= 95.00%)
+  Row  8 | PASS       | MCP default_tools=5, locate_evidence present, scholar_search_provenance removed, cli_vs_mcp_diffs=0/45, ERR_INVALID_ARGUMENT verified
+  Row  9 | PASS       | Error handling verified (error_cases_passed=9/9, exit=2, --json stdout empty, stderr non-empty)
+  Row 10 | SKIP(没跑) | All 5 m4-*.patch files verified clean with git apply --check; run Scripts/acceptance/m4-mutations.sh standalone
+  Row 11 | PASS       | Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=169.17s)
+------------------------------------------------------------------------
+Passed: 10 | Failed: 0 | Skipped (没跑): 1
+========================================================================
