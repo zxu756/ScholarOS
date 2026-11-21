@@ -276,6 +276,19 @@ extension LSPDiagnosticSeverity {
     }
 }
 
+extension EvidenceLocalizationVerdict {
+    public func localizedLabel(_ lang: ScholarLanguage) -> String {
+        switch self {
+        case .found:
+            return lang.L("FOUND", "找到相近段落")
+        case .numericMismatch:
+            return lang.L("NUMERIC_MISMATCH", "数字不一致")
+        case .notFound:
+            return lang.L("NOT_FOUND", "没找到")
+        }
+    }
+}
+
 extension EvidenceSupportVerdict {
     public func localizedLabel(_ lang: ScholarLanguage) -> String {
         switch self {

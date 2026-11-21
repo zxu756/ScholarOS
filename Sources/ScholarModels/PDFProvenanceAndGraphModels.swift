@@ -93,6 +93,255 @@ public struct PDFPassageChunk: Sendable, Codable, Hashable, Identifiable {
     }
 }
 
+// MARK: - Evidence Localization & Quantitative Checking Models (M4, schema "scholaros.evidence/1")
+
+/// Three-way outcome for local PDF passage localization and explicit number/unit verification.
+/// Does NOT claim semantic entailment or logical support.
+public enum EvidenceLocalizationVerdict: String, Sendable, Codable, Hashable, CaseIterable {
+    case found = "FOUND"
+    case numericMismatch = "NUMERIC_MISMATCH"
+    case notFound = "NOT_FOUND"
+
+    /// Standard CLI exit code: 0 FOUND, 1 NUMERIC_MISMATCH, 3 NOT_FOUND (2 reserved for errors).
+    public var cliExitCode: Int32 {
+        switch self {
+        case .found:
+            return 0
+        case .numericMismatch:
+            return 1
+        case .notFound:
+            return 3
+        }
+    }
+}
+
+/// Page-local geometric rectangle in PDF mediaBox coordinates (origin at bottom-left, points).
+public struct EvidenceBoundingBox: Sendable, Codable, Hashable {
+    public let x: Double
+    public let y: Double
+    public let width: Double
+    public let height: Double
+
+    public init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    public init(regionBox: PDFPageRegionBox) {
+        self.x = regionBox.x
+        self.y = regionBox.y
+        self.width = regionBox.width
+        self.height = regionBox.height
+    }
+}
+
+/// Quantitative discrepancy between a number+unit/noun phrase in a claim and the corresponding PDF passage.
+public struct EvidenceNumericDiscrepancy: Sendable, Codable, Hashable {
+    public let claimText: String
+    public let pdfText: String?
+    public let reason: String
+
+    public init(claimText: String, pdfText: String?, reason: String) {
+        self.claimText = claimText
+        self.pdfText = pdfText
+        self.reason = reason
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case claimText = "claim_text"
+        case pdfText = "pdf_text"
+        case reason
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(claimText, forKey: .claimText)
+        if let pdfText {
+            try container.encode(pdfText, forKey: .pdfText)
+        } else {
+            try container.encodeNil(forKey: .pdfText)
+        }
+        try container.encode(reason, forKey: .reason)
+    }
+}
+
+/// A candidate PDF passage that passed the keyword coverage threshold, with page/box coordinates and numeric check details.
+public struct EvidencePassageMatch: Sendable, Codable, Hashable, Identifiable {
+    public var id: String { passageID }
+    public let passageID: String
+    public let citeKey: String?
+    public let pdfFile: String
+    /// 1-based physical page number (`pageIndex + 1`).
+    public let page: Int
+    /// 0-based page index.
+    public let pageIndex: Int
+    public let boundingBox: EvidenceBoundingBox
+    public let columnIndex: Int
+    public let sectionTitle: String
+    public let kind: PDFPassageChunkKind
+    public let excerpt: String
+    public let coverage: Double
+    public let matchedKeywords: [String]
+    public let bm25Score: Double
+    public let discrepancies: [EvidenceNumericDiscrepancy]
+
+    public init(
+        passageID: String,
+        citeKey: String?,
+        pdfFile: String,
+        page: Int,
+        pageIndex: Int,
+        boundingBox: EvidenceBoundingBox,
+        columnIndex: Int,
+        sectionTitle: String,
+        kind: PDFPassageChunkKind = .body,
+        excerpt: String,
+        coverage: Double,
+        matchedKeywords: [String] = [],
+        bm25Score: Double = 0.0,
+        discrepancies: [EvidenceNumericDiscrepancy] = []
+    ) {
+        self.passageID = passageID
+        self.citeKey = citeKey
+        self.pdfFile = pdfFile
+        self.page = page
+        self.pageIndex = pageIndex
+        self.boundingBox = boundingBox
+        self.columnIndex = columnIndex
+        self.sectionTitle = sectionTitle
+        self.kind = kind
+        self.excerpt = excerpt
+        self.coverage = coverage
+        self.matchedKeywords = matchedKeywords
+        self.bm25Score = bm25Score
+        self.discrepancies = discrepancies
+    }
+
+    public init(
+        chunk: PDFPassageChunk,
+        coverage: Double,
+        matchedKeywords: [String] = [],
+        bm25Score: Double = 0.0,
+        discrepancies: [EvidenceNumericDiscrepancy] = []
+    ) {
+        self.init(
+            passageID: chunk.id,
+            citeKey: chunk.citeKey.isEmpty ? nil : chunk.citeKey,
+            pdfFile: chunk.pdfFileName,
+            page: chunk.boundingBox.pageIndex + 1,
+            pageIndex: chunk.boundingBox.pageIndex,
+            boundingBox: EvidenceBoundingBox(regionBox: chunk.boundingBox),
+            columnIndex: chunk.columnIndex,
+            sectionTitle: chunk.sectionTitle,
+            kind: chunk.kind,
+            excerpt: chunk.passageText,
+            coverage: coverage,
+            matchedKeywords: matchedKeywords,
+            bm25Score: bm25Score,
+            discrepancies: discrepancies
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case passageID = "passage_id"
+        case citeKey = "cite_key"
+        case pdfFile = "pdf_file"
+        case page
+        case pageIndex = "page_index"
+        case boundingBox = "bounding_box"
+        case columnIndex = "column_index"
+        case sectionTitle = "section_title"
+        case kind
+        case excerpt
+        case coverage
+        case matchedKeywords = "matched_keywords"
+        case bm25Score = "bm25_score"
+        case discrepancies
+    }
+}
+
+/// Top-level JSON-serializable result for M4 evidence localization (`schema: "scholaros.evidence/1"`).
+public struct EvidenceLocalizationResult: Sendable, Codable, Hashable {
+    public static let currentSchema = "scholaros.evidence/1"
+
+    public let schema: String
+    public let claim: String
+    public let pdfFile: String?
+    public let verdict: EvidenceLocalizationVerdict
+    public let queryKeywords: [String]
+    public let page: Int?
+    public let pageIndex: Int?
+    public let boundingBox: EvidenceBoundingBox?
+    public let columnIndex: Int?
+    public let sectionTitle: String?
+    public let excerpt: String?
+    public let coverage: Double?
+    public let discrepancies: [EvidenceNumericDiscrepancy]
+    public let matches: [EvidencePassageMatch]
+
+    public init(
+        schema: String = EvidenceLocalizationResult.currentSchema,
+        claim: String,
+        pdfFile: String? = nil,
+        verdict: EvidenceLocalizationVerdict,
+        queryKeywords: [String] = [],
+        matches: [EvidencePassageMatch] = [],
+        discrepancies: [EvidenceNumericDiscrepancy] = []
+    ) {
+        self.schema = schema
+        self.claim = claim
+        self.pdfFile = pdfFile ?? matches.first?.pdfFile
+        self.verdict = verdict
+        self.queryKeywords = queryKeywords
+
+        if verdict == .notFound || matches.isEmpty {
+            self.page = nil
+            self.pageIndex = nil
+            self.boundingBox = nil
+            self.columnIndex = nil
+            self.sectionTitle = nil
+            self.excerpt = nil
+            self.coverage = nil
+            self.discrepancies = []
+            self.matches = []
+        } else {
+            let primary = matches[0]
+            self.page = primary.page
+            self.pageIndex = primary.pageIndex
+            self.boundingBox = primary.boundingBox
+            self.columnIndex = primary.columnIndex
+            self.sectionTitle = primary.sectionTitle
+            self.excerpt = primary.excerpt
+            self.coverage = primary.coverage
+            self.discrepancies = verdict == .numericMismatch
+                ? (discrepancies.isEmpty ? primary.discrepancies : discrepancies)
+                : []
+            self.matches = matches
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schema
+        case claim
+        case pdfFile = "pdf_file"
+        case verdict
+        case queryKeywords = "query_keywords"
+        case page
+        case pageIndex = "page_index"
+        case boundingBox = "bounding_box"
+        case columnIndex = "column_index"
+        case sectionTitle = "section_title"
+        case excerpt
+        case coverage
+        case discrepancies
+        case matches
+    }
+}
+
+// Legacy SQLite project-store / UI compatibility types (retained only for persisted project rows until M5 CiteStudio)
+
 public enum EvidenceSupportVerdict: String, Sendable, Codable, Hashable, CaseIterable {
     case groundedEntailment = "GROUNDED"
     case partialEvidence = "PARTIAL"
