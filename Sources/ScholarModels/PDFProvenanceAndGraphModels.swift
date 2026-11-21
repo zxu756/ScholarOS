@@ -18,6 +18,18 @@ public struct PDFPageRegionBox: Sendable, Codable, Hashable {
     }
 }
 
+public enum PDFPassageChunkKind: String, Sendable, Codable, Hashable, CaseIterable {
+    case body = "body"
+    case sectionHeading = "section_heading"
+    case tableOrFigure = "table_or_figure"
+    case header = "header"
+    case footer = "footer"
+
+    public var isHeaderOrFooter: Bool {
+        self == .header || self == .footer
+    }
+}
+
 public struct PDFPassageChunk: Sendable, Codable, Hashable, Identifiable {
     public let id: String
     public let citeKey: String
@@ -27,6 +39,11 @@ public struct PDFPassageChunk: Sendable, Codable, Hashable, Identifiable {
     public let readingSequence: Int
     public let boundingBox: PDFPageRegionBox
     public let passageText: String
+    public let kind: PDFPassageChunkKind
+
+    public var pageNumber: Int {
+        boundingBox.pageIndex + 1
+    }
 
     public init(
         id: String,
@@ -36,7 +53,8 @@ public struct PDFPassageChunk: Sendable, Codable, Hashable, Identifiable {
         columnIndex: Int,
         readingSequence: Int,
         boundingBox: PDFPageRegionBox,
-        passageText: String
+        passageText: String,
+        kind: PDFPassageChunkKind = .body
     ) {
         self.id = id
         self.citeKey = citeKey
@@ -46,6 +64,32 @@ public struct PDFPassageChunk: Sendable, Codable, Hashable, Identifiable {
         self.readingSequence = readingSequence
         self.boundingBox = boundingBox
         self.passageText = passageText
+        self.kind = kind
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case citeKey
+        case pdfFileName
+        case sectionTitle
+        case columnIndex
+        case readingSequence
+        case boundingBox
+        case passageText
+        case kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.citeKey = try container.decode(String.self, forKey: .citeKey)
+        self.pdfFileName = try container.decode(String.self, forKey: .pdfFileName)
+        self.sectionTitle = try container.decode(String.self, forKey: .sectionTitle)
+        self.columnIndex = try container.decode(Int.self, forKey: .columnIndex)
+        self.readingSequence = try container.decode(Int.self, forKey: .readingSequence)
+        self.boundingBox = try container.decode(PDFPageRegionBox.self, forKey: .boundingBox)
+        self.passageText = try container.decode(String.self, forKey: .passageText)
+        self.kind = try container.decodeIfPresent(PDFPassageChunkKind.self, forKey: .kind) ?? .body
     }
 }
 

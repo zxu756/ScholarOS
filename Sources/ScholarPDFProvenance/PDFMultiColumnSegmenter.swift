@@ -7,6 +7,19 @@ import ScholarModels
 // MARK: - PDFKit Geometric Multi-Column Reading-Order Segmenter
 
 public struct PDFMultiColumnSegmenter: Sendable {
+    /// Top/bottom page-height fraction scanned for cross-page repeating headers and footers.
+    public static let marginBandHeightRatio: Double = 0.10
+    /// Top/bottom page-height fraction scanned for isolated standalone page numbers (including single-page PDFs).
+    public static let standalonePageNumberBandRatio: Double = 0.085
+    /// Minimum vertical gap (pt) separating an isolated standalone page number from interior content.
+    public static let standalonePageNumberMinGapPt: Double = 10.0
+    /// Minimum fraction of page width for a single text line to count as intrinsically full-width spanning.
+    public static let spanningLineWidthRatio: Double = 0.56
+    /// Half-width around `mediaBox.midX` (pt) used to detect lines crossing the central two-column gutter.
+    public static let centralGutterCrossingHalfWidthPt: Double = 18.0
+    /// Maximum vertical gap (pt) before starting a new paragraph within a column stream.
+    public static let paragraphVerticalGapThresholdPt: Double = 11.5
+
     public init() {}
 
     public func segmentPDF(at url: URL, citeKey: String) throws -> [PDFPassageChunk] {
@@ -24,86 +37,284 @@ public struct PDFMultiColumnSegmenter: Sendable {
     }
 
     public func segmentDocument(_ document: PDFDocument, pdfFileName: String, citeKey: String) -> [PDFPassageChunk] {
+        let pageCount = document.pageCount
+        guard pageCount > 0 else { return [] }
+
+        // Pass 1: Extract positioned lines on every page and build cross-page margin template frequencies
+        var rawPages: [PageRawLayout] = []
+        rawPages.reserveCapacity(pageCount)
+
+        var topTemplatePages: [String: Set<Int>] = [:]
+        var bottomTemplatePages: [String: Set<Int>] = [:]
+
+        for pageIndex in 0..<pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+            let mediaBox = page.bounds(for: .mediaBox)
+            let lines = extractPositionedLines(from: page, pageIndex: pageIndex)
+            guard !lines.isEmpty else { continue }
+
+            let pageMinY = Double(mediaBox.minY)
+            let pageMaxY = Double(mediaBox.maxY)
+            let pageHeight = max(1.0, pageMaxY - pageMinY)
+            let topCutoffY = pageMaxY - Self.marginBandHeightRatio * pageHeight
+            let bottomCutoffY = pageMinY + Self.marginBandHeightRatio * pageHeight
+
+            for line in lines {
+                if line.minY >= topCutoffY, let tpl = Self.normalizeMarginTemplate(line.text) {
+                    topTemplatePages[tpl, default: []].insert(pageIndex)
+                }
+                if line.maxY <= bottomCutoffY, let tpl = Self.normalizeMarginTemplate(line.text) {
+                    bottomTemplatePages[tpl, default: []].insert(pageIndex)
+                }
+            }
+
+            rawPages.append(PageRawLayout(pageIndex: pageIndex, mediaBox: mediaBox, lines: lines))
+        }
+
+        // Pass 2: Segment each page into headers, spanning floats/front-matter, two-column/single-column prose, and footers
         var chunks: [PDFPassageChunk] = []
         var globalSeq = 0
         var activeSection = "Front Matter & Abstract"
 
-        for pageIndex in 0..<document.pageCount {
-            guard let page = document.page(at: pageIndex) else { continue }
-            let mediaBox = page.bounds(for: .mediaBox)
+        func appendChunk(
+            pageIndex: Int,
+            columnIndex: Int,
+            sectionTitle: String,
+            kind: PDFPassageChunkKind,
+            block: PositionedTextLine
+        ) {
+            let trimmed = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            globalSeq += 1
+            let bbox = PDFPageRegionBox(
+                pageIndex: pageIndex,
+                x: block.minX,
+                y: block.minY,
+                width: max(8.0, block.maxX - block.minX),
+                height: max(8.0, block.maxY - block.minY)
+            )
+            chunks.append(
+                PDFPassageChunk(
+                    id: "\(citeKey)#p\(pageIndex + 1)-c\(columnIndex)-\(globalSeq)",
+                    citeKey: citeKey,
+                    pdfFileName: pdfFileName,
+                    sectionTitle: sectionTitle,
+                    columnIndex: columnIndex,
+                    readingSequence: globalSeq,
+                    boundingBox: bbox,
+                    passageText: trimmed,
+                    kind: kind
+                )
+            )
+        }
+
+        for rawPage in rawPages {
+            let pageIndex = rawPage.pageIndex
+            let mediaBox = rawPage.mediaBox
             let midX = Double(mediaBox.midX)
             let pageWidth = Double(max(1.0, mediaBox.width))
 
-            let rawLines = extractPositionedLines(from: page, pageIndex: pageIndex)
-            guard !rawLines.isEmpty else { continue }
+            // 1. Strip repeating headers/footers and isolated standalone page numbers
+            let partitioned = Self.partitionMarginLines(
+                lines: rawPage.lines,
+                pageIndex: pageIndex,
+                totalPageCount: pageCount,
+                mediaBox: mediaBox,
+                topTemplatePages: topTemplatePages,
+                bottomTemplatePages: bottomTemplatePages
+            )
 
-            // Partition into spanning blocks (full-width headers/abstract), left column, and right column
-            var spanningLines: [PositionedTextLine] = []
-            var leftLines: [PositionedTextLine] = []
-            var rightLines: [PositionedTextLine] = []
-
-            for line in rawLines {
-                let widthRatio = line.width / pageWidth
-                let crossesCenter = line.minX < (midX - 24.0) && line.maxX > (midX + 24.0)
-                if widthRatio > 0.56 || crossesCenter {
-                    spanningLines.append(line)
-                } else if line.midX <= midX {
-                    leftLines.append(line)
-                } else {
-                    rightLines.append(line)
-                }
+            let headerBlocks = Self.mergeHorizontalRows(partitioned.headers)
+            for hb in headerBlocks {
+                appendChunk(
+                    pageIndex: pageIndex,
+                    columnIndex: 0,
+                    sectionTitle: activeSection,
+                    kind: .header,
+                    block: hb
+                )
             }
 
-            // Sort each stream top-to-bottom (in PDF coordinates, larger Y is higher on page)
-            let sortTopDown: (PositionedTextLine, PositionedTextLine) -> Bool = { a, b in
-                if abs(a.maxY - b.maxY) > 3.0 { return a.maxY > b.maxY }
-                return a.minX < b.minX
-            }
-            spanningLines.sort(by: sortTopDown)
-            leftLines.sort(by: sortTopDown)
-            rightLines.sort(by: sortTopDown)
+            let contentLines = partitioned.content
+            if !contentLines.isEmpty {
+                // 2. Isolate cross-column spanning tables/figures (carrying along narrow column cells inside their Y band)
+                let tableExtraction = Self.extractSpanningTablesAndFigures(
+                    from: contentLines,
+                    midX: midX,
+                    pageWidth: pageWidth
+                )
+                let spanningFloats = tableExtraction.floatBlocks
+                let proseLines = tableExtraction.remainingLines
 
-            let streams: [(Int, [PositionedTextLine])]
-            if leftLines.count >= 3 && rightLines.count >= 3 {
-                streams = [(0, spanningLines), (1, leftLines), (2, rightLines)]
-            } else {
-                var mergedSingle = rawLines
-                mergedSingle.sort(by: sortTopDown)
-                streams = [(0, mergedSingle)]
-            }
+                // 3. Partition remaining prose/heading lines into spanning vs left vs right streams
+                var spanningProse: [PositionedTextLine] = []
+                var leftProse: [PositionedTextLine] = []
+                var rightProse: [PositionedTextLine] = []
 
-            for (colIdx, streamLines) in streams where !streamLines.isEmpty {
-                let groupedParagraphs = groupLinesIntoParagraphs(streamLines)
-                for para in groupedParagraphs {
-                    if let heading = detectSectionHeading(para.text) {
-                        activeSection = heading
+                for line in proseLines {
+                    if Self.isSpanningLine(line, midX: midX, pageWidth: pageWidth) {
+                        spanningProse.append(line)
+                    } else if line.midX <= midX {
+                        leftProse.append(line)
+                    } else {
+                        rightProse.append(line)
                     }
-                    guard para.text.count >= 18 else { continue }
-                    globalSeq += 1
-                    let bbox = PDFPageRegionBox(
-                        pageIndex: pageIndex,
-                        x: para.minX,
-                        y: para.minY,
-                        width: max(8.0, para.maxX - para.minX),
-                        height: max(8.0, para.maxY - para.minY)
-                    )
-                    chunks.append(
-                        PDFPassageChunk(
-                            id: "\(citeKey)#p\(pageIndex + 1)-c\(colIdx)-\(globalSeq)",
-                            citeKey: citeKey,
-                            pdfFileName: pdfFileName,
-                            sectionTitle: activeSection,
-                            columnIndex: colIdx,
-                            readingSequence: globalSeq,
-                            boundingBox: bbox,
-                            passageText: para.text
-                        )
-                    )
                 }
+
+                spanningProse.sort(by: Self.sortTopDown)
+                leftProse.sort(by: Self.sortTopDown)
+                rightProse.sort(by: Self.sortTopDown)
+
+                let maxLeftMaxX = leftProse.map(\.maxX).max() ?? -.infinity
+                let minRightMinX = rightProse.map(\.minX).min() ?? .infinity
+                let twoColTopY = max(
+                    leftProse.map(\.maxY).max() ?? -.infinity,
+                    rightProse.map(\.maxY).max() ?? -.infinity
+                )
+                let twoColBottomY = min(
+                    leftProse.map(\.minY).min() ?? .infinity,
+                    rightProse.map(\.minY).min() ?? .infinity
+                )
+                let interleavedSpanningCount = spanningProse.filter {
+                    $0.midY < twoColTopY - 4.0 && $0.midY > twoColBottomY + 4.0
+                }.count
+
+                let hasCleanTwoColumnBothSides =
+                    !leftProse.isEmpty
+                    && !rightProse.isEmpty
+                    && maxLeftMaxX < (midX + 12.0)
+                    && minRightMinX > (midX - 12.0)
+                    && maxLeftMaxX < minRightMinX
+                    && interleavedSpanningCount * 3 <= (leftProse.count + rightProse.count)
+
+                let hasLeftOnlyTwoColumnStream =
+                    !leftProse.isEmpty
+                    && rightProse.isEmpty
+                    && maxLeftMaxX <= (midX + 8.0)
+                    && interleavedSpanningCount == 0
+
+                let isTwoColumn = hasCleanTwoColumnBothSides || hasLeftOnlyTwoColumnStream
+
+                // Split spanning floats into top floats (above body columns) vs bottom floats
+                let topThresholdY = proseLines.isEmpty ? -.infinity : (twoColTopY - 6.0)
+                let topFloats = spanningFloats.filter { $0.minY >= topThresholdY }
+                let bottomFloats = spanningFloats.filter { $0.minY < topThresholdY }
+
+                func emitProseStream(columnIndex: Int, lines: [PositionedTextLine]) {
+                    guard !lines.isEmpty else { return }
+                    let paragraphs = groupLinesIntoParagraphs(lines)
+                    for para in paragraphs {
+                        if let heading = detectSectionHeading(para.text) {
+                            activeSection = heading
+                            appendChunk(
+                                pageIndex: pageIndex,
+                                columnIndex: columnIndex,
+                                sectionTitle: activeSection,
+                                kind: .sectionHeading,
+                                block: para
+                            )
+                        } else if Self.isTableOrFigureCaption(para.text) {
+                            appendChunk(
+                                pageIndex: pageIndex,
+                                columnIndex: columnIndex,
+                                sectionTitle: activeSection,
+                                kind: .tableOrFigure,
+                                block: para
+                            )
+                        } else {
+                            appendChunk(
+                                pageIndex: pageIndex,
+                                columnIndex: columnIndex,
+                                sectionTitle: activeSection,
+                                kind: .body,
+                                block: para
+                            )
+                        }
+                    }
+                }
+
+                if isTwoColumn {
+                    let topSpanningProse = spanningProse.filter { $0.midY >= twoColTopY - 4.0 }
+                    let lowerSpanningProse = spanningProse.filter { $0.midY < twoColTopY - 4.0 }
+
+                    // Emit top spanning prose and top spanning floats ordered top-to-bottom
+                    enum TopSpanItem {
+                        case prose(PositionedTextLine)
+                        case tableFigure(PositionedTextLine)
+                        var maxY: Double {
+                            switch self {
+                            case .prose(let b), .tableFigure(let b): return b.maxY
+                            }
+                        }
+                    }
+                    var topItems: [TopSpanItem] = []
+                    for p in groupLinesIntoParagraphs(topSpanningProse) {
+                        topItems.append(.prose(p))
+                    }
+                    for tf in topFloats {
+                        topItems.append(.tableFigure(tf))
+                    }
+                    topItems.sort { $0.maxY > $1.maxY }
+
+                    for item in topItems {
+                        switch item {
+                        case .prose(let para):
+                            if let heading = detectSectionHeading(para.text) {
+                                activeSection = heading
+                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .sectionHeading, block: para)
+                            } else {
+                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .body, block: para)
+                            }
+                        case .tableFigure(let tf):
+                            appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
+                        }
+                    }
+
+                    // Left column strictly precedes right column
+                    emitProseStream(columnIndex: 1, lines: leftProse)
+                    emitProseStream(columnIndex: 2, lines: rightProse)
+
+                    if !lowerSpanningProse.isEmpty {
+                        emitProseStream(columnIndex: 0, lines: lowerSpanningProse)
+                    }
+                    for tf in bottomFloats.sorted(by: Self.sortTopDown) {
+                        appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
+                    }
+                } else {
+                    // Single-column page: interleave single-column prose blocks and spanning floats top-to-bottom
+                    for tf in topFloats.sorted(by: Self.sortTopDown) {
+                        appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
+                    }
+                    var mergedSingle = proseLines
+                    mergedSingle.sort(by: Self.sortTopDown)
+                    emitProseStream(columnIndex: 0, lines: mergedSingle)
+                    for tf in bottomFloats.sorted(by: Self.sortTopDown) {
+                        appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
+                    }
+                }
+            }
+
+            let footerBlocks = Self.mergeHorizontalRows(partitioned.footers)
+            for fb in footerBlocks {
+                appendChunk(
+                    pageIndex: pageIndex,
+                    columnIndex: 0,
+                    sectionTitle: activeSection,
+                    kind: .footer,
+                    block: fb
+                )
             }
         }
 
         return chunks
+    }
+
+    // MARK: - Internal Geometry Types
+
+    private struct PageRawLayout {
+        let pageIndex: Int
+        let mediaBox: CGRect
+        let lines: [PositionedTextLine]
     }
 
     private struct PositionedTextLine {
@@ -113,8 +324,25 @@ public struct PDFMultiColumnSegmenter: Sendable {
         let maxX: Double
         let maxY: Double
         var width: Double { maxX - minX }
+        var height: Double { maxY - minY }
         var midX: Double { (minX + maxX) * 0.5 }
+        var midY: Double { (minY + maxY) * 0.5 }
     }
+
+    private static func sortTopDown(_ a: PositionedTextLine, _ b: PositionedTextLine) -> Bool {
+        if abs(a.maxY - b.maxY) > 3.0 { return a.maxY > b.maxY }
+        return a.minX < b.minX
+    }
+
+    private static func isSpanningLine(_ line: PositionedTextLine, midX: Double, pageWidth: Double) -> Bool {
+        let widthRatio = line.width / pageWidth
+        let crossesGutter =
+            line.minX < (midX - centralGutterCrossingHalfWidthPt)
+            && line.maxX > (midX + centralGutterCrossingHalfWidthPt)
+        return widthRatio > spanningLineWidthRatio || crossesGutter
+    }
+
+    // MARK: - PDFKit Line Extraction
 
     private func extractPositionedLines(from page: PDFPage, pageIndex: Int) -> [PositionedTextLine] {
         guard let fullSelection = page.selection(for: page.bounds(for: .mediaBox)) else {
@@ -154,19 +382,346 @@ public struct PDFMultiColumnSegmenter: Sendable {
         return lines
     }
 
+    // MARK: - Margin Header & Footer Stripping
+
+    private static func normalizeMarginTemplate(_ raw: String) -> String? {
+        let collapsed = raw
+            .lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+
+        var digitNormalized = collapsed.replacingOccurrences(
+            of: #"\d+"#,
+            with: "#",
+            options: .regularExpression
+        )
+
+        // Strip leading or trailing page number tokens ("4 ieee transactions..." / "... title 5")
+        let strippedEdgeNum = digitNormalized
+            .replacingOccurrences(of: #"^#\s+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+#$"#, with: "", options: .regularExpression)
+        let alphaCount = strippedEdgeNum.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
+        if alphaCount >= 6 {
+            digitNormalized = strippedEdgeNum
+        }
+
+        let totalLetters = digitNormalized.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
+        guard totalLetters >= 3 || digitNormalized.contains("page #") else { return nil }
+        return digitNormalized
+    }
+
+    private static func isStandalonePageNumber(_ raw: String) -> Bool {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !s.isEmpty, s.count <= 24 else { return false }
+        if s.range(of: #"^\d{1,4}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.range(of: #"^[-–—]\s*\d{1,4}\s*[-–—]$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.range(of: #"^page\s+\d{1,4}(?:\s*(?:of|/)\s*\d{1,4})?$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if s.range(of: #"^[ivxlcdm]{1,6}$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return false
+    }
+
+    private static func partitionMarginLines(
+        lines: [PositionedTextLine],
+        pageIndex: Int,
+        totalPageCount: Int,
+        mediaBox: CGRect,
+        topTemplatePages: [String: Set<Int>],
+        bottomTemplatePages: [String: Set<Int>]
+    ) -> (headers: [PositionedTextLine], footers: [PositionedTextLine], content: [PositionedTextLine]) {
+        let pageMinY = Double(mediaBox.minY)
+        let pageMaxY = Double(mediaBox.maxY)
+        let pageHeight = max(1.0, pageMaxY - pageMinY)
+
+        let topBandY = pageMaxY - marginBandHeightRatio * pageHeight
+        let bottomBandY = pageMinY + marginBandHeightRatio * pageHeight
+        let topPageNumY = pageMaxY - standalonePageNumberBandRatio * pageHeight
+        let bottomPageNumY = pageMinY + standalonePageNumberBandRatio * pageHeight
+
+        let interiorLines = lines.filter { $0.minY < topBandY && $0.maxY > bottomBandY }
+        let interiorTopMaxY = interiorLines.map(\.maxY).max()
+        let interiorBottomMinY = interiorLines.map(\.minY).min()
+
+        var headers: [PositionedTextLine] = []
+        var footers: [PositionedTextLine] = []
+        var content: [PositionedTextLine] = []
+
+        for line in lines {
+            if line.minY >= topBandY {
+                let repeatsAcrossPages =
+                    totalPageCount >= 2
+                    && (normalizeMarginTemplate(line.text).map { (topTemplatePages[$0]?.count ?? 0) >= 2 } ?? false)
+                let isolatedPageNum =
+                    line.minY >= topPageNumY
+                    && isStandalonePageNumber(line.text)
+                    && (interiorTopMaxY.map { line.minY - $0 >= standalonePageNumberMinGapPt } ?? true)
+                if repeatsAcrossPages || isolatedPageNum {
+                    headers.append(line)
+                    continue
+                }
+            }
+
+            if line.maxY <= bottomBandY {
+                let repeatsAcrossPages =
+                    totalPageCount >= 2
+                    && (normalizeMarginTemplate(line.text).map { (bottomTemplatePages[$0]?.count ?? 0) >= 2 } ?? false)
+                let isolatedPageNum =
+                    line.maxY <= bottomPageNumY
+                    && isStandalonePageNumber(line.text)
+                    && (interiorBottomMinY.map { $0 - line.maxY >= standalonePageNumberMinGapPt } ?? true)
+                if repeatsAcrossPages || isolatedPageNum {
+                    footers.append(line)
+                    continue
+                }
+            }
+
+            content.append(line)
+        }
+
+        return (headers, footers, content)
+    }
+
+    private static func mergeHorizontalRows(_ lines: [PositionedTextLine]) -> [PositionedTextLine] {
+        guard !lines.isEmpty else { return [] }
+        let sorted = lines.sorted(by: sortTopDown)
+        var rowGroups: [[PositionedTextLine]] = []
+
+        for line in sorted {
+            if let idx = rowGroups.firstIndex(where: { abs($0[0].midY - line.midY) <= 4.0 }) {
+                rowGroups[idx].append(line)
+            } else {
+                rowGroups.append([line])
+            }
+        }
+
+        return rowGroups.map { group in
+            let lr = group.sorted { $0.minX < $1.minX }
+            return PositionedTextLine(
+                text: lr.map(\.text).joined(separator: " "),
+                minX: lr.map(\.minX).min() ?? 0.0,
+                minY: lr.map(\.minY).min() ?? 0.0,
+                maxX: lr.map(\.maxX).max() ?? 0.0,
+                maxY: lr.map(\.maxY).max() ?? 0.0
+            )
+        }
+        .sorted(by: sortTopDown)
+    }
+
+    // MARK: - Spanning Table & Figure Detection
+
+    private static func isTableOrFigureCaption(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let pattern = #"^(?:table|tab\.|figure|fig\.|figs\.|algorithm|alg\.|scheme|chart)\s*(?:\d+|[ivxlcdm]+|[a-z]\d*)(?:[:.\s—–-]|$)"#
+        return trimmed.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    private static func looksTabularRow(_ text: String, segmentCount: Int) -> Bool {
+        if segmentCount >= 3 { return true }
+        var numericTokens = 0
+        let parts = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        for part in parts {
+            if part.range(of: #"^[+-]?\d+(?:[.,]\d+)?(?:%|ms|s|x|×|mb|gb|kb)?$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                numericTokens += 1
+            }
+        }
+        return numericTokens >= 3
+    }
+
+    private static func extractSpanningTablesAndFigures(
+        from contentLines: [PositionedTextLine],
+        midX: Double,
+        pageWidth: Double
+    ) -> (floatBlocks: [PositionedTextLine], remainingLines: [PositionedTextLine]) {
+        guard !contentLines.isEmpty else { return ([], []) }
+
+        // Group content lines into horizontal Y-bands (tolerance 4 pt) to detect multi-cell wide rows
+        struct HorizontalRow {
+            var indices: [Int]
+            var lines: [PositionedTextLine]
+            var minX: Double
+            var maxX: Double
+            var minY: Double
+            var maxY: Double
+            var midY: Double { (minY + maxY) * 0.5 }
+            var combinedWidth: Double { maxX - minX }
+        }
+
+        let indexedSorted = contentLines.enumerated().sorted { sortTopDown($0.element, $1.element) }
+        var rows: [HorizontalRow] = []
+
+        for (origIdx, line) in indexedSorted {
+            if let rIdx = rows.firstIndex(where: { abs($0.midY - line.midY) <= 4.0 }) {
+                rows[rIdx].indices.append(origIdx)
+                rows[rIdx].lines.append(line)
+                rows[rIdx].minX = min(rows[rIdx].minX, line.minX)
+                rows[rIdx].maxX = max(rows[rIdx].maxX, line.maxX)
+                rows[rIdx].minY = min(rows[rIdx].minY, line.minY)
+                rows[rIdx].maxY = max(rows[rIdx].maxY, line.maxY)
+            } else {
+                rows.append(
+                    HorizontalRow(
+                        indices: [origIdx],
+                        lines: [line],
+                        minX: line.minX,
+                        maxX: line.maxX,
+                        minY: line.minY,
+                        maxY: line.maxY
+                    )
+                )
+            }
+        }
+        rows.sort { $0.maxY > $1.maxY }
+
+        // Mark candidate spanning rows: either contains an intrinsically spanning line, or >=3 cells spanning >56% width
+        func rowIsSpanningCandidate(_ row: HorizontalRow) -> Bool {
+            if row.lines.contains(where: { isSpanningLine($0, midX: midX, pageWidth: pageWidth) }) {
+                return true
+            }
+            if row.lines.count >= 3 && (row.combinedWidth / pageWidth) > spanningLineWidthRatio {
+                return true
+            }
+            let lrText = row.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
+            if isTableOrFigureCaption(lrText) && (row.combinedWidth / pageWidth) > 0.45 {
+                return true
+            }
+            return false
+        }
+
+        // Build contiguous vertical clusters of spanning candidate rows (gap <= 22 pt)
+        var clusters: [[Int]] = []
+        for rIdx in rows.indices where rowIsSpanningCandidate(rows[rIdx]) {
+            if let lastCluster = clusters.last,
+               let prevRowIdx = lastCluster.last,
+               (rows[prevRowIdx].minY - rows[rIdx].maxY) <= 22.0 {
+                clusters[clusters.count - 1].append(rIdx)
+            } else {
+                clusters.append([rIdx])
+            }
+        }
+
+        var consumedLineIndices: Set<Int> = []
+        var floatBlocks: [PositionedTextLine] = []
+
+        for cluster in clusters {
+            var expandedRowIndices = Set(cluster)
+            // Attach immediately adjacent caption continuation or caption header/footer rows within 20 pt
+            if let firstR = cluster.first, firstR > 0 {
+                let above = rows[firstR - 1]
+                let aboveText = above.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
+                if (above.minY - rows[firstR].maxY) <= 20.0 && isTableOrFigureCaption(aboveText) {
+                    expandedRowIndices.insert(firstR - 1)
+                }
+            }
+            if let lastR = cluster.last, lastR + 1 < rows.count {
+                let below = rows[lastR + 1]
+                let belowText = below.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
+                if (rows[lastR].minY - below.maxY) <= 20.0 && isTableOrFigureCaption(belowText) {
+                    expandedRowIndices.insert(lastR + 1)
+                }
+            }
+
+            let orderedRows = expandedRowIndices.sorted().map { rows[$0] }
+            let rowTexts = orderedRows.map { r in
+                r.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
+            }
+
+            let hasCaption = rowTexts.contains { isTableOrFigureCaption($0) }
+            let tabularRowCount = zip(orderedRows, rowTexts).filter { r, txt in
+                looksTabularRow(txt, segmentCount: r.lines.count)
+            }.count
+            let startsLikeAbstract = rowTexts.first?.lowercased().hasPrefix("abstract") == true
+
+            guard hasCaption || (tabularRowCount >= 2 && !startsLikeAbstract) else {
+                continue
+            }
+
+            let clusterMinY = orderedRows.map(\.minY).min() ?? 0.0
+            let clusterMaxY = orderedRows.map(\.maxY).max() ?? 0.0
+
+            // Sweep every content line on this page whose midY lies within the spanning float's Y interval
+            // (captures narrow left/right table column headers like "Engine Variant" that do not cross midX)
+            var clusterLines: [PositionedTextLine] = []
+            for (idx, line) in contentLines.enumerated() where !consumedLineIndices.contains(idx) {
+                if line.midY >= (clusterMinY - 2.5) && line.midY <= (clusterMaxY + 2.5) {
+                    consumedLineIndices.insert(idx)
+                    clusterLines.append(line)
+                }
+            }
+
+            let mergedRows = mergeHorizontalRows(clusterLines)
+            guard !mergedRows.isEmpty else { continue }
+            let combinedText = mergedRows.map(\.text).joined(separator: " ")
+            let floatBox = PositionedTextLine(
+                text: combinedText,
+                minX: mergedRows.map(\.minX).min() ?? 0.0,
+                minY: mergedRows.map(\.minY).min() ?? 0.0,
+                maxX: mergedRows.map(\.maxX).max() ?? 0.0,
+                maxY: mergedRows.map(\.maxY).max() ?? 0.0
+            )
+            floatBlocks.append(floatBox)
+        }
+
+        let remaining = contentLines.enumerated().compactMap { idx, line in
+            consumedLineIndices.contains(idx) ? nil : line
+        }
+        return (floatBlocks.sorted(by: sortTopDown), remaining)
+    }
+
+    // MARK: - Paragraph Grouping & Section Heading Detection
+
+    private static func endsSentence(_ text: String) -> Bool {
+        guard let last = text.trimmingCharacters(in: .whitespaces).last else { return false }
+        return ".?!\"”)]".contains(last)
+    }
+
+    private static func shouldDehyphenateJoin(_ currentText: String, _ nextText: String) -> Bool {
+        guard currentText.hasSuffix("-"), !currentText.hasSuffix("--") else { return false }
+        let beforeHyphen = currentText.dropLast()
+        guard let prevChar = beforeHyphen.last,
+              prevChar.unicodeScalars.allSatisfy({ CharacterSet.letters.contains($0) }),
+              let nextFirst = nextText.first,
+              nextFirst.isLowercase else {
+            return false
+        }
+        return true
+    }
+
     private func groupLinesIntoParagraphs(_ lines: [PositionedTextLine]) -> [PositionedTextLine] {
         guard var current = lines.first else { return [] }
         var paragraphs: [PositionedTextLine] = []
+        let columnLeftMargin = lines.map(\.minX).min() ?? current.minX
 
         for next in lines.dropFirst() {
             let verticalGap = current.minY - next.maxY
-            let nextLooksLikeHeading = detectSectionHeading(next.text) != nil
-            if verticalGap > 11.5 || nextLooksLikeHeading || current.text.count > 520 {
+            let currentIsHeading = detectSectionHeading(current.text) != nil
+            let nextIsHeading = detectSectionHeading(next.text) != nil
+            let nextStartsCaption = Self.isTableOrFigureCaption(next.text)
+            let nextIsIndentedNewParagraph =
+                !currentIsHeading
+                && (next.minX - columnLeftMargin) >= 6.5
+                && (current.minX - columnLeftMargin) <= 3.5
+                && Self.endsSentence(current.text)
+
+            if currentIsHeading
+                || nextIsHeading
+                || nextStartsCaption
+                || verticalGap > Self.paragraphVerticalGapThresholdPt
+                || nextIsIndentedNewParagraph {
                 paragraphs.append(current)
                 current = next
             } else {
                 let joinedText: String
-                if current.text.hasSuffix("-") {
+                if Self.shouldDehyphenateJoin(current.text, next.text) {
                     joinedText = String(current.text.dropLast()) + next.text
                 } else {
                     joinedText = current.text + " " + next.text
@@ -184,24 +739,187 @@ public struct PDFMultiColumnSegmenter: Sendable {
         return paragraphs
     }
 
-    private func detectSectionHeading(_ line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 4 && trimmed.count <= 72 else { return nil }
-        let known = [
-            "abstract", "introduction", "background", "related work",
-            "methodology", "methods", "architecture", "evaluation",
-            "experiments", "results", "discussion", "limitations", "conclusion"
-        ]
+    public static func detectSectionHeading(_ line: String) -> String? {
+        let trimmed = line
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        guard trimmed.count >= 4, trimmed.count <= 80 else { return nil }
+        guard let lastChar = trimmed.last, !".;,:-–—".contains(lastChar) else { return nil }
+        guard trimmed.rangeOfCharacter(from: CharacterSet(charactersIn: "=<>$%[]{}")) == nil else {
+            return nil
+        }
+
+        // First alphabetic character must be uppercase (rejects wrapped lowercase words at paragraph tails)
+        guard let firstLetter = trimmed.first(where: { $0.isLetter }), firstLetter.isUppercase else {
+            return nil
+        }
+
+        // 1. Standalone unnumbered academic headings
         let lower = trimmed.lowercased()
-        for kw in known {
-            if lower == kw || lower.hasPrefix("1 \(kw)") || lower.hasPrefix("2 \(kw)")
-                || lower.hasPrefix("3 \(kw)") || lower.hasPrefix("4 \(kw)")
-                || lower.hasPrefix("5 \(kw)") || lower.hasPrefix("6 \(kw)")
-                || lower.hasPrefix("i. \(kw)") || lower.hasPrefix("ii. \(kw)") {
+        if standaloneSectionTitles.contains(lower) {
+            return trimmed
+        }
+
+        // 2. Appendix headings ("Appendix A", "Appendix B: Extended Proofs")
+        if trimmed.range(of: #"^(?:Appendix|APPENDIX)\s+[A-Z0-9]{1,3}(?:[:.]?\s+[A-Z].*)?$"#, options: .regularExpression) != nil {
+            return trimmed
+        }
+
+        // 3. Roman-numeral headings I..XV ("I. Introduction", "II. Related Work", "XIV. Extended Limitations")
+        if let titleBody = matchNumberedPrefix(
+            in: trimmed,
+            pattern: #"^(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)\.\s+(.+)$"#
+        ) {
+            if isValidHeadingTitleBody(titleBody, requireTitleCase: false) {
                 return trimmed
             }
+            return nil
         }
+
+        // 4. Dotted Arabic section or multi-level subsection ("3. Methodology", "3.1 Geometric Partitioning", "2.1.2 Setup")
+        if let titleBody = matchNumberedPrefix(
+            in: trimmed,
+            pattern: #"^(?:(?:[1-9]|1[0-9]|20)(?:\.\d{1,2})+\.?|(?:[1-9]|1[0-9]|20)\.)\s+(.+)$"#
+        ) {
+            if isValidHeadingTitleBody(titleBody, requireTitleCase: false) {
+                return trimmed
+            }
+            return nil
+        }
+
+        // 5. Undotted Arabic integer 1..20 + Title-Case / Uppercase heading ("1 Introduction", "4 Experimental Evaluation")
+        if let titleBody = matchNumberedPrefix(
+            in: trimmed,
+            pattern: #"^(?:[1-9]|1[0-9]|20)\s+(.+)$"#
+        ) {
+            if isValidHeadingTitleBody(titleBody, requireTitleCase: true) {
+                return trimmed
+            }
+            return nil
+        }
+
         return nil
+    }
+
+    private func detectSectionHeading(_ line: String) -> String? {
+        Self.detectSectionHeading(line)
+    }
+
+    private static let standaloneSectionTitles: Set<String> = [
+        "abstract",
+        "introduction",
+        "background",
+        "preliminaries",
+        "overview",
+        "related work",
+        "prior work",
+        "literature review",
+        "methodology",
+        "methods",
+        "method",
+        "proposed method",
+        "approach",
+        "system design",
+        "architecture",
+        "implementation",
+        "experimental setup",
+        "experimental evaluation",
+        "experiments",
+        "evaluation",
+        "empirical evaluation",
+        "results",
+        "results and discussion",
+        "discussion",
+        "analysis",
+        "ablation study",
+        "limitations",
+        "threats to validity",
+        "ethical considerations",
+        "broader impact",
+        "conclusion",
+        "conclusions",
+        "conclusion and future work",
+        "future work",
+        "summary",
+        "acknowledgments",
+        "acknowledgements",
+        "acknowledgment",
+        "acknowledgement",
+        "references",
+        "bibliography",
+        "works cited",
+        "appendix",
+        "appendices",
+        "supplementary material"
+    ]
+
+    private static let minorTitleConnectors: Set<String> = [
+        "a", "an", "the", "of", "in", "on", "for", "and", "or", "to", "with",
+        "vs", "vs.", "from", "by", "at", "via", "over", "under", "across",
+        "without", "into", "between", "through", "as", "&"
+    ]
+
+    private static let finiteProseVerbs: Set<String> = [
+        "is", "are", "was", "were", "have", "has", "had", "can", "could",
+        "will", "would", "should", "may", "might", "must", "remained",
+        "achieved", "completes", "evaluates", "requires", "required"
+    ]
+
+    private static func matchNumberedPrefix(in text: String, pattern: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: nsRange),
+              match.numberOfRanges >= 2,
+              let bodyRange = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return String(text[bodyRange])
+    }
+
+    private static func isValidHeadingTitleBody(_ body: String, requireTitleCase: Bool) -> Bool {
+        let words = body.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        guard !words.isEmpty, words.count <= 9 else { return false }
+
+        // First word must begin with an uppercase letter (blocks "18 distinct conference templates", "368 regression tests")
+        guard let firstChar = words[0].first, firstChar.isLetter, firstChar.isUppercase else {
+            return false
+        }
+
+        // Reject author middle/first initials like "I. Goodfellow and Y. Bengio" or "A. Rivera"
+        if body.range(of: #"\b[A-Z]\."#, options: .regularExpression) != nil {
+            return false
+        }
+
+        let nonSpaceScalars = body.unicodeScalars.filter { !CharacterSet.whitespaces.contains($0) }
+        let letterScalars = nonSpaceScalars.filter { CharacterSet.letters.contains($0) }
+        guard letterScalars.count >= 3,
+              Double(letterScalars.count) / Double(max(1, nonSpaceScalars.count)) >= 0.50 else {
+            return false
+        }
+
+        for word in words {
+            let lowerWord = word.lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if finiteProseVerbs.contains(lowerWord) {
+                return false
+            }
+        }
+
+        if requireTitleCase {
+            for word in words {
+                let lowerWord = word.lowercased()
+                if minorTitleConnectors.contains(lowerWord) { continue }
+                // Allow trailing section numbers or acronyms/hyphenated capitalized compounds
+                if word.allSatisfy(\.isNumber) { continue }
+                guard let firstAlpha = word.first(where: { $0.isLetter }), firstAlpha.isUppercase else {
+                    return false
+                }
+            }
+        }
+
+        return true
     }
 }
 

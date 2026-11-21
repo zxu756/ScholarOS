@@ -280,6 +280,146 @@ struct PDFProvenanceAndCitationGraphTests {
         #expect(report.quantitativeTokenPreservationRate >= 0.75)
     }
 
+    // MARK: - 1B. S12 Tectonic Two-Column PDF Segmentation Regression Tests
+
+    private static var pdfSegmentationFixturesURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/pdf-segmentation", isDirectory: true)
+    }
+
+    @Test("S12-1: Repeating headers and footers are stripped from body chunks and preserved as header/footer chunks")
+    func s12RepeatingHeadersAndFootersStrippedFromBodyChunks() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "rivera2026")
+
+        let bodyChunks = chunks.filter { $0.kind == .body }
+        #expect(!bodyChunks.isEmpty)
+
+        for chunk in bodyChunks {
+            #expect(!chunk.passageText.contains("Journal of Reproducible Systems"))
+            #expect(!chunk.passageText.contains("Lexical Grounding Study"))
+            #expect(!chunk.passageText.contains("Preprint Under Review"))
+        }
+
+        let headerChunks = chunks.filter { $0.kind == .header }
+        let footerChunks = chunks.filter { $0.kind == .footer }
+        #expect(headerChunks.count >= 3)
+        #expect(footerChunks.count == 3)
+        #expect(headerChunks.contains { $0.passageText.contains("Journal of Reproducible Systems") })
+        #expect(footerChunks.contains { $0.passageText.contains("Page 1") })
+        #expect(footerChunks.contains { $0.passageText.contains("Page 2") })
+        #expect(footerChunks.contains { $0.passageText.contains("Page 3") })
+    }
+
+    @Test("S12-2: Section headings recognize dotted/undotted Arabic, Roman I-XV, subsections, and References without matching numeric prose")
+    func s12SectionHeadingsRecognizedAcrossConventions() throws {
+        let segmenter = PDFMultiColumnSegmenter()
+
+        let paperURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let paperChunks = try segmenter.segmentPDF(at: paperURL, citeKey: "rivera2026")
+        let paperHeadings = paperChunks.filter { $0.kind == .sectionHeading }.map(\.passageText)
+        #expect(paperHeadings == [
+            "Abstract",
+            "1 Introduction",
+            "2 Related Work",
+            "3. Methodology",
+            "4 Experimental Evaluation",
+            "5 Conclusion",
+            "References"
+        ])
+
+        // Verify subsequent body chunks inherit the recognized sectionTitle
+        let evalBody = try #require(paperChunks.first { $0.kind == .body && $0.passageText.contains("Across 1,240 benchmark queries") })
+        #expect(evalBody.sectionTitle == "4 Experimental Evaluation")
+        let conclBody = try #require(paperChunks.first { $0.kind == .body && $0.passageText.contains("Separating repeating margin furniture") })
+        #expect(conclBody.sectionTitle == "5 Conclusion")
+        let refBody = try #require(paperChunks.first { $0.kind == .body && $0.passageText.contains("[1] A. Rivera") })
+        #expect(refBody.sectionTitle == "References")
+
+        let ieeeURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_ieeetran.pdf")
+        let ieeeChunks = try segmenter.segmentPDF(at: ieeeURL, citeKey: "riveraIEEE2026")
+        let ieeeHeadings = ieeeChunks.filter { $0.kind == .sectionHeading }.map(\.passageText)
+        #expect(ieeeHeadings == [
+            "I. Introduction",
+            "II. Related Work",
+            "III. Methodology",
+            "IV. Experiments",
+            "V. Conclusion",
+            "References"
+        ])
+
+        // Subsections, Roman up to XV, Bibliography, Acknowledgments vs numeric prose traps
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("3.1 Geometric Column Partitioning") == "3.1 Geometric Column Partitioning")
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("XIV. Extended Limitations") == "XIV. Extended Limitations")
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("Bibliography") == "Bibliography")
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("Acknowledgments") == "Acknowledgments")
+
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("368 regression tests in 14.5 ms on a single CPU core.") == nil)
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("18 distinct conference templates.") == nil)
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("4 GPU nodes were profiled across runs") == nil)
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("4 12.0 24 3.5 98.4%") == nil)
+    }
+
+    @Test("S12-3: Long paragraphs preserve trailing words without 520-char truncation loss")
+    func s12LongParagraphsPreserveTrailingWordsWithoutTruncationLoss() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "rivera2026")
+        let nonHeaderFooterText = chunks
+            .filter { !$0.kind.isHeaderOrFooter }
+            .map(\.passageText)
+            .joined(separator: " ")
+
+        #expect(nonHeaderFooterText.contains("checks explicit numbers."))
+        #expect(!chunks.contains { $0.passageText.hasSuffix("checks ex-") })
+    }
+
+    @Test("S12-4: Spanning tables become tableOrFigure chunks and retain narrow column cells")
+    func s12SpanningTablesBecomeTableOrFigureChunksWithNarrowCells() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "rivera2026")
+
+        let tableChunks = chunks.filter { $0.kind == .tableOrFigure }
+        #expect(tableChunks.count == 2)
+
+        let table1 = try #require(tableChunks.first { $0.passageText.contains("Table 1:") })
+        #expect(table1.boundingBox.pageIndex == 1)
+        #expect(table1.passageText.contains("Engine Variant"))
+        #expect(table1.passageText.contains("Header Leak Rate"))
+        #expect(table1.passageText.contains("Proposed Margin-Trimmed XY"))
+
+        let table2 = try #require(tableChunks.first { $0.passageText.contains("Table 2:") })
+        #expect(table2.boundingBox.pageIndex == 2)
+        #expect(table2.passageText.contains("Template Family"))
+
+        // Narrow table header cell must not leak into body chunks
+        #expect(!chunks.filter { $0.kind == .body }.contains { $0.passageText.contains("Engine Variant") })
+    }
+
+    @Test("S12-5: Wide spanning tables do not degrade 1-2 line two-column body text into single-column interleaving")
+    func s12WideTablePreservesLeftBeforeRightReadingOrderOnSparseColumns() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "rivera2026")
+
+        let page3Body = chunks.filter { $0.boundingBox.pageIndex == 2 && $0.kind == .body }
+        let leftPage3 = try #require(page3Body.first { $0.passageText.contains("PAGE3_LEFT_1") })
+        let rightPage3 = try #require(page3Body.first { $0.passageText.contains("PAGE3_RIGHT_1") })
+
+        #expect(leftPage3.passageText.contains("PAGE3_LEFT_2"))
+        #expect(!leftPage3.passageText.contains("PAGE3_RIGHT_1"))
+        #expect(leftPage3.columnIndex == 1)
+        #expect(rightPage3.columnIndex == 2)
+        #expect(leftPage3.readingSequence < rightPage3.readingSequence)
+
+        let page2Body = chunks.filter { $0.boundingBox.pageIndex == 1 && $0.kind == .body }
+        let leftPage2 = try #require(page2Body.first { $0.passageText.contains("LEFT_COL_LINE_1") })
+        let rightPage2 = try #require(page2Body.first { $0.passageText.contains("RIGHT_COL_LINE_1") })
+        #expect(leftPage2.columnIndex == 1)
+        #expect(rightPage2.columnIndex == 2)
+        #expect(leftPage2.readingSequence < rightPage2.readingSequence)
+    }
+
     // MARK: - 2. SQLite FTS5 BM25 Retrieval & Numeric Claim Entailment Tests
 
     @Test("FTS5ProvenanceIndex indexes passages in temp SQLite DB and ranks citeKey-filtered BM25 hits")
