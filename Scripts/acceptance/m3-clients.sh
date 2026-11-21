@@ -14,8 +14,10 @@
 #      `Library/Application Support/ai.opencode.desktop`) plus ScholarOS preference/cache hygiene
 #      before and after running; fails immediately if anything changed.
 #   3. Wraps every client invocation in `env -i` (isolated HOME and client config directories in
-#      /tmp) and `/usr/bin/sandbox-exec` (denying external network while allowing unix sockets and
-#      localhost, and denying all file writes to the real user home directory and client configs).
+#      /tmp) and `/usr/bin/sandbox-exec` (denying external network via directional localhost rules
+#      `network-bind`/`network-inbound`/`network-outbound` + unix sockets, self-checked upfront with
+#      `/usr/bin/python3` against `1.1.1.1:80` -> `PermissionError` and a `127.0.0.1` self-listener,
+#      and denying all file writes to the real user home directory and client configs).
 #   4. Wraps the built `ScholarOS` binary with a stdio tee logger (`--registry-replay
 #      Benchmarks/citations/recordings`) to verify each client sends `tools/list` and receives
 #      `verify_citation`, `add_verified_bibtex`, `check_manuscript` (and `scholar_verify_bibliography`).
@@ -276,8 +278,9 @@ def build_sandbox_profile(dst_path: str) -> None:
             "(deny network*)",
             "(allow network* (local unix))",
             "(allow network* (remote unix))",
-            '(allow network* (local ip "localhost:*"))',
-            '(allow network* (remote ip "localhost:*"))',
+            '(allow network-bind (local ip "localhost:*"))',
+            '(allow network-inbound (local ip "localhost:*"))',
+            '(allow network-outbound (remote ip "localhost:*"))',
             "(deny file-write*",
             *deny_clauses,
             ")",
@@ -286,6 +289,98 @@ def build_sandbox_profile(dst_path: str) -> None:
     )
     with open(dst_path, "w", encoding="utf-8") as fh:
         fh.write(profile)
+
+
+def selfcheck_sandbox_profile(sb_path: str, base_dir: str) -> tuple[bool, list[str], str]:
+    sc_dir = os.path.join(base_dir, "sb-selfcheck")
+    os.makedirs(sc_dir, exist_ok=True)
+    sc_env, sc_dirs = make_isolated_env(sc_dir, {})
+    probe_code = """
+import socket
+import sys
+
+ext = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ext.settimeout(3.0)
+try:
+    ext.connect(("1.1.1.1", 80))
+    print("FAIL_EXTERNAL: outbound connect to 1.1.1.1:80 succeeded (sandbox leaked external network)")
+    sys.exit(11)
+except PermissionError as exc:
+    print(f"OK_EXTERNAL_BLOCKED: 1.1.1.1:80 raised {type(exc).__name__}(errno={exc.errno}): {exc}")
+except BaseException as exc:
+    print(
+        f"FAIL_EXTERNAL: expected PermissionError connecting to 1.1.1.1:80, "
+        f"got {type(exc).__name__}(errno={getattr(exc, 'errno', None)}): {exc}"
+    )
+    sys.exit(12)
+finally:
+    ext.close()
+
+srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+srv.settimeout(3.0)
+cli = None
+conn = None
+try:
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    cli.settimeout(3.0)
+    cli.connect(("127.0.0.1", port))
+    conn, _ = srv.accept()
+    conn.settimeout(3.0)
+    cli.sendall(b"scholaros-sb-selfcheck")
+    got = conn.recv(64)
+    if got != b"scholaros-sb-selfcheck":
+        print(f"FAIL_LOCALHOST: unexpected loopback payload {got!r}")
+        sys.exit(13)
+    conn.sendall(b"ack")
+    ack = cli.recv(16)
+    if ack != b"ack":
+        print(f"FAIL_LOCALHOST: unexpected loopback ack {ack!r}")
+        sys.exit(13)
+    print(f"OK_LOCALHOST_CONNECTED: 127.0.0.1:{port} bind/connect/accept roundtrip ok")
+except BaseException as exc:
+    print(
+        f"FAIL_LOCALHOST: 127.0.0.1 self-listener check failed with "
+        f"{type(exc).__name__}(errno={getattr(exc, 'errno', None)}): {exc}"
+    )
+    sys.exit(14)
+finally:
+    for sock in (conn, cli, srv):
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                pass
+
+print("SELFCHECK_OK")
+"""
+    try:
+        proc = subprocess.run(
+            ["/usr/bin/sandbox-exec", "-f", sb_path, "/usr/bin/python3", "-I", "-c", probe_code],
+            cwd=sc_dirs["tmp"],
+            env=sc_env,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=15.0,
+        )
+    except Exception as exc:
+        return False, [], f"/usr/bin/sandbox-exec self-check execution error: {exc}"
+
+    out_lines = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    err_lines = [ln.strip() for ln in (proc.stderr or "").splitlines() if ln.strip()]
+    has_ext_ok = any(ln.startswith("OK_EXTERNAL_BLOCKED:") for ln in out_lines)
+    has_loc_ok = any(ln.startswith("OK_LOCALHOST_CONNECTED:") for ln in out_lines)
+    has_done = "SELFCHECK_OK" in out_lines
+
+    if proc.returncode == 0 and has_ext_ok and has_loc_ok and has_done:
+        details = [ln for ln in out_lines if ln != "SELFCHECK_OK"]
+        return True, details, "ok"
+
+    combined = "; ".join(out_lines + err_lines) or f"exit code {proc.returncode}"
+    return False, out_lines, f"sandbox network self-check failed (rc={proc.returncode}): {combined}"
 
 
 def extract_readme_registration_snippets(readme_path: str) -> dict:
@@ -549,6 +644,21 @@ log(f"Binary: {os.path.relpath(cli_bin, repo_root)}")
 log("Replay: Benchmarks/citations/recordings (network denied except localhost/unix; real home writes denied)")
 log("")
 
+# 0. Build and self-check sandbox-exec network isolation profile upfront before touching clients
+log("== [Step 0] Self-check sandbox-exec network isolation profile ==")
+sb_file = os.path.join(work_dir, "client-iso.sb")
+build_sandbox_profile(sb_file)
+sb_ok, sb_details, sb_reason = selfcheck_sandbox_profile(sb_file, work_dir)
+if not sb_ok:
+    log(f"  FAIL: {sb_reason}")
+    with open(report_file, "w", encoding="utf-8") as rfh:
+        rfh.write("\n".join(lines_out) + "\n")
+    sys.exit(1)
+for d_line in sb_details:
+    log(f"  {d_line}")
+log("  PASS: external TCP (1.1.1.1:80) raised PermissionError and local 127.0.0.1 listener connected")
+log("")
+
 # 1. Verify README.md & README.zh-CN.md snippets match before touching any client
 log("== [Step 1] Verify README.md and README.zh-CN.md MCP registration snippets ==")
 try:
@@ -573,21 +683,6 @@ for rel in MONITORED_REL_PATHS:
     log(f"  [BEFORE] ~/{rel}: state={info['state']} files={info['files']} sha256={info['sha256']}")
 log(f"  [BEFORE] overall_manifest_sha256={before_overall}")
 log("")
-
-# 3. Prepare and validate sandbox-exec profile
-sb_file = os.path.join(work_dir, "client-iso.sb")
-build_sandbox_profile(sb_file)
-probe_sb = subprocess.run(
-    ["/usr/bin/sandbox-exec", "-f", sb_file, "/usr/bin/true"],
-    env={"PATH": "/usr/bin:/bin"},
-    capture_output=True,
-    text=True,
-)
-if probe_sb.returncode != 0:
-    log(f"FAIL: /usr/bin/sandbox-exec failed to apply isolation profile (rc={probe_sb.returncode}): {probe_sb.stderr.strip()}")
-    with open(report_file, "w", encoding="utf-8") as rfh:
-        rfh.write("\n".join(lines_out) + "\n")
-    sys.exit(1)
 
 passed_count = 0
 failed_count = 0
@@ -893,6 +988,13 @@ else:
                 f"serve_stopped={serve_shutdown_clean} traffic={traffic_msg}"
             )
             log(f"  last_poll_out: {last_poll_out[-300:]}")
+            try:
+                with open(serve_log_path, encoding="utf-8", errors="replace") as sfh:
+                    serve_tail = sfh.read().strip()[-400:]
+            except Exception:
+                serve_tail = ""
+            if serve_tail:
+                log(f"  serve_log tail: {serve_tail}")
             log("  RESULT [opencode]: FAIL")
             failed_count += 1
             summary_rows.append(f"opencode  | FAIL       | {traffic_msg}")
