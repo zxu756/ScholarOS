@@ -158,6 +158,18 @@ working_tree_state() {
     fi
 }
 
+CREATED_REPORT_TMPDIR=""
+M3_STEP_TMP=""
+cleanup_test_sh() {
+    if [[ -n "$M3_STEP_TMP" && -d "$M3_STEP_TMP" ]]; then
+        rm -rf "$M3_STEP_TMP"
+    fi
+    if [[ -n "$CREATED_REPORT_TMPDIR" && -d "$CREATED_REPORT_TMPDIR" ]]; then
+        rm -rf "$CREATED_REPORT_TMPDIR"
+    fi
+}
+trap cleanup_test_sh EXIT
+
 # Picks the report directory: reports/ with --record, a fresh temporary directory otherwise.
 select_report_dir() {
     local record="$1"
@@ -165,6 +177,133 @@ select_report_dir() {
         echo "$REPO_ROOT/reports"
     else
         mktemp -d "${TMPDIR:-/tmp}/scholaros-reports.XXXXXX"
+    fi
+}
+
+snapshot_real_home_full_hygiene() {
+    python3 -I - "$REAL_USER_HOME" <<'PY'
+import glob, hashlib, os, sys
+
+home = sys.argv[1]
+lib_entries = []
+for sub in ("Caches", "Preferences", "Application Support"):
+    base = os.path.join(home, "Library", sub)
+    if not os.path.isdir(base):
+        lib_entries.append(f"{base}:ABSENT")
+        continue
+    for name in sorted(os.listdir(base)):
+        if "scholaros" in name.lower():
+            p = os.path.join(base, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                lib_entries.append(f"{p}:DIR")
+                for root, dirs, files in os.walk(p):
+                    dirs.sort()
+                    for fn in sorted(files):
+                        fp = os.path.join(root, fn)
+                        try:
+                            st = os.lstat(fp)
+                            lib_entries.append(f"{fp}:{st.st_size}:{st.st_mtime_ns}")
+                        except OSError:
+                            lib_entries.append(f"{fp}:ERR")
+            else:
+                try:
+                    st = os.lstat(p)
+                    lib_entries.append(f"{p}:{st.st_size}:{st.st_mtime_ns}")
+                except OSError:
+                    lib_entries.append(f"{p}:ERR")
+
+VOLATILE_SUBDIRS = {
+    ".claude": {"projects", "todos", "statsig", "debug", "shell-snapshots", "session-env", "ide", "telemetry", "file-history", "logs", "cache", "backups"},
+    ".codex": {"sessions", "archived_sessions", "log", "logs", "tmp", "shell_snapshots", "sqlite"},
+}
+VOLATILE_FILENAMES = {"history.jsonl", ".claude.json.lock"}
+
+client_targets = sorted(set(glob.glob(os.path.join(home, ".claude*")))) + [
+    os.path.join(home, ".codex"),
+    os.path.join(home, ".config", "opencode"),
+]
+h = hashlib.sha256()
+for t in client_targets:
+    rel_t = os.path.relpath(t, home)
+    base_t = os.path.basename(t)
+    if base_t in VOLATILE_FILENAMES or base_t.startswith(".claude.json.backup") or base_t.startswith(".claude.json.tmp"):
+        continue
+    if not os.path.lexists(t):
+        h.update(f"{rel_t}:ABSENT\n".encode("utf-8"))
+        continue
+    st0 = os.lstat(t)
+    if os.path.isfile(t) and not os.path.islink(t):
+        h.update(f"{rel_t}:FILE:{st0.st_size}:".encode("utf-8"))
+        if st0.st_size <= 8 * 1024 * 1024:
+            try:
+                h.update(hashlib.sha256(open(t, "rb").read()).hexdigest().encode("utf-8"))
+            except OSError:
+                h.update(b"UNREADABLE")
+        h.update(b"\n")
+    elif os.path.isdir(t) and not os.path.islink(t):
+        skip_top = VOLATILE_SUBDIRS.get(rel_t, set())
+        h.update(f"{rel_t}:DIR\n".encode("utf-8"))
+        for root, dirs, files in os.walk(t):
+            rel_r = os.path.relpath(root, home)
+            if rel_r == rel_t:
+                dirs[:] = sorted(d for d in dirs if d not in skip_top)
+            else:
+                dirs.sort()
+            h.update(f"D:{rel_r}\n".encode("utf-8"))
+            for fn in sorted(files):
+                if fn in VOLATILE_FILENAMES or fn.endswith((".sqlite", ".sqlite-wal", ".sqlite-shm", ".lock")):
+                    continue
+                fp = os.path.join(root, fn)
+                rel_f = os.path.relpath(fp, home)
+                try:
+                    st = os.lstat(fp)
+                    h.update(f"F:{rel_f}:{st.st_mode}:{st.st_size}".encode("utf-8"))
+                    if st.st_size <= 8 * 1024 * 1024 and not os.path.islink(fp):
+                        h.update(b":" + hashlib.sha256(open(fp, "rb").read()).hexdigest().encode("utf-8"))
+                    h.update(b"\n")
+                except OSError:
+                    h.update(f"F:{rel_f}:ERR\n".encode("utf-8"))
+    else:
+        h.update(f"{rel_t}:OTHER:{st0.st_mode}\n".encode("utf-8"))
+
+lib_hash = hashlib.sha256("\n".join(lib_entries).encode("utf-8")).hexdigest()
+print(f"lib={lib_hash}|clients={h.hexdigest()}")
+PY
+}
+
+snapshot_scholaros_tmpdir() {
+    local exclude1="${1:-}"
+    python3 -I - "${TMPDIR:-/tmp}" "$exclude1" <<'PY'
+import os, sys
+
+tdir, ex1 = sys.argv[1], sys.argv[2]
+if not os.path.isdir(tdir):
+    sys.exit(0)
+prefixes = (
+    "scholaros-reports.",
+    "scholaros-m3-",
+    "scholaros-m2-",
+    "scholaros-m1-",
+    "scholaros-hard-inputs.",
+    "scholaros-bench-work.",
+    "m2-regen.",
+)
+items = sorted(n for n in os.listdir(tdir) if n.startswith(prefixes) and n != ex1)
+print("\n".join(items))
+PY
+}
+
+swift_test_no_network() {
+    if [[ "$DISABLE_SWIFTPM_SANDBOX" -eq 1 ]]; then
+        swift_test "$@"
+    elif /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' /usr/bin/true >/dev/null 2>&1; then
+        local extra=("--disable-sandbox")
+        if [[ -n "${SCHOLAR_BUILD_JOBS:-}" ]]; then
+            extra+=("-j" "$SCHOLAR_BUILD_JOBS")
+        fi
+        /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' swift test "${extra[@]}" "$@"
+    else
+        swift_test "$@"
     fi
 }
 
@@ -267,6 +406,9 @@ case "$MODE" in
                 PREFS_BEFORE="$(count_scholaros_preference_files)"
                 CACHE_BEFORE="$(scholaros_cache_dir_state)"
                 SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                if [[ "$RECORD" -eq 0 ]]; then
+                    CREATED_REPORT_TMPDIR="$SCHOLAR_REPORT_DIR"
+                fi
                 export SCHOLAR_REPORT_DIR
 
                 echo "[test.sh] Running M0 scoped unit tests..."
@@ -283,6 +425,9 @@ case "$MODE" in
                 PREFS_BEFORE="$(count_scholaros_preference_files)"
                 CACHE_BEFORE="$(scholaros_cache_dir_state)"
                 SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                if [[ "$RECORD" -eq 0 ]]; then
+                    CREATED_REPORT_TMPDIR="$SCHOLAR_REPORT_DIR"
+                fi
                 export SCHOLAR_REPORT_DIR
 
                 echo "[test.sh] Running M1 scoped unit tests..."
@@ -336,6 +481,9 @@ case "$MODE" in
                 PREFS_BEFORE="$(count_scholaros_preference_files)"
                 CACHE_BEFORE="$(scholaros_cache_dir_state)"
                 SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                if [[ "$RECORD" -eq 0 ]]; then
+                    CREATED_REPORT_TMPDIR="$SCHOLAR_REPORT_DIR"
+                fi
                 export SCHOLAR_REPORT_DIR
 
                 echo "[test.sh] Running M2 + M1 scoped unit tests..."
@@ -406,6 +554,114 @@ case "$MODE" in
                     exit 1
                 fi
                 echo "[test.sh] MILESTONE 2 PASSED."
+                ;;
+
+            3)
+                TREE_BEFORE="$(working_tree_state)"
+                PREFS_BEFORE="$(count_scholaros_preference_files)"
+                CACHE_BEFORE="$(scholaros_cache_dir_state)"
+                FULL_HOME_BEFORE="$(snapshot_real_home_full_hygiene)"
+                TMP_BEFORE="$(snapshot_scholaros_tmpdir)"
+                BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+
+                SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                if [[ "$RECORD" -eq 0 ]]; then
+                    CREATED_REPORT_TMPDIR="$SCHOLAR_REPORT_DIR"
+                fi
+                export SCHOLAR_REPORT_DIR
+
+                M3_STEP_TMP="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m3-step.XXXXXX")"
+                mkdir -p "$M3_STEP_TMP/h-scope" "$M3_STEP_TMP/h-ut1" "$M3_STEP_TMP/h-ut2" "$M3_STEP_TMP/ut-cache" "$M3_STEP_TMP/h-m3"
+
+                echo "[test.sh] Running M3 changed-module scoped unit tests..."
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M3_STEP_TMP/h-scope" CFFIXED_USER_HOME="$M3_STEP_TMP/h-scope" \
+                        swift_test --no-parallel --filter "(BibCSLAndFirewallTests|LSPEngineAndSyncTeXTests|PluginSDKMCPAndShellTests|ZZZCacheHomeIsolationGuardTests)"
+                )
+
+                echo "[test.sh] Running network-denied full unit tests (without SCHOLAR_CACHE_DIR)..."
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M3_STEP_TMP/h-ut1" CFFIXED_USER_HOME="$M3_STEP_TMP/h-ut1" \
+                        swift_test_no_network --no-parallel
+                )
+
+                echo "[test.sh] Running network-denied full unit tests (with SCHOLAR_CACHE_DIR)..."
+                (
+                    HOME="$M3_STEP_TMP/h-ut2" CFFIXED_USER_HOME="$M3_STEP_TMP/h-ut2" SCHOLAR_CACHE_DIR="$M3_STEP_TMP/ut-cache" \
+                        swift_test_no_network --no-parallel
+                )
+
+                require_executable "$REPO_ROOT/Scripts/acceptance/m3-mcp.sh"
+
+                M3_FAILED=0
+                echo "[test.sh] Running milestone 2 regression suite..."
+                set +e
+                if [[ "$RECORD" -eq 1 ]]; then
+                    "$REPO_ROOT/Scripts/test.sh" milestone 2 --record
+                else
+                    "$REPO_ROOT/Scripts/test.sh" milestone 2
+                fi
+                M3_M2_EXIT=$?
+                set -e
+                if [[ "$M3_M2_EXIT" -ne 0 ]]; then
+                    M3_FAILED=1
+                fi
+
+                echo "[test.sh] Running M3 MCP acceptance script (m3-mcp.sh)..."
+                M3_MCP_T0="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
+                set +e
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M3_STEP_TMP/h-m3" CFFIXED_USER_HOME="$M3_STEP_TMP/h-m3" \
+                        "$REPO_ROOT/Scripts/acceptance/m3-mcp.sh" $([[ "$RECORD" -eq 1 ]] && echo "--record")
+                )
+                M3_ACC_EXIT=$?
+                set -e
+                M3_MCP_T1="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
+                M3_MCP_ELAPSED="$(python3 -I -c 'import sys; print(f"{float(sys.argv[2]) - float(sys.argv[1]):.2f}")' "$M3_MCP_T0" "$M3_MCP_T1")"
+                echo "[test.sh] m3-mcp.sh exit=$M3_ACC_EXIT elapsed=${M3_MCP_ELAPSED}s"
+                if [[ "$M3_ACC_EXIT" -ne 0 ]]; then
+                    M3_FAILED=1
+                fi
+
+                rm -rf "$M3_STEP_TMP"
+                M3_STEP_TMP=""
+                if [[ "$RECORD" -eq 0 && -n "$CREATED_REPORT_TMPDIR" && -d "$CREATED_REPORT_TMPDIR" ]]; then
+                    rm -rf "$CREATED_REPORT_TMPDIR"
+                    CREATED_REPORT_TMPDIR=""
+                fi
+
+                assert_post_run_hygiene "$RECORD" "$PREFS_BEFORE" "$CACHE_BEFORE" "$TREE_BEFORE"
+
+                FULL_HOME_AFTER="$(snapshot_real_home_full_hygiene)"
+                TMP_AFTER="$(snapshot_scholaros_tmpdir)"
+                BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+                set +e
+                git -C "$REPO_ROOT" diff --exit-code -- Benchmarks >/dev/null 2>&1
+                BENCH_DIFF_EXIT=$?
+                set -e
+
+                if [[ "$TMP_BEFORE" != "$TMP_AFTER" ]]; then
+                    echo "ERROR: temporary directories left behind in TMPDIR (before='$TMP_BEFORE' after='$TMP_AFTER')." >&2
+                    exit 1
+                fi
+                if [[ "$FULL_HOME_BEFORE" != "$FULL_HOME_AFTER" ]]; then
+                    echo "ERROR: real ~/Library ScholarOS entries or ~/.claude* / ~/.codex / ~/.config/opencode changed during milestone 3." >&2
+                    exit 1
+                fi
+                if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then
+                    echo "ERROR: Benchmarks/ changed during milestone 3 (git diff exit=$BENCH_DIFF_EXIT)." >&2
+                    exit 1
+                fi
+                echo "[test.sh] Row 23 hygiene verified: temp dirs cleaned, real ~/Library & client configs untouched, Benchmarks/ clean."
+                echo "[test.sh] Reports: $SCHOLAR_REPORT_DIR"
+                if [[ "$M3_FAILED" -ne 0 ]]; then
+                    echo "[test.sh] MILESTONE 3 FAILED (milestone2 exit=$M3_M2_EXIT, m3-mcp exit=$M3_ACC_EXIT)." >&2
+                    exit 1
+                fi
+                echo "[test.sh] MILESTONE 3 PASSED (m3-mcp.sh elapsed=${M3_MCP_ELAPSED}s)."
                 ;;
 
             *)
@@ -487,6 +743,20 @@ case "$MODE" in
         REL_HARD_EXIT=$?
         set -e
         if [[ "$REL_HARD_EXIT" -ne 0 ]]; then
+            REL_FAILED=1
+        fi
+
+        require_executable "$REPO_ROOT/Scripts/acceptance/m3-mcp.sh"
+        echo "[test.sh] Running M3 MCP acceptance script..."
+        set +e
+        if [[ "$RECORD" -eq 1 ]]; then
+            "$REPO_ROOT/Scripts/acceptance/m3-mcp.sh" --record
+        else
+            "$REPO_ROOT/Scripts/acceptance/m3-mcp.sh"
+        fi
+        REL_M3_EXIT=$?
+        set -e
+        if [[ "$REL_M3_EXIT" -ne 0 ]]; then
             REL_FAILED=1
         fi
 

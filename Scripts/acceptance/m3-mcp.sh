@@ -26,18 +26,25 @@
 #   - Row 20: Non-regression (`S77` / `S81`) — `m1-citation-bench.py --replay`, 480-entry per-entry & 12-group exit parity vs baseline,
 #             206/206 `VERIFIED` carrying `record`, updated M1 Row 18/20, and M2 acceptance (`m2-acceptance.sh` + `hard-inputs.sh`)
 #
-# Remaining rows (Row 18 in Stage 06, Rows 21–23 in Stage 07) print `没跑`.
-# Exit code: 0 only when all executed rows PASS and 0 rows are `没跑`; 1 on any FAIL; 2 when 0 FAIL and >= 1 `没跑`.
+#   - Row 21: Read-only `git apply --check` across all 8 `m3-*.patch` mutation files (`SKIP / 没跑`; full copy/apply/build/revert run via `Scripts/acceptance/m3-mutations.sh`)
+#   - Row 22: Wall-clock timing budget (`m3-mcp.sh` <= 120 s debug build; full network-denied `Scripts/test.sh milestone 3` run)
+#   - Row 23: Post-run hygiene (temp dirs cleaned, `~/Library/{Caches,Preferences,Application Support}` free of new ScholarOS items, `~/.claude*`, `~/.codex`, `~/.config/opencode` untouched, `git diff --exit-code Benchmarks/`)
+#
+# Standalone rows (Row 18 `m3-clients.sh`, Row 21 `m3-mutations.sh`) print `没跑` inside `m3-mcp.sh`.
+# Exit code: 0 when 0 rows FAIL (and >= 1 row PASS); 1 on any FAIL; 2 when a standalone skipped row is queried directly (`PASSED == 0 && SKIPPED > 0`).
 #
 # Usage:
-#   Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>]
+#   Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+M3_START_EPOCH="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
+
 RECORD=0
 ONLY_ROW=""
+SELECTED_ROWS=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --record)
@@ -46,7 +53,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --row)
             if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+$ || "$2" -lt 1 || "$2" -gt 23 ]]; then
-                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>]" >&2
+                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]" >&2
                 exit 2
             fi
             ONLY_ROW="$2"
@@ -55,18 +62,231 @@ while [[ $# -gt 0 ]]; do
         --row=*)
             val="${1#--row=}"
             if [[ ! "$val" =~ ^[0-9]+$ || "$val" -lt 1 || "$val" -gt 23 ]]; then
-                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>]" >&2
+                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]" >&2
                 exit 2
             fi
             ONLY_ROW="$val"
             shift
             ;;
+        --rows)
+            if [[ $# -lt 2 || ! "$2" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]" >&2
+                exit 2
+            fi
+            SELECTED_ROWS="$2"
+            shift 2
+            ;;
+        --rows=*)
+            val="${1#--rows=}"
+            if [[ ! "$val" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+                echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]" >&2
+                exit 2
+            fi
+            SELECTED_ROWS="$val"
+            shift
+            ;;
         *)
-            echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>]" >&2
+            echo "Usage: Scripts/acceptance/m3-mcp.sh [--record] [--row <1..23>] [--rows <r1,r2,...>]" >&2
             exit 2
             ;;
     esac
 done
+
+verify_outer_no_network_sandbox() {
+    python3 -I -c '
+import errno, socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(0.5)
+try:
+    rc = s.connect_ex(("127.0.0.1", 9))
+except PermissionError:
+    rc = errno.EPERM
+except OSError as exc:
+    rc = exc.errno or 0
+finally:
+    s.close()
+sys.exit(0 if rc in (errno.EPERM, errno.EACCES) else 1)
+'
+}
+
+DISABLE_SWIFTPM_SANDBOX=0
+if [[ "${SCHOLAR_OUTER_NO_NETWORK:-0}" == "1" ]]; then
+    if ! verify_outer_no_network_sandbox; then
+        echo "ERROR: SCHOLAR_OUTER_NO_NETWORK=1 requires an active network-denying sandbox (loopback connect was not blocked with EPERM/EACCES)." >&2
+        exit 2
+    fi
+    DISABLE_SWIFTPM_SANDBOX=1
+    export SCHOLAR_OUTER_NO_NETWORK=1
+fi
+
+m3_swift_build() {
+    local extra=()
+    if [[ "$DISABLE_SWIFTPM_SANDBOX" -eq 1 ]]; then
+        extra+=("--disable-sandbox")
+    fi
+    if [[ -n "${SCHOLAR_BUILD_JOBS:-}" ]]; then
+        extra+=("-j" "$SCHOLAR_BUILD_JOBS")
+    fi
+    if [[ "${#extra[@]}" -gt 0 ]]; then
+        swift build "${extra[@]}" "$@"
+    else
+        swift build "$@"
+    fi
+}
+
+m3_swift_test() {
+    local extra=()
+    if [[ "$DISABLE_SWIFTPM_SANDBOX" -eq 1 ]]; then
+        extra+=("--disable-sandbox")
+    fi
+    if [[ -n "${SCHOLAR_BUILD_JOBS:-}" ]]; then
+        extra+=("-j" "$SCHOLAR_BUILD_JOBS")
+    fi
+    if [[ "${#extra[@]}" -gt 0 ]]; then
+        swift test "${extra[@]}" "$@"
+    else
+        swift test "$@"
+    fi
+}
+
+REAL_USER_HOME="$(python3 -I -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
+
+snapshot_real_home_library_scholaros() {
+    python3 -I - "$REAL_USER_HOME" <<'PY'
+import os, sys
+
+home = sys.argv[1]
+entries = []
+for sub in ("Caches", "Preferences", "Application Support"):
+    base = os.path.join(home, "Library", sub)
+    if not os.path.isdir(base):
+        entries.append(f"{base}:ABSENT")
+        continue
+    for name in sorted(os.listdir(base)):
+        if "scholaros" in name.lower():
+            p = os.path.join(base, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                entries.append(f"{p}:DIR")
+                for root, dirs, files in os.walk(p):
+                    dirs.sort()
+                    for fn in sorted(files):
+                        fp = os.path.join(root, fn)
+                        try:
+                            st = os.lstat(fp)
+                            entries.append(f"{fp}:{st.st_size}:{st.st_mtime_ns}")
+                        except OSError:
+                            entries.append(f"{fp}:ERR")
+            else:
+                try:
+                    st = os.lstat(p)
+                    entries.append(f"{p}:{st.st_size}:{st.st_mtime_ns}")
+                except OSError:
+                    entries.append(f"{p}:ERR")
+print("\n".join(entries))
+PY
+}
+
+snapshot_real_home_client_configs() {
+    python3 -I - "$REAL_USER_HOME" <<'PY'
+import glob, hashlib, os, sys
+
+home = sys.argv[1]
+# Ignore live session/transcript/daemon directories written asynchronously by host Claude/Codex sessions,
+# while strictly hashing every MCP registration & client configuration file under ~/.claude*, ~/.codex, ~/.config/opencode.
+VOLATILE_SUBDIRS = {
+    ".claude": {"projects", "todos", "statsig", "debug", "shell-snapshots", "session-env", "ide", "telemetry", "file-history", "logs", "cache", "backups"},
+    ".codex": {"sessions", "archived_sessions", "log", "logs", "tmp", "shell_snapshots", "sqlite"},
+}
+VOLATILE_FILENAMES = {"history.jsonl", ".claude.json.lock"}
+
+targets = sorted(set(glob.glob(os.path.join(home, ".claude*")))) + [
+    os.path.join(home, ".codex"),
+    os.path.join(home, ".config", "opencode"),
+]
+h = hashlib.sha256()
+count = 0
+for t in targets:
+    rel_t = os.path.relpath(t, home)
+    base_t = os.path.basename(t)
+    if base_t in VOLATILE_FILENAMES or base_t.startswith(".claude.json.backup") or base_t.startswith(".claude.json.tmp"):
+        continue
+    if not os.path.lexists(t):
+        h.update(f"{rel_t}:ABSENT\n".encode("utf-8"))
+        continue
+    st0 = os.lstat(t)
+    if os.path.isfile(t) and not os.path.islink(t):
+        count += 1
+        h.update(f"{rel_t}:FILE:{st0.st_size}:".encode("utf-8"))
+        if st0.st_size <= 8 * 1024 * 1024:
+            try:
+                h.update(hashlib.sha256(open(t, "rb").read()).hexdigest().encode("utf-8"))
+            except OSError:
+                h.update(b"UNREADABLE")
+        h.update(b"\n")
+    elif os.path.isdir(t) and not os.path.islink(t):
+        skip_top = VOLATILE_SUBDIRS.get(rel_t, set())
+        h.update(f"{rel_t}:DIR\n".encode("utf-8"))
+        for root, dirs, files in os.walk(t):
+            rel_r = os.path.relpath(root, home)
+            if rel_r == rel_t:
+                dirs[:] = sorted(d for d in dirs if d not in skip_top)
+            else:
+                dirs.sort()
+            h.update(f"D:{rel_r}\n".encode("utf-8"))
+            for fn in sorted(files):
+                if fn in VOLATILE_FILENAMES or fn.endswith((".sqlite", ".sqlite-wal", ".sqlite-shm", ".lock")):
+                    continue
+                fp = os.path.join(root, fn)
+                rel_f = os.path.relpath(fp, home)
+                count += 1
+                try:
+                    st = os.lstat(fp)
+                    h.update(f"F:{rel_f}:{st.st_mode}:{st.st_size}".encode("utf-8"))
+                    if st.st_size <= 8 * 1024 * 1024 and not os.path.islink(fp):
+                        h.update(b":" + hashlib.sha256(open(fp, "rb").read()).hexdigest().encode("utf-8"))
+                    h.update(b"\n")
+                except OSError:
+                    h.update(f"F:{rel_f}:ERR\n".encode("utf-8"))
+    else:
+        h.update(f"{rel_t}:OTHER:{st0.st_mode}\n".encode("utf-8"))
+print(f"files={count}:sha256={h.hexdigest()}")
+PY
+}
+
+snapshot_tmpdir_m3() {
+    local exclude1="${1:-}"
+    local exclude2="${2:-}"
+    python3 -I - "${TMPDIR:-/tmp}" "$exclude1" "$exclude2" <<'PY'
+import os, sys
+
+tdir, ex1, ex2 = sys.argv[1], sys.argv[2], sys.argv[3]
+if not os.path.isdir(tdir):
+    sys.exit(0)
+prefixes = (
+    "scholaros-m3-work.",
+    "scholaros-m3-report.",
+    "scholaros-m3-clients.",
+    "scholaros-m2-work.",
+    "scholaros-m2-report.",
+    "scholaros-m2-sub.",
+    "scholaros-m1-work.",
+    "scholaros-m1-report.",
+    "scholaros-m1-sub.",
+    "scholaros-hard-inputs.",
+    "scholaros-bench-work.",
+    "m2-regen.",
+)
+excluded = {x for x in (ex1, ex2) if x}
+items = sorted(n for n in os.listdir(tdir) if n.startswith(prefixes) and n not in excluded)
+print("\n".join(items))
+PY
+}
+
+HOME_LIB_SNAP_BEFORE="$(snapshot_real_home_library_scholaros)"
+CLIENT_CFG_SNAP_BEFORE="$(snapshot_real_home_client_configs)"
+TMP_SNAP_BEFORE="$(snapshot_tmpdir_m3)"
+BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+REPORTS_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m3-work.XXXXXX")"
 WORK_SCRATCH="$WORK/scratch"
@@ -80,6 +300,7 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+PARENT_EXIT_TRAP="$(trap -p EXIT)"
 
 if [[ -n "${SCHOLAR_REPORT_DIR:-}" ]]; then
     REPORT_DIR="$SCHOLAR_REPORT_DIR"
@@ -101,7 +322,7 @@ source "$REPO_ROOT/Scripts/acceptance/lib-cli-guard.sh"
 
 if [[ -z "${SCHOLAR_CLI_BIN:-}" ]]; then
     export SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS"
-    swift build >/dev/null
+    m3_swift_build >/dev/null
 elif [[ ! -x "$SCHOLAR_CLI_BIN" ]]; then
     echo "FAIL: SCHOLAR_CLI_BIN is not an executable file: $SCHOLAR_CLI_BIN" >&2
     exit 2
@@ -109,10 +330,15 @@ fi
 
 should_run_row() {
     local r="$1"
-    if [[ -z "$ONLY_ROW" || "$ONLY_ROW" == "$r" ]]; then
-        return 0
+    if [[ -n "$ONLY_ROW" ]]; then
+        [[ "$ONLY_ROW" == "$r" ]]
+        return
     fi
-    return 1
+    if [[ -n "$SELECTED_ROWS" ]]; then
+        [[ ",$SELECTED_ROWS," == *",$r,"* ]]
+        return
+    fi
+    return 0
 }
 
 SUMMARY_FILE="$WORK/row-summary.txt"
@@ -2297,12 +2523,12 @@ PY
         set +e
         (
             unset SCHOLAR_CACHE_DIR
-            HOME="$R19_HOME1" CFFIXED_USER_HOME="$R19_HOME1" swift test --no-parallel
+            HOME="$R19_HOME1" CFFIXED_USER_HOME="$R19_HOME1" m3_swift_test --no-parallel
         ) >"$WORK_SCRATCH/r19-nocache.log" 2>&1
         R19_RC1=$?
 
         (
-            HOME="$R19_HOME2" CFFIXED_USER_HOME="$R19_HOME2" SCHOLAR_CACHE_DIR="$R19_CACHE" swift test --no-parallel
+            HOME="$R19_HOME2" CFFIXED_USER_HOME="$R19_HOME2" SCHOLAR_CACHE_DIR="$R19_CACHE" m3_swift_test --no-parallel
         ) >"$WORK_SCRATCH/r19-withcache.log" 2>&1
         R19_RC2=$?
 
@@ -2542,14 +2768,148 @@ PY
     fi
 
     # ==================================================================
-    # Rows 21–23: Deferred to Stage 07
+    # Row 21: Mutation patches check (read-only git apply --check; full run via m3-mutations.sh)
     # ==================================================================
-    for r in 21 22 23; do
-        if should_run_row "$r"; then
-            echo "== [Row $r] 没跑 — Scheduled for Stage 07 =="
-            record_skip "$r" "Scheduled for Stage 07 — 没跑"
+    if should_run_row 21; then
+        echo "== [Row 21] 变异补丁与脚本检查 (Scripts/acceptance/mutations/m3-*.patch & m3-mutations.sh) =="
+        MUT_RUNNER="$REPO_ROOT/Scripts/acceptance/m3-mutations.sh"
+        declare -a M3_PATCHES=(
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-01-allow-not-found.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-02-offline-skip-verify-write.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-03-disable-deduplication.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-04-write-caller-fields.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-05-restore-replay-path-arg.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-06-rewrite-whole-bib-file.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-07-read-cache-on-write.patch"
+            "$REPO_ROOT/Scripts/acceptance/mutations/m3-08-legacy-batch-offline.patch"
+        )
+        R21_OK=1
+        if [[ ! -x "$MUT_RUNNER" ]]; then
+            echo "  FAIL: Missing or non-executable $MUT_RUNNER"
+            R21_OK=0
+        else
+            set +e
+            bash -n "$MUT_RUNNER" 2>"$WORK/r21-runner.err"
+            RUNNER_SYNTAX_RC=$?
+            set -e
+            if [[ "$RUNNER_SYNTAX_RC" -ne 0 ]]; then
+                cat "$WORK/r21-runner.err" || true
+                R21_OK=0
+            fi
         fi
-    done
+
+        for p_file in "${M3_PATCHES[@]}"; do
+            p_base="$(basename "$p_file")"
+            if [[ ! -f "$p_file" ]]; then
+                echo "  FAIL: Missing mutation patch $p_base"
+                R21_OK=0
+                continue
+            fi
+            set +e
+            if [[ "${SCHOLAR_M3_MUTATION_ACTIVE:-}" == "$p_base" ]]; then
+                git -C "$REPO_ROOT" apply -R --check "$p_file" 2>"$WORK/r21-${p_base}.err"
+                P_RC=$?
+                echo "  patch_reverse_apply_check_exit=$P_RC ($p_base, active mutation)"
+            else
+                git -C "$REPO_ROOT" apply --check "$p_file" 2>"$WORK/r21-${p_base}.err"
+                P_RC=$?
+                echo "  patch_apply_check_exit=$P_RC ($p_base)"
+            fi
+            set -e
+            if [[ "$P_RC" -ne 0 ]]; then
+                cat "$WORK/r21-${p_base}.err" || true
+                R21_OK=0
+            fi
+        done
+
+        if [[ "$R21_OK" -ne 1 ]]; then
+            record_fail 21 "M3 mutation patches or m3-mutations.sh failed git apply --check / syntax check"
+        else
+            echo "SKIP: 没跑 — 8 个 m3-*.patch 补丁已通过 git apply --check 校验；临时拷贝打补丁、构建与还原由 Scripts/acceptance/m3-mutations.sh 单独运行"
+            record_skip 21 "All 8 m3-*.patch files verified clean with git apply --check; run Scripts/acceptance/m3-mutations.sh standalone"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 22: Wall-clock timing budget (m3-mcp.sh <= 120s debug build)
+    # ==================================================================
+    if should_run_row 22; then
+        echo "== [Row 22] 耗时检查 (m3-mcp.sh <= 120s debug 构建；禁网整套由 Scripts/test.sh milestone 3 运行) =="
+        set +e
+        python3 -I - "$M3_START_EPOCH" >"$WORK/row22.out" 2>&1 <<'PY'
+import sys, time
+m3_start = float(sys.argv[1])
+elapsed = time.time() - m3_start
+print(f"  m3_mcp_elapsed={elapsed:.3f}s (budget <= 120.000s debug build)")
+if elapsed > 120.0:
+    print(f"  FAIL [Row 22]: m3-mcp.sh exceeded 120.0s debug budget ({elapsed:.3f}s)")
+    sys.exit(1)
+sys.exit(0)
+PY
+        R22_RC=$?
+        set -e
+        cat "$WORK/row22.out"
+        if [[ "$R22_RC" -eq 0 ]]; then
+            record_pass 22 "Wall-clock budget satisfied (m3-mcp.sh <= 120s debug build)"
+        else
+            record_fail 22 "Row 22 m3-mcp.sh wall-clock budget exceeded 120s"
+        fi
+    fi
+
+    # ==================================================================
+    # Row 23: Post-run hygiene (temp dirs cleaned, ~/Library free of ScholarOS additions, client configs untouched, Benchmarks/ clean)
+    # ==================================================================
+    if should_run_row 23; then
+        echo "== [Row 23] 跑后洁净检查 (临时目录清理、真实 ~/Library 无新增 ScholarOS 项、~/.claude* ~/.codex ~/.config/opencode 未被写、git diff --exit-code Benchmarks/) =="
+        rm -rf "$WORK_SCRATCH"
+        HOME_LIB_SNAP_AFTER="$(snapshot_real_home_library_scholaros)"
+        CLIENT_CFG_SNAP_AFTER="$(snapshot_real_home_client_configs)"
+        OWN_WORK_BASE="$(basename "$WORK")"
+        OWN_REPORT_BASE=""
+        if [[ -n "$CREATED_TEMP_REPORT_DIR" ]]; then
+            OWN_REPORT_BASE="$(basename "$CREATED_TEMP_REPORT_DIR")"
+        fi
+        TMP_SNAP_AFTER="$(snapshot_tmpdir_m3 "$OWN_WORK_BASE" "$OWN_REPORT_BASE")"
+        BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+        REPORTS_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
+        set +e
+        git -C "$REPO_ROOT" diff --exit-code -- Benchmarks >/dev/null 2>&1
+        BENCH_DIFF_EXIT=$?
+        set -e
+
+        R23_OK=1
+        if [[ -e "$WORK_SCRATCH" || -z "$PARENT_EXIT_TRAP" ]]; then
+            echo "  FAIL: WORK_SCRATCH was not removed or EXIT cleanup trap is missing"
+            R23_OK=0
+        fi
+        if [[ "$TMP_SNAP_BEFORE" != "$TMP_SNAP_AFTER" ]]; then
+            echo "  FAIL: stray temporary directories left in TMPDIR (before='$TMP_SNAP_BEFORE' after='$TMP_SNAP_AFTER')"
+            R23_OK=0
+        fi
+        if [[ "$HOME_LIB_SNAP_BEFORE" != "$HOME_LIB_SNAP_AFTER" ]]; then
+            echo "  FAIL: real ~/Library (Caches / Preferences / Application Support) ScholarOS entries changed"
+            R23_OK=0
+        fi
+        if [[ "$CLIENT_CFG_SNAP_BEFORE" != "$CLIENT_CFG_SNAP_AFTER" ]]; then
+            echo "  FAIL: real client configuration directories (~/.claude*, ~/.codex, ~/.config/opencode) changed (before=$CLIENT_CFG_SNAP_BEFORE after=$CLIENT_CFG_SNAP_AFTER)"
+            R23_OK=0
+        fi
+        if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then
+            echo "  FAIL: Benchmarks/ was modified during the run (diff_exit=$BENCH_DIFF_EXIT)"
+            R23_OK=0
+        fi
+        if [[ "$RECORD" -eq 0 && "$REPORTS_STATUS_BEFORE" != "$REPORTS_STATUS_AFTER" ]]; then
+            echo "  FAIL: reports/ was modified without --record"
+            R23_OK=0
+        fi
+
+        echo "  scratch_cleaned=$([[ ! -e "$WORK_SCRATCH" ]] && echo true || echo false) tmp_clean=$([[ "$TMP_SNAP_BEFORE" == "$TMP_SNAP_AFTER" ]] && echo true || echo false) real_library_scholaros_untouched=$([[ "$HOME_LIB_SNAP_BEFORE" == "$HOME_LIB_SNAP_AFTER" ]] && echo true || echo false) client_configs_untouched=$([[ "$CLIENT_CFG_SNAP_BEFORE" == "$CLIENT_CFG_SNAP_AFTER" ]] && echo true || echo false) benchmarks_diff_exit=$BENCH_DIFF_EXIT reports_untouched=$([[ "$RECORD" -eq 1 || "$REPORTS_STATUS_BEFORE" == "$REPORTS_STATUS_AFTER" ]] && echo true || echo false)"
+        if [[ "$R23_OK" -eq 1 ]]; then
+            record_pass 23 "Temporary directories cleaned, real ~/Library free of new ScholarOS items, client configs untouched, and git diff --exit-code Benchmarks/ passed"
+        else
+            record_fail 23 "Row 23 post-run hygiene check failed"
+        fi
+    fi
 
     echo "========================================================================"
     echo "M3 MCP Acceptance Summary:"
@@ -2557,6 +2917,7 @@ PY
     echo "------------------------------------------------------------------------"
     echo "Passed: $PASSED_COUNT | Failed: $FAILED_COUNT | Skipped (没跑): $SKIPPED_COUNT"
     echo "========================================================================"
+    echo "$PASSED_COUNT" > "$WORK/passed-count.txt"
     echo "$FAILED_COUNT" > "$WORK/failed-count.txt"
     echo "$SKIPPED_COUNT" > "$WORK/skipped-count.txt"
 } | tee "$REPORT_FILE"
@@ -2565,12 +2926,13 @@ if [[ -z "$CREATED_TEMP_REPORT_DIR" ]]; then
     echo "[m3-mcp] report written to $REPORT_FILE" >&2
 fi
 
+FINAL_PASSED="$(cat "$WORK/passed-count.txt")"
 FINAL_FAILED="$(cat "$WORK/failed-count.txt")"
 FINAL_SKIPPED="$(cat "$WORK/skipped-count.txt")"
 if [[ "$FINAL_FAILED" -gt 0 ]]; then
     exit 1
 fi
-if [[ "$FINAL_SKIPPED" -gt 0 ]]; then
+if [[ "$FINAL_PASSED" -eq 0 && "$FINAL_SKIPPED" -gt 0 ]]; then
     exit 2
 fi
 exit 0
