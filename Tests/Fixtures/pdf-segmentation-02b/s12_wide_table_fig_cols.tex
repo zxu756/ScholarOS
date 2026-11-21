@@ -1,0 +1,106 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[letterpaper,margin=0.72in,top=0.88in,bottom=0.88in]{geometry}
+
+\renewcommand{\dbltopfraction}{0.88}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\dblfloatpagefraction}{0.85}
+\setcounter{dbltopnumber}{4}
+\setcounter{topnumber}{4}
+\setcounter{totalnumber}{6}
+
+\makeatletter
+\def\ps@mfourhdr{%
+  \def\@oddhead{\small Transactions on Empirical Document Analysis\hfill Vol.~9, 2026}%
+  \def\@evenhead{\small Transactions on Empirical Document Analysis\hfill Vol.~9, 2026}%
+  \def\@oddfoot{\hfill\small Page \thepage\hfill}%
+  \def\@evenfoot{\hfill\small Page \thepage\hfill}%
+}
+\makeatother
+\pagestyle{mfourhdr}
+
+\begin{document}
+
+\section{Introduction}
+Two-column scientific articles often place a full-width summary table at the top of an evaluation page and a full-width multi-panel chart immediately beneath it, leaving only the lower third of the page for two-column prose discussion.
+
+When short axis ticks, rotated or compact axis labels such as Score (\%), or legend entries near the page centerline remain outside extracted float blocks, naive page-level column detectors merge the left and right body columns into one interleaved stream.
+
+\begin{table*}[t]
+\centering
+\caption{Comprehensive benchmark results across six evaluation suites with short numeric cells.}
+\vspace{3pt}
+\begin{tabular}{lcccccc}
+\hline
+ & \multicolumn{3}{c}{In-Domain Suites} & \multicolumn{3}{c}{Out-of-Domain Suites} \\
+Method & S1 & S2 & Avg. & O1 & O2 & Avg. \\
+\hline
+Greedy XY & 71.2 & 68.4 & 69.8 & 58.1 & 54.9 & 56.5 \\
+LayoutLM-Rule & 80.5 & 79.1 & 79.8 & 70.2 & 68.0 & 69.1 \\
+FHBI (Ours) & 94.6 & 93.2 & 93.9 & 89.4 & 88.0 & 88.7 \\
+\hline
+\end{tabular}
+\end{table*}
+
+\begin{figure*}[t]
+\centering
+\setlength{\unitlength}{1pt}
+\begin{picture}(460,124)
+  % Legend box at top of multi-panel figure
+  \put(148,108){\framebox(168,14){}}
+  \put(158,111){\small FHBI}
+  \put(210,111){\small Baseline}
+  \put(272,111){\small Oracle}
+
+  % Left subplot (a) axes and bars
+  \put(42,26){\rule{165pt}{0.6pt}}
+  \put(42,26){\rule{0.6pt}{72pt}}
+  \put(0,58){\small Score (\%)}
+  \put(22,92){\small 100}
+  \put(27,70){\small 60}
+  \put(27,48){\small 20}
+  \put(64,26){\rule{14pt}{40pt}}
+  \put(82,26){\rule{14pt}{58pt}}
+  \put(140,26){\rule{14pt}{46pt}}
+  \put(158,26){\rule{14pt}{64pt}}
+  \put(68,14){\small 10k}
+  \put(146,14){\small 50k}
+  \put(82,2){\small (a) In-Domain}
+
+  % Right subplot (b) whose Y-axis label sits near the page centerline midX
+  \put(274,26){\rule{165pt}{0.6pt}}
+  \put(274,26){\rule{0.6pt}{72pt}}
+  \put(220,58){\small Score (\%)}
+  \put(254,92){\small 100}
+  \put(259,70){\small 60}
+  \put(259,48){\small 20}
+  \put(296,26){\rule{14pt}{36pt}}
+  \put(314,26){\rule{14pt}{56pt}}
+  \put(372,26){\rule{14pt}{44pt}}
+  \put(390,26){\rule{14pt}{62pt}}
+  \put(300,14){\small 10k}
+  \put(378,14){\small 50k}
+  \put(306,2){\small (b) Out-of-Domain}
+\end{picture}
+\vspace{3pt}
+\caption{Accuracy scaling curves under increasing query budgets across evaluation suites.}
+\end{figure*}
+
+\section{Methodology}
+Our benchmark evaluates hierarchical layout recovery across heterogeneous scholarly templates. Each page is decomposed into running margins, spanning floats, and column-isolated body paragraphs before downstream numeric verification.
+
+Architectural parameters are strictly audited: our reference encoder uses 3 layers, 4 attention heads, and a hidden width of 256 units across 19 datasets grouped into 4 task families, plus a small dataset (610) of PuzzleScript games with n = 1, 000 samples per split.
+
+\newpage
+\section{Dataset Construction}
+Every archival PDF in our evaluation corpus is verified against reference word tokens extracted by independent layout tools. Running headers and footers are matched across page margins so that repeated journal titles never contaminate downstream passage retrieval.
+
+For quantitative verification, numbers attached to dimensional units or count nouns are canonicalized before comparison, preventing cross-noun collisions when multiple quantities appear inside the same paragraph or table note.
+
+\newpage
+\section{Experimental Results}
+To assess the efficacy of FHBI, we evaluate our layout recovery pipeline on six diverse benchmark suites spanning both in-domain and out-of-domain distributions. Isolating wide floats before column partitioning preserves exact paragraph boundaries in the left column.
+
+\newpage
+\noindent baselines, outperforming them by 14.1 percentage points on in-domain suites and 19.6 percentage points on out-of-domain suites across 30, 000 evaluation queries. Under tight query budgets, our method maintains 88.7\% accuracy in the right column.
+
+\end{document}
