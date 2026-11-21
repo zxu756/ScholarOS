@@ -17,6 +17,10 @@ public struct PDFMultiColumnSegmenter: Sendable {
     public static let spanningLineWidthRatio: Double = 0.56
     /// Half-width around `mediaBox.midX` (pt) used to detect lines crossing the central two-column gutter.
     public static let centralGutterCrossingHalfWidthPt: Double = 18.0
+    /// Minimum straddle around `mediaBox.midX` (pt) for a caption line to count as cross-column spanning.
+    public static let spanningCaptionCenterHalfWidthPt: Double = 10.0
+    /// Maximum horizontal gap (pt) for coalescing touching or overlapping intra-line math/kerning glyph fragments.
+    public static let kerningCoalesceMaxGapPt: Double = 3.5
     /// Maximum vertical gap (pt) before starting a new paragraph within a column stream.
     public static let paragraphVerticalGapThresholdPt: Double = 11.5
 
@@ -518,15 +522,178 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
     // MARK: - Spanning Table & Figure Detection
 
+    private static let captionProseFollowers: Set<String> = [
+        "shows", "show", "illustrates", "illustrate", "reports", "report",
+        "summarizes", "summarize", "compares", "compare", "depicts", "depict",
+        "presents", "present", "demonstrates", "demonstrate", "lists", "list",
+        "gives", "give", "provides", "provide", "contains", "contain",
+        "is", "are", "was", "were", "has", "have", "can", "will",
+        "in", "on", "at", "to", "for", "of", "with", "from", "and", "or", "that"
+    ]
+
     private static func isTableOrFigureCaption(_ raw: String) -> Bool {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
-        let pattern = #"^(?:table|tab\.|figure|fig\.|figs\.|algorithm|alg\.|scheme|chart)\s*(?:\d+|[ivxlcdm]+|[a-z]\d*)(?:[:.\s—–-]|$)"#
-        return trimmed.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+        let prefixPattern = #"^(?:table|tab\.|figure|fig\.|figs\.|algorithm|alg\.|scheme|chart)(?:\s*\d+[a-z]?|\s+(?:[ivxlcdm]{1,6}|[a-z]\d*))"#
+        guard let matchRange = trimmed.range(of: prefixPattern, options: [.regularExpression, .caseInsensitive]) else {
+            return false
+        }
+        let remainder = String(trimmed[matchRange.upperBound...])
+        if remainder.isEmpty {
+            return true
+        }
+        if let firstChar = remainder.first, ":.—–-".contains(firstChar) {
+            return true
+        }
+        let afterSpace = remainder.trimmingCharacters(in: .whitespaces)
+        guard afterSpace.count < remainder.count, let nextChar = afterSpace.first else {
+            return false
+        }
+        if nextChar == "(" || nextChar == "[" {
+            return true
+        }
+        guard nextChar.isLetter, nextChar.isUppercase else {
+            return false
+        }
+        let firstWord = afterSpace
+            .components(separatedBy: .whitespaces)
+            .first?
+            .trimmingCharacters(in: .punctuationCharacters)
+            .lowercased() ?? ""
+        return !captionProseFollowers.contains(firstWord)
+    }
+
+    private static func coalesceHorizontalSegments(
+        _ lines: [PositionedTextLine],
+        maxGapPt: Double
+    ) -> [PositionedTextLine] {
+        let sorted = lines.sorted {
+            if abs($0.minX - $1.minX) > 0.5 { return $0.minX < $1.minX }
+            return $0.maxY > $1.maxY
+        }
+        guard var current = sorted.first else { return [] }
+        var merged: [PositionedTextLine] = []
+        for next in sorted.dropFirst() {
+            let gap = next.minX - current.maxX
+            if gap <= maxGapPt {
+                current = PositionedTextLine(
+                    text: current.text + " " + next.text,
+                    minX: min(current.minX, next.minX),
+                    minY: min(current.minY, next.minY),
+                    maxX: max(current.maxX, next.maxX),
+                    maxY: max(current.maxY, next.maxY)
+                )
+            } else {
+                merged.append(current)
+                current = next
+            }
+        }
+        merged.append(current)
+        return merged
+    }
+
+    private static func hasDenseTabularMetrics(_ text: String) -> Bool {
+        let parts = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        var decimalOrUnitTokens = 0
+        var plainNumericTokens = 0
+        for part in parts {
+            let cleaned = part.trimmingCharacters(in: CharacterSet(charactersIn: ",;"))
+            if cleaned.range(
+                of: #"^[+-]?(?:\d+[.,]\d+(?:%|ms|s|x|×|mb|gb|kb|m|k)?|\d+(?:%|ms|s|x|×|mb|gb|kb))$"#,
+                options: [.regularExpression, .caseInsensitive]
+            ) != nil {
+                decimalOrUnitTokens += 1
+            } else if let intVal = Int(cleaned), !(1900...2039).contains(intVal) {
+                plainNumericTokens += 1
+            }
+        }
+        return decimalOrUnitTokens >= 3 || (decimalOrUnitTokens >= 1 && (decimalOrUnitTokens + plainNumericTokens) >= 4)
+    }
+
+    private static func isMathEquationSegment(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        if isTableOrFigureCaption(trimmed) || hasDenseTabularMetrics(trimmed) {
+            return false
+        }
+        if trimmed.range(of: #"[\u{f8eb}-\u{f8fe}]"#, options: .regularExpression) != nil {
+            return true
+        }
+        if trimmed.range(of: #"[=≈∝≡→←↔↦≤≥≪≫∂∇∫∬∮∑∏⟨⟩±∓⊗⊕∈∉⊂⊆∀∃ˆ¯]"#, options: .regularExpression) != nil {
+            return true
+        }
+        if trimmed.range(of: #"(?:^|\s)\((?:[A-Z]\.)?\d{1,3}[a-z]?\)\.?$"#, options: .regularExpression) != nil {
+            return true
+        }
+        return false
+    }
+
+    private static func isBibliographyHeading(_ raw: String) -> Bool {
+        let trimmed = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !trimmed.isEmpty, trimmed.count <= 48 else { return false }
+        return trimmed.range(
+            of: #"^(?:(?:\d{1,2}\.?|[ivxlcdm]{1,6}\.)\s+)?(?:references|bibliography|works cited|literature cited|references and notes)$"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    private static func hasBibliographicCue(_ text: String) -> Bool {
+        let patterns = [
+            #"\b(?:19\d{2}|20[0-3]\d)[a-z]?\b"#,
+            #"\bpp?\.\s*\d"#,
+            #"\bvol\.\s*\d"#,
+            #"\bno\.\s*\d"#,
+            #"\barxiv(?:\s+preprint|:)"#,
+            #"\bdoi\s*:"#,
+            #"\b(?:proceedings|conference|symposium|transactions|journal|letters|annals)\b"#,
+            #"\bet\s+al\."#,
+            #"\b\d{1,5}[–—-]\d{1,5}\b"#
+        ]
+        return patterns.contains { pat in
+            text.range(of: pat, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+    }
+
+    private static func isBibliographyEntryStart(_ raw: String) -> Bool {
+        let trimmed = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !trimmed.isEmpty, !hasDenseTabularMetrics(trimmed) else { return false }
+
+        // 1. Bracketed numeric item ("[1]", "[12] Author...")
+        if trimmed.range(of: #"^\[\d{1,4}\](?:\s+\S.*|$)"#, options: .regularExpression) != nil {
+            return true
+        }
+        // 2. Dotted numeric item ("1. A. Rivera...", "12. Qingyao Ai... 2018")
+        if trimmed.range(of: #"^\d{1,4}\.\s+[A-Z]"#, options: .regularExpression) != nil,
+           detectSectionHeading(trimmed) == nil,
+           hasBibliographicCue(trimmed) {
+            return true
+        }
+        // 3. Author-name / Author-year item ("Rivera, A., 2024...", "Qingyao Ai, Keping Bi, and ... 2018.")
+        if trimmed.range(of: #"^[A-Z][A-Za-z'’-]+,\s+(?:[A-Z]\.|[A-Z][a-z]+)"#, options: .regularExpression) != nil,
+           hasBibliographicCue(trimmed) {
+            return true
+        }
+        if trimmed.range(of: #"^[A-Z][A-Za-z'’-]+\s+[A-Z][A-Za-z'’.-]+(?:,\s+|\s+and\s+|\s+&\s+)"#, options: .regularExpression) != nil,
+           hasBibliographicCue(trimmed) {
+            return true
+        }
+        return false
     }
 
     private static func looksTabularRow(_ text: String, segmentCount: Int) -> Bool {
+        if isMathEquationSegment(text) && !hasDenseTabularMetrics(text) {
+            return false
+        }
         if segmentCount >= 3 { return true }
+        if hasDenseTabularMetrics(text) { return true }
         var numericTokens = 0
         let parts = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
         for part in parts {
@@ -544,10 +711,11 @@ public struct PDFMultiColumnSegmenter: Sendable {
     ) -> (floatBlocks: [PositionedTextLine], remainingLines: [PositionedTextLine]) {
         guard !contentLines.isEmpty else { return ([], []) }
 
-        // Group content lines into horizontal Y-bands (tolerance 4 pt) to detect multi-cell wide rows
+        // Group content lines into horizontal Y-bands (tolerance 4 pt) to evaluate cross-column spanning structure
         struct HorizontalRow {
             var indices: [Int]
             var lines: [PositionedTextLine]
+            var segments: [PositionedTextLine]
             var minX: Double
             var maxX: Double
             var minY: Double
@@ -572,6 +740,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     HorizontalRow(
                         indices: [origIdx],
                         lines: [line],
+                        segments: [line],
                         minX: line.minX,
                         maxX: line.maxX,
                         minY: line.minY,
@@ -580,21 +749,120 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 )
             }
         }
+        for rIdx in rows.indices {
+            rows[rIdx].segments = coalesceHorizontalSegments(
+                rows[rIdx].lines,
+                maxGapPt: kerningCoalesceMaxGapPt
+            )
+        }
         rows.sort { $0.maxY > $1.maxY }
 
-        // Mark candidate spanning rows: either contains an intrinsically spanning line, or >=3 cells spanning >56% width
-        func rowIsSpanningCandidate(_ row: HorizontalRow) -> Bool {
-            if row.lines.contains(where: { isSpanningLine($0, midX: midX, pageWidth: pageWidth) }) {
-                return true
+        func rowHasSpanningCaption(_ row: HorizontalRow) -> Bool {
+            let captionPieces = coalesceHorizontalSegments(row.lines, maxGapPt: 12.0)
+            return captionPieces.contains { piece in
+                guard isTableOrFigureCaption(piece.text) else { return false }
+                if isSpanningLine(piece, midX: midX, pageWidth: pageWidth) {
+                    return true
+                }
+                if piece.minX < (midX - spanningCaptionCenterHalfWidthPt)
+                    && piece.maxX > (midX + spanningCaptionCenterHalfWidthPt) {
+                    return true
+                }
+                if abs(piece.midX - midX) <= 20.0 && piece.minX < midX && piece.maxX > midX {
+                    return true
+                }
+                return false
             }
-            if row.lines.count >= 3 && (row.combinedWidth / pageWidth) > spanningLineWidthRatio {
-                return true
+        }
+
+        func partitionRowAroundGutter(_ row: HorizontalRow) -> (
+            left: [PositionedTextLine],
+            bridge: [PositionedTextLine],
+            right: [PositionedTextLine]
+        ) {
+            var left: [PositionedTextLine] = []
+            var bridge: [PositionedTextLine] = []
+            var right: [PositionedTextLine] = []
+            for seg in row.segments {
+                if seg.maxX <= (midX + 12.0) {
+                    left.append(seg)
+                } else if seg.minX >= (midX - 12.0) {
+                    right.append(seg)
+                } else {
+                    bridge.append(seg)
+                }
             }
-            let lrText = row.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
-            if isTableOrFigureCaption(lrText) && (row.combinedWidth / pageWidth) > 0.45 {
-                return true
+            return (left, bridge, right)
+        }
+
+        func isReferenceListCluster(_ orderedRows: [HorizontalRow], rowTexts: [String]) -> Bool {
+            for (row, fullText) in zip(orderedRows, rowTexts) {
+                if isBibliographyHeading(fullText) { return true }
+                for seg in row.segments where isBibliographyHeading(seg.text) {
+                    return true
+                }
             }
+
+            var entryStartRows = 0
+            var bibCueRows = 0
+            for (row, fullText) in zip(orderedRows, rowTexts) {
+                if hasDenseTabularMetrics(fullText) { continue }
+                let parts = partitionRowAroundGutter(row)
+                let leftText = parts.left.map(\.text).joined(separator: " ")
+                let rightText = parts.right.map(\.text).joined(separator: " ")
+
+                let rowStartsEntry =
+                    isBibliographyEntryStart(fullText)
+                    || isBibliographyEntryStart(leftText)
+                    || isBibliographyEntryStart(rightText)
+                    || row.segments.contains { isBibliographyEntryStart($0.text) }
+                if rowStartsEntry {
+                    entryStartRows += 1
+                }
+                if hasBibliographicCue(fullText) {
+                    bibCueRows += 1
+                }
+            }
+
+            if entryStartRows >= 2 { return true }
+            if entryStartRows >= 1 && bibCueRows * 2 >= orderedRows.count { return true }
             return false
+        }
+
+        // Mark candidate spanning rows: spanning caption, single gutter-crossing line, or multi-column grid across both sides
+        func rowIsSpanningCandidate(_ row: HorizontalRow) -> Bool {
+            if rowHasSpanningCaption(row) {
+                return true
+            }
+            let lrText = row.segments.map(\.text).joined(separator: " ")
+            if row.lines.contains(where: { isSpanningLine($0, midX: midX, pageWidth: pageWidth) }) {
+                if isMathEquationSegment(lrText) && !hasDenseTabularMetrics(lrText) {
+                    return false
+                }
+                return true
+            }
+
+            guard (row.combinedWidth / pageWidth) > spanningLineWidthRatio,
+                  row.minX < (midX - centralGutterCrossingHalfWidthPt),
+                  row.maxX > (midX + centralGutterCrossingHalfWidthPt) else {
+                return false
+            }
+
+            let parts = partitionRowAroundGutter(row)
+            if !parts.bridge.isEmpty {
+                return row.segments.count >= 3 && !isMathEquationSegment(lrText)
+            }
+
+            // Without any centerline-bridging cell, segments must appear on both sides (>= 3 total) and neither side may be a math equation
+            guard !parts.left.isEmpty, !parts.right.isEmpty, row.segments.count >= 3 else {
+                return false
+            }
+            let leftText = parts.left.map(\.text).joined(separator: " ")
+            let rightText = parts.right.map(\.text).joined(separator: " ")
+            if isMathEquationSegment(leftText) || isMathEquationSegment(rightText) {
+                return false
+            }
+            return true
         }
 
         // Build contiguous vertical clusters of spanning candidate rows (gap <= 22 pt)
@@ -614,34 +882,45 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
         for cluster in clusters {
             var expandedRowIndices = Set(cluster)
-            // Attach immediately adjacent caption continuation or caption header/footer rows within 20 pt
+            // Attach immediately adjacent spanning caption rows within 20 pt (never single-column captions)
             if let firstR = cluster.first, firstR > 0 {
                 let above = rows[firstR - 1]
-                let aboveText = above.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
-                if (above.minY - rows[firstR].maxY) <= 20.0 && isTableOrFigureCaption(aboveText) {
+                if (above.minY - rows[firstR].maxY) <= 20.0 && rowHasSpanningCaption(above) {
                     expandedRowIndices.insert(firstR - 1)
                 }
             }
             if let lastR = cluster.last, lastR + 1 < rows.count {
                 let below = rows[lastR + 1]
-                let belowText = below.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
-                if (rows[lastR].minY - below.maxY) <= 20.0 && isTableOrFigureCaption(belowText) {
+                if (rows[lastR].minY - below.maxY) <= 20.0 && rowHasSpanningCaption(below) {
                     expandedRowIndices.insert(lastR + 1)
                 }
             }
 
             let orderedRows = expandedRowIndices.sorted().map { rows[$0] }
             let rowTexts = orderedRows.map { r in
-                r.lines.sorted { $0.minX < $1.minX }.map(\.text).joined(separator: " ")
+                r.segments.map(\.text).joined(separator: " ")
             }
 
-            let hasCaption = rowTexts.contains { isTableOrFigureCaption($0) }
+            let hasSpanningCaption = orderedRows.contains { rowHasSpanningCaption($0) }
+            if !hasSpanningCaption && isReferenceListCluster(orderedRows, rowTexts: rowTexts) {
+                continue
+            }
+
             let tabularRowCount = zip(orderedRows, rowTexts).filter { r, txt in
-                looksTabularRow(txt, segmentCount: r.lines.count)
+                let parts = partitionRowAroundGutter(r)
+                let effectiveSegments: Int
+                if !parts.bridge.isEmpty || r.lines.contains(where: { isSpanningLine($0, midX: midX, pageWidth: pageWidth) }) {
+                    effectiveSegments = r.segments.count
+                } else if !parts.left.isEmpty && !parts.right.isEmpty && r.segments.count >= 3 {
+                    effectiveSegments = r.segments.count
+                } else {
+                    effectiveSegments = 1
+                }
+                return looksTabularRow(txt, segmentCount: effectiveSegments)
             }.count
             let startsLikeAbstract = rowTexts.first?.lowercased().hasPrefix("abstract") == true
 
-            guard hasCaption || (tabularRowCount >= 2 && !startsLikeAbstract) else {
+            guard hasSpanningCaption || (tabularRowCount >= 2 && !startsLikeAbstract) else {
                 continue
             }
 
@@ -680,7 +959,11 @@ public struct PDFMultiColumnSegmenter: Sendable {
     // MARK: - Paragraph Grouping & Section Heading Detection
 
     private static func endsSentence(_ text: String) -> Bool {
-        guard let last = text.trimmingCharacters(in: .whitespaces).last else { return false }
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard let last = trimmed.last else { return false }
+        if trimmed.range(of: #"^\[\d{1,4}\]$"#, options: .regularExpression) != nil {
+            return false
+        }
         return ".?!\"”)]".contains(last)
     }
 
@@ -703,11 +986,13 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
         for next in lines.dropFirst() {
             let verticalGap = current.minY - next.maxY
+            let sameHorizontalLine = abs(current.midY - next.midY) <= 4.0 && next.minX >= (current.maxX - 2.0)
             let currentIsHeading = detectSectionHeading(current.text) != nil
-            let nextIsHeading = detectSectionHeading(next.text) != nil
-            let nextStartsCaption = Self.isTableOrFigureCaption(next.text)
+            let nextIsHeading = !sameHorizontalLine && detectSectionHeading(next.text) != nil
+            let nextStartsCaption = !sameHorizontalLine && Self.isTableOrFigureCaption(next.text)
             let nextIsIndentedNewParagraph =
-                !currentIsHeading
+                !sameHorizontalLine
+                && !currentIsHeading
                 && (next.minX - columnLeftMargin) >= 6.5
                 && (current.minX - columnLeftMargin) <= 3.5
                 && Self.endsSentence(current.text)
@@ -851,6 +1136,8 @@ public struct PDFMultiColumnSegmenter: Sendable {
         "references",
         "bibliography",
         "works cited",
+        "literature cited",
+        "references and notes",
         "appendix",
         "appendices",
         "supplementary material"
@@ -865,7 +1152,8 @@ public struct PDFMultiColumnSegmenter: Sendable {
     private static let finiteProseVerbs: Set<String> = [
         "is", "are", "was", "were", "have", "has", "had", "can", "could",
         "will", "would", "should", "may", "might", "must", "remained",
-        "achieved", "completes", "evaluates", "requires", "required"
+        "achieved", "completes", "evaluates", "requires", "required",
+        "vanishes", "vanish", "holds", "follows", "implies", "denotes"
     ]
 
     private static func matchNumberedPrefix(in text: String, pattern: String) -> String? {

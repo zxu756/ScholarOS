@@ -420,6 +420,94 @@ struct PDFProvenanceAndCitationGraphTests {
         #expect(leftPage2.readingSequence < rightPage2.readingSequence)
     }
 
+    @Test("S12-6: All-caps REFERENCES heading and bracketed bibliography items remain body chunks while genuine spanning table stays tableOrFigure")
+    func s12AllCapsReferencesAndBibliographyExcludedFromTableWhileSpanningTablePreserved() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_acm_refs.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "riveraACM2026")
+
+        let headings = chunks.filter { $0.kind == .sectionHeading }.map(\.passageText)
+        #expect(headings == [
+            "ABSTRACT",
+            "1 INTRODUCTION",
+            "2 METHODOLOGY",
+            "3 EXPERIMENTS",
+            "4 CONCLUSION",
+            "REFERENCES"
+        ])
+
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("REFERENCES") == "REFERENCES")
+        #expect(PDFMultiColumnSegmenter.detectSectionHeading("BIBLIOGRAPHY") == "BIBLIOGRAPHY")
+
+        // Genuine cross-column Table 1 on Page 2 must still be classified as tableOrFigure (col == 0)
+        let tableChunks = chunks.filter { $0.kind == .tableOrFigure }
+        let spanningTable = try #require(tableChunks.first { $0.passageText.contains("Table 1: Cross-column evaluation") })
+        #expect(spanningTable.columnIndex == 0)
+        #expect(spanningTable.boundingBox.pageIndex == 1)
+        #expect(spanningTable.passageText.contains("Model Variant"))
+        #expect(spanningTable.passageText.contains("Proposed Listwise Model"))
+
+        // Reference heading, bibliography entries, and prose cross-references must never become tableOrFigure
+        #expect(!tableChunks.contains { $0.passageText.contains("REFERENCES") })
+        #expect(!tableChunks.contains { $0.passageText.contains("[1] Qingyao Ai") })
+        #expect(!tableChunks.contains { $0.passageText.contains("[6] Changhua Pei") })
+        #expect(!tableChunks.contains { $0.passageText.contains("Table 1 reports ranking performance") })
+
+        let proseRef = try #require(chunks.first { $0.kind == .body && $0.passageText.contains("Table 1 reports ranking performance") })
+        #expect(proseRef.columnIndex == 1)
+        #expect(proseRef.sectionTitle == "3 EXPERIMENTS")
+
+        let leftBib = try #require(chunks.first { $0.kind == .body && $0.passageText.contains("[1] Qingyao Ai") })
+        let rightBib = try #require(chunks.first { $0.kind == .body && $0.passageText.contains("[6] Changhua Pei") })
+        #expect(leftBib.sectionTitle == "REFERENCES")
+        #expect(rightBib.sectionTitle == "REFERENCES")
+        #expect(leftBib.columnIndex == 1)
+        #expect(rightBib.columnIndex == 2)
+        #expect(leftBib.readingSequence < rightBib.readingSequence)
+        #expect(!leftBib.passageText.contains("Changhua Pei"))
+    }
+
+    @Test("S12-7: Display equations and inline math in two-column prose do not become spanning tables or swallow section headings")
+    func s12DisplayEquationsInTwoColumnProsePreserveHeadingsAndColumns() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_math_columns.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "ovchinnikova2026")
+
+        let headings = chunks.filter { $0.kind == .sectionHeading }.map(\.passageText)
+        #expect(headings == [
+            "Abstract",
+            "1. Introduction",
+            "2. Stochastic Dynamics and Operators",
+            "3. Global Symmetries and Supergauge Field",
+            "4. Effective Field Theory",
+            "5. Generating Functional",
+            "6. Conclusion",
+            "References"
+        ])
+
+        let tableChunks = chunks.filter { $0.kind == .tableOrFigure }
+        #expect(tableChunks.isEmpty)
+
+        // All body chunks after front-matter/abstract must belong to column 1 or column 2, never column 0
+        let twoColumnBody = chunks.filter {
+            $0.kind == .body
+            && $0.sectionTitle != "Front Matter & Abstract"
+            && $0.sectionTitle != "Abstract"
+        }
+        #expect(!twoColumnBody.isEmpty)
+        for chunk in twoColumnBody {
+            #expect(chunk.columnIndex == 1 || chunk.columnIndex == 2)
+        }
+
+        let sec3Body = try #require(twoColumnBody.first { $0.passageText.contains("The topological symmetry is defined") })
+        let page2RightBody = try #require(twoColumnBody.first { $0.passageText.contains("represents the spatial densities") })
+        let sec5Body = try #require(twoColumnBody.first { $0.passageText.contains("Once the effective action is established") })
+        #expect(sec3Body.columnIndex == 1)
+        #expect(page2RightBody.columnIndex == 2)
+        #expect(sec3Body.readingSequence < page2RightBody.readingSequence)
+        #expect(!sec3Body.passageText.contains("exp(c(x)"))
+        #expect(sec5Body.columnIndex == 2)
+        #expect(sec5Body.sectionTitle == "5. Generating Functional")
+    }
+
     // MARK: - 2. SQLite FTS5 BM25 Retrieval & Numeric Claim Entailment Tests
 
     @Test("FTS5ProvenanceIndex indexes passages in temp SQLite DB and ranks citeKey-filtered BM25 hits")
