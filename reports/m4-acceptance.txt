@@ -1,6 +1,6 @@
 # ScholarOS M4 Acceptance Verification Report
-Date: 2026-11-21T13:16:25Z
-Commit: 0164e64
+Date: 2026-11-21T14:18:20Z
+Commit: 1c7203d
 Binary: .build/debug/ScholarOS
 Mode: --offline (isolated HOME, SCHOLAR_CACHE_DIR unset)
 
@@ -65,7 +65,7 @@ RESULT [Row 4]: PASS — Not-mentioned & sentinels: 25/25 NOT_FOUND with empty m
   boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
 RESULT [Row 5]: PASS — Bounding boxes verified: boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
 
-== [Row 6] 5 份评测论文与 5 份合成夹具分段 (页眉页脚不进正文、引言与参考文献识别、通栏表下先左后右) ==
+== [Row 6] 5 份评测论文与 7 份合成夹具分段 (页眉页脚不进正文、引言与参考文献识别、通栏表下先左后右) ==
   [PASS] 2506.06524v1: chunks=68 headings=8 hf_leaks=0 intro=True refs=True col_order_ok=True
   [PASS] 2409.19431v3: chunks=938 headings=18 hf_leaks=0 intro=True refs=True col_order_ok=True
   [PASS] 2410.04196v2: chunks=337 headings=11 hf_leaks=0 intro=True refs=True col_order_ok=True
@@ -76,15 +76,17 @@ RESULT [Row 5]: PASS — Bounding boxes verified: boxes_verified=19/19 (min_word
   [PASS] fixture s12_acm_refs: chunks=28 headings=6 hf_leaks=0 intro=True refs=True col_order_ok=True
   [PASS] fixture s12_math_columns: chunks=30 headings=8 hf_leaks=0 intro=True refs=True col_order_ok=True
   [PASS] fixture s12_wide_table_fig_cols: chunks=18 headings=4 hf_leaks=0 intro=True refs=False col_order_ok=True
-  benchmark_papers=5/5 synthetic_fixtures=5/5
-RESULT [Row 6]: PASS — Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=5/5; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
+  [PASS] fixture s12_tight_word_spacing: chunks=19 headings=6 hf_leaks=0 intro=True refs=True col_order_ok=True
+  [PASS] fixture s12_lm_math_kerning: chunks=22 headings=6 hf_leaks=0 intro=True refs=True col_order_ok=True
+  benchmark_papers=5/5 synthetic_fixtures=7/7
+RESULT [Row 6]: PASS — Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=7/7; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
 
 == [Row 7] 提取文字与 pdftotext 词重合率 (5 份评测论文每份 >= 95%，记录百分比与耗时) ==
-  [PASS] 2506.06524v1: word_overlap=99.91% (3293/3296 words) segment_time=300.0ms ref=live_pdftotext
-  [PASS] 2409.19431v3: word_overlap=97.69% (20279/20759 words) segment_time=2359.2ms ref=live_pdftotext
-  [PASS] 2410.04196v2: word_overlap=96.87% (10333/10667 words) segment_time=1213.4ms ref=live_pdftotext
-  [PASS] 2611.15445v1: word_overlap=98.67% (6814/6906 words) segment_time=784.7ms ref=live_pdftotext
-  [PASS] 2610.15486v1: word_overlap=98.55% (15163/15386 words) segment_time=2121.9ms ref=live_pdftotext
+  [PASS] 2506.06524v1: word_overlap=99.91% (3293/3296 words) segment_time=333.3ms ref=live_pdftotext
+  [PASS] 2409.19431v3: word_overlap=97.69% (20279/20759 words) segment_time=2137.8ms ref=live_pdftotext
+  [PASS] 2410.04196v2: word_overlap=96.87% (10333/10667 words) segment_time=1083.7ms ref=live_pdftotext
+  [PASS] 2611.15445v1: word_overlap=98.67% (6814/6906 words) segment_time=822.0ms ref=live_pdftotext
+  [PASS] 2610.15486v1: word_overlap=98.55% (15163/15386 words) segment_time=2030.8ms ref=live_pdftotext
   papers_passed=5/5 min_word_overlap=96.87% (required >= 95.00%)
 RESULT [Row 7]: PASS — Word overlap verified (papers_passed=5/5 min_word_overlap=96.87%, required >= 95.00%)
 
@@ -106,8 +108,8 @@ SKIP: 没跑 — 5 个 m4-*.patch 补丁已通过 git apply --check 校验；临
 RESULT [Row 10]: SKIP (没跑) — All 5 m4-*.patch files verified clean with git apply --check; run Scripts/acceptance/m4-mutations.sh standalone
 
 == [Row 11] 卫生检查 (真实 ~/Library 无新增 ScholarOS 条目、临时目录清理、git diff --exit-code Benchmarks/) ==
-  scratch_cleaned=true tmp_clean=true real_library_scholaros_untouched=true benchmarks_diff_exit=0 reports_untouched=true elapsed=169.17s
-RESULT [Row 11]: PASS — Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=169.17s)
+  scratch_cleaned=true tmp_clean=true real_library_scholaros_untouched=true benchmarks_diff_exit=0 reports_untouched=true elapsed=167.71s
+RESULT [Row 11]: PASS — Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=167.71s)
 
 ========================================================================
 M4 Acceptance Summary:
@@ -116,12 +118,12 @@ M4 Acceptance Summary:
   Row  3 | PASS       | Numeric-mismatch claims: 9/10 NUMERIC_MISMATCH with expected_pages & ground_truth_numbers (threshold >= 8/10)
   Row  4 | PASS       | Not-mentioned & sentinels: 25/25 NOT_FOUND with empty matches (0 tolerance)
   Row  5 | PASS       | Bounding boxes verified: boxes_verified=19/19 (min_word_coverage=100.0%, required >= 80.0%)
-  Row  6 | PASS       | Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=5/5; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
+  Row  6 | PASS       | Segmentation verified (benchmark_papers=5/5 synthetic_fixtures=7/7; 0 header/footer body leaks, Intro+Refs recognized, col1<col2)
   Row  7 | PASS       | Word overlap verified (papers_passed=5/5 min_word_overlap=96.87%, required >= 95.00%)
   Row  8 | PASS       | MCP default_tools=5, locate_evidence present, scholar_search_provenance removed, cli_vs_mcp_diffs=0/45, ERR_INVALID_ARGUMENT verified
   Row  9 | PASS       | Error handling verified (error_cases_passed=9/9, exit=2, --json stdout empty, stderr non-empty)
   Row 10 | SKIP(没跑) | All 5 m4-*.patch files verified clean with git apply --check; run Scripts/acceptance/m4-mutations.sh standalone
-  Row 11 | PASS       | Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=169.17s)
+  Row 11 | PASS       | Temporary directories cleaned, real ~/Library free of new ScholarOS items, and git diff --exit-code Benchmarks/ passed (elapsed=167.71s)
 ------------------------------------------------------------------------
 Passed: 10 | Failed: 0 | Skipped (没跑): 1
 ========================================================================
