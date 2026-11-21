@@ -1,0 +1,12 @@
+diff --git a/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift b/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
+--- a/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
++++ b/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
+@@ -485,6 +485,8 @@
+         topTemplatePages: [String: Set<Int>],
+         bottomTemplatePages: [String: Set<Int>]
+     ) -> (headers: [PositionedTextLine], footers: [PositionedTextLine], content: [PositionedTextLine]) {
++        // MUTATION (M4 acceptance row 10a): disable repeating margin header/footer stripping.
++        if totalPageCount >= 0 { return (headers: [], footers: [], content: lines) }
+         let pageMinY = Double(mediaBox.minY)
+         let pageMaxY = Double(mediaBox.maxY)
+         let pageHeight = max(1.0, pageMaxY - pageMinY)

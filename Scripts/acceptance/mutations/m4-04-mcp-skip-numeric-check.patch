@@ -1,0 +1,49 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -1880,11 +1880,44 @@
+ 
+         do {
+-            let result = try PDFEvidenceCLIAndMCPService.locateEvidenceInLocalPDF(
++            let rawResult = try PDFEvidenceCLIAndMCPService.locateEvidenceInLocalPDF(
+                 atPath: pdfFilePath,
+                 claim: claimText,
+                 topK: topK,
+                 language: lang
+             )
++            // MUTATION (M4 acceptance row 10d): skip numeric checking in MCP locate_evidence.
++            let result: EvidenceLocalizationResult
++            if rawResult.verdict == .numericMismatch {
++                let strippedMatches = rawResult.matches.map { m in
++                    EvidencePassageMatch(
++                        passageID: m.passageID,
++                        citeKey: m.citeKey,
++                        pdfFile: m.pdfFile,
++                        page: m.page,
++                        pageIndex: m.pageIndex,
++                        boundingBox: m.boundingBox,
++                        columnIndex: m.columnIndex,
++                        sectionTitle: m.sectionTitle,
++                        kind: m.kind,
++                        excerpt: m.excerpt,
++                        coverage: m.coverage,
++                        matchedKeywords: m.matchedKeywords,
++                        bm25Score: m.bm25Score,
++                        discrepancies: []
++                    )
++                }
++                result = EvidenceLocalizationResult(
++                    schema: rawResult.schema,
++                    claim: rawResult.claim,
++                    pdfFile: rawResult.pdfFile,
++                    verdict: .found,
++                    queryKeywords: rawResult.queryKeywords,
++                    matches: strippedMatches,
++                    discrepancies: []
++                )
++            } else {
++                result = rawResult
++            }
+             let json = try PDFEvidenceCLIAndMCPService.encodeEvidenceLocalizationJSON(result)
+             return textResult(json, isError: false)
+         } catch let scholarErr as ScholarOSError {

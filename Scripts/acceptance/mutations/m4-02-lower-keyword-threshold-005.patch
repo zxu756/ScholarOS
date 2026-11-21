@@ -1,0 +1,13 @@
+diff --git a/Sources/ScholarPDFProvenance/EvidenceLocatorAndNumericChecker.swift b/Sources/ScholarPDFProvenance/EvidenceLocatorAndNumericChecker.swift
+--- a/Sources/ScholarPDFProvenance/EvidenceLocatorAndNumericChecker.swift
++++ b/Sources/ScholarPDFProvenance/EvidenceLocatorAndNumericChecker.swift
+@@ -121,7 +121,8 @@
+ /// and verifies explicit `<number + unit/classifier/noun>` pairs with SI/binary unit conversion, p-value inequality logic,
+ /// and confidence interval checks. Deliberately makes NO claim about semantic entailment or logical support.
+ public struct EvidenceLocatorAndNumericChecker: Sendable {
+-    public static let defaultMinimumKeywordCoverage: Double = 0.60
++    // MUTATION (M4 acceptance row 10b): lower keyword coverage threshold to 0.05.
++    public static let defaultMinimumKeywordCoverage: Double = 0.05
+     public static let defaultEnableBareNumberNounExtraction: Bool = true
+     public static let defaultPreferCandidatesWithAlignedNumbers: Bool = true
+     public static let defaultRequireSameNounValueAgreement: Bool = true

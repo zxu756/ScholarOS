@@ -32,6 +32,7 @@ usage() {
 Usage:
   Scripts/test.sh scope <ModuleOrFilter...>
   Scripts/test.sh milestone <N> [--record]
+  Scripts/test.sh mutations <N> [--record]
   Scripts/test.sh release [--record]
 EOF
     exit 2
@@ -117,6 +118,21 @@ swift_test() {
     fi
 }
 
+swift_build() {
+    local extra=()
+    if [[ "$DISABLE_SWIFTPM_SANDBOX" -eq 1 ]]; then
+        extra+=("--disable-sandbox")
+    fi
+    if [[ -n "${SCHOLAR_BUILD_JOBS:-}" ]]; then
+        extra+=("-j" "$SCHOLAR_BUILD_JOBS")
+    fi
+    if [[ "${#extra[@]}" -gt 0 ]]; then
+        swift build "${extra[@]}" "$@"
+    else
+        swift build "$@"
+    fi
+}
+
 # Number of ScholarOS preference files in the caller's real ~/Library/Preferences (names only are read).
 count_scholaros_preference_files() {
     local prefs_dir="$REAL_USER_HOME/Library/Preferences"
@@ -160,9 +176,13 @@ working_tree_state() {
 
 CREATED_REPORT_TMPDIR=""
 M3_STEP_TMP=""
+M4_STEP_TMP=""
 cleanup_test_sh() {
     if [[ -n "$M3_STEP_TMP" && -d "$M3_STEP_TMP" ]]; then
         rm -rf "$M3_STEP_TMP"
+    fi
+    if [[ -n "$M4_STEP_TMP" && -d "$M4_STEP_TMP" ]]; then
+        rm -rf "$M4_STEP_TMP"
     fi
     if [[ -n "$CREATED_REPORT_TMPDIR" && -d "$CREATED_REPORT_TMPDIR" ]]; then
         rm -rf "$CREATED_REPORT_TMPDIR"
@@ -271,6 +291,43 @@ print(f"lib={lib_hash}|clients={h.hexdigest()}")
 PY
 }
 
+snapshot_real_home_library_scholaros_only() {
+    python3 -I - "$REAL_USER_HOME" <<'PY'
+import hashlib, os, sys
+
+home = sys.argv[1]
+entries = []
+for sub in ("Caches", "Preferences", "Application Support"):
+    base = os.path.join(home, "Library", sub)
+    if not os.path.isdir(base):
+        entries.append(f"{sub}:ABSENT")
+        continue
+    for name in sorted(os.listdir(base)):
+        low = name.lower()
+        if "scholaros" in low or "tectonic" in low:
+            p = os.path.join(base, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                entries.append(f"{sub}/{name}:DIR")
+                for root, dirs, files in os.walk(p):
+                    dirs.sort()
+                    for fn in sorted(files):
+                        fp = os.path.join(root, fn)
+                        rel = os.path.relpath(fp, base)
+                        try:
+                            st = os.lstat(fp)
+                            entries.append(f"{sub}/{rel}:{st.st_size}:{st.st_mtime_ns}")
+                        except OSError:
+                            entries.append(f"{sub}/{rel}:ERR")
+            else:
+                try:
+                    st = os.lstat(p)
+                    entries.append(f"{sub}/{name}:{st.st_size}:{st.st_mtime_ns}")
+                except OSError:
+                    entries.append(f"{sub}/{name}:ERR")
+print(hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest())
+PY
+}
+
 snapshot_scholaros_tmpdir() {
     local exclude1="${1:-}"
     python3 -I - "${TMPDIR:-/tmp}" "$exclude1" <<'PY'
@@ -281,6 +338,7 @@ if not os.path.isdir(tdir):
     sys.exit(0)
 prefixes = (
     "scholaros-reports.",
+    "scholaros-m4-",
     "scholaros-m3-",
     "scholaros-m2-",
     "scholaros-m1-",
@@ -664,8 +722,141 @@ case "$MODE" in
                 echo "[test.sh] MILESTONE 3 PASSED (m3-mcp.sh elapsed=${M3_MCP_ELAPSED}s)."
                 ;;
 
+            4)
+                TREE_BEFORE="$(working_tree_state)"
+                PREFS_BEFORE="$(count_scholaros_preference_files)"
+                CACHE_BEFORE="$(scholaros_cache_dir_state)"
+                LIB_SNAP_BEFORE="$(snapshot_real_home_library_scholaros_only)"
+                TMP_BEFORE="$(snapshot_scholaros_tmpdir)"
+                BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+
+                SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
+                if [[ "$RECORD" -eq 0 ]]; then
+                    CREATED_REPORT_TMPDIR="$SCHOLAR_REPORT_DIR"
+                fi
+                export SCHOLAR_REPORT_DIR
+
+                M4_STEP_TMP="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m4-step.XXXXXX")"
+                mkdir -p "$M4_STEP_TMP/h-scope/Library/Preferences" "$M4_STEP_TMP/h-scope/Library/Caches"
+                mkdir -p "$M4_STEP_TMP/h-m4/Library/Preferences" "$M4_STEP_TMP/h-m4/Library/Caches"
+
+                echo "[test.sh] Running M4 changed-module scoped unit tests..."
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M4_STEP_TMP/h-scope" CFFIXED_USER_HOME="$M4_STEP_TMP/h-scope" \
+                        swift_test --no-parallel --filter "(BibCSLAndFirewallTests|MarkupASTAndMacroTests|PDFProvenanceAndCitationGraphTests|PluginSDKMCPAndShellTests|ZZZCacheHomeIsolationGuardTests)"
+                )
+
+                echo "[test.sh] Running M4 acceptance Python harness unit tests..."
+                python3 -I -m unittest discover -s "$REPO_ROOT/Scripts/acceptance" -p "test_m4_*.py"
+
+                echo "[test.sh] Building ScholarOS executable for M4 acceptance..."
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M4_STEP_TMP/h-m4" CFFIXED_USER_HOME="$M4_STEP_TMP/h-m4" \
+                        swift_build
+                )
+
+                require_executable "$REPO_ROOT/Scripts/acceptance/m4-acceptance.sh"
+                require_executable "$REPO_ROOT/Scripts/acceptance/m4-mutations.sh"
+
+                M4_FAILED=0
+                echo "[test.sh] Running M4 acceptance script (m4-acceptance.sh)..."
+                M4_ACC_T0="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
+                set +e
+                (
+                    unset SCHOLAR_CACHE_DIR
+                    HOME="$M4_STEP_TMP/h-m4" CFFIXED_USER_HOME="$M4_STEP_TMP/h-m4" \
+                        SCHOLAR_CLI_BIN="$REPO_ROOT/.build/debug/ScholarOS" \
+                        "$REPO_ROOT/Scripts/acceptance/m4-acceptance.sh" $([[ "$RECORD" -eq 1 ]] && echo "--record")
+                )
+                M4_ACC_EXIT=$?
+                set -e
+                M4_ACC_T1="$(python3 -I -c 'import time; print(f"{time.time():.6f}")')"
+                M4_ACC_ELAPSED="$(python3 -I -c 'import sys; print(f"{float(sys.argv[2]) - float(sys.argv[1]):.2f}")' "$M4_ACC_T0" "$M4_ACC_T1")"
+                echo "[test.sh] m4-acceptance.sh exit=$M4_ACC_EXIT elapsed=${M4_ACC_ELAPSED}s"
+                if [[ "$M4_ACC_EXIT" -ne 0 ]]; then
+                    M4_FAILED=1
+                fi
+
+                rm -rf "$M4_STEP_TMP"
+                M4_STEP_TMP=""
+                if [[ "$RECORD" -eq 0 && -n "$CREATED_REPORT_TMPDIR" && -d "$CREATED_REPORT_TMPDIR" ]]; then
+                    rm -rf "$CREATED_REPORT_TMPDIR"
+                    CREATED_REPORT_TMPDIR=""
+                fi
+
+                assert_post_run_hygiene "$RECORD" "$PREFS_BEFORE" "$CACHE_BEFORE" "$TREE_BEFORE"
+
+                LIB_SNAP_AFTER="$(snapshot_real_home_library_scholaros_only)"
+                TMP_AFTER="$(snapshot_scholaros_tmpdir)"
+                BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
+                set +e
+                git -C "$REPO_ROOT" diff --exit-code -- Benchmarks >/dev/null 2>&1
+                BENCH_DIFF_EXIT=$?
+                set -e
+
+                if [[ "$TMP_BEFORE" != "$TMP_AFTER" ]]; then
+                    echo "ERROR: temporary directories left behind in TMPDIR (before='$TMP_BEFORE' after='$TMP_AFTER')." >&2
+                    exit 1
+                fi
+                if [[ "$LIB_SNAP_BEFORE" != "$LIB_SNAP_AFTER" ]]; then
+                    echo "ERROR: real ~/Library ScholarOS/Tectonic entries changed during milestone 4." >&2
+                    exit 1
+                fi
+                if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then
+                    echo "ERROR: Benchmarks/ changed during milestone 4 (git diff exit=$BENCH_DIFF_EXIT)." >&2
+                    exit 1
+                fi
+                echo "[test.sh] Row 11 hygiene verified: temp dirs cleaned, real ~/Library untouched, Benchmarks/ clean."
+                echo "[test.sh] Reports: $SCHOLAR_REPORT_DIR"
+                if [[ "$M4_FAILED" -ne 0 ]]; then
+                    echo "[test.sh] MILESTONE 4 FAILED (m4-acceptance exit=$M4_ACC_EXIT)." >&2
+                    exit 1
+                fi
+                echo "[test.sh] MILESTONE 4 PASSED (m4-acceptance.sh elapsed=${M4_ACC_ELAPSED}s)."
+                ;;
+
             *)
                 echo "ERROR: Milestone M${MS} acceptance script is not implemented yet." >&2
+                exit 1
+                ;;
+        esac
+        ;;
+
+    mutations)
+        MUT_MS=""
+        RECORD=0
+        for arg in "$@"; do
+            case "$arg" in
+                --record) RECORD=1 ;;
+                -*) usage ;;
+                *)
+                    if [[ -n "$MUT_MS" ]]; then
+                        usage
+                    fi
+                    MUT_MS="$arg"
+                    ;;
+            esac
+        done
+        if [[ -z "$MUT_MS" ]]; then
+            usage
+        fi
+        case "$MUT_MS" in
+            2)
+                require_executable "$REPO_ROOT/Scripts/acceptance/m2-mutations.sh"
+                "$REPO_ROOT/Scripts/acceptance/m2-mutations.sh"
+                ;;
+            3)
+                require_executable "$REPO_ROOT/Scripts/acceptance/m3-mutations.sh"
+                "$REPO_ROOT/Scripts/acceptance/m3-mutations.sh" $([[ "$RECORD" -eq 1 ]] && echo "--record")
+                ;;
+            4)
+                require_executable "$REPO_ROOT/Scripts/acceptance/m4-mutations.sh"
+                "$REPO_ROOT/Scripts/acceptance/m4-mutations.sh" $([[ "$RECORD" -eq 1 ]] && echo "--record")
+                ;;
+            *)
+                echo "ERROR: Mutations runner for milestone M${MUT_MS} is not implemented." >&2
                 exit 1
                 ;;
         esac
@@ -757,6 +948,23 @@ case "$MODE" in
         REL_M3_EXIT=$?
         set -e
         if [[ "$REL_M3_EXIT" -ne 0 ]]; then
+            REL_FAILED=1
+        fi
+
+        echo "[test.sh] Running M4 acceptance Python harness unit tests..."
+        python3 -I -m unittest discover -s "$REPO_ROOT/Scripts/acceptance" -p "test_m4_*.py"
+
+        require_executable "$REPO_ROOT/Scripts/acceptance/m4-acceptance.sh"
+        echo "[test.sh] Running M4 evidence acceptance script..."
+        set +e
+        if [[ "$RECORD" -eq 1 ]]; then
+            "$REPO_ROOT/Scripts/acceptance/m4-acceptance.sh" --record
+        else
+            "$REPO_ROOT/Scripts/acceptance/m4-acceptance.sh"
+        fi
+        REL_M4_EXIT=$?
+        set -e
+        if [[ "$REL_M4_EXIT" -ne 0 ]]; then
             REL_FAILED=1
         fi
 

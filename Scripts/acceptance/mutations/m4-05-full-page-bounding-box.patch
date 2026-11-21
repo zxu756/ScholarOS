@@ -1,0 +1,22 @@
+diff --git a/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift b/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
+--- a/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
++++ b/Sources/ScholarPDFProvenance/PDFMultiColumnSegmenter.swift
+@@ -90,12 +90,14 @@
+             let trimmed = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+             guard !trimmed.isEmpty else { return }
+             globalSeq += 1
++            // MUTATION (M4 acceptance row 10e): replace passage bounding_box with full-page mediaBox.
++            let pageBox = document.page(at: pageIndex)?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 612, height: 792)
+             let bbox = PDFPageRegionBox(
+                 pageIndex: pageIndex,
+-                x: block.minX,
+-                y: block.minY,
+-                width: max(8.0, block.maxX - block.minX),
+-                height: max(8.0, block.maxY - block.minY)
++                x: Double(pageBox.minX),
++                y: Double(pageBox.minY),
++                width: max(8.0, Double(pageBox.width)),
++                height: max(8.0, Double(pageBox.height))
+             )
+             chunks.append(
+                 PDFPassageChunk(
