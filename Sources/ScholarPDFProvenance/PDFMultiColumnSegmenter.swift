@@ -208,22 +208,22 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     guard !lines.isEmpty else { return }
                     let paragraphs = groupLinesIntoParagraphs(lines)
                     for para in paragraphs {
-                        if let heading = detectSectionHeading(para.text) {
+                        if let heading = para.detectedHeading {
                             activeSection = heading
                             appendChunk(
                                 pageIndex: pageIndex,
                                 columnIndex: columnIndex,
                                 sectionTitle: activeSection,
                                 kind: .sectionHeading,
-                                block: para
+                                block: para.block
                             )
-                        } else if Self.isTableOrFigureCaption(para.text) {
+                        } else if Self.isTableOrFigureCaption(para.block.text) {
                             appendChunk(
                                 pageIndex: pageIndex,
                                 columnIndex: columnIndex,
                                 sectionTitle: activeSection,
                                 kind: .tableOrFigure,
-                                block: para
+                                block: para.block
                             )
                         } else {
                             appendChunk(
@@ -231,7 +231,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
                                 columnIndex: columnIndex,
                                 sectionTitle: activeSection,
                                 kind: .body,
-                                block: para
+                                block: para.block
                             )
                         }
                     }
@@ -243,11 +243,12 @@ public struct PDFMultiColumnSegmenter: Sendable {
 
                     // Emit top spanning prose and top spanning floats ordered top-to-bottom
                     enum TopSpanItem {
-                        case prose(PositionedTextLine)
+                        case prose(GroupedParagraph)
                         case tableFigure(PositionedTextLine)
                         var maxY: Double {
                             switch self {
-                            case .prose(let b), .tableFigure(let b): return b.maxY
+                            case .prose(let p): return p.block.maxY
+                            case .tableFigure(let b): return b.maxY
                             }
                         }
                     }
@@ -263,11 +264,11 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     for item in topItems {
                         switch item {
                         case .prose(let para):
-                            if let heading = detectSectionHeading(para.text) {
+                            if let heading = para.detectedHeading {
                                 activeSection = heading
-                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .sectionHeading, block: para)
+                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .sectionHeading, block: para.block)
                             } else {
-                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .body, block: para)
+                                appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .body, block: para.block)
                             }
                         case .tableFigure(let tf):
                             appendChunk(pageIndex: pageIndex, columnIndex: 0, sectionTitle: activeSection, kind: .tableOrFigure, block: tf)
@@ -979,16 +980,47 @@ public struct PDFMultiColumnSegmenter: Sendable {
         return true
     }
 
-    private func groupLinesIntoParagraphs(_ lines: [PositionedTextLine]) -> [PositionedTextLine] {
-        guard var current = lines.first else { return [] }
-        var paragraphs: [PositionedTextLine] = []
-        let columnLeftMargin = lines.map(\.minX).min() ?? current.minX
+    private struct GroupedParagraph {
+        let block: PositionedTextLine
+        let detectedHeading: String?
+    }
 
-        for next in lines.dropFirst() {
+    private func groupLinesIntoParagraphs(_ lines: [PositionedTextLine]) -> [GroupedParagraph] {
+        guard !lines.isEmpty else { return [] }
+        let columnLeftMargin = lines.map(\.minX).min() ?? lines[0].minX
+
+        var lineHeadings: [String?] = []
+        lineHeadings.reserveCapacity(lines.count)
+        for idx in lines.indices {
+            if idx > 0 {
+                let prev = lines[idx - 1]
+                let cur = lines[idx]
+                let sameHorizWithPrev = abs(prev.midY - cur.midY) <= 4.0 && cur.minX >= (prev.maxX - 2.0)
+                if sameHorizWithPrev {
+                    lineHeadings.append(nil)
+                    continue
+                }
+            }
+            let nextLineText: String?
+            if idx + 1 < lines.count, (lines[idx].minY - lines[idx + 1].maxY) <= 20.0 {
+                nextLineText = lines[idx + 1].text
+            } else {
+                nextLineText = nil
+            }
+            lineHeadings.append(Self.detectSectionHeading(lines[idx].text, nextLine: nextLineText))
+        }
+
+        var current = lines[0]
+        var currentHeading = lineHeadings[0]
+        var paragraphs: [GroupedParagraph] = []
+
+        for idx in lines.indices.dropFirst() {
+            let next = lines[idx]
+            let nextHeading = lineHeadings[idx]
             let verticalGap = current.minY - next.maxY
             let sameHorizontalLine = abs(current.midY - next.midY) <= 4.0 && next.minX >= (current.maxX - 2.0)
-            let currentIsHeading = detectSectionHeading(current.text) != nil
-            let nextIsHeading = !sameHorizontalLine && detectSectionHeading(next.text) != nil
+            let currentIsHeading = (currentHeading != nil)
+            let nextIsHeading = !sameHorizontalLine && (nextHeading != nil)
             let nextStartsCaption = !sameHorizontalLine && Self.isTableOrFigureCaption(next.text)
             let nextIsIndentedNewParagraph =
                 !sameHorizontalLine
@@ -1002,8 +1034,9 @@ public struct PDFMultiColumnSegmenter: Sendable {
                 || nextStartsCaption
                 || verticalGap > Self.paragraphVerticalGapThresholdPt
                 || nextIsIndentedNewParagraph {
-                paragraphs.append(current)
+                paragraphs.append(GroupedParagraph(block: current, detectedHeading: currentHeading))
                 current = next
+                currentHeading = nextHeading
             } else {
                 let joinedText: String
                 if Self.shouldDehyphenateJoin(current.text, next.text) {
@@ -1018,13 +1051,66 @@ public struct PDFMultiColumnSegmenter: Sendable {
                     maxX: max(current.maxX, next.maxX),
                     maxY: max(current.maxY, next.maxY)
                 )
+                let followingLineText: String? = (idx + 1 < lines.count && (current.minY - lines[idx + 1].maxY) <= 20.0)
+                    ? lines[idx + 1].text
+                    : nil
+                currentHeading = Self.detectMultiLineWrappedHeading(current.text, nextLine: followingLineText)
             }
         }
-        paragraphs.append(current)
+        paragraphs.append(GroupedParagraph(block: current, detectedHeading: currentHeading))
         return paragraphs
     }
 
-    public static func detectSectionHeading(_ line: String) -> String? {
+    public static func detectSectionHeading(_ line: String, nextLine: String? = nil) -> String? {
+        guard let candidate = detectSingleLineSectionHeading(line, forceTitleCase: false) else { return nil }
+        if let nextLine, nextLineContinuesSameSentence(nextLine, afterCandidateHeading: candidate) {
+            return nil
+        }
+        return candidate
+    }
+
+    private static func detectMultiLineWrappedHeading(_ text: String, nextLine: String?) -> String? {
+        guard let candidate = detectSingleLineSectionHeading(text, forceTitleCase: true) else { return nil }
+        if let nextLine, nextLineContinuesSameSentence(nextLine, afterCandidateHeading: candidate) {
+            return nil
+        }
+        return candidate
+    }
+
+    private static func nextLineContinuesSameSentence(
+        _ nextRaw: String,
+        afterCandidateHeading candidate: String
+    ) -> Bool {
+        let nextTrimmed = nextRaw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard let firstChar = nextTrimmed.first else { return false }
+
+        // 1. Next line begins with a lowercase word (excluding camelCase proper nouns such as iOS, macOS, vLLM, mRNA)
+        if firstChar.isLetter && firstChar.isLowercase {
+            let firstToken = nextTrimmed.prefix(while: { !$0.isWhitespace })
+            if !firstToken.dropFirst().contains(where: \.isUppercase) {
+                return true
+            }
+        }
+
+        // 2. Next line begins with a bracketed citation (e.g. "[33], we can compute..."),
+        //    unless the candidate heading itself introduces a bibliography section ("References", "Bibliography")
+        if firstChar == "[" && !isBibliographyHeading(candidate) {
+            return true
+        }
+
+        // 3. Next line begins with continuation or closing punctuation
+        if ",.;:?!)]}—–".contains(firstChar) || nextTrimmed.hasPrefix("--") {
+            return true
+        }
+
+        return false
+    }
+
+    private static func detectSingleLineSectionHeading(_ line: String, forceTitleCase: Bool = false) -> String? {
         let trimmed = line
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: .whitespaces)
@@ -1058,7 +1144,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
             in: trimmed,
             pattern: #"^(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)\.\s+(.+)$"#
         ) {
-            if isValidHeadingTitleBody(titleBody, requireTitleCase: false) {
+            if isValidHeadingTitleBody(titleBody, requireTitleCase: forceTitleCase) {
                 return trimmed
             }
             return nil
@@ -1069,7 +1155,7 @@ public struct PDFMultiColumnSegmenter: Sendable {
             in: trimmed,
             pattern: #"^(?:(?:[1-9]|1[0-9]|20)(?:\.\d{1,2})+\.?|(?:[1-9]|1[0-9]|20)\.)\s+(.+)$"#
         ) {
-            if isValidHeadingTitleBody(titleBody, requireTitleCase: false) {
+            if isValidHeadingTitleBody(titleBody, requireTitleCase: forceTitleCase) {
                 return trimmed
             }
             return nil
