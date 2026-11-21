@@ -1,0 +1,33 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -1633,10 +1633,25 @@
+                 recordObj = NSNull()
+             }
+ 
+-            guard verdict.firewallClass == .verified,
+-                  verdict.insertable,
+-                  !verdict.sources.isEmpty,
+-                  let verifiedRecord = verdict.record else {
++            // MUTATION (M3 acceptance row 21a): allow NOT_FOUND citations through add_verified_bibtex.
++            let candidateRecord: RegistryWorkRecord? = verdict.record ?? (
++                verdict.firewallClass == .notFound
++                    ? RegistryWorkRecord(
++                        source: "Crossref",
++                        requestURL: "",
++                        fetchedAt: "2026-11-16T00:00:00Z",
++                        origin: .replay,
++                        workType: "journal-article",
++                        title: entry.title,
++                        authors: entry.authors.map { RegistryWorkAuthor(givenName: $0.givenName, familyName: $0.familyName) },
++                        publicationDates: RegistryPublicationDates(issued: entry.year.map { RegistryPublicationDate(year: $0) }),
++                        containerTitle: entry.venue,
++                        doi: entry.doi
++                    )
++                    : nil
++            )
++            guard (verdict.firewallClass == .verified && verdict.insertable && !verdict.sources.isEmpty) || verdict.firewallClass == .notFound,
++                  let verifiedRecord = candidateRecord else {
+                 let firewall = CitationVerificationFirewall(clock: registryClock)
+                 let rejectionReason = firewall.formatInRunRejectionReason(for: verdict, language: lang)
+                 let payload: [String: Any] = [

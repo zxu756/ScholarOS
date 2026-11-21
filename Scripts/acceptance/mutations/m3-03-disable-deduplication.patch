@@ -1,0 +1,12 @@
+diff --git a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+--- a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
++++ b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+@@ -451,6 +451,8 @@
+         candidate: BibliographyEntry,
+         existingEntries: [BibliographyEntry]
+     ) -> BibTeXDuplicateCheckResult {
++        // MUTATION (M3 acceptance row 21c): disable deduplication and key-conflict detection.
++        if !candidate.citeKey.isEmpty { return .allowAppend }
+         let candSig = DedupSignature(entry: candidate)
+ 
+         // Step 1: Check case-insensitive citation key match first

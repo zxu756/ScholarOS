@@ -1,0 +1,42 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -400,6 +400,12 @@
+         arguments: [String: Any],
+         isDemo: Bool
+     ) throws -> BibliographyVerificationMode {
++        // MUTATION (M3 acceptance row 21e): honor caller-supplied registryReplayPath argument in tool calls.
++        if let callerReplay = (arguments["registryReplayPath"] as? String)?
++            .trimmingCharacters(in: .whitespacesAndNewlines),
++           !callerReplay.isEmpty {
++            return .replay(snapshot: try RegistryReplaySnapshot(directoryURL: URL(fileURLWithPath: callerReplay)))
++        }
+         if (arguments["offline"] as? Bool == true) || isOffline || isDemo {
+             return .offline
+         }
+@@ -1569,7 +1575,8 @@
+         let callOffline = (arguments["offline"] as? Bool == true)
+ 
+         // Settled #6 & Row 8: server started with --offline OR single call passing offline: true is rejected immediately.
+-        if isOffline || callOffline {
++        let hasCallerReplayOverride = ((arguments["registryReplayPath"] as? String)?.isEmpty == false)
++        if (isOffline && !hasCallerReplayOverride) || callOffline {
+             var payload: [String: Any] = [
+                 "error_code": "ERR_UNVERIFIED_CITATION",
+                 "category": "unverified_citation",
+@@ -1786,6 +1793,7 @@
+                 "properties": [
+                     "bibtex": ["type": "string"],
+                     "offline": ["type": "boolean"],
++                    "registryReplayPath": ["type": "string"],
+                     "lang": ["type": "string"]
+                 ],
+                 "required": ["bibtex"]
+@@ -1800,6 +1808,7 @@
+                     "bib_file": ["type": "string"],
+                     "bibtex": ["type": "string"],
+                     "offline": ["type": "boolean"],
++                    "registryReplayPath": ["type": "string"],
+                     "lang": ["type": "string"]
+                 ],
+                 "required": ["bib_file", "bibtex"]

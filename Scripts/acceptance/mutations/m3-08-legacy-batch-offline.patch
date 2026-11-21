@@ -1,0 +1,14 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -774,7 +774,9 @@
+ 
+         let entries = try BibTeXCodec().parse(rawBib)
+         let callOffline = (arguments["offline"] as? Bool == true)
+-        let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
++        // MUTATION (M3 acceptance row 21h): force retained legacy batch tool to offline mode.
++        let _ = try resolveVerificationMode(arguments: arguments, isDemo: false)
++        let mode: BibliographyVerificationMode = .offline
+         let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+             entries: entries,
+             mode: mode,

@@ -1,0 +1,18 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -1597,12 +1597,12 @@
+             let mode = try resolveVerificationMode(arguments: arguments, isDemo: false)
+             let modeLabel = isReplayServer ? "REPLAY" : "online"
+ 
+-            // Settled #6: bypass reading from cache on write (`skipCacheRead: true`), while still storing freshly fetched responses into cache (`noCache: noCache`).
++            // MUTATION (M3 acceptance row 21g): allow reading SQLite cache during add_verified_bibtex write.
+             let verificationResult = try await CitationVerificationFirewall.verifyBibliography(
+                 entries: [entry],
+                 mode: mode,
+                 noCache: noCache,
+-                skipCacheRead: true,
++                skipCacheRead: false,
+                 environment: effectiveEnvironment,
+                 clock: registryClock,
+                 sharedRateLimiter: sharedRateLimiter,

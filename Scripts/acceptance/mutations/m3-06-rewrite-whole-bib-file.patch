@@ -1,0 +1,20 @@
+diff --git a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+--- a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
++++ b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+@@ -635,6 +635,16 @@
+             break
+         }
+ 
++        // MUTATION (M3 acceptance row 21f): rewrite the whole .bib file from parsed entries instead of O_APPEND.
++        if originalLength >= 0 {
++            let rewrittenText = BibTeXCodec().serialize(existingDoc.entries + [candidateEntry]) + "\n"
++            let rewrittenBytes = Data(rewrittenText.utf8)
++            _ = Darwin.ftruncate(fd, 0)
++            try writeAllBytes(fd: fd, data: rewrittenBytes, path: bibFilePath)
++            _ = Darwin.fsync(fd)
++            return .appendedVerified(generated: generated)
++        }
++
+         // Step 3–5: Match existing newline style (CRLF vs LF), prepend newline if missing at EOF, write via O_APPEND, fsync
+         let newline = detectDominantLineEnding(in: originalBytes)
+         let normalizedEntryText: String

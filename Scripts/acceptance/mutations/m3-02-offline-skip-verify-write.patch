@@ -1,0 +1,41 @@
+diff --git a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+--- a/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
++++ b/Sources/ScholarCLIAndMCP/ScholarMCPServer.swift
+@@ -1570,6 +1570,37 @@
+ 
+         // Settled #6 & Row 8: server started with --offline OR single call passing offline: true is rejected immediately.
+         if isOffline || callOffline {
++            // MUTATION (M3 acceptance row 21b): skip verification when offline and write directly.
++            let offlineRecord = RegistryWorkRecord(
++                source: "offline",
++                requestURL: "",
++                fetchedAt: "2026-11-16T00:00:00Z",
++                origin: .network,
++                workType: "journal-article",
++                title: entry.title,
++                authors: entry.authors.map { RegistryWorkAuthor(givenName: $0.givenName, familyName: $0.familyName) },
++                publicationDates: RegistryPublicationDates(issued: entry.year.map { RegistryPublicationDate(year: $0) }),
++                containerTitle: entry.venue,
++                doi: entry.doi
++            )
++            if let outcome = try? VerifiedBibTeXWriter.appendVerifiedEntry(
++                toBibFileAtPath: bibFilePath,
++                citeKey: entry.citeKey,
++                record: offlineRecord,
++                localEntry: entry,
++                localUnmappedFields: unmappedFields
++            ), case .appendedVerified(let generated) = outcome {
++                let okPayload: [String: Any] = [
++                    "status": "APPENDED_VERIFIED",
++                    "cite_key": generated.citeKey,
++                    "verdict": CitationFirewallClass.verified.rawValue,
++                    "mode": isReplayServer ? "REPLAY" : "offline",
++                    "written_bibtex": generated.bibtex,
++                    "changed_fields": [Any](),
++                    "sources": [Any]()
++                ]
++                return jsonTextResult(okPayload, isError: false, fallback: "{\"status\":\"APPENDED_VERIFIED\"}")
++            }
+             var payload: [String: Any] = [
+                 "error_code": "ERR_UNVERIFIED_CITATION",
+                 "category": "unverified_citation",

@@ -1,0 +1,19 @@
+diff --git a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+--- a/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
++++ b/Sources/ScholarBibAndCSL/VerifiedBibTeXWriter.swift
+@@ -251,6 +251,15 @@
+     ) -> GeneratedVerifiedBibTeX {
+         let trimmedKey = citeKey.trimmingCharacters(in: .whitespacesAndNewlines)
+         let effectiveKey = trimmedKey.isEmpty ? localEntry.citeKey : trimmedKey
++        // MUTATION (M3 acceptance row 21d): write caller-supplied BibTeX fields instead of registry record fields.
++        if !effectiveKey.isEmpty {
++            return GeneratedVerifiedBibTeX(
++                citeKey: localEntry.citeKey,
++                entryType: localEntry.kind.rawValue,
++                bibtex: BibTeXCodec().serializeEntry(localEntry),
++                changedFields: []
++            )
++        }
+         let arXivOnly = isArXivOnlyRecord(record)
+         let entryType = mapWorkTypeToBibTeXEntryType(workType: record.workType, isArXivOnly: arXivOnly)
+ 
