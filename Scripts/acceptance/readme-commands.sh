@@ -103,6 +103,7 @@ with open(src_path, encoding="utf-8") as f:
     lines = f.readlines()
 
 re_recursive_driver = re.compile(r"^\s*Scripts/test\.sh\s+(milestone\s+\d+|release)(?:\s|$)")
+re_suite_driver = re.compile(r"^\s*Scripts/acceptance/m4-acceptance\.sh(?:\s|$)")
 re_online_cmd = re.compile(r"^\s*SCHOLAR_ONLINE=1\s+(.+)$")
 re_client_reg = re.compile(r"^\s*(claude|codex|opencode)\s+mcp\s+")
 
@@ -111,6 +112,9 @@ for raw in lines:
     if re_recursive_driver.match(stripped):
         msg = shlex.quote(f"[SKIP-RECURSIVE] verified top-level suite driver: {stripped.strip()}")
         print(f"test -x Scripts/test.sh && echo {msg}")
+    elif re_suite_driver.match(stripped):
+        msg = shlex.quote(f"[SKIP-SUITE] verified acceptance suite driver: {stripped.strip()}")
+        print(f"test -x Scripts/acceptance/m4-acceptance.sh && echo {msg}")
     elif re_client_reg.match(stripped):
         msg = shlex.quote(f"[SKIP-CLIENT] client registration command verified by m3-clients.sh: {stripped.strip()}")
         print(f"echo {msg}")
@@ -209,12 +213,28 @@ PY
         echo "FAIL: README bash blocks must include a 'scholaros mcp --registry-replay Tests/Fixtures/registry' example"
         exit 1
     fi
+    if ! grep -q -F 'Scripts/acceptance/m4-acceptance.sh' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include 'Scripts/acceptance/m4-acceptance.sh'"
+        exit 1
+    fi
+    if ! grep -q -E '(ScholarOS|scholaros)[[:space:]]+locate-evidence[[:space:]].*--offline' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS locate-evidence ... --offline' example"
+        exit 1
+    fi
+    if ! grep -q -E '(ScholarOS|scholaros)[[:space:]]+segment-pdf[[:space:]].*--offline' "$WORK/README.md.commands.txt"; then
+        echo "FAIL: README bash blocks must include a 'ScholarOS segment-pdf ... --offline' example"
+        exit 1
+    fi
+    if grep -E '(ScholarOS|scholaros)[[:space:]]+(locate-evidence|segment-pdf)[[:space:]]' "$WORK/README.md.commands.txt" | grep -v -E -- '--offline'; then
+        echo "FAIL: every 'ScholarOS locate-evidence' and 'ScholarOS segment-pdf' command in README must pass --offline"
+        exit 1
+    fi
     python3 -I - "$REPO_ROOT/README.md" "$REPO_ROOT/README.zh-CN.md" <<'PY'
 import json, re, sys
 
 def check_doc(path):
     txt = open(path, encoding="utf-8").read()
-    for removed in ("scholar_cite_key", "scholar_lsp_diagnostics"):
+    for removed in ("scholar_cite_key", "scholar_lsp_diagnostics", "scholar_search_provenance"):
         if removed in txt:
             raise SystemExit(f"FAIL: {path} still mentions removed MCP tool {removed}")
     for note in ("/opt/homebrew/bin/scholaros", "tool_timeout_sec"):
@@ -308,21 +328,21 @@ PY
             echo "FAIL: replaying $README_FILE did not emit expected --no-verify notice from diagnostics --no-verify"
             exit 1
         fi
-        for REQUIRED_TOOL in verify_citation add_verified_bibtex check_manuscript scholar_verify_bibliography; do
+        for REQUIRED_TOOL in verify_citation add_verified_bibtex check_manuscript scholar_verify_bibliography locate_evidence; do
             if ! grep -q -F "\"name\":\"$REQUIRED_TOOL\"" "$WORK/$README_FILE.replay.out"; then
                 echo "FAIL: replaying $README_FILE did not emit MCP tool '$REQUIRED_TOOL' in tools/list output"
                 exit 1
             fi
         done
-        for REMOVED_TOOL in scholar_cite_key scholar_lsp_diagnostics; do
+        for REMOVED_TOOL in scholar_cite_key scholar_lsp_diagnostics scholar_search_provenance; do
             if grep -q -F "$REMOVED_TOOL" "$WORK/$README_FILE.replay.out"; then
                 echo "FAIL: replaying $README_FILE unexpectedly emitted removed MCP tool '$REMOVED_TOOL'"
                 exit 1
             fi
         done
-        for EXPECTED_MCP_MARKER in ERR_UNVERIFIED_CITATION APPENDED_VERIFIED non_verified_citations; do
+        for EXPECTED_MCP_MARKER in ERR_UNVERIFIED_CITATION APPENDED_VERIFIED non_verified_citations evidence_examples_verified=true; do
             if ! grep -q -F "$EXPECTED_MCP_MARKER" "$WORK/$README_FILE.replay.out"; then
-                echo "FAIL: replaying $README_FILE did not emit expected MCP write-gate/check_manuscript marker '$EXPECTED_MCP_MARKER'"
+                echo "FAIL: replaying $README_FILE did not emit expected MCP write-gate/check_manuscript/evidence marker '$EXPECTED_MCP_MARKER'"
                 exit 1
             fi
         done

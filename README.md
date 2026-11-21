@@ -2,11 +2,11 @@
 
 **English** | **[简体中文](README.zh-CN.md)**
 
-macOS Swift package (`1.4.0`) and bilingual (`--lang en|zh`) command-line tool (`scholaros`) for online citation verification against public scholarly registries, LaTeX/BibTeX parsing, APA 7th / IEEE reference formatting, statistical agreement/meta-analysis library routines, and a stdio JSON-RPC 2.0 MCP server.
+macOS Swift package (`1.4.0`) and bilingual (`--lang en|zh`) command-line tool (`scholaros`) for online citation verification against public scholarly registries, local two-column PDF passage localization and explicit number checking, LaTeX/BibTeX parsing, APA 7th / IEEE reference formatting, statistical agreement/meta-analysis library routines, and a stdio JSON-RPC 2.0 MCP server.
 
 > **Fabricated references do not enter your `.bib`.** On a 480-entry mixed benchmark of real, fabricated, mutated, and retracted references, **0** fabricated entries are judged verified (`0/80` in `fabricated_model`; `0/86` across all `truth=fabricated` entries; `0/254` across all non-insertable entries), and the rate at which genuine references in the three real groups are falsely judged non-existent or retracted (`NOT_FOUND` or `RETRACTED`) is **0% (`0/215`)** (`0/220` across all 220 entries of the three real groups; `0/225` across all `truth=real` entries in the benchmark).
 
-> **Current Status (M0, M1, M2 & M3 MCP write gate verified):** M0, M1, M2, and M3 MCP checks pass as verified by [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh), [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh), [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh), [`Scripts/acceptance/hard-inputs.sh`](Scripts/acceptance/hard-inputs.sh), [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) (Rows 1–17, 19, 20), and [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (Row 18 isolated client registration; live registry rows M1 Row 19 & Row 23 require `SCHOLAR_ONLINE=1`, M2 Row 17 source-mutation cloning runs via [`Scripts/acceptance/m2-mutations.sh`](Scripts/acceptance/m2-mutations.sh), and M2 Row 19 Tectonic regeneration runs via [`Scripts/acceptance/m2-regen-expected.sh`](Scripts/acceptance/m2-regen-expected.sh) `--check` — otherwise those rows print `SKIP (没跑)`). `scholaros verify-citations`, MCP `verify_citation`, MCP `add_verified_bibtex`, MCP `scholar_verify_bibliography`, `scholaros diagnostics`, MCP `check_manuscript`, and `scholaros cite` share the same citation verification pipeline against public registries online by default with SQLite caching, rate limiting, and retry backoff (`add_verified_bibtex` bypasses cache reads on write so unverified or offline entries never enter `.bib`); `--offline` sends zero network requests, `--registry-replay <dir>` replays SHA-256-verified recorded fixtures offline (`REPLAY`, startup flag only), `--no-verify` runs structure/lint diagnostics without citation verification, `.bib` `x-firewall-class`/`x-firewall-note` declarations are ignored, and cached/stored verdicts expire after 30 days (1 day for `NOT_FOUND`). On the 11 CC BY 4.0 arXiv manuscripts in [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/), static multi-file loading, verbatim/URL/conditional skipping, BibTeX error recovery, and `thebibliography`/`.bbl` extraction match the committed Tectonic 0.17 `.aux`/`.blg` expectations without performing TeX macro expansion. The macOS desktop window starts empty and **only displays sample data** when `--demo` or **Load Demo** is explicitly selected (`DEMO` banner).
+> **Current Status (M0, M1, M2, M3 MCP write gate & M4 PDF evidence localization verified):** M0, M1, M2, M3, and M4 checks pass as verified by [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh), [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh), [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh), [`Scripts/acceptance/hard-inputs.sh`](Scripts/acceptance/hard-inputs.sh), [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) (Rows 1–17, 19, 20), [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (Row 18 isolated client registration), and [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh) (Rows 1–9, 11; live registry rows M1 Row 19 & Row 23 require `SCHOLAR_ONLINE=1`, M2 Row 17 / M3 Row 21 / M4 Row 10 source-mutation cloning runs via [`Scripts/acceptance/m2-mutations.sh`](Scripts/acceptance/m2-mutations.sh), [`Scripts/acceptance/m3-mutations.sh`](Scripts/acceptance/m3-mutations.sh), and [`Scripts/acceptance/m4-mutations.sh`](Scripts/acceptance/m4-mutations.sh), and M2 Row 19 Tectonic regeneration runs via [`Scripts/acceptance/m2-regen-expected.sh`](Scripts/acceptance/m2-regen-expected.sh) `--check` — otherwise those rows print `SKIP (没跑)`). `scholaros verify-citations`, MCP `verify_citation`, MCP `add_verified_bibtex`, MCP `scholar_verify_bibliography`, `scholaros diagnostics`, MCP `check_manuscript`, and `scholaros cite` share the same citation verification pipeline against public registries online by default with SQLite caching, rate limiting, and retry backoff (`add_verified_bibtex` bypasses cache reads on write so unverified or offline entries never enter `.bib`); `--offline` sends zero network requests, `--registry-replay <dir>` replays SHA-256-verified recorded fixtures offline (`REPLAY`, startup flag only), `--no-verify` runs structure/lint diagnostics without citation verification, `.bib` `x-firewall-class`/`x-firewall-note` declarations are ignored, and cached/stored verdicts expire after 30 days (1 day for `NOT_FOUND`). `scholaros locate-evidence`, `scholaros segment-pdf`, and MCP `locate_evidence` segment local two-column PDFs via `PDFKit` and check explicit numbers and units offline without network access. On the 11 CC BY 4.0 arXiv manuscripts in [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/), static multi-file loading, verbatim/URL/conditional skipping, BibTeX error recovery, and `thebibliography`/`.bbl` extraction match the committed Tectonic 0.17 `.aux`/`.blg` expectations without performing TeX macro expansion. The macOS desktop window starts empty and **only displays sample data** when `--demo` or **Load Demo** is explicitly selected (`DEMO` banner).
 
 ---
 
@@ -71,9 +71,68 @@ SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live
 
 ---
 
-## Verified Capabilities (`2026-11-14` M0, `2026-11-16` M1, `2026-11-17` M2 & `2026-11-21` M3)
+## Evidence Localization (`2026-11-21`)
 
-M3 MCP write gate, tool surface, and isolated client registration checks come from [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) and [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (`2026-11-21`, macOS arm64, replayed against [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings)); M2 manuscript-level checks come from [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) and [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) (`2026-11-17`); M1 citation verification metrics and acceptance checks come from [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json) (`2026-11-16`) and [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh); M0 parsing, formatting, statistical, MCP protocol, and CLI baseline numbers come from [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) and [`reports/readme-commands.txt`](reports/readme-commands.txt) (`2026-11-14`, macOS arm64, `Scripts/test.sh milestone 0`; without `--record`, reports go to a temporary directory and leave `reports/` untouched).
+Given a local PDF and a claim sentence, ScholarOS segments two-column layouts, retrieves lexically matching passages with page coordinates, and compares explicit numbers and units:
+
+- **Commands & MCP tool:**
+  - `scholaros locate-evidence <pdf> --claim <text> --json` (also supports `--top-k <N>`, `--offline`, and `--lang en|zh`)
+  - `scholaros segment-pdf <pdf> --json` (also supports `--offline` and `--lang en|zh`; emits `schema: "scholaros.pdf_segments/1"` chunks)
+  - MCP tool `locate_evidence` (`pdf_file`, `claim`, optional `top_k`), sharing the exact same retrieval and number-checking implementation and returning byte-for-byte identical `scholaros.evidence/1` JSON.
+- **Verdicts & exit codes:**
+  - `FOUND` (exit code `0`): Lexically matching passage found above the keyword-coverage threshold with no conflicting explicit numbers or units.
+  - `NUMERIC_MISMATCH` (exit code `1`): Lexically matching passage found, but explicit numbers or units in the claim conflict with those in the PDF passage (`discrepancies` lists `claim_text`, `pdf_text`, and `reason`).
+  - `NOT_FOUND` (exit code `3`): No passage meets the keyword-coverage threshold (`matches` is empty).
+  - Error (exit code `2`): Missing file, non-PDF bytes, unreadable/textless PDF, empty claim, or invalid arguments (`stdout` is empty under `--json`, and `stderr` explains the error; `segment-pdf` exits `0` on success and `2` on error).
+- **Output fields (`scholaros.evidence/1`):** When a passage is located (`FOUND` or `NUMERIC_MISMATCH`), the top-level JSON and each entry in `matches` include 1-based physical `page`, 0-based `page_index`, `bounding_box` (`{x, y, width, height}` in PDF `mediaBox` points with origin at bottom-left), `column_index` (`1` left column, `2` right column, `0` full-width spanning block), `section_title`, and `excerpt`.
+
+### Evidence Localization Boundaries
+
+- **Only locates lexically similar passages and checks explicit numbers; it does not judge whether the source text supports your conclusion.** Statements without conflicting explicit numbers (for example, adding or removing a negation when no numbers are present) are not semantically adjudicated.
+- **Same-language only:** Retrieval matches content words in the same language; querying an English PDF with a Chinese claim returns `NOT_FOUND` (exit code `3`).
+- **Text comes from macOS `PDFKit`:** Scanned PDFs and PDFs without an embedded text layer are not supported (they exit with code `2` and an error message; no OCR is performed).
+- **Spacing artifacts near certain LaTeX fonts and inline math:** Near certain LaTeX fonts and inline mathematical expressions, extraction occasionally splits one word into two fragments or glues two adjacent words together (tight justified word-space recovery and Latin Modern math-italic spacing were addressed in M4 stages 4b and 4c, with isolated residual cases remaining).
+
+### Benchmark Metrics (`reports/m4-acceptance.txt`)
+
+- **Date & commit:** `2026-11-21T13:16:25Z`, commit `0164e64`, all numbers below taken from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) (`--offline`, isolated `HOME`, `SCHOLAR_CACHE_DIR` unset).
+- **Method:** `5` official two-column CC BY 4.0 arXiv PDFs (`2506.06524v1`, `2409.19431v3`, `2410.04196v2`, `2611.15445v1`, `2610.15486v1`; per-paper licence and SHA-256 attributions in [`Benchmarks/evidence/`](Benchmarks/evidence/)), evaluated on `30` claims (`10` grounded, `10` numeric-mismatch, `10` not-mentioned) plus `15` English/Chinese sentinel rows (`45` rows total in [`Benchmarks/evidence/claims.jsonl`](Benchmarks/evidence/claims.jsonl)) written by the conductor, spot-checked and frozen by the user, and never modified by the implementer.
+
+| Check / Metric | Result | Requirement / Notes |
+|---|---|---|
+| **Grounded claims (`FOUND` on `expected_pages`)** | **`10/10`** | Hard requirement `>= 8/10`: Passed (Row 2). |
+| **Numeric-mismatch claims (`NUMERIC_MISMATCH` on `expected_pages` with ground-truth number in `pdf_text`)** | **`9/10`** | Hard requirement `>= 8/10`: Passed (Row 3; `ev_004` returned `NUMERIC_MISMATCH` on page `2` instead of expected page `3`). |
+| **Not-mentioned (`10`) + sentinel (`15`) rows returning `NOT_FOUND` (`matches == []`)** | **`25/25`** | Hard requirement `25/25` (`0` tolerance): Passed (`10/10` not-mentioned, `15/15` sentinels; Row 4). |
+| **Bounding-box geometric verification (`+4.0pt` expansion vs. `pdftotext -tsv`)** | **`19/19` boxes verified** | Hard requirement `>= 80.0%` word coverage: Passed (`min_word_coverage = 100.0%`, Poppler `pdftotext` `26.10.0`, `0/5` stored-vs-live diffs; Row 5). |
+| **Two-column PDF segmentation (0 header/footer body leaks, Intro + Refs recognized, `col1 < col2`)** | **`5/5` benchmark papers** | Hard requirement: Passed (`5/5` benchmark papers and `5/5` synthetic fixtures at `0164e64`; Row 6). |
+| **Word overlap vs. `pdftotext` across 5 benchmark papers** | **Min `96.87%` (`5/5` passed)** | Hard requirement `>= 95.00%` per paper: Passed (Row 7; per-paper breakdown below). |
+| **CLI `locate-evidence --json` vs. MCP `locate_evidence` parity across 45 rows** | **`0/45` differences** | Hard requirement `0` differences: Passed (`default_tools = 5`, `ERR_INVALID_ARGUMENT` verified; Row 8). |
+| **Error handling (missing file, non-PDF bytes, blank PDF, empty claim)** | **`9/9` passed** | All exit `2` with empty `--json` `stdout` and non-empty `stderr` (Row 9). |
+
+**Per-paper word overlap and segmentation time** (timings in milliseconds from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt), measured on the conductor's machine while other builds were running concurrently):
+
+| Paper (`Benchmarks/evidence/pdfs/`) | Template | Chunks / Headings | Word Overlap vs. `pdftotext` | Segmentation Time (`ms`) |
+|---|---|---:|---:|---:|
+| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`** (`3293/3296`) | **`300.0 ms`** |
+| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`** (`20279/20759`) | **`2359.2 ms`** |
+| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`** (`10333/10667`) | **`1213.4 ms`** |
+| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`** (`6814/6906`) | **`784.7 ms`** |
+| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`** (`15163/15386`) | **`2121.9 ms`** |
+| **Minimum / Summary** | **`5` two-column papers** | — | **Min `96.87%` (`5/5 >= 95.00%`)** | — |
+
+### How to Reproduce Evidence Localization Metrics
+
+Run the offline M4 acceptance script on a clean clone to reproduce all numbers above:
+
+```bash
+Scripts/acceptance/m4-acceptance.sh
+```
+
+---
+
+## Verified Capabilities (`2026-11-14` M0, `2026-11-16` M1, `2026-11-17` M2, `2026-11-21` M3 & `2026-11-21` M4)
+
+M4 PDF evidence localization and two-column segmentation checks come from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) and [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh) (`2026-11-21`, commit `0164e64`, `--offline`); M3 MCP write gate, tool surface, and isolated client registration checks come from [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) and [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (`2026-11-21`, macOS arm64, replayed against [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings)); M2 manuscript-level checks come from [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) and [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) (`2026-11-17`); M1 citation verification metrics and acceptance checks come from [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json) (`2026-11-16`) and [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh); M0 parsing, formatting, statistical, MCP protocol, and CLI baseline numbers come from [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) and [`reports/readme-commands.txt`](reports/readme-commands.txt) (`2026-11-14`, macOS arm64, `Scripts/test.sh milestone 0`; without `--record`, reports go to a temporary directory and leave `reports/` untouched).
 
 - **Citation Verification (`scholaros verify-citations`, `scholaros cite`, `scholaros cache clear`, MCP `verify_citation`, MCP `add_verified_bibtex`, MCP `scholar_verify_bibliography`)** ([`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json), `2026-11-16`): Classifies entries into 5 states (`VERIFIED`, `DRIFT`, `NOT_FOUND`, `RETRACTED`, `UNVERIFIED`) with `--lang en`, `--lang zh`, and `--json` output:
   - Queries Crossref, OpenAlex, `doi.org`, arXiv, and PubMed online by default and caches valid responses in SQLite (`~/Library/Caches/ScholarOS/registry.sqlite`, or `$SCHOLAR_CACHE_DIR/registry.sqlite`; 30-day TTL for valid `200` records, 1-day TTL for confirmed non-existence); `--no-cache` skips reading and writing the cache for one run, `scholaros cache clear` removes `registry.sqlite` (`-wal`/`-shm`), and `--verbose` logs one line per lookup to `stderr` (source, URL, status, elapsed time, and origin).
@@ -86,6 +145,7 @@ M3 MCP write gate, tool surface, and isolated client registration checks come fr
   - Across all `480/480` benchmark entries replayed against [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings), `verify_citation` matches CLI `scholaros verify-citations --registry-replay --json` with **`0` differences** (`m3-mcp.sh` Row 11).
   - `add_verified_bibtex` re-verifies each single BibTeX entry in-process **without reading the SQLite cache** (rejecting writes under `--offline`, `offline: true`, or network denial even when a warm cache exists), rejects `NOT_FOUND`, `DRIFT`, `UNVERIFIED`, and `RETRACTED` with `isError: true` (`ERR_UNVERIFIED_CITATION`) without modifying the `.bib` file, enforces `4`-rule deduplication (`SKIPPED_DUPLICATE` vs. `ERR_CITE_KEY_CONFLICT`) and `8` path/encoding/syntax safety checks (`ERR_BIB_PATH`, `ERR_BIB_ENCODING`, `ERR_BIB_SYNTAX`, CRLF preservation), and writes registry-authoritative fields under exclusive `flock` + `O_APPEND` + `fsync`; when **`2` simultaneous MCP server processes** each append **`20` distinct `VERIFIED` entries** to the same `.bib` file, all **`40/40` unique entries** are preserved with **`0` parse or duplicate errors** (`m3-mcp.sh` Rows 2–10, 13, 14).
   - Across all `11/11` benchmark manuscripts (`offline: true`), `check_manuscript` returns a compact summary (`1,794`–`8,704` bytes) matching CLI `diagnostics <path> --offline --json` `counts` on `11/11` manuscripts by default, and matches CLI `--json` (`33,929`–`296,414` bytes) **byte for byte** on `11/11` manuscripts when `detail: "full"` is passed (`m3-mcp.sh` Row 15).
+- **PDF Evidence Localization & Two-Column Segmentation (`scholaros locate-evidence`, `scholaros segment-pdf`, MCP `locate_evidence`)** ([`reports/m4-acceptance.txt`](reports/m4-acceptance.txt), `2026-11-21`): Strips repeating margin headers/footers, detects section headings and spanning floats, orders two-column prose left-before-right (`96.87%`–`99.91%` word overlap vs. `pdftotext` across `5` benchmark papers), and checks explicit numbers and units (`10/10` grounded `FOUND` on `expected_pages`, `9/10` numeric-mismatch `NUMERIC_MISMATCH`, `25/25` not-mentioned + sentinels `NOT_FOUND`, `19/19` bounding boxes verified, `0/45` CLI vs. MCP JSON differences).
 - **LaTeX Outline & Manuscript Diagnostics (`scholaros outline`, `scholaros diagnostics`, MCP `check_manuscript`)** ([`reports/m0-acceptance.txt`](reports/m0-acceptance.txt), `2026-11-14` & [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh), `2026-11-17`): Lexes and parses LaTeX manuscripts directly from `.tex` files without creating a project bundle. On the 449-line IEEEtran-style sample manuscript [`Fixtures/sample-ieeetran-manuscript.tex`](Fixtures/sample-ieeetran-manuscript.tex) (fictional content written for this repository, so anyone can rerun the check), `scholaros outline` extracts all `46` `\section`/`\subsection` headings, numbered and starred, in both `--lang en` and `--lang zh`, matching `grep -c -E '\\(section|subsection)\*?\{'` (measured 2026-11-14).
   - Resolves multi-file graphs (`\input`, unbraced `\input`, `\include`, `\InputIfFileExists`, `\subfile`, `\import`, `\subimport`) with Windows-1252 fallback (`ENC001`), skips verbatim/code/URL/conditional spans losslessly (`\verb`, `verbatim`, `lstlisting`, `\lstinline`, `minted`, `\mintinline`, `comment`, `\iffalse...\fi`, `\url`, `\path`, `\nolinkurl`, `\href`), and extracts bibliography entries from `.bib`, `thebibliography`, `\input{*.bbl}`, and `<main>.bbl` fallback (`BIB_FROM_BBL`).
   - Separates diagnostics into `structure` (`SYM003`, `SYM004`, `CITE404`, `INC002`, `BIB001`, `CITE_KEY_CASE`, etc.), `citation` (at most one `ERR_UNVERIFIED_CITATION` per unique cited key: `ERROR` on `DRIFT`/`NOT_FOUND`/`RETRACTED`, `WARNING` with reason code on `UNVERIFIED`), and `lint` (`LINT_LABEL_BEFORE_CAPTION` `WARNING`; `LINT_UNCITED_BIB_ENTRY` and float hints `INFO`/`HINT`, suppressed under `\nocite{*}` and for `crossref` parents).
@@ -102,7 +162,7 @@ M3 MCP write gate, tool surface, and isolated client registration checks come fr
 
 ### Default Tools (`scholaros mcp`)
 
-By default, `scholaros mcp` exposes **4** citation and manuscript tools (`snake_case` parameters; none accept `registryReplayPath`, `demo`, or `projectPath`, and any unknown or mistyped argument returns `isError: true` with `ERR_INVALID_ARGUMENT`; replay mode can only be enabled at server startup via `scholaros mcp --registry-replay <dir>`):
+By default, `scholaros mcp` exposes **5** citation, manuscript, and PDF evidence tools (`verify_citation`, `add_verified_bibtex`, `check_manuscript`, `scholar_verify_bibliography`, `locate_evidence`; `snake_case` parameters; none accept `registryReplayPath`, `demo`, or `projectPath`, and any unknown or mistyped argument returns `isError: true` with `ERR_INVALID_ARGUMENT`; replay mode can only be enabled at server startup via `scholaros mcp --registry-replay <dir>`):
 
 | Tool | Parameters (`*` = required) | Writes `.bib`? | Behavior |
 |---|---|---|---|
@@ -110,9 +170,10 @@ By default, `scholaros mcp` exposes **4** citation and manuscript tools (`snake_
 | `add_verified_bibtex` | `bib_file*` (`string`), `bibtex*` (`string`), `offline` (`boolean`), `lang` (`string`) | Yes (`VERIFIED` only) | Re-verifies 1 BibTeX entry in-process **without reading the cache** and appends canonical registry-backed BibTeX to `bib_file` under `flock` + `O_APPEND` + `fsync` only when `verdict == "VERIFIED"` and `insertable == true`. Returns `APPENDED_VERIFIED` or `SKIPPED_DUPLICATE` (`isError: false`), or `isError: true` (`ERR_UNVERIFIED_CITATION`, `ERR_CITE_KEY_CONFLICT`, `ERR_BIB_PATH`, `ERR_BIB_ENCODING`, `ERR_BIB_SYNTAX`, `ERR_INVALID_BIBTEX`, `ERR_INVALID_ARGUMENT`, `ERR_IO`) leaving `bib_file` untouched. |
 | `check_manuscript` | `path*` (`string`), `bib_file` (`string`), `no_verify` (`boolean`), `offline` (`boolean`), `detail` (`"summary"` \| `"full"`), `lang` (`string`) | No | Loads multi-file manuscripts from `path`, runs structure/cross-reference diagnostics, and **verifies cited bibliography entries online by default** (using the SQLite cache; pass `no_verify: true` for structure-only checks or `offline: true` for zero-network offline checks). Returns `isError: false` when diagnostics finish, or `isError: true` (`ERR_FILE_NOT_FOUND` when `path` or `bib_file` does not exist, `ERR_IO` when a directory or unreadable, `ERR_INVALID_ARGUMENT` on invalid arguments). |
 | `scholar_verify_bibliography` | `bibtex*` (`string`), `offline` (`boolean`), `lang` (`string`) | No | Batch read-only verification of a BibTeX string (`0`, `1`, or multiple entries) sharing the same firewall, rate limiter, SQLite cache, and replay rules as `verify_citation`. |
+| `locate_evidence` | `pdf_file*` (`string`), `claim*` (`string`), `top_k` (`integer`, default `3`, `>= 1`) | No | Segments local `pdf_file`, retrieves lexically similar passages, and checks explicit numbers and units offline; returns `scholaros.evidence/1` JSON (`FOUND`, `NUMERIC_MISMATCH`, or `NOT_FOUND`, `isError: false`) byte-for-byte identical to `scholaros locate-evidence <pdf> --claim <claim> --json`, or `isError: true` (`ERR_INVALID_ARGUMENT`, `ERR_FILE_NOT_FOUND`, `ERR_PDF_EXTRACTION`). |
 
 - **`check_manuscript` output granularity & timeout:** By default (`detail` omitted or `"summary"`), `check_manuscript` returns a compact 6-field JSON object (`mode`, `root`, `complete`, `counts`, `structure_errors`, `non_verified_citations`) sized for MCP client token budgets; passing `detail: "full"` returns the full `scholaros.diagnostics/1` JSON object byte-for-byte identical to `scholaros diagnostics <path> --json`. Because `check_manuscript` queries public registries over the network by default (roughly 1–2 minutes on an uncached manuscript with dozens of cited keys), **Codex users may need to increase `tool_timeout_sec`** under `[mcp_servers.scholaros]`.
-- **Experimental frozen tools (`--experimental-tools`):** Starting the server as `scholaros mcp --experimental-tools` additionally exposes 5 frozen domain tools (`scholar_search_provenance`, `scholar_prisma_agreement`, `scholar_editorial_audit`, `scholar_track_changes_diff`, `scholar_citation_gaps`). Without `--experimental-tools`, they are omitted from `tools/list` and return JSON-RPC `-32602` if called.
+- **Experimental frozen tools (`--experimental-tools`):** Starting the server as `scholaros mcp --experimental-tools` additionally exposes 4 frozen domain tools (`scholar_prisma_agreement`, `scholar_editorial_audit`, `scholar_track_changes_diff`, `scholar_citation_gaps`). Without `--experimental-tools`, they are omitted from `tools/list` and return JSON-RPC `-32602` if called.
 
 ### Registering in MCP Clients
 
@@ -221,12 +282,31 @@ scholaros mcp --registry-replay Tests/Fixtures/registry < "$WORK/mcp-requests.js
 ScholarOS outline Fixtures/sample-ieeetran-manuscript.tex | grep -c .
 grep -c -E '\\(section|subsection)\*?\{' Fixtures/sample-ieeetran-manuscript.tex
 
+# 7. PDF evidence localization & two-column segmentation (--offline): FOUND (exit 0), NUMERIC_MISMATCH (exit 1), NOT_FOUND (exit 3), segment-pdf (exit 0), and MCP locate_evidence
+ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "The language model in ScriptDoctor gets 10 total chances to output functional PuzzleScript code." --offline --json > "$WORK/ev-found.json"
+rc=0; ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "For few-shot prompting, human-made games were sampled from a small dataset of 6,100 PuzzleScript games." --offline --json > "$WORK/ev-mismatch.json" || rc=$?; test "$rc" -eq 1
+rc=0; ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "月亮是绿奶酪做的。" --offline --json > "$WORK/ev-notfound.json" || rc=$?; test "$rc" -eq 3
+ScholarOS segment-pdf Benchmarks/evidence/pdfs/2506.06524v1.pdf --offline --json > "$WORK/segments.json"
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"locate_evidence","arguments":{"pdf_file":"Benchmarks/evidence/pdfs/2506.06524v1.pdf","claim":"The language model in ScriptDoctor gets 10 total chances to output functional PuzzleScript code."}}}' | scholaros mcp --offline > "$WORK/ev-mcp.jsonl"
+python3 -I - "$WORK/ev-found.json" "$WORK/ev-mismatch.json" "$WORK/ev-notfound.json" "$WORK/segments.json" "$WORK/ev-mcp.jsonl" <<'PY'
+import json, sys
+found, mm, nf, seg = [json.load(open(p, encoding="utf-8")) for p in sys.argv[1:5]]
+mcp_lines = [json.loads(ln) for ln in open(sys.argv[5], encoding="utf-8") if ln.strip()]
+mcp_ev = json.loads(mcp_lines[-1]["result"]["content"][0]["text"])
+assert found["verdict"] == "FOUND" and found["page"] == 2 and found["page_index"] == 1
+assert mm["verdict"] == "NUMERIC_MISMATCH" and mm["page"] == 2 and "610" in mm["discrepancies"][0]["pdf_text"]
+assert nf["verdict"] == "NOT_FOUND" and nf["matches"] == []
+assert seg["schema"] == "scholaros.pdf_segments/1" and seg["chunk_count"] == 68
+assert mcp_ev == found
+print("evidence_examples_verified=true")
+PY
+
 rm -rf "$WORK"
 ```
 
 ### Scoped Module Tests
 
-To run the M0, M1, or M2 acceptance suites offline (`Scripts/test.sh milestone 0`, `Scripts/test.sh milestone 1`, or `Scripts/test.sh milestone 2`), reports are written to a temporary directory and the working tree stays clean; add `--record` to refresh `reports/`. For a single module:
+To run the M0, M1, M2, M3, or M4 acceptance suites offline (`Scripts/test.sh milestone 0` through `Scripts/test.sh milestone 4`), reports are written to a temporary directory and the working tree stays clean; add `--record` to refresh `reports/`. For a single module:
 
 ```bash
 Scripts/test.sh scope ScholarBibAndCSL
@@ -238,8 +318,8 @@ Scripts/test.sh scope ScholarBibAndCSL
 
 - **Desktop GUI (`ScholarOS` with no subcommand)**: Launches an empty window (`0` manuscripts, `0` bibliography entries). It cannot yet open user `.tex`, `.bib`, or `.pdf` files and **only views built-in unverified sample data** when launched with `--demo` or when **Load Demo** is clicked (marked with a window-wide `DEMO` banner).
 - **Static LaTeX & `\bibitem` Parsing Boundaries**: Manuscript analysis reads `.tex`, `.bib`, and `.bbl` statically without executing a TeX macro engine (citation keys or labels constructed dynamically via custom macros are not expanded), and free-text `thebibliography` / `.bbl` `\bibitem` metadata extraction is best-effort heuristic parsing.
-- **Planned for M4–M5**:
-  - **M4 & M5 (PDF Evidence Localization & CiteStudio Unification)**: Replace keyword/number matching with bounded passage retrieval and number-with-unit checks on two-column PDFs; expose engine libraries to CiteStudio and calibrate APA / IEEE against 15 manual examples each.
+- **Planned for M5**:
+  - **M5 (CiteStudio Unification)**: Expose `ScholarModels`, `ScholarMarkupAST`, `ScholarBibAndCSL`, and `ScholarPDFProvenance` as library products for CiteStudio, consolidate the duplicate MCP servers, and calibrate APA 7th / IEEE formatting against 15 manual examples each.
 - **Frozen (unverified, gated behind `--experimental-tools` on MCP)**: Citation graph analytics (force layout, PageRank, Louvain, Kleinberg bursts, main-path analysis), PRISMA screening UI, risk-of-bias and meta-analysis UI, Myers track-changes UI, submission archive bundler, Zotero SQLite bridge, Typst support, `JavaScriptCore` editorial plugins, persistent undo/redo, and test-only synthetic PDF generation.
 
 ---

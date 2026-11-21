@@ -2,11 +2,11 @@
 
 **[English](README.md)** | **简体中文**
 
-面向 macOS 的 Swift 包（`1.4.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
+面向 macOS 的 Swift 包（`1.4.0`）与中英双语（`--lang zh|en`）命令行工具（`scholaros`），提供公开学术注册库引文联网核查、本地双栏 PDF 证据段落定位与显式数字核对、LaTeX/BibTeX 解析、APA 7th / IEEE 参考文献排版、信度与 Meta 分析统计计算库，以及基于标准输入输出的 JSON-RPC 2.0 MCP 服务端。
 
 > **编造的参考文献进不了你的 `.bib`。** 在一份 480 条真假混合的文献集上，没有一条编造的文献被判为已验证（`fabricated_model` 组 `0/80`；全集 `truth=fabricated` 条目 `0/86`；全部不可写入条目 `0/254`）；真实三组中的真实文献被误判为不存在或已撤稿（`NOT_FOUND` 或 `RETRACTED`）的比例是 **0%（`0/215`）**（真实三组合计 220 条亦为 `0/220`；全集 `truth=real` 条目为 `0/225`）。
 
-> **当前状态说明（M0、M1、M2 与 M3 MCP 写入关口已验证）：** M0、M1、M2 及 M3 MCP 各检查项已通过，以 [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh)、[`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)、[`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh)、[`Scripts/acceptance/hard-inputs.sh`](Scripts/acceptance/hard-inputs.sh)、[`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh)（第 1–17、19、20 行）与 [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（第 18 行三家客户端隔离注册连通）为准（需真实联网请求的行——M1 第 19 行与第 23 行——需设 `SCHOLAR_ONLINE=1`；M2 第 17 行独立克隆变异核查由 [`Scripts/acceptance/m2-mutations.sh`](Scripts/acceptance/m2-mutations.sh) 运行，M2 第 19 行 Tectonic 重生成核对由 [`Scripts/acceptance/m2-regen-expected.sh`](Scripts/acceptance/m2-regen-expected.sh) `--check` 运行——未单独执行时输出 `SKIP (没跑)`）。`scholaros verify-citations`、MCP `verify_citation`、MCP `add_verified_bibtex`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、MCP `check_manuscript` 与 `scholaros cite` 共用同一引文核查流程，默认联网查询公开学术注册库，带本地 SQLite 响应缓存、限速与退避重试（`add_verified_bibtex` 写入时绕开缓存读取，确保离线或未验证文献绝不写入 `.bib`）；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（仅认启动参数，输出带 `REPLAY` 标记），`--no-verify` 仅做结构与写作检查、不核查引用，忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，缓存与写回结论按 30 天（`NOT_FOUND` 为 1 天）过期。在 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) 的 11 篇 CC BY 4.0 arXiv 真实论文上，静态多文件加载、原样跳过、BibTeX 单条错误恢复与 `thebibliography`/`.bbl` 提取与仓库提交的 Tectonic 0.17 `.aux`/`.blg` 期望一致（不做 TeX 宏展开）。macOS 桌面窗口启动默认为空，**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**（带 `DEMO` 横幅）。
+> **当前状态说明（M0、M1、M2、M3 MCP 写入关口与 M4 证据定位已验证）：** M0、M1、M2、M3 及 M4 各检查项已通过，以 [`Scripts/acceptance/m0-acceptance.sh`](Scripts/acceptance/m0-acceptance.sh)、[`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)、[`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh)、[`Scripts/acceptance/hard-inputs.sh`](Scripts/acceptance/hard-inputs.sh)、[`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh)（第 1–17、19、20 行）、[`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（第 18 行三家客户端隔离注册连通）与 [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh)（第 1–9、11 行）为准（需真实联网请求的行——M1 第 19 行与第 23 行——需设 `SCHOLAR_ONLINE=1`；M2 第 17 行、M3 第 21 行、M4 第 10 行独立副本变异核查分别由 [`Scripts/acceptance/m2-mutations.sh`](Scripts/acceptance/m2-mutations.sh)、[`Scripts/acceptance/m3-mutations.sh`](Scripts/acceptance/m3-mutations.sh)、[`Scripts/acceptance/m4-mutations.sh`](Scripts/acceptance/m4-mutations.sh) 运行，M2 第 19 行 Tectonic 重生成核对由 [`Scripts/acceptance/m2-regen-expected.sh`](Scripts/acceptance/m2-regen-expected.sh) `--check` 运行——未单独执行时输出 `SKIP (没跑)`）。`scholaros verify-citations`、MCP `verify_citation`、MCP `add_verified_bibtex`、MCP `scholar_verify_bibliography`、`scholaros diagnostics`、MCP `check_manuscript` 与 `scholaros cite` 共用同一引文核查流程，默认联网查询公开学术注册库，带本地 SQLite 响应缓存、限速与退避重试（`add_verified_bibtex` 写入时绕开缓存读取，确保离线或未验证文献绝不写入 `.bib`）；`--offline` 不发任何网络请求，`--registry-replay <目录>` 从 SHA-256 校验通过的录制目录离线回放（仅认启动参数，输出带 `REPLAY` 标记），`--no-verify` 仅做结构与写作检查、不核查引用，忽略 `.bib` 中的 `x-firewall-class`/`x-firewall-note` 标记，缓存与写回结论按 30 天（`NOT_FOUND` 为 1 天）过期。`scholaros locate-evidence`、`scholaros segment-pdf` 与 MCP `locate_evidence` 基于 `PDFKit` 纯本地离线完成双栏 PDF 分段、相近段落定位与显式数字单位核对。在 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) 的 11 篇 CC BY 4.0 arXiv 真实论文上，静态多文件加载、原样跳过、BibTeX 单条错误恢复与 `thebibliography`/`.bbl` 提取与仓库提交的 Tectonic 0.17 `.aux`/`.blg` 期望一致（不做 TeX 宏展开）。macOS 桌面窗口启动默认为空，**仅在显式传入 `--demo` 或点击“载入演示数据”时展示内置未核查示例数据**（带 `DEMO` 横幅）。
 
 ---
 
@@ -71,9 +71,68 @@ SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live
 
 ---
 
-## 已验证能力（`2026-11-14` M0、`2026-11-16` M1、`2026-11-17` M2 与 `2026-11-21` M3）
+## 证据定位（`2026-11-21`）
 
-M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) 与 [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（`2026-11-21`，macOS arm64，基于 [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings) 离线回放）；M2 稿件级检查来自 [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) 与 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/)（`2026-11-17`）；M1 引文核查指标与验收检查来自 [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)（`2026-11-16`）与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)；M0 解析、格式化、统计函数、MCP 协议与命令行基线数值来自 [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) 与 [`reports/readme-commands.txt`](reports/readme-commands.txt)（`2026-11-14` 于 macOS arm64 执行 `Scripts/test.sh milestone 0` 实测；不带 `--record` 时报告写到临时目录，不改动 `reports/`）：
+给定一份本地 PDF 与一句论断，ScholarOS 对双栏版面做分段，定位词汇相近的原文段落（带页码与位置框），并核对显式数字和单位：
+
+- **命令与 MCP 工具：**
+  - `scholaros locate-evidence <pdf> --claim <文字> --json`（亦支持 `--top-k <N>`、`--offline` 与 `--lang zh|en`）
+  - `scholaros segment-pdf <pdf> --json`（亦支持 `--offline` 与 `--lang zh|en`；输出 `schema: "scholaros.pdf_segments/1"` 分段块）
+  - MCP 工具 `locate_evidence`（参数 `pdf_file`、`claim`、可选 `top_k`），与命令行共用同一套检索与数字核对实现，返回逐字节一致的 `scholaros.evidence/1` JSON。
+- **三种结论与退出码：**
+  - `FOUND`（退出码 `0`）：找到满足关键词覆盖率门槛的相近段落，且全部显式数字与单位无冲突。
+  - `NUMERIC_MISMATCH`（退出码 `1`）：找到相近段落，但论断中的显式数字或单位与原文不一致（`discrepancies` 列出 `claim_text`、`pdf_text` 与 `reason`）。
+  - `NOT_FOUND`（退出码 `3`）：未找到满足关键词覆盖率门槛的相近段落（`matches` 为空）。
+  - 错误（退出码 `2`）：文件不存在、非 PDF 字节、空白或无文字层 PDF、空论断或参数错误（`--json` 时 `stdout` 为空，`stderr` 写清原因；`segment-pdf` 成功退出 `0`，错误退出 `2`）。
+- **输出字段（`scholaros.evidence/1`）：** 定位到候选段落（`FOUND` 或 `NUMERIC_MISMATCH`）时，顶层与 `matches` 每项包含 1 起算的物理页码 `page`、0 起算的 `page_index`、`bounding_box`（PDF `mediaBox` 左下角原点坐标系下的 `{x, y, width, height}`，单位 pt）、`column_index`（`1` 左栏、`2` 右栏、`0` 跨栏通栏块）、`section_title` 与 `excerpt`。
+
+### 证据定位的边界
+
+- **只定位相近段落并核对显式数字，不判断原文是否支持你的结论。** 只要没有显式数字冲突（例如不含数字的肯定与否定改写），产品不做语义判定。
+- **只做同语种：** 按同语种实词重合检索；用中文论断查英文 PDF（或反之）返回 `NOT_FOUND`（退出码 `3`）。
+- **文字来自 macOS 的 `PDFKit`，扫描件和没有文字层的 PDF 不支持：** 读不出可检索文字的 PDF 返回退出码 `2` 并写明原因，不做 OCR。
+- **某些 LaTeX 字体和行内公式附近的切词与粘连：** 某些 LaTeX 字体和行内公式附近偶尔会把一个词切成两段或把两个词粘在一起（窄字距吞空格与数学斜体多插空格已在第 4b、4c 段修过，还有零星残留）。
+
+### 评测指标（`reports/m4-acceptance.txt`）
+
+- **日期与提交：** `2026-11-21T13:16:25Z`，提交 `0164e64`，下表全部数字取自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt)（`--offline`，隔离 `HOME`，未设 `SCHOLAR_CACHE_DIR`）。
+- **方法：** `5` 份 arXiv 上 CC BY 4.0 的两栏论文官方 PDF（`2506.06524v1`、`2409.19431v3`、`2410.04196v2`、`2611.15445v1`、`2610.15486v1`，[`Benchmarks/evidence/`](Benchmarks/evidence/) 里有署名与 SHA-256），共 `30` 句论断（有依据、数字不同、没提及各 `10` 句）加 `15` 行中英文哨兵（合计 `45` 行，见 [`Benchmarks/evidence/claims.jsonl`](Benchmarks/evidence/claims.jsonl)），由总调度写、用户抽查后冻结、实现方没有改过。
+
+| 检查项 / 指标 | 结果 | 要求与说明 |
+|---|---|---|
+| **有依据 10 句里找到并且页码对的句数（`FOUND` 且页码命中 `expected_pages`）** | **`10/10`** | 硬要求 `>= 8/10`：通过（第 2 行）。 |
+| **数字不同 10 句里判出的句数（`NUMERIC_MISMATCH`、页码对且 `pdf_text` 含原文数字）** | **`9/10`** | 硬要求 `>= 8/10`：通过（第 3 行；`ev_004` 判为 `NUMERIC_MISMATCH` 但指到第 `2` 页，期望第 `3` 页）。 |
+| **没提及和哨兵 25 行里 `NOT_FOUND` 的行数（且 `matches` 为空）** | **`25/25`** | 硬要求 `25/25`（`0` 容忍）：通过（没提及 `10/10`，哨兵 `15/15`；第 4 行）。 |
+| **位置框核对数（外扩 `4.0pt` 对照 `pdftotext -tsv` 覆盖段落 `>= 80.0%` 词）** | **`19/19` 个位置框通过** | 硬要求 `>= 80.0%`：通过（最低词覆盖率 `100.0%`，Poppler `pdftotext` `26.10.0` 现场比对与存储文件 `0/5` 差异；第 5 行）。 |
+| **双栏 PDF 分段（页眉页脚不进正文、认出引言和参考文献、通栏表下先左后右）** | **`5/5` 篇评测论文** | 硬要求：通过（`0164e64` 记录下 `5/5` 篇评测论文与 `5/5` 份合成夹具全部通过；第 6 行）。 |
+| **5 篇与 `pdftotext` 的词重合率** | **最低 `96.87%`（`5/5` 通过）** | 硬要求每篇 `>= 95.00%`：通过（第 7 行；逐篇明细见下表）。 |
+| **CLI `locate-evidence --json` 与 MCP `locate_evidence` 全部 45 行对照** | **`0/45` 处差异** | 硬要求 `0` 处差异：通过（默认工具 `5` 个，未知参数 `ERR_INVALID_ARGUMENT` 已核验；第 8 行）。 |
+| **错误处理（文件不存在、非 PDF 字节、空白 PDF、空论断）** | **`9/9` 通过** | 全部退出码 `2`、`--json` 下 `stdout` 为空、`stderr` 写清原因（第 9 行）。 |
+
+**5 篇评测论文的词重合率与分段耗时**（耗时取自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) 的毫秒数，**在总调度的机器上、同时有别的构建在跑**）：
+
+| 论文（`Benchmarks/evidence/pdfs/`） | 排版模板 | 分段块数 / 标题数 | 与 `pdftotext` 词重合率 | 分段耗时（`ms`） |
+|---|---|---:|---:|---:|
+| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`**（`3293/3296`） | **`300.0 ms`** |
+| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`**（`20279/20759`） | **`2359.2 ms`** |
+| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`**（`10333/10667`） | **`1213.4 ms`** |
+| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`**（`6814/6906`） | **`784.7 ms`** |
+| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`**（`15163/15386`） | **`2121.9 ms`** |
+| **最低值 / 汇总** | **`5` 篇两栏论文** | — | **最低 `96.87%`（`5/5 >= 95.00%`）** | — |
+
+### 如何复现证据定位指标
+
+在干净克隆上离线运行以下命令即可复现上表全部数字：
+
+```bash
+Scripts/acceptance/m4-acceptance.sh
+```
+
+---
+
+## 已验证能力（`2026-11-14` M0、`2026-11-16` M1、`2026-11-17` M2、`2026-11-21` M3 与 `2026-11-21` M4）
+
+M4 PDF 证据定位与双栏分段检查来自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) 与 [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh)（`2026-11-21`，提交 `0164e64`，`--offline`）；M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) 与 [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（`2026-11-21`，macOS arm64，基于 [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings) 离线回放）；M2 稿件级检查来自 [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) 与 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/)（`2026-11-17`）；M1 引文核查指标与验收检查来自 [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)（`2026-11-16`）与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)；M0 解析、格式化、统计函数、MCP 协议与命令行基线数值来自 [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) 与 [`reports/readme-commands.txt`](reports/readme-commands.txt)（`2026-11-14` 于 macOS arm64 执行 `Scripts/test.sh milestone 0` 实测；不带 `--record` 时报告写到临时目录，不改动 `reports/`）：
 
 - **引文核查（`scholaros verify-citations`、`scholaros cite`、`scholaros cache clear`、MCP `verify_citation`、MCP `add_verified_bibtex`、MCP `scholar_verify_bibliography`）**（[`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)，`2026-11-16`）：使用五类状态（`VERIFIED`、`DRIFT`、`NOT_FOUND`、`RETRACTED`、`UNVERIFIED`），支持 `--lang en`、`--lang zh` 与 `--json` 输出：
   - 默认联网查询 Crossref、OpenAlex、`doi.org`、arXiv 与 PubMed，并将可缓存响应写入本地 SQLite（默认 `~/Library/Caches/ScholarOS/registry.sqlite`，或 `$SCHOLAR_CACHE_DIR/registry.sqlite`；有效 `200` 记录有效期 30 天，有依据的不存在记录有效期 1 天）；`--no-cache` 本次运行不读写缓存，`scholaros cache clear` 删除当前生效位置的 `registry.sqlite`（含 `-wal`/`-shm`），`--verbose` 每查一次向标准错误输出一行（数据源、地址、状态码、耗时与来源）。
@@ -86,6 +145,7 @@ M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 
   - 在基于 [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings) 回放的全部 `480/480` 条评测集上，`verify_citation` 与命令行 `scholaros verify-citations --registry-replay --json` 对比 **`0` 处差异**（`m3-mcp.sh` 第 11 行）。
   - `add_verified_bibtex` 在本进程内重新核查单条 BibTeX 且**写入时绕开 SQLite 缓存读取**（`--offline`、`offline: true` 或禁网环境下即使有有效热缓存也一律拒绝写入），对 `NOT_FOUND`、`DRIFT`、`UNVERIFIED`、`RETRACTED` 一律返回 `isError: true`（`ERR_UNVERIFIED_CITATION`）且保持 `.bib` 字节不变，执行 `4` 类规则精确查重（`SKIPPED_DUPLICATE` 与 `ERR_CITE_KEY_CONFLICT`）和 `8` 类路径/编码/语法安全拦截（`ERR_BIB_PATH`、`ERR_BIB_ENCODING`、`ERR_BIB_SYNTAX` 及 CRLF 保留），并在独占锁 `flock` + `O_APPEND` + `fsync` 下写入数据源权威字段；**`2` 个并发 MCP 服务进程**同时往同一 `.bib` 各写 **`20` 条不同 `VERIFIED` 文献**时，**`40/40` 条唯一文献全部在列，`0` 处解析或重复错误**（`m3-mcp.sh` 第 2–10、13、14 行）。
   - 在全部 `11/11` 篇基准论文（`offline: true`）上，`check_manuscript` 默认返回精简摘要（`1,794`–`8,704` 字节），其 `counts` 在 `11/11` 篇上与命令行 `diagnostics <path> --offline --json` 一致；传入 `detail: "full"` 时（`33,929`–`296,414` 字节）在 `11/11` 篇上与命令行 `--json` **逐字节相同**（`m3-mcp.sh` 第 15 行）。
+- **PDF 证据定位与双栏分段（`scholaros locate-evidence`、`scholaros segment-pdf`、MCP `locate_evidence`）**（[`reports/m4-acceptance.txt`](reports/m4-acceptance.txt)，`2026-11-21`）：剥离重复页眉页脚、识别章节标题与跨栏图表、保持双栏正文先左后右（`5` 篇基准论文与 `pdftotext` 词重合率 `96.87%`–`99.91%`），并核对显式数字与单位（有依据 `10/10` `FOUND` 且页码正确、数字不同 `9/10` `NUMERIC_MISMATCH`、没提及与哨兵 `25/25` `NOT_FOUND`、位置框 `19/19` 通过、CLI 与 MCP JSON `0/45` 处差异）。
 - **LaTeX 章节大纲与稿件级静态诊断（`scholaros outline`、`scholaros diagnostics`、MCP `check_manuscript`）**（[`reports/m0-acceptance.txt`](reports/m0-acceptance.txt)，`2026-11-14` 与 [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh)，`2026-11-17`）：支持直接读取 `.tex` 源文件而无需先创建工程包。在仓库自带的 449 行 IEEEtran 风格样稿 [`Fixtures/sample-ieeetran-manuscript.tex`](Fixtures/sample-ieeetran-manuscript.tex)（内容是为本仓库虚构的，任何人都能重跑这项检查）上，`scholaros outline` 在 `--lang en` 与 `--lang zh` 下均提取出全部 `46` 个 `\section` / `\subsection` 标题（带星号和不带星号的都有），与 `grep -c -E '\\(section|subsection)\*?\{'` 的计数一致（2026-11-14 实测）。
   - 递归解析多文件包含图（`\input`、无花括号 `\input`、`\include`、`\InputIfFileExists`、`\subfile`、`\import`、`\subimport`）并支持 Windows-1252 编码回退（`ENC001`），无损跳过原样内容、代码块、条件块与 URL 参数（`\verb`、`verbatim`、`lstlisting`、`\lstinline`、`minted`、`\mintinline`、`comment`、`\iffalse...\fi`、`\url`、`\path`、`\nolinkurl`、`\href`），并支持从 `.bib`、`thebibliography`、`\input{*.bbl}` 与 `<主文件>.bbl` 回退（`BIB_FROM_BBL`）提取文献。
   - 诊断分为 `structure`（`SYM003`、`SYM004`、`CITE404`、`INC002`、`BIB001`、`CITE_KEY_CASE` 等）、`citation`（每个唯一引用键最多 1 条 `ERR_UNVERIFIED_CITATION`：`DRIFT`/`NOT_FOUND`/`RETRACTED` 为 `ERROR`，`UNVERIFIED` 为带原因码的 `WARNING`）与 `lint`（`LINT_LABEL_BEFORE_CAPTION` 为 `WARNING`，`LINT_UNCITED_BIB_ENTRY` 等为 `INFO`/`HINT`，在 `\nocite{*}` 下与 `crossref` 父条目上抑制未使用提示）。
@@ -102,7 +162,7 @@ M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 
 
 ### 默认工具表（`scholaros mcp`）
 
-`scholaros mcp` 默认只列出 **4** 个引文与稿件工具（参数统一为 `snake_case`；所有工具均不接受 `registryReplayPath`、`demo` 或 `projectPath`，传入任何未知或类型错误参数均返回 `isError: true` 与 `ERR_INVALID_ARGUMENT`；回放模式只能通过服务端启动参数 `scholaros mcp --registry-replay <目录>` 开启）：
+`scholaros mcp` 默认列出 **5** 个引文、稿件与证据定位工具（`verify_citation`、`add_verified_bibtex`、`check_manuscript`、`scholar_verify_bibliography`、`locate_evidence`；参数统一为 `snake_case`；所有工具均不接受 `registryReplayPath`、`demo` 或 `projectPath`，传入任何未知或类型错误参数均返回 `isError: true` 与 `ERR_INVALID_ARGUMENT`；回放模式只能通过服务端启动参数 `scholaros mcp --registry-replay <目录>` 开启）：
 
 | 工具名 | 参数（`*` 为必填） | 写 `.bib`？ | 作用与行为 |
 |---|---|---|---|
@@ -110,9 +170,10 @@ M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 
 | `add_verified_bibtex` | `bib_file*`（`string`）、`bibtex*`（`string`）、`offline`（`boolean`）、`lang`（`string`） | 是（仅 `VERIFIED`） | 进程内重新核查单条 BibTeX（**写入时绕开缓存读取**），仅当 `verdict == "VERIFIED"` 且 `insertable == true` 时在独占锁 `flock` + `O_APPEND` + `fsync` 下将数据源权威字段追加到 `bib_file`。返回 `APPENDED_VERIFIED` 或 `SKIPPED_DUPLICATE`（`isError: false`），否则返回 `isError: true`（`ERR_UNVERIFIED_CITATION`、`ERR_CITE_KEY_CONFLICT`、`ERR_BIB_PATH`、`ERR_BIB_ENCODING`、`ERR_BIB_SYNTAX`、`ERR_INVALID_BIBTEX`、`ERR_INVALID_ARGUMENT`、`ERR_IO`）且不改动文件。 |
 | `check_manuscript` | `path*`（`string`）、`bib_file`（`string`）、`no_verify`（`boolean`）、`offline`（`boolean`）、`detail`（`"summary"` \| `"full"`）、`lang`（`string`） | 否 | 从 `path` 加载多文件稿件、运行结构与交叉引用检查，并**默认联网核查被引文献**（可使用 SQLite 缓存；传 `no_verify: true` 只查结构，传 `offline: true` 走零网络离线检查）。诊断正常完成时返回 `isError: false`；`path` 或 `bib_file` 不存在返回 `isError: true`（`ERR_FILE_NOT_FOUND`），是目录或不可读返回 `ERR_IO`，参数错误返回 `ERR_INVALID_ARGUMENT`。 |
 | `scholar_verify_bibliography` | `bibtex*`（`string`）、`offline`（`boolean`）、`lang`（`string`） | 否 | 批量只读核查一段 BibTeX 字符串（`0`、`1` 或多条），与 `verify_citation` 共用同一防火墙、限速器、SQLite 缓存与回放规则。 |
+| `locate_evidence` | `pdf_file*`（`string`）、`claim*`（`string`）、`top_k`（`integer`，默认 `3`，`>= 1`） | 否 | 纯本地离线对 `pdf_file` 分段、定位相近段落并核对显式数字与单位；返回与命令行 `scholaros locate-evidence <pdf> --claim <文字> --json` 逐字节一致的 `scholaros.evidence/1` JSON（`FOUND`、`NUMERIC_MISMATCH` 或 `NOT_FOUND`，`isError: false`），出错返回 `isError: true`（`ERR_INVALID_ARGUMENT`、`ERR_FILE_NOT_FOUND`、`ERR_PDF_EXTRACTION`）。 |
 
 - **`check_manuscript` 输出粒度与超时说明：** 默认（省略 `detail` 或传 `"summary"`）返回精简摘要对象（`mode`、`root`、`complete`、`counts`、`structure_errors`、`non_verified_citations` 六个字段），控制 MCP 客户端上下文体积；传 `detail: "full"` 时返回与命令行 `scholaros diagnostics <path> --json` 逐字节相同的完整 `scholaros.diagnostics/1` 对象。由于 `check_manuscript` 默认会联网核查被引条目（未命中缓存且含几十个引用键的稿件约需 1–2 分钟），**在 Codex 中使用时可能需要在 `[mcp_servers.scholaros]` 下调大 `tool_timeout_sec`**。
-- **实验与冻结工具（`--experimental-tools`）：** 以 `scholaros mcp --experimental-tools` 启动时，额外列出 5 个冻结功能工具（`scholar_search_provenance`、`scholar_prisma_agreement`、`scholar_editorial_audit`、`scholar_track_changes_diff`、`scholar_citation_gaps`）；默认启动时这些工具不出现在 `tools/list`，调用返回 JSON-RPC `-32602`。
+- **实验与冻结工具（`--experimental-tools`）：** 以 `scholaros mcp --experimental-tools` 启动时，额外列出 4 个冻结功能工具（`scholar_prisma_agreement`、`scholar_editorial_audit`、`scholar_track_changes_diff`、`scholar_citation_gaps`）；默认启动时这些工具不出现在 `tools/list`，调用返回 JSON-RPC `-32602`。
 
 ### 在三家客户端中注册
 
@@ -221,12 +282,31 @@ scholaros mcp --registry-replay Tests/Fixtures/registry < "$WORK/mcp-requests.js
 ScholarOS outline Fixtures/sample-ieeetran-manuscript.tex | grep -c .
 grep -c -E '\\(section|subsection)\*?\{' Fixtures/sample-ieeetran-manuscript.tex
 
+# 7. PDF 证据定位与双栏分段（--offline）：FOUND（退出码 0）、NUMERIC_MISMATCH（退出码 1）、NOT_FOUND（退出码 3）、segment-pdf（退出码 0）与 MCP locate_evidence
+ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "The language model in ScriptDoctor gets 10 total chances to output functional PuzzleScript code." --offline --json > "$WORK/ev-found.json"
+rc=0; ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "For few-shot prompting, human-made games were sampled from a small dataset of 6,100 PuzzleScript games." --offline --json > "$WORK/ev-mismatch.json" || rc=$?; test "$rc" -eq 1
+rc=0; ScholarOS locate-evidence Benchmarks/evidence/pdfs/2506.06524v1.pdf --claim "月亮是绿奶酪做的。" --offline --json > "$WORK/ev-notfound.json" || rc=$?; test "$rc" -eq 3
+ScholarOS segment-pdf Benchmarks/evidence/pdfs/2506.06524v1.pdf --offline --json > "$WORK/segments.json"
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"locate_evidence","arguments":{"pdf_file":"Benchmarks/evidence/pdfs/2506.06524v1.pdf","claim":"The language model in ScriptDoctor gets 10 total chances to output functional PuzzleScript code."}}}' | scholaros mcp --offline > "$WORK/ev-mcp.jsonl"
+python3 -I - "$WORK/ev-found.json" "$WORK/ev-mismatch.json" "$WORK/ev-notfound.json" "$WORK/segments.json" "$WORK/ev-mcp.jsonl" <<'PY'
+import json, sys
+found, mm, nf, seg = [json.load(open(p, encoding="utf-8")) for p in sys.argv[1:5]]
+mcp_lines = [json.loads(ln) for ln in open(sys.argv[5], encoding="utf-8") if ln.strip()]
+mcp_ev = json.loads(mcp_lines[-1]["result"]["content"][0]["text"])
+assert found["verdict"] == "FOUND" and found["page"] == 2 and found["page_index"] == 1
+assert mm["verdict"] == "NUMERIC_MISMATCH" and mm["page"] == 2 and "610" in mm["discrepancies"][0]["pdf_text"]
+assert nf["verdict"] == "NOT_FOUND" and nf["matches"] == []
+assert seg["schema"] == "scholaros.pdf_segments/1" and seg["chunk_count"] == 68
+assert mcp_ev == found
+print("evidence_examples_verified=true")
+PY
+
 rm -rf "$WORK"
 ```
 
 ### 按模块运行单测
 
-离线运行 M0、M1 或 M2 验收套件（`Scripts/test.sh milestone 0`、`Scripts/test.sh milestone 1` 或 `Scripts/test.sh milestone 2`）时，报告默认写到临时目录且工作区保持不变；加 `--record` 才会更新 `reports/`。单独运行某一模块单测：
+离线运行 M0 至 M4 验收套件（`Scripts/test.sh milestone 0` 至 `Scripts/test.sh milestone 4`）时，报告默认写到临时目录且工作区保持不变；加 `--record` 才会更新 `reports/`。单独运行某一模块单测：
 
 ```bash
 Scripts/test.sh scope ScholarBibAndCSL
@@ -238,8 +318,8 @@ Scripts/test.sh scope ScholarBibAndCSL
 
 - **桌面端界面（不带子命令运行 `ScholarOS`）**：默认打开空白窗口（`0` 份手稿、`0` 条文献），当前尚不能直接打开用户本地 `.tex`、`.bib` 或 `.pdf` 文件，**仅在传入 `--demo` 或点击“载入演示数据”时查看内置未核查示例数据**（顶部带有 `DEMO / 演示数据` 横幅）。
 - **静态 LaTeX 与 `\bibitem` 解析边界**：稿件分析直接静态读取 `.tex`、`.bib` 与 `.bbl` 源文件，不运行 TeX 宏展开引擎（由自定义宏动态拼出的引用键或标签不会展开）；对 `thebibliography` / `.bbl` 自由文本 `\bibitem` 的作者、标题、年份提取为尽力启发式解析。
-- **后续计划（M4–M5）**：
-  - **M4 与 M5（PDF 证据定位与 CiteStudio 引擎统一）**：将关键词匹配改为双栏 PDF 原文段落定位与“数字加单位”核对；对外导出核心引擎库供 CiteStudio 调用，并对照手册各校对 15 条 APA 与 IEEE 示例。
+- **后续计划（M5）**：
+  - **M5（CiteStudio 引擎统一）**：将 `ScholarModels`、`ScholarMarkupAST`、`ScholarBibAndCSL`、`ScholarPDFProvenance` 作为库产品对外提供供 CiteStudio 调用，合并重复的 MCP 服务端，并对照官方手册各校对 15 条 APA 7th 与 IEEE 示例。
 - **冻结模块（尚未完成端到端验收，MCP 层收起在 `--experimental-tools` 之后）**：引文图谱分析（力导向布局、PageRank、Louvain 聚类、Kleinberg 突现检测、主路径分析）、PRISMA 筛查界面、偏倚风险与 Meta 分析界面、Myers 修订追踪界面、投稿归档打包器、Zotero SQLite 桥接、Typst 支持、`JavaScriptCore` 审稿插件、持久化撤销/重做以及仅用于测试的合成 PDF 生成器。
 
 ---
