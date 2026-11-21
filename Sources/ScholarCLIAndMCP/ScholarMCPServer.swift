@@ -445,6 +445,9 @@ public struct ScholarMCPServer: Sendable {
             case "scholar_verify_bibliography":
                 return try await executeScholarVerifyBibliography(arguments: arguments)
 
+            case "locate_evidence":
+                return executeLocateEvidence(arguments: arguments)
+
             default:
                 return executeToolCall(name: name, arguments: arguments)
             }
@@ -500,26 +503,8 @@ public struct ScholarMCPServer: Sendable {
 
         do {
             switch name {
-            case "scholar_search_provenance":
-                let claim = arguments["claim"] as? String ?? ""
-                let opened = try openDatabase(from: arguments)
-                defer { opened.db.close() }
-                let passages = try opened.db.listPDFPassages()
-                let fts = try FTS5ProvenanceIndex()
-                try fts.indexPassages(passages)
-                let hits = try fts.searchPassages(
-                    query: claim,
-                    citeKeyFilter: arguments["citeKey"] as? String,
-                    limit: arguments["topK"] as? Int ?? 5
-                ).map(\.chunk)
-                let data = try JSONEncoder().encode(hits)
-                if isReplayServer {
-                    let arr = (try? JSONSerialization.jsonObject(with: data)) ?? []
-                    let obj: [String: Any] = ["mode": "REPLAY", "passages": arr]
-                    let out = try JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])
-                    return textResult(String(decoding: out, as: UTF8.self), isError: false)
-                }
-                return textResult(String(decoding: data, as: UTF8.self), isError: false)
+            case "locate_evidence":
+                return executeLocateEvidence(arguments: arguments)
 
             case "scholar_prisma_agreement":
                 let opened = try openDatabase(from: arguments)
@@ -1772,6 +1757,183 @@ public struct ScholarMCPServer: Sendable {
         ]
     }
 
+    // MARK: - M4 Stage 03: `locate_evidence`
+
+    private func executeLocateEvidence(arguments: [String: Any]) -> [String: Any] {
+        let lang = resolvedLanguage(arguments: arguments)
+
+        guard let rawPDFAny = arguments["pdf_file"], !(rawPDFAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["pdf_file"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'pdf_file' for 'locate_evidence'.",
+                    "工具 'locate_evidence' 缺少必填字符串参数 'pdf_file'。"
+                ),
+                language: lang
+            )
+        }
+        guard let pdfFilePath = rawPDFAny as? String else {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["pdf_file"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'pdf_file' for 'locate_evidence' must be a string.",
+                    "工具 'locate_evidence' 的参数 'pdf_file' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+        if pdfFilePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["pdf_file"],
+                reasons: ["invalid_argument_value"],
+                customReason: lang.L(
+                    "Argument 'pdf_file' for 'locate_evidence' must not be empty.",
+                    "工具 'locate_evidence' 的参数 'pdf_file' 不能为空。"
+                ),
+                language: lang
+            )
+        }
+
+        guard let rawClaimAny = arguments["claim"], !(rawClaimAny is NSNull) else {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["claim"],
+                reasons: ["missing_required_argument"],
+                customReason: lang.L(
+                    "Missing required string argument 'claim' for 'locate_evidence'.",
+                    "工具 'locate_evidence' 缺少必填字符串参数 'claim'。"
+                ),
+                language: lang
+            )
+        }
+        guard let claimText = rawClaimAny as? String else {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["claim"],
+                reasons: ["invalid_argument_type"],
+                customReason: lang.L(
+                    "Argument 'claim' for 'locate_evidence' must be a string.",
+                    "工具 'locate_evidence' 的参数 'claim' 必须是字符串。"
+                ),
+                language: lang
+            )
+        }
+        if claimText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return invalidArgumentResult(
+                toolName: "locate_evidence",
+                invalidArguments: ["claim"],
+                reasons: ["invalid_argument_value"],
+                customReason: lang.L(
+                    "Argument 'claim' for 'locate_evidence' must not be empty or whitespace-only.",
+                    "工具 'locate_evidence' 的参数 'claim' 不能为空或仅包含空白字符。"
+                ),
+                language: lang
+            )
+        }
+
+        var topK = PDFEvidenceCLIAndMCPService.defaultTopK
+        if let rawTopKAny = arguments["top_k"], !(rawTopKAny is NSNull) {
+            if CFGetTypeID(rawTopKAny as CFTypeRef) == CFBooleanGetTypeID() {
+                return invalidArgumentResult(
+                    toolName: "locate_evidence",
+                    invalidArguments: ["top_k"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'top_k' for 'locate_evidence' must be a positive integer, not a boolean.",
+                        "工具 'locate_evidence' 的参数 'top_k' 必须是正整数，不能是布尔值。"
+                    ),
+                    language: lang
+                )
+            }
+            guard let num = rawTopKAny as? NSNumber,
+                  Double(num.intValue) == num.doubleValue else {
+                return invalidArgumentResult(
+                    toolName: "locate_evidence",
+                    invalidArguments: ["top_k"],
+                    reasons: ["invalid_argument_type"],
+                    customReason: lang.L(
+                        "Argument 'top_k' for 'locate_evidence' must be an integer.",
+                        "工具 'locate_evidence' 的参数 'top_k' 必须是整数。"
+                    ),
+                    language: lang
+                )
+            }
+            guard num.intValue >= 1 else {
+                return invalidArgumentResult(
+                    toolName: "locate_evidence",
+                    invalidArguments: ["top_k"],
+                    reasons: ["invalid_argument_value"],
+                    customReason: lang.L(
+                        "Argument 'top_k' for 'locate_evidence' must be a positive integer (>= 1).",
+                        "工具 'locate_evidence' 的参数 'top_k' 必须是大于等于 1 的正整数。"
+                    ),
+                    language: lang
+                )
+            }
+            topK = num.intValue
+        }
+
+        do {
+            let result = try PDFEvidenceCLIAndMCPService.locateEvidenceInLocalPDF(
+                atPath: pdfFilePath,
+                claim: claimText,
+                topK: topK,
+                language: lang
+            )
+            let json = try PDFEvidenceCLIAndMCPService.encodeEvidenceLocalizationJSON(result)
+            return textResult(json, isError: false)
+        } catch let scholarErr as ScholarOSError {
+            switch scholarErr {
+            case .invalidCLIArguments(let detail):
+                return invalidArgumentResult(
+                    toolName: "locate_evidence",
+                    invalidArguments: [],
+                    reasons: ["invalid_argument_value"],
+                    customReason: detail,
+                    language: lang
+                )
+            case .fileNotFound:
+                var payload: [String: Any] = [
+                    "error_code": "ERR_FILE_NOT_FOUND",
+                    "category": "pdf_io",
+                    "reasons": ["file_not_found"],
+                    "reason": scholarErr.errorDescription ?? String(describing: scholarErr)
+                ]
+                if isReplayServer {
+                    payload["mode"] = "REPLAY"
+                }
+                return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_FILE_NOT_FOUND\"}")
+            default:
+                var payload: [String: Any] = [
+                    "error_code": "ERR_PDF_EXTRACTION",
+                    "category": "pdf_io",
+                    "reasons": ["pdf_extraction_failed"],
+                    "reason": scholarErr.errorDescription ?? String(describing: scholarErr)
+                ]
+                if isReplayServer {
+                    payload["mode"] = "REPLAY"
+                }
+                return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_PDF_EXTRACTION\"}")
+            }
+        } catch {
+            var payload: [String: Any] = [
+                "error_code": "ERR_PDF_EXTRACTION",
+                "category": "pdf_io",
+                "reasons": ["pdf_extraction_failed"],
+                "reason": error.localizedDescription
+            ]
+            if isReplayServer {
+                payload["mode"] = "REPLAY"
+            }
+            return jsonTextResult(payload, isError: true, fallback: "{\"error_code\":\"ERR_PDF_EXTRACTION\"}")
+        }
+    }
+
     public static var toolDefinitions: [[String: Any]] {
         defaultToolDefinitions
     }
@@ -1833,29 +1995,25 @@ public struct ScholarMCPServer: Sendable {
                 ],
                 "required": ["bibtex"]
             ]
+        ],
+        [
+            "name": "locate_evidence",
+            "description": "Locate lexically matching passages in a local PDF file (with 1-based page, 0-based page_index, and mediaBox bounding_box) and check explicit numbers and units. Returns scholaros.evidence/1 JSON with verdict FOUND, NUMERIC_MISMATCH, or NOT_FOUND identical to CLI 'locate-evidence <pdf> --claim <claim> --json'.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "pdf_file": ["type": "string"],
+                    "claim": ["type": "string"],
+                    "top_k": ["type": "integer"]
+                ],
+                "required": ["pdf_file", "claim"]
+            ]
         ]
         ]
     }
 
     public static var experimentalToolDefinitions: [[String: Any]] {
         [
-        [
-            "name": "scholar_search_provenance",
-            "description": "Search indexed PDF passages via SQLite FTS5 BM25 to compare manuscript claims against bounding-box passages.",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "claim": ["type": "string"],
-                    "citeKey": ["type": "string"],
-                    "filePath": ["type": "string"],
-                    "line": ["type": "integer"],
-                    "topK": ["type": "integer"],
-                    "projectPath": ["type": "string"],
-                    "demo": ["type": "boolean"]
-                ],
-                "required": ["claim"]
-            ]
-        ],
         [
             "name": "scholar_prisma_agreement",
             "description": "Compute PRISMA 2020 flow counts and nominal Cohen's kappa, PABAK, and Gwet's AC1.",

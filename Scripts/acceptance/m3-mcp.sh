@@ -383,10 +383,10 @@ record_skip() {
     echo ""
 
     # ==================================================================
-    # Row 1: tools/list — final tool table (default 4 tools, --experimental-tools +5 frozen tools, deleted tools -> -32602)
+    # Row 1: tools/list — final tool table (default 5 tools, --experimental-tools +4 frozen tools, deleted tools -> -32602)
     # ==================================================================
     if should_run_row 1; then
-        echo "== [Row 1] tools/list: default 4 tools, --experimental-tools +5 frozen tools, 0 registryReplayPath, deleted tools -> -32602 =="
+        echo "== [Row 1] tools/list: default 5 tools, --experimental-tools +4 frozen tools, 0 registryReplayPath, deleted tools -> -32602 =="
         set +e
         R1_OUT="$(python3 -I - "$REPO_ROOT" "$SCHOLAR_CLI_BIN" "$SCHOLAR_SANDBOX_HOME" <<'PY'
 import json, os, subprocess, sys
@@ -404,17 +404,17 @@ expected_default = {
     "add_verified_bibtex": (["bib_file", "bibtex", "lang", "offline"], ["bib_file", "bibtex"]),
     "check_manuscript": (["bib_file", "detail", "lang", "no_verify", "offline", "path"], ["path"]),
     "scholar_verify_bibliography": (["bibtex", "lang", "offline"], ["bibtex"]),
+    "locate_evidence": (["claim", "pdf_file", "top_k"], ["claim", "pdf_file"]),
 }
 frozen_tools = {
-    "scholar_search_provenance",
     "scholar_prisma_agreement",
     "scholar_editorial_audit",
     "scholar_track_changes_diff",
     "scholar_citation_gaps",
 }
-deleted_tools = ["scholar_cite_key", "scholar_lsp_diagnostics"]
+deleted_tools = ["scholar_cite_key", "scholar_lsp_diagnostics", "scholar_search_provenance"]
 
-# 1. Default server: exactly 4 tools, clean snake_case schemas, 0 registryReplayPath/demo/projectPath,
+# 1. Default server: exactly 5 tools, clean snake_case schemas, 0 registryReplayPath/demo/projectPath,
 #    and deleted + frozen + unknown tools all return JSON-RPC -32602
 default_reqs = [
     {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "m3-mcp", "version": "1"}}},
@@ -439,8 +439,8 @@ if proc.returncode != 0:
 resps = {obj.get("id"): obj for obj in (json.loads(ln) for ln in proc.stdout.splitlines() if ln.strip())}
 tools = ((resps.get(2) or {}).get("result") or {}).get("tools") or []
 names = [t.get("name", "<unnamed>") for t in tools]
-if len(tools) != 4 or set(names) != set(expected_default):
-    print(f"  FAIL [Row 1]: expected 4 default tools {sorted(expected_default)}, got {len(tools)}: {names}")
+if len(tools) != 5 or set(names) != set(expected_default):
+    print(f"  FAIL [Row 1]: expected 5 default tools {sorted(expected_default)}, got {len(tools)}: {names}")
     sys.exit(1)
 
 by_name = {t["name"]: t for t in tools}
@@ -469,14 +469,15 @@ for idx, tname in enumerate(rejected_on_default, start=10):
         print(f"  FAIL [Row 1]: calling {tname!r} on default server expected JSON-RPC -32602, got {resps.get(idx)}")
         sys.exit(1)
 
-print(f"  [Row 1a] PASS: default tools/list has exact 4 tools {names}; deleted & frozen tools return -32602")
+print(f"  [Row 1a] PASS: default tools/list has exact 5 tools {names}; deleted & frozen tools return -32602")
 
-# 2. --experimental-tools server: 4 default + 5 frozen = 9 tools, 0 registryReplayPath, deleted tools still -32602
+# 2. --experimental-tools server: 5 default + 4 frozen = 9 tools, 0 registryReplayPath, deleted tools still -32602
 exp_reqs = [
     {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
     {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "scholar_track_changes_diff", "arguments": {"original": "Old.", "revised": "New."}}},
     {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "scholar_cite_key", "arguments": {"citeKey": "x"}}},
     {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "scholar_lsp_diagnostics", "arguments": {"path": "x.tex"}}},
+    {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "scholar_search_provenance", "arguments": {"claim": "attention"}}},
 ]
 proc_exp = subprocess.run(
     [cli_bin, "mcp", "--registry-replay", rec_dir, "--experimental-tools"],
@@ -503,7 +504,7 @@ for t in exp_tools:
 if ((exp_resps.get(2) or {}).get("result") or {}).get("isError") is not False:
     print(f"  FAIL [Row 1]: scholar_track_changes_diff failed under --experimental-tools: {exp_resps.get(2)}")
     sys.exit(1)
-for rid, dname in [(3, "scholar_cite_key"), (4, "scholar_lsp_diagnostics")]:
+for rid, dname in [(3, "scholar_cite_key"), (4, "scholar_lsp_diagnostics"), (5, "scholar_search_provenance")]:
     if ((exp_resps.get(rid) or {}).get("error") or {}).get("code") != -32602:
         print(f"  FAIL [Row 1]: deleted {dname} did not return -32602 under --experimental-tools: {exp_resps.get(rid)}")
         sys.exit(1)
@@ -514,7 +515,7 @@ for lang in ("en", "zh"):
         print(f"  FAIL [Row 1]: --help --lang {lang} missing --experimental-tools")
         sys.exit(1)
 
-print(f"  [Row 1b] PASS: --experimental-tools adds 5 frozen tools (total 9={exp_names}), --help EN/ZH documented, deleted tools still -32602")
+print(f"  [Row 1b] PASS: --experimental-tools adds 4 frozen tools (total 9={exp_names}), --help EN/ZH documented, deleted tools still -32602")
 sys.exit(0)
 PY
 )"
@@ -522,7 +523,7 @@ PY
         set -e
         echo "$R1_OUT"
         if [[ "$R1_RC" -eq 0 ]]; then
-            record_pass 1 "tools/list exposes exact 4 default tools (+5 frozen under --experimental-tools), 0 tools carry registryReplayPath, and deleted tools return -32602"
+            record_pass 1 "tools/list exposes exact 5 default tools (+4 frozen under --experimental-tools), 0 tools carry registryReplayPath, and deleted tools return -32602"
         else
             record_fail 1 "Row 1 tools/list, --experimental-tools, or deleted-tool -32602 check failed"
         fi
@@ -1789,9 +1790,8 @@ for s in add_ok.get("sources") or []:
         print(f"  FAIL [Row 12]: add_verified_bibtex source fetchedAt != 2026-11-16: {s}")
         sys.exit(1)
 
-# Also verify all 5 frozen tools carry mode='REPLAY' when --experimental-tools is enabled
+# Also verify all 4 remaining frozen tools carry mode='REPLAY' when --experimental-tools is enabled
 exp_reqs = [
-    {"jsonrpc": "2.0", "id": 101, "method": "tools/call", "params": {"name": "scholar_search_provenance", "arguments": {"claim": "attention", "projectPath": proj_path}}},
     {"jsonrpc": "2.0", "id": 102, "method": "tools/call", "params": {"name": "scholar_prisma_agreement", "arguments": {"projectPath": proj_path}}},
     {"jsonrpc": "2.0", "id": 103, "method": "tools/call", "params": {"name": "scholar_editorial_audit", "arguments": {"source": "\\section{Intro}\nPlain text.\n"}}},
     {"jsonrpc": "2.0", "id": 104, "method": "tools/call", "params": {"name": "scholar_track_changes_diff", "arguments": {"original": "Old.", "revised": "New."}}},
@@ -1802,7 +1802,7 @@ if proc_exp.returncode != 0:
     print(f"  FAIL [Row 12]: mcp --experimental-tools exited {proc_exp.returncode}: {proc_exp.stderr}")
     sys.exit(1)
 exp_resps = {obj.get("id"): obj for obj in (json.loads(ln) for ln in proc_exp.stdout.splitlines() if ln.strip())}
-for rid in range(101, 106):
+for rid in range(102, 106):
     txt = (((exp_resps.get(rid) or {}).get("result") or {}).get("content") or [{}])[0].get("text") or ""
     payload = json.loads(txt)
     if not isinstance(payload, dict) or payload.get("mode") != "REPLAY":

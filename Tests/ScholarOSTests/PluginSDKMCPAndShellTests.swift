@@ -557,17 +557,18 @@ struct PluginSDKMCPAndShellTests {
         let initResult = try #require(initJSON["result"] as? [String: Any])
         #expect(initResult["protocolVersion"] as? String == "2024-11-05")
 
-        // 2. tools/list exposes the 4 active M3 tools by default (and 9 when enableExperimentalTools is true)
+        // 2. tools/list exposes the 5 active tools by default (and 9 when enableExperimentalTools is true)
         let listReq = #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
         let listRaw = try #require(server.handleJSONRPCLine(listReq))
         let listJSON = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
         let listResult = try #require(listJSON["result"] as? [String: Any])
         let tools = try #require(listResult["tools"] as? [[String: Any]])
-        #expect(tools.count == 4)
+        #expect(tools.count == 5)
         let names = Set(tools.compactMap { $0["name"] as? String })
-        #expect(names == ["verify_citation", "add_verified_bibtex", "check_manuscript", "scholar_verify_bibliography"])
+        #expect(names == ["verify_citation", "add_verified_bibtex", "check_manuscript", "scholar_verify_bibliography", "locate_evidence"])
         #expect(!names.contains("scholar_cite_key"))
         #expect(!names.contains("scholar_lsp_diagnostics"))
+        #expect(!names.contains("scholar_search_provenance"))
 
         let expServer = ScholarMCPServer(
             isOffline: true,
@@ -580,6 +581,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(expTools.count == 9)
         let expNames = Set(expTools.compactMap { $0["name"] as? String })
         #expect(expNames.contains("scholar_prisma_agreement"))
+        #expect(!expNames.contains("scholar_search_provenance"))
 
         // Notifications without id return nil per JSON-RPC 2.0
         #expect(server.handleJSONRPCLine(#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#) == nil)
@@ -693,7 +695,7 @@ struct PluginSDKMCPAndShellTests {
         let server = ScholarMCPServer(allowDemoMode: true, isOffline: true, enableExperimentalTools: true, environment: isolatedEnv)
 
         let prov = server.executeToolCall(name: "scholar_search_provenance", arguments: ["claim": "FlashAttention speedup", "demo": true])
-        #expect(prov["isError"] as? Bool == false)
+        #expect(prov["isError"] as? Bool == true)
 
         let prisma = server.executeToolCall(name: "scholar_prisma_agreement", arguments: ["demo": true])
         #expect(prisma["isError"] as? Bool == false)
@@ -7221,7 +7223,7 @@ struct PluginSDKMCPAndShellTests {
         #expect(citeFakeObj["mode"] as? String == "REPLAY")
         #expect(citeFakeObj["verdict"] as? String == "NOT_FOUND")
 
-        // 5. `check_manuscript` (default & full) and all 5 experimental tools on replay server also carry top-level mode == "REPLAY"
+        // 5. `check_manuscript` (default & full) and all 4 remaining experimental tools on replay server also carry top-level mode == "REPLAY"
         let expReplayServer = ScholarMCPServer(
             defaultProjectBundlePath: bundleURL.path,
             defaultRegistryReplayPath: registryDir.path,
@@ -7233,7 +7235,6 @@ struct PluginSDKMCPAndShellTests {
         let otherToolCalls: [(ScholarMCPServer, String, [String: Any])] = [
             (replayServer, "check_manuscript", ["path": texFile.path, "bib_file": recheckBibURL.path]),
             (replayServer, "check_manuscript", ["path": texFile.path, "bib_file": recheckBibURL.path, "detail": "full"]),
-            (expReplayServer, "scholar_search_provenance", ["claim": "attention"]),
             (expReplayServer, "scholar_prisma_agreement", [:]),
             (expReplayServer, "scholar_editorial_audit", ["source": "\\section{Test}\nPlain text.\n"]),
             (expReplayServer, "scholar_track_changes_diff", ["original": "Old text.", "revised": "New text."]),
@@ -7934,7 +7935,7 @@ struct PluginSDKMCPAndShellTests {
 
         let defaultServer = ScholarMCPServer(isOffline: true, environment: env)
 
-        // 1. Default tools/list exposes exactly the 4 non-frozen tools
+        // 1. Default tools/list exposes the 5 non-frozen tools (4 M3 tools + M4 locate_evidence)
         let listRaw = try #require(await defaultServer.handleJSONRPCLineAsync(#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#))
         let listEnv = try #require(JSONSerialization.jsonObject(with: Data(listRaw.utf8)) as? [String: Any])
         let tools = try #require((listEnv["result"] as? [String: Any])?["tools"] as? [[String: Any]])
@@ -7943,9 +7944,10 @@ struct PluginSDKMCPAndShellTests {
             "verify_citation",
             "add_verified_bibtex",
             "check_manuscript",
-            "scholar_verify_bibliography"
+            "scholar_verify_bibliography",
+            "locate_evidence"
         ]
-        #expect(tools.count == 4, "Expected 4 default MCP tools, got \(tools.count): \(defaultNames.sorted())")
+        #expect(tools.count == 5, "Expected 5 default MCP tools, got \(tools.count): \(defaultNames.sorted())")
         #expect(defaultNames == expectedDefault)
 
         // 2. Deleted tools, unknown tool, and all 5 frozen tools return JSON-RPC error -32602 by default (sync & async)
@@ -8003,7 +8005,6 @@ struct PluginSDKMCPAndShellTests {
             let expTools = try #require((r1["result"] as? [String: Any])?["tools"] as? [[String: Any]])
             let expNames = Set(expTools.compactMap { $0["name"] as? String })
             let expectedExp: Set<String> = expectedDefault.union([
-                "scholar_search_provenance",
                 "scholar_prisma_agreement",
                 "scholar_editorial_audit",
                 "scholar_track_changes_diff",
@@ -8013,6 +8014,7 @@ struct PluginSDKMCPAndShellTests {
             #expect(expNames == expectedExp)
             #expect(!expNames.contains("scholar_cite_key"))
             #expect(!expNames.contains("scholar_lsp_diagnostics"))
+            #expect(!expNames.contains("scholar_search_provenance"))
 
             let r2 = try #require(JSONSerialization.jsonObject(with: Data(expReplies[1].utf8)) as? [String: Any])
             #expect((r2["result"] as? [String: Any])?["isError"] as? Bool == false)
