@@ -95,7 +95,7 @@ SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live
 
 ### 评测指标（`reports/m4-acceptance.txt`）
 
-- **日期与提交：** `2026-11-21T13:16:25Z`，提交 `0164e64`，下表全部数字取自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt)（`--offline`，隔离 `HOME`，未设 `SCHOLAR_CACHE_DIR`）。
+- **日期与提交：** `2026-11-21T14:18:20Z`，提交 `1c7203d`，下表全部数字取自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt)（`--offline`，隔离 `HOME`，未设 `SCHOLAR_CACHE_DIR`）。
 - **方法：** `5` 份 arXiv 上 CC BY 4.0 的两栏论文官方 PDF（`2506.06524v1`、`2409.19431v3`、`2410.04196v2`、`2611.15445v1`、`2610.15486v1`，[`Benchmarks/evidence/`](Benchmarks/evidence/) 里有署名与 SHA-256），共 `30` 句论断（有依据、数字不同、没提及各 `10` 句）加 `15` 行中英文哨兵（合计 `45` 行，见 [`Benchmarks/evidence/claims.jsonl`](Benchmarks/evidence/claims.jsonl)），由总调度写、用户抽查后冻结、实现方没有改过。
 
 | 检查项 / 指标 | 结果 | 要求与说明 |
@@ -104,7 +104,7 @@ SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live
 | **数字不同 10 句里判出的句数（`NUMERIC_MISMATCH`、页码对且 `pdf_text` 含原文数字）** | **`9/10`** | 硬要求 `>= 8/10`：通过（第 3 行；`ev_004` 判为 `NUMERIC_MISMATCH` 但指到第 `2` 页，期望第 `3` 页）。 |
 | **没提及和哨兵 25 行里 `NOT_FOUND` 的行数（且 `matches` 为空）** | **`25/25`** | 硬要求 `25/25`（`0` 容忍）：通过（没提及 `10/10`，哨兵 `15/15`；第 4 行）。 |
 | **位置框核对数（外扩 `4.0pt` 对照 `pdftotext -tsv` 覆盖段落 `>= 80.0%` 词）** | **`19/19` 个位置框通过** | 硬要求 `>= 80.0%`：通过（最低词覆盖率 `100.0%`，Poppler `pdftotext` `26.10.0` 现场比对与存储文件 `0/5` 差异；第 5 行）。 |
-| **双栏 PDF 分段（页眉页脚不进正文、认出引言和参考文献、通栏表下先左后右）** | **`5/5` 篇评测论文** | 硬要求：通过（`0164e64` 记录下 `5/5` 篇评测论文与 `5/5` 份合成夹具全部通过；第 6 行）。 |
+| **双栏 PDF 分段（页眉页脚不进正文、认出引言和参考文献、通栏表下先左后右）** | **`5/5` 篇评测论文、`7/7` 份合成夹具** | 硬要求：通过（`5/5` 篇评测论文与 `7/7` 份合成夹具全部通过；第 6 行）。 |
 | **5 篇与 `pdftotext` 的词重合率** | **最低 `96.87%`（`5/5` 通过）** | 硬要求每篇 `>= 95.00%`：通过（第 7 行；逐篇明细见下表）。 |
 | **CLI `locate-evidence --json` 与 MCP `locate_evidence` 全部 45 行对照** | **`0/45` 处差异** | 硬要求 `0` 处差异：通过（默认工具 `5` 个，未知参数 `ERR_INVALID_ARGUMENT` 已核验；第 8 行）。 |
 | **错误处理（文件不存在、非 PDF 字节、空白 PDF、空论断）** | **`9/9` 通过** | 全部退出码 `2`、`--json` 下 `stdout` 为空、`stderr` 写清原因（第 9 行）。 |
@@ -113,11 +113,11 @@ SCHOLAR_ONLINE=1 python3 Scripts/acceptance/m1-citation-bench.py --live
 
 | 论文（`Benchmarks/evidence/pdfs/`） | 排版模板 | 分段块数 / 标题数 | 与 `pdftotext` 词重合率 | 分段耗时（`ms`） |
 |---|---|---:|---:|---:|
-| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`**（`3293/3296`） | **`300.0 ms`** |
-| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`**（`20279/20759`） | **`2359.2 ms`** |
-| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`**（`10333/10667`） | **`1213.4 ms`** |
-| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`**（`6814/6906`） | **`784.7 ms`** |
-| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`**（`15163/15386`） | **`2121.9 ms`** |
+| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`**（`3293/3296`） | **`333.3ms`** |
+| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`**（`20279/20759`） | **`2137.8ms`** |
+| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`**（`10333/10667`） | **`1083.7ms`** |
+| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`**（`6814/6906`） | **`822.0ms`** |
+| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`**（`15163/15386`） | **`2030.8ms`** |
 | **最低值 / 汇总** | **`5` 篇两栏论文** | — | **最低 `96.87%`（`5/5 >= 95.00%`）** | — |
 
 ### 如何复现证据定位指标
@@ -132,7 +132,7 @@ Scripts/acceptance/m4-acceptance.sh
 
 ## 已验证能力（`2026-11-14` M0、`2026-11-16` M1、`2026-11-17` M2、`2026-11-21` M3 与 `2026-11-21` M4）
 
-M4 PDF 证据定位与双栏分段检查来自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) 与 [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh)（`2026-11-21`，提交 `0164e64`，`--offline`）；M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) 与 [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（`2026-11-21`，macOS arm64，基于 [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings) 离线回放）；M2 稿件级检查来自 [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) 与 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/)（`2026-11-17`）；M1 引文核查指标与验收检查来自 [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)（`2026-11-16`）与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)；M0 解析、格式化、统计函数、MCP 协议与命令行基线数值来自 [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) 与 [`reports/readme-commands.txt`](reports/readme-commands.txt)（`2026-11-14` 于 macOS arm64 执行 `Scripts/test.sh milestone 0` 实测；不带 `--record` 时报告写到临时目录，不改动 `reports/`）：
+M4 PDF 证据定位与双栏分段检查来自 [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) 与 [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh)（`2026-11-21`，提交 `1c7203d`，`--offline`）；M3 MCP 写入关口、工具表与三家客户端隔离注册连通检查来自 [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) 与 [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh)（`2026-11-21`，macOS arm64，基于 [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings) 离线回放）；M2 稿件级检查来自 [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) 与 [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/)（`2026-11-17`）；M1 引文核查指标与验收检查来自 [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)（`2026-11-16`）与 [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh)；M0 解析、格式化、统计函数、MCP 协议与命令行基线数值来自 [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) 与 [`reports/readme-commands.txt`](reports/readme-commands.txt)（`2026-11-14` 于 macOS arm64 执行 `Scripts/test.sh milestone 0` 实测；不带 `--record` 时报告写到临时目录，不改动 `reports/`）：
 
 - **引文核查（`scholaros verify-citations`、`scholaros cite`、`scholaros cache clear`、MCP `verify_citation`、MCP `add_verified_bibtex`、MCP `scholar_verify_bibliography`）**（[`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json)，`2026-11-16`）：使用五类状态（`VERIFIED`、`DRIFT`、`NOT_FOUND`、`RETRACTED`、`UNVERIFIED`），支持 `--lang en`、`--lang zh` 与 `--json` 输出：
   - 默认联网查询 Crossref、OpenAlex、`doi.org`、arXiv 与 PubMed，并将可缓存响应写入本地 SQLite（默认 `~/Library/Caches/ScholarOS/registry.sqlite`，或 `$SCHOLAR_CACHE_DIR/registry.sqlite`；有效 `200` 记录有效期 30 天，有依据的不存在记录有效期 1 天）；`--no-cache` 本次运行不读写缓存，`scholaros cache clear` 删除当前生效位置的 `registry.sqlite`（含 `-wal`/`-shm`），`--verbose` 每查一次向标准错误输出一行（数据源、地址、状态码、耗时与来源）。

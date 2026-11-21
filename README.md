@@ -95,7 +95,7 @@ Given a local PDF and a claim sentence, ScholarOS segments two-column layouts, r
 
 ### Benchmark Metrics (`reports/m4-acceptance.txt`)
 
-- **Date & commit:** `2026-11-21T13:16:25Z`, commit `0164e64`, all numbers below taken from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) (`--offline`, isolated `HOME`, `SCHOLAR_CACHE_DIR` unset).
+- **Date & commit:** `2026-11-21T14:18:20Z`, commit `1c7203d`, all numbers below taken from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) (`--offline`, isolated `HOME`, `SCHOLAR_CACHE_DIR` unset).
 - **Method:** `5` official two-column CC BY 4.0 arXiv PDFs (`2506.06524v1`, `2409.19431v3`, `2410.04196v2`, `2611.15445v1`, `2610.15486v1`; per-paper licence and SHA-256 attributions in [`Benchmarks/evidence/`](Benchmarks/evidence/)), evaluated on `30` claims (`10` grounded, `10` numeric-mismatch, `10` not-mentioned) plus `15` English/Chinese sentinel rows (`45` rows total in [`Benchmarks/evidence/claims.jsonl`](Benchmarks/evidence/claims.jsonl)) written by the conductor, spot-checked and frozen by the user, and never modified by the implementer.
 
 | Check / Metric | Result | Requirement / Notes |
@@ -104,7 +104,7 @@ Given a local PDF and a claim sentence, ScholarOS segments two-column layouts, r
 | **Numeric-mismatch claims (`NUMERIC_MISMATCH` on `expected_pages` with ground-truth number in `pdf_text`)** | **`9/10`** | Hard requirement `>= 8/10`: Passed (Row 3; `ev_004` returned `NUMERIC_MISMATCH` on page `2` instead of expected page `3`). |
 | **Not-mentioned (`10`) + sentinel (`15`) rows returning `NOT_FOUND` (`matches == []`)** | **`25/25`** | Hard requirement `25/25` (`0` tolerance): Passed (`10/10` not-mentioned, `15/15` sentinels; Row 4). |
 | **Bounding-box geometric verification (`+4.0pt` expansion vs. `pdftotext -tsv`)** | **`19/19` boxes verified** | Hard requirement `>= 80.0%` word coverage: Passed (`min_word_coverage = 100.0%`, Poppler `pdftotext` `26.10.0`, `0/5` stored-vs-live diffs; Row 5). |
-| **Two-column PDF segmentation (0 header/footer body leaks, Intro + Refs recognized, `col1 < col2`)** | **`5/5` benchmark papers** | Hard requirement: Passed (`5/5` benchmark papers and `5/5` synthetic fixtures at `0164e64`; Row 6). |
+| **Two-column PDF segmentation (0 header/footer body leaks, Intro + Refs recognized, `col1 < col2`)** | **`5/5` benchmark papers, `7/7` synthetic fixtures** | Hard requirement: Passed (`5/5` benchmark papers and `7/7` synthetic fixtures; Row 6). |
 | **Word overlap vs. `pdftotext` across 5 benchmark papers** | **Min `96.87%` (`5/5` passed)** | Hard requirement `>= 95.00%` per paper: Passed (Row 7; per-paper breakdown below). |
 | **CLI `locate-evidence --json` vs. MCP `locate_evidence` parity across 45 rows** | **`0/45` differences** | Hard requirement `0` differences: Passed (`default_tools = 5`, `ERR_INVALID_ARGUMENT` verified; Row 8). |
 | **Error handling (missing file, non-PDF bytes, blank PDF, empty claim)** | **`9/9` passed** | All exit `2` with empty `--json` `stdout` and non-empty `stderr` (Row 9). |
@@ -113,11 +113,11 @@ Given a local PDF and a claim sentence, ScholarOS segments two-column layouts, r
 
 | Paper (`Benchmarks/evidence/pdfs/`) | Template | Chunks / Headings | Word Overlap vs. `pdftotext` | Segmentation Time (`ms`) |
 |---|---|---:|---:|---:|
-| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`** (`3293/3296`) | **`300.0 ms`** |
-| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`** (`20279/20759`) | **`2359.2 ms`** |
-| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`** (`10333/10667`) | **`1213.4 ms`** |
-| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`** (`6814/6906`) | **`784.7 ms`** |
-| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`** (`15163/15386`) | **`2121.9 ms`** |
+| `2506.06524v1` | IEEEtran conference | `68` / `8` | **`99.91%`** (`3293/3296`) | **`333.3ms`** |
+| `2409.19431v3` | ICML 2025 | `938` / `18` | **`97.69%`** (`20279/20759`) | **`2137.8ms`** |
+| `2410.04196v2` | ICML 2025 | `337` / `11` | **`96.87%`** (`10333/10667`) | **`1083.7ms`** |
+| `2611.15445v1` | acmart sigconf | `202` / `18` | **`98.67%`** (`6814/6906`) | **`822.0ms`** |
+| `2610.15486v1` | Elsevier cas-dc | `366` / `36` | **`98.55%`** (`15163/15386`) | **`2030.8ms`** |
 | **Minimum / Summary** | **`5` two-column papers** | — | **Min `96.87%` (`5/5 >= 95.00%`)** | — |
 
 ### How to Reproduce Evidence Localization Metrics
@@ -132,7 +132,7 @@ Scripts/acceptance/m4-acceptance.sh
 
 ## Verified Capabilities (`2026-11-14` M0, `2026-11-16` M1, `2026-11-17` M2, `2026-11-21` M3 & `2026-11-21` M4)
 
-M4 PDF evidence localization and two-column segmentation checks come from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) and [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh) (`2026-11-21`, commit `0164e64`, `--offline`); M3 MCP write gate, tool surface, and isolated client registration checks come from [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) and [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (`2026-11-21`, macOS arm64, replayed against [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings)); M2 manuscript-level checks come from [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) and [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) (`2026-11-17`); M1 citation verification metrics and acceptance checks come from [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json) (`2026-11-16`) and [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh); M0 parsing, formatting, statistical, MCP protocol, and CLI baseline numbers come from [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) and [`reports/readme-commands.txt`](reports/readme-commands.txt) (`2026-11-14`, macOS arm64, `Scripts/test.sh milestone 0`; without `--record`, reports go to a temporary directory and leave `reports/` untouched).
+M4 PDF evidence localization and two-column segmentation checks come from [`reports/m4-acceptance.txt`](reports/m4-acceptance.txt) and [`Scripts/acceptance/m4-acceptance.sh`](Scripts/acceptance/m4-acceptance.sh) (`2026-11-21`, commit `1c7203d`, `--offline`); M3 MCP write gate, tool surface, and isolated client registration checks come from [`Scripts/acceptance/m3-mcp.sh`](Scripts/acceptance/m3-mcp.sh) and [`Scripts/acceptance/m3-clients.sh`](Scripts/acceptance/m3-clients.sh) (`2026-11-21`, macOS arm64, replayed against [`Benchmarks/citations/recordings/`](Benchmarks/citations/recordings)); M2 manuscript-level checks come from [`Scripts/acceptance/m2-acceptance.sh`](Scripts/acceptance/m2-acceptance.sh) and [`Benchmarks/manuscripts/`](Benchmarks/manuscripts/) (`2026-11-17`); M1 citation verification metrics and acceptance checks come from [`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json) (`2026-11-16`) and [`Scripts/acceptance/m1-acceptance.sh`](Scripts/acceptance/m1-acceptance.sh); M0 parsing, formatting, statistical, MCP protocol, and CLI baseline numbers come from [`reports/m0-acceptance.txt`](reports/m0-acceptance.txt) and [`reports/readme-commands.txt`](reports/readme-commands.txt) (`2026-11-14`, macOS arm64, `Scripts/test.sh milestone 0`; without `--record`, reports go to a temporary directory and leave `reports/` untouched).
 
 - **Citation Verification (`scholaros verify-citations`, `scholaros cite`, `scholaros cache clear`, MCP `verify_citation`, MCP `add_verified_bibtex`, MCP `scholar_verify_bibliography`)** ([`reports/citation-bench-2026-11-16-live.json`](reports/citation-bench-2026-11-16-live.json), `2026-11-16`): Classifies entries into 5 states (`VERIFIED`, `DRIFT`, `NOT_FOUND`, `RETRACTED`, `UNVERIFIED`) with `--lang en`, `--lang zh`, and `--json` output:
   - Queries Crossref, OpenAlex, `doi.org`, arXiv, and PubMed online by default and caches valid responses in SQLite (`~/Library/Caches/ScholarOS/registry.sqlite`, or `$SCHOLAR_CACHE_DIR/registry.sqlite`; 30-day TTL for valid `200` records, 1-day TTL for confirmed non-existence); `--no-cache` skips reading and writing the cache for one run, `scholaros cache clear` removes `registry.sqlite` (`-wal`/`-shm`), and `--verbose` logs one line per lookup to `stderr` (source, URL, status, elapsed time, and origin).
