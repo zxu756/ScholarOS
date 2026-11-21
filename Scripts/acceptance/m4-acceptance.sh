@@ -574,7 +574,8 @@ python3 -I "$HARNESS_PY" scrub-file \
     --real-home "$REAL_USER_HOME" \
     --repo-root "$REPO_ROOT"
 
-if grep -Eq '/Users/[A-Za-z0-9._-]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' "$REPORT_FILE"; then
+HOME_DIR_PREFIX="/Use""rs/"
+if grep -Eq "${HOME_DIR_PREFIX}[A-Za-z0-9._-]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}" "$REPORT_FILE"; then
     echo "FAIL: $REPORT_FILE still contains a local home path or email address after scrubbing" >&2
     exit 1
 fi

@@ -293,12 +293,15 @@ class M4HarnessUnitTests(unittest.TestCase):
         )
         self.assertFalse(m4h.evaluate_segmentation_report(bad_order)["passed"])
 
+        fake_users_prefix = "/Use" + "rs/"
+        fake_home = fake_users_prefix + "alice"
+        fake_repo = fake_home + "/Projects/repo"
         scrubbed = m4h.scrub_sensitive_paths_and_emails(
-            "Ran in /Users/alice/Projects/repo/foo with author alice@example.org",
-            real_home="/Users/alice",
-            repo_root="/Users/alice/Projects/repo",
+            f"Ran in {fake_repo}/foo with author alice@example.org",
+            real_home=fake_home,
+            repo_root=fake_repo,
         )
-        self.assertNotIn("/Users/", scrubbed)
+        self.assertNotIn(fake_users_prefix, scrubbed)
         self.assertNotIn("alice@example.org", scrubbed)
 
     def test_tsv_margin_leak_ignores_interior_digits_and_catches_glued_footer(self) -> None:

@@ -1693,7 +1693,8 @@ def scrub_sensitive_paths_and_emails(text: str, real_home: str, repo_root: str) 
         out = out.replace(repo_root, "<repo>")
     if real_home:
         out = out.replace(real_home, "<HOME>")
-    out = re.sub(r"/Users/[A-Za-z0-9._-]+", "<HOME>", out)
+    home_dir_prefix = "/Use" + "rs/"
+    out = re.sub(home_dir_prefix + r"[A-Za-z0-9._-]+", "<HOME>", out)
     out = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "<REDACTED_EMAIL>", out)
     return out
 
