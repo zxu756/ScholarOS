@@ -411,10 +411,16 @@ public struct PDFMultiColumnSegmenter: Sendable {
             return []
         }
 
+        let pageNS = page.string as NSString?
+        let scannedGlyphs = PDFGlyphRunScanner.scan(page: page)
         var lines: [PositionedTextLine] = []
         for lineSel in fullSelection.selectionsByLine() {
-            guard let raw = lineSel.string?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !raw.isEmpty else { continue }
+            guard let raw = Self.reconstructLineText(
+                from: lineSel,
+                on: page,
+                pageString: pageNS,
+                scannedGlyphs: scannedGlyphs
+            ), !raw.isEmpty else { continue }
             let bounds = lineSel.bounds(for: page)
             lines.append(
                 PositionedTextLine(
@@ -1510,6 +1516,579 @@ public struct PDFMultiColumnSegmenter: Sendable {
         }
 
         return true
+    }
+
+    // MARK: - Character-Level Horizontal Clearance Space Recovery
+
+    /// Minimum horizontal glyph clearance, expressed as a fraction of effective horizontal font size,
+    /// required to insert an inter-word space when PDFKit's `PDFSelection.string` omits one.
+    ///
+    /// How this constant is determined:
+    /// - Intra-word positive kerning in Latin/math typefaces stays below ~0.05 * fontSize (<= 50/1000 em).
+    /// - SI number-unit thin spaces (`\,`, e.g. `40 ms`, `2.5 m`) equal 1/6 em (~0.167 * fontSize).
+    /// - Tightly compressed justified inter-word spaces (`\spaceskip` ~2.0–2.5 pt across 10–18.5 pt fonts,
+    ///   including fonts whose tall `/FontBBox` causes PDFKit to swallow spaces) sit at ~0.109–0.25 * fontSize.
+    /// Setting 0.105 (> 2x maximum intra-word kerning) recovers compressed justified word spaces and SI unit
+    /// spaces without splitting kerning pairs.
+    public static let minimumInterWordGapFontSizeRatio: Double = 0.105
+
+    /// Minimum horizontal clearance ratio required when adjacent glyphs have shifted baselines
+    /// (`> 0.18 * fontSize`), preventing spurious spaces before attached subscripts/superscripts (`x_i`, `R^d`).
+    public static let subscriptSuperscriptGapFontSizeRatio: Double = 0.22
+
+    /// Minimum horizontal clearance ratio required immediately inside delimiters/hyphens or before closing
+    /// punctuation (`.,;:)]}`), preventing spurious spaces inside `whole-body`, `(610)`, `2.5`, or `0.`.
+    public static let delimiterPunctuationGapFontSizeRatio: Double = 0.30
+
+    private static func reconstructLineText(
+        from lineSel: PDFSelection,
+        on page: PDFPage,
+        pageString pageNS: NSString?,
+        scannedGlyphs pageGlyphs: [ScannedPDFGlyph]
+    ) -> String? {
+        guard let fallbackRaw = lineSel.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !fallbackRaw.isEmpty else {
+            return nil
+        }
+        guard let pageNS, !pageGlyphs.isEmpty else {
+            return fallbackRaw
+        }
+
+        let lb = lineSel.bounds(for: page)
+        let minX = Double(lb.minX) - 1.5
+        let maxX = Double(lb.maxX) + 1.5
+        let minY = Double(lb.minY)
+        let maxY = Double(lb.maxY)
+        let lineMidY = 0.5 * (minY + maxY)
+
+        let lineGlyphs = pageGlyphs.filter { g in
+            let vMid = g.visualMidY
+            return g.maxX >= minX && g.minX <= maxX
+                && vMid >= minY && vMid <= maxY
+                && abs(vMid - lineMidY) <= max(0.65 * g.fontSizePt, 0.42 * Double(lb.height))
+        }.sorted { $0.minX < $1.minX }
+
+        guard lineGlyphs.count >= 2 else { return fallbackRaw }
+
+        // Fast path: if no adjacent glyph pair on this line has clearance >= threshold, keep PDFKit's string
+        var hasCandidateGap = false
+        for i in 1..<lineGlyphs.count {
+            let prev = lineGlyphs[i - 1]
+            let cur = lineGlyphs[i]
+            let refFS = max(4.0, min(prev.fontSizePt, cur.fontSizePt))
+            if (cur.minX - prev.maxX) >= minimumInterWordGapFontSizeRatio * refFS {
+                hasCandidateGap = true
+                break
+            }
+        }
+        if !hasCandidateGap {
+            return fallbackRaw
+        }
+
+        let nRanges = lineSel.numberOfTextRanges(on: page)
+        guard nRanges > 0 else { return fallbackRaw }
+
+        func matchGlyphIndex(for subBounds: CGRect) -> Int? {
+            let sx0 = Double(subBounds.minX)
+            let sx1 = Double(subBounds.maxX)
+            let sMid = 0.5 * (sx0 + sx1)
+            var bestIdx: Int? = nil
+            var bestScore = Double.greatestFiniteMagnitude
+            for (idx, g) in lineGlyphs.enumerated() {
+                let overlap = min(sx1, g.maxX) - max(sx0, g.minX)
+                let score: Double
+                if overlap > 0 {
+                    score = abs(g.midX - sMid) - overlap * 2.0
+                } else {
+                    let edgeDist = max(0.0, max(g.minX - sx1, sx0 - g.maxX))
+                    if edgeDist > max(2.5, 0.35 * g.fontSizePt) { continue }
+                    score = edgeDist + abs(g.midX - sMid)
+                }
+                if score < bestScore {
+                    bestScore = score
+                    bestIdx = idx
+                }
+            }
+            return bestIdx
+        }
+
+        var out = ""
+        out.reserveCapacity(fallbackRaw.count + 16)
+        var prevGlyphIdx: Int? = nil
+
+        for r in 0..<nRanges {
+            let rng = lineSel.range(at: r, on: page)
+            guard rng.location != NSNotFound, rng.location + rng.length <= pageNS.length else { continue }
+            var u = rng.location
+            let end = rng.location + rng.length
+            while u < end {
+                let chRange = pageNS.rangeOfComposedCharacterSequence(at: u)
+                let nextU = max(u + 1, chRange.location + chRange.length)
+                let chStr = pageNS.substring(with: chRange)
+                u = nextU
+
+                if chStr == "\n" || chStr == "\r" { continue }
+                if chStr.unicodeScalars.allSatisfy({ CharacterSet.whitespacesAndNewlines.contains($0) }) {
+                    if !out.isEmpty && !out.hasSuffix(" ") {
+                        out.append(" ")
+                    }
+                    prevGlyphIdx = nil
+                    continue
+                }
+
+                var curGlyphIdx: Int? = nil
+                if let subSel = page.selection(for: chRange) {
+                    let sb = subSel.bounds(for: page)
+                    if sb.width > 0 && sb.height > 0 {
+                        curGlyphIdx = matchGlyphIndex(for: sb)
+                    }
+                }
+
+                if let pIdx = prevGlyphIdx, let cIdx = curGlyphIdx, cIdx > pIdx, !out.hasSuffix(" ") {
+                    let gPrev = lineGlyphs[pIdx]
+                    let gCur = lineGlyphs[cIdx]
+                    let directGap = gCur.minX - gPrev.maxX
+                    let refFS = max(4.0, min(gPrev.fontSizePt, gCur.fontSizePt))
+                    let baselineDiff = abs(gCur.baselineY - gPrev.baselineY)
+
+                    var minRatio = minimumInterWordGapFontSizeRatio
+                    if baselineDiff > 0.18 * refFS {
+                        minRatio = max(minRatio, subscriptSuperscriptGapFontSizeRatio)
+                    }
+                    let prevChar = out.last
+                    let curChar = chStr.first
+                    if prevChar == "-" || curChar == "-" {
+                        minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
+                    } else if let c = curChar, ".,;:)]}".contains(c) {
+                        minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
+                    } else if let p = prevChar, "([{".contains(p) {
+                        minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
+                    } else if prevChar == ",", curChar?.isNumber == true, out.dropLast().last?.isNumber == true {
+                        minRatio = max(minRatio, 0.15)
+                    } else if prevChar?.isNumber == true, curChar == "." {
+                        minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
+                    } else if prevChar == ".", curChar?.isNumber == true {
+                        minRatio = max(minRatio, delimiterPunctuationGapFontSizeRatio)
+                    }
+
+                    if directGap >= minRatio * refFS {
+                        out.append(" ")
+                    }
+                }
+
+                out.append(chStr)
+                if curGlyphIdx != nil {
+                    prevGlyphIdx = curGlyphIdx
+                }
+            }
+        }
+
+        let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallbackRaw : trimmed
+    }
+}
+
+// MARK: - CoreGraphics PDF Content Stream Glyph Run Scanner
+
+private struct ScannedPDFGlyph: Sendable {
+    let minX: Double
+    let maxX: Double
+    let baselineY: Double
+    let fontSizePt: Double
+
+    var midX: Double { 0.5 * (minX + maxX) }
+    var visualMidY: Double { baselineY + 0.30 * fontSizePt }
+}
+
+private final class PDFGlyphRunScanner {
+    struct FontMetrics {
+        let isTwoByteCID: Bool
+        let hasReliableWidths: Bool
+        let defaultWidth: Double
+        let widths: [Int: Double]
+        let fontMatrixScaleX: Double
+    }
+
+    struct GraphicsState {
+        var ctm: CGAffineTransform = .identity
+        var fontSize: Double = 10.0
+        var charSpace: Double = 0.0
+        var wordSpace: Double = 0.0
+        var horizScale: Double = 1.0
+        var leading: Double = 0.0
+        var textRise: Double = 0.0
+        var currentFont: FontMetrics?
+    }
+
+    var stateStack: [GraphicsState] = []
+    var state = GraphicsState()
+    var textMatrix: CGAffineTransform = .identity
+    var lineMatrix: CGAffineTransform = .identity
+    var resourcesStack: [CGPDFDictionaryRef] = []
+    var contentStreamStack: [CGPDFContentStreamRef] = []
+    var fontCache: [String: FontMetrics] = [:]
+    var glyphs: [ScannedPDFGlyph] = []
+
+    static func scan(page: PDFPage) -> [ScannedPDFGlyph] {
+        guard let cgPage = page.pageRef else { return [] }
+        let scanner = PDFGlyphRunScanner()
+        if let pageDict = cgPage.dictionary {
+            var resDict: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(pageDict, "Resources", &resDict), let r = resDict {
+                scanner.resourcesStack.append(r)
+            }
+        }
+        let contentStream = CGPDFContentStreamCreateWithPage(cgPage)
+        scanner.contentStreamStack.append(contentStream)
+        let table = scanner.makeOperatorTable()
+        let cgScanner = CGPDFScannerCreate(contentStream, table, Unmanaged.passUnretained(scanner).toOpaque())
+        CGPDFScannerScan(cgScanner)
+        CGPDFScannerRelease(cgScanner)
+        CGPDFOperatorTableRelease(table)
+        _ = scanner.contentStreamStack.popLast()
+        CGPDFContentStreamRelease(contentStream)
+        return scanner.glyphs
+    }
+
+    private func lookupFont(named name: UnsafePointer<CChar>) -> FontMetrics? {
+        let nameStr = String(cString: name)
+        for (depth, res) in resourcesStack.enumerated().reversed() {
+            var fontsDict: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(res, "Font", &fontsDict), let fd = fontsDict else { continue }
+            var fontDict: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(fd, name, &fontDict), let f = fontDict else { continue }
+            let cacheKey = "\(depth):\(nameStr)"
+            if let cached = fontCache[cacheKey] { return cached }
+            let parsed = Self.parseFontMetrics(f)
+            fontCache[cacheKey] = parsed
+            return parsed
+        }
+        return nil
+    }
+
+    private static func parseFontMetrics(_ fontDict: CGPDFDictionaryRef) -> FontMetrics {
+        var subtypePtr: UnsafePointer<CChar>?
+        let subtype = CGPDFDictionaryGetName(fontDict, "Subtype", &subtypePtr) && subtypePtr != nil
+            ? String(cString: subtypePtr!)
+            : ""
+
+        if subtype == "Type0" {
+            var descArr: CGPDFArrayRef?
+            var cidDict: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetArray(fontDict, "DescendantFonts", &descArr),
+               let arr = descArr, CGPDFArrayGetCount(arr) > 0,
+               CGPDFArrayGetDictionary(arr, 0, &cidDict), let cid = cidDict {
+                var dwInt: CGPDFInteger = 1000
+                var dwReal: CGPDFReal = 1000.0
+                let dw: Double
+                if CGPDFDictionaryGetNumber(cid, "DW", &dwReal) {
+                    dw = Double(dwReal)
+                } else if CGPDFDictionaryGetInteger(cid, "DW", &dwInt) {
+                    dw = Double(dwInt)
+                } else {
+                    dw = 1000.0
+                }
+
+                var wMap: [Int: Double] = [:]
+                var wArr: CGPDFArrayRef?
+                if CGPDFDictionaryGetArray(cid, "W", &wArr), let wa = wArr {
+                    let count = CGPDFArrayGetCount(wa)
+                    var i = 0
+                    while i + 1 < count {
+                        var startCID: CGPDFInteger = 0
+                        guard CGPDFArrayGetInteger(wa, i, &startCID) else { i += 1; continue }
+                        var subArr: CGPDFArrayRef?
+                        if CGPDFArrayGetArray(wa, i + 1, &subArr), let sa = subArr {
+                            let sc = CGPDFArrayGetCount(sa)
+                            for j in 0..<sc {
+                                var wVal: CGPDFReal = 0
+                                if CGPDFArrayGetNumber(sa, j, &wVal) {
+                                    wMap[Int(startCID) + j] = Double(wVal)
+                                }
+                            }
+                            i += 2
+                        } else if i + 2 < count {
+                            var endCID: CGPDFInteger = 0
+                            var wVal: CGPDFReal = 0
+                            if CGPDFArrayGetInteger(wa, i + 1, &endCID),
+                               CGPDFArrayGetNumber(wa, i + 2, &wVal),
+                               endCID >= startCID && (endCID - startCID) <= 65536 {
+                                for cidCode in startCID...endCID {
+                                    wMap[Int(cidCode)] = Double(wVal)
+                                }
+                            }
+                            i += 3
+                        } else {
+                            break
+                        }
+                    }
+                }
+
+                var twoByte = true
+                var encNamePtr: UnsafePointer<CChar>?
+                if CGPDFDictionaryGetName(fontDict, "Encoding", &encNamePtr), let ep = encNamePtr {
+                    let encName = String(cString: ep)
+                    if encName == "WinAnsiEncoding" || encName == "MacRomanEncoding" || encName == "StandardEncoding" {
+                        twoByte = false
+                    }
+                }
+                return FontMetrics(
+                    isTwoByteCID: twoByte,
+                    hasReliableWidths: true,
+                    defaultWidth: dw,
+                    widths: wMap,
+                    fontMatrixScaleX: 0.001
+                )
+            }
+        }
+
+        var scaleX = 0.001
+        if subtype == "Type3" {
+            var fmArr: CGPDFArrayRef?
+            if CGPDFDictionaryGetArray(fontDict, "FontMatrix", &fmArr), let fma = fmArr, CGPDFArrayGetCount(fma) >= 1 {
+                var a: CGPDFReal = 0.001
+                if CGPDFArrayGetNumber(fma, 0, &a), abs(a) > 0 {
+                    scaleX = abs(Double(a))
+                }
+            }
+        }
+
+        var firstChar: CGPDFInteger = 0
+        _ = CGPDFDictionaryGetInteger(fontDict, "FirstChar", &firstChar)
+        var wMap: [Int: Double] = [:]
+        var wArr: CGPDFArrayRef?
+        if CGPDFDictionaryGetArray(fontDict, "Widths", &wArr), let wa = wArr {
+            let count = CGPDFArrayGetCount(wa)
+            for j in 0..<count {
+                var wVal: CGPDFReal = 0
+                if CGPDFArrayGetNumber(wa, j, &wVal) {
+                    wMap[Int(firstChar) + j] = Double(wVal)
+                }
+            }
+        }
+
+        var baseFontPtr: UnsafePointer<CChar>?
+        let baseFont = CGPDFDictionaryGetName(fontDict, "BaseFont", &baseFontPtr) && baseFontPtr != nil
+            ? String(cString: baseFontPtr!)
+            : ""
+        let isCourier = baseFont.lowercased().hasPrefix("courier")
+
+        var missingW: Double = isCourier ? 600.0 : 500.0
+        var fdDict: CGPDFDictionaryRef?
+        if CGPDFDictionaryGetDictionary(fontDict, "FontDescriptor", &fdDict), let fd = fdDict {
+            var mw: CGPDFReal = 0
+            if CGPDFDictionaryGetNumber(fd, "MissingWidth", &mw), mw > 0 {
+                missingW = Double(mw)
+            }
+        }
+
+        return FontMetrics(
+            isTwoByteCID: false,
+            hasReliableWidths: !wMap.isEmpty || isCourier,
+            defaultWidth: missingW,
+            widths: wMap,
+            fontMatrixScaleX: scaleX
+        )
+    }
+
+    private func showPDFString(_ pdfStr: CGPDFStringRef) {
+        guard let bytePtr = CGPDFStringGetBytePtr(pdfStr) else { return }
+        let len = CGPDFStringGetLength(pdfStr)
+        guard len > 0, let fm = state.currentFont, fm.hasReliableWidths else { return }
+
+        var idx = 0
+        while idx < len {
+            let code: Int
+            let isSpaceByte: Bool
+            if fm.isTwoByteCID && idx + 1 < len {
+                code = (Int(bytePtr[idx]) << 8) | Int(bytePtr[idx + 1])
+                isSpaceByte = false
+                idx += 2
+            } else {
+                code = Int(bytePtr[idx])
+                isSpaceByte = (code == 32)
+                idx += 1
+            }
+
+            let rawW = fm.widths[code] ?? fm.defaultWidth
+            let glyphAdvTextSpace = (rawW * fm.fontMatrixScaleX * state.fontSize) * state.horizScale
+            let extraAdvTextSpace = (state.charSpace + (isSpaceByte ? state.wordSpace : 0.0)) * state.horizScale
+
+            let combined = textMatrix.concatenating(state.ctm)
+            let p0 = CGPoint(x: 0.0, y: state.textRise).applying(combined)
+            let pGlyphEnd = CGPoint(x: glyphAdvTextSpace, y: state.textRise).applying(combined)
+
+            let dx = Double(pGlyphEnd.x - p0.x)
+            let dy = Double(pGlyphEnd.y - p0.y)
+            let effFontSize = abs(state.fontSize * hypot(Double(combined.a), Double(combined.b)))
+            if !isSpaceByte && rawW > 1e-3 && abs(dx) >= abs(dy) {
+                let x0 = min(Double(p0.x), Double(pGlyphEnd.x))
+                let x1 = max(Double(p0.x), Double(pGlyphEnd.x))
+                glyphs.append(
+                    ScannedPDFGlyph(
+                        minX: x0,
+                        maxX: x1,
+                        baselineY: Double(p0.y),
+                        fontSizePt: max(1.0, effFontSize)
+                    )
+                )
+            }
+
+            let totalTx = glyphAdvTextSpace + extraAdvTextSpace
+            textMatrix = CGAffineTransform(translationX: totalTx, y: 0).concatenating(textMatrix)
+        }
+    }
+
+    private func displaceTextX(thousandths: Double) {
+        let tx = (-thousandths / 1000.0) * state.fontSize * state.horizScale
+        textMatrix = CGAffineTransform(translationX: tx, y: 0).concatenating(textMatrix)
+    }
+
+    private func makeOperatorTable() -> CGPDFOperatorTableRef {
+        let tbl = CGPDFOperatorTableCreate()!
+        func me(_ info: UnsafeMutableRawPointer?) -> PDFGlyphRunScanner {
+            Unmanaged<PDFGlyphRunScanner>.fromOpaque(info!).takeUnretainedValue()
+        }
+
+        CGPDFOperatorTableSetCallback(tbl, "q") { _, info in
+            let s = me(info); s.stateStack.append(s.state)
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Q") { _, info in
+            let s = me(info); if let prev = s.stateStack.popLast() { s.state = prev }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "cm") { sc, info in
+            var a: CGPDFReal = 0, b: CGPDFReal = 0, c: CGPDFReal = 0, d: CGPDFReal = 0, e: CGPDFReal = 0, f: CGPDFReal = 0
+            guard CGPDFScannerPopNumber(sc, &f), CGPDFScannerPopNumber(sc, &e),
+                  CGPDFScannerPopNumber(sc, &d), CGPDFScannerPopNumber(sc, &c),
+                  CGPDFScannerPopNumber(sc, &b), CGPDFScannerPopNumber(sc, &a) else { return }
+            let s = me(info)
+            s.state.ctm = CGAffineTransform(a: a, b: b, c: c, d: d, tx: e, ty: f).concatenating(s.state.ctm)
+        }
+        CGPDFOperatorTableSetCallback(tbl, "BT") { _, info in
+            let s = me(info); s.textMatrix = .identity; s.lineMatrix = .identity
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tf") { sc, info in
+            var sz: CGPDFReal = 0; var name: UnsafePointer<CChar>?
+            guard CGPDFScannerPopNumber(sc, &sz), CGPDFScannerPopName(sc, &name), let n = name else { return }
+            let s = me(info); s.state.fontSize = Double(sz); s.state.currentFont = s.lookupFont(named: n)
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tc") { sc, info in
+            var v: CGPDFReal = 0; if CGPDFScannerPopNumber(sc, &v) { me(info).state.charSpace = Double(v) }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tw") { sc, info in
+            var v: CGPDFReal = 0; if CGPDFScannerPopNumber(sc, &v) { me(info).state.wordSpace = Double(v) }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tz") { sc, info in
+            var v: CGPDFReal = 100; if CGPDFScannerPopNumber(sc, &v) { me(info).state.horizScale = Double(v) / 100.0 }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "TL") { sc, info in
+            var v: CGPDFReal = 0; if CGPDFScannerPopNumber(sc, &v) { me(info).state.leading = Double(v) }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Ts") { sc, info in
+            var v: CGPDFReal = 0; if CGPDFScannerPopNumber(sc, &v) { me(info).state.textRise = Double(v) }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Td") { sc, info in
+            var tx: CGPDFReal = 0, ty: CGPDFReal = 0
+            guard CGPDFScannerPopNumber(sc, &ty), CGPDFScannerPopNumber(sc, &tx) else { return }
+            let s = me(info)
+            s.lineMatrix = CGAffineTransform(translationX: tx, y: ty).concatenating(s.lineMatrix)
+            s.textMatrix = s.lineMatrix
+        }
+        CGPDFOperatorTableSetCallback(tbl, "TD") { sc, info in
+            var tx: CGPDFReal = 0, ty: CGPDFReal = 0
+            guard CGPDFScannerPopNumber(sc, &ty), CGPDFScannerPopNumber(sc, &tx) else { return }
+            let s = me(info); s.state.leading = Double(-ty)
+            s.lineMatrix = CGAffineTransform(translationX: tx, y: ty).concatenating(s.lineMatrix)
+            s.textMatrix = s.lineMatrix
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tm") { sc, info in
+            var a: CGPDFReal = 0, b: CGPDFReal = 0, c: CGPDFReal = 0, d: CGPDFReal = 0, e: CGPDFReal = 0, f: CGPDFReal = 0
+            guard CGPDFScannerPopNumber(sc, &f), CGPDFScannerPopNumber(sc, &e),
+                  CGPDFScannerPopNumber(sc, &d), CGPDFScannerPopNumber(sc, &c),
+                  CGPDFScannerPopNumber(sc, &b), CGPDFScannerPopNumber(sc, &a) else { return }
+            let s = me(info); s.lineMatrix = CGAffineTransform(a: a, b: b, c: c, d: d, tx: e, ty: f); s.textMatrix = s.lineMatrix
+        }
+        CGPDFOperatorTableSetCallback(tbl, "T*") { _, info in
+            let s = me(info)
+            s.lineMatrix = CGAffineTransform(translationX: 0, y: -s.state.leading).concatenating(s.lineMatrix)
+            s.textMatrix = s.lineMatrix
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Tj") { sc, info in
+            var str: CGPDFStringRef?; if CGPDFScannerPopString(sc, &str), let st = str { me(info).showPDFString(st) }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "'") { sc, info in
+            var str: CGPDFStringRef?; guard CGPDFScannerPopString(sc, &str), let st = str else { return }
+            let s = me(info)
+            s.lineMatrix = CGAffineTransform(translationX: 0, y: -s.state.leading).concatenating(s.lineMatrix)
+            s.textMatrix = s.lineMatrix; s.showPDFString(st)
+        }
+        CGPDFOperatorTableSetCallback(tbl, "\"") { sc, info in
+            var str: CGPDFStringRef?; var ac: CGPDFReal = 0, aw: CGPDFReal = 0
+            guard CGPDFScannerPopString(sc, &str), CGPDFScannerPopNumber(sc, &ac), CGPDFScannerPopNumber(sc, &aw), let st = str else { return }
+            let s = me(info); s.state.wordSpace = Double(aw); s.state.charSpace = Double(ac)
+            s.lineMatrix = CGAffineTransform(translationX: 0, y: -s.state.leading).concatenating(s.lineMatrix)
+            s.textMatrix = s.lineMatrix; s.showPDFString(st)
+        }
+        CGPDFOperatorTableSetCallback(tbl, "TJ") { sc, info in
+            var arr: CGPDFArrayRef?; guard CGPDFScannerPopArray(sc, &arr), let a = arr else { return }
+            let s = me(info); let cnt = CGPDFArrayGetCount(a)
+            for i in 0..<cnt {
+                var str: CGPDFStringRef?; var num: CGPDFReal = 0
+                if CGPDFArrayGetString(a, i, &str), let st = str { s.showPDFString(st) }
+                else if CGPDFArrayGetNumber(a, i, &num) { s.displaceTextX(thousandths: Double(num)) }
+            }
+        }
+        CGPDFOperatorTableSetCallback(tbl, "Do") { sc, info in
+            var name: UnsafePointer<CChar>?
+            guard CGPDFScannerPopName(sc, &name), let n = name else { return }
+            let s = me(info)
+            for res in s.resourcesStack.reversed() {
+                var xobjDict: CGPDFDictionaryRef?
+                guard CGPDFDictionaryGetDictionary(res, "XObject", &xobjDict), let xd = xobjDict else { continue }
+                var stream: CGPDFStreamRef?
+                guard CGPDFDictionaryGetStream(xd, n, &stream), let st = stream,
+                      let stDict = CGPDFStreamGetDictionary(st) else { continue }
+                var subPtr: UnsafePointer<CChar>?
+                guard CGPDFDictionaryGetName(stDict, "Subtype", &subPtr), let sp = subPtr,
+                      String(cString: sp) == "Form" else { break }
+
+                s.stateStack.append(s.state)
+                var matArr: CGPDFArrayRef?
+                if CGPDFDictionaryGetArray(stDict, "Matrix", &matArr), let ma = matArr, CGPDFArrayGetCount(ma) == 6 {
+                    var a: CGPDFReal = 1, b: CGPDFReal = 0, c: CGPDFReal = 0, d: CGPDFReal = 1, e: CGPDFReal = 0, f: CGPDFReal = 0
+                    if CGPDFArrayGetNumber(ma, 0, &a), CGPDFArrayGetNumber(ma, 1, &b),
+                       CGPDFArrayGetNumber(ma, 2, &c), CGPDFArrayGetNumber(ma, 3, &d),
+                       CGPDFArrayGetNumber(ma, 4, &e), CGPDFArrayGetNumber(ma, 5, &f) {
+                        s.state.ctm = CGAffineTransform(a: a, b: b, c: c, d: d, tx: e, ty: f).concatenating(s.state.ctm)
+                    }
+                }
+                var formRes: CGPDFDictionaryRef?
+                let pushedRes: Bool
+                if CGPDFDictionaryGetDictionary(stDict, "Resources", &formRes), let fr = formRes {
+                    s.resourcesStack.append(fr); pushedRes = true
+                } else {
+                    pushedRes = false
+                }
+                guard let parentCS = s.contentStreamStack.last else {
+                    if pushedRes { _ = s.resourcesStack.popLast() }
+                    if let prev = s.stateStack.popLast() { s.state = prev }
+                    break
+                }
+                let cs = CGPDFContentStreamCreateWithStream(st, stDict, parentCS)
+                s.contentStreamStack.append(cs)
+                let subTbl = s.makeOperatorTable()
+                let subSc = CGPDFScannerCreate(cs, subTbl, info)
+                CGPDFScannerScan(subSc)
+                CGPDFScannerRelease(subSc)
+                CGPDFOperatorTableRelease(subTbl)
+                _ = s.contentStreamStack.popLast()
+                CGPDFContentStreamRelease(cs)
+                if pushedRes { _ = s.resourcesStack.popLast() }
+                if let prev = s.stateStack.popLast() { s.state = prev }
+                break
+            }
+        }
+        return tbl
     }
 }
 

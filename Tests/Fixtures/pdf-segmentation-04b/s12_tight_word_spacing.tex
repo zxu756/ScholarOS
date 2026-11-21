@@ -1,0 +1,72 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[paperwidth=11in,paperheight=14in,margin=0.58in,top=1.05in,bottom=1.05in,columnsep=0.52in]{geometry}
+\usepackage{amsmath}
+
+\font\tightrm="[lmroman17-regular.otf]:mapping=tex-text" at 18.5pt
+\font\tighthdrf="[lmroman17-regular.otf]:mapping=tex-text" at 18.5pt
+\font\tightsecf="[lmroman12-bold.otf]:mapping=tex-text" at 18.5pt
+
+\newcommand{\tightprose}{%
+  \tightrm%
+  \baselineskip=21.5pt%
+  \lineskip=1.5pt%
+  \pretolerance=80%
+  \tolerance=4500%
+  \emergencystretch=0.9em%
+  \hyphenpenalty=10%
+  \exhyphenpenalty=10%
+  \spaceskip=2.18pt plus 0.36pt minus 0.16pt%
+  \xspaceskip=2.24pt plus 0.38pt minus 0.16pt%
+}
+
+\newcommand{\tightsec}[1]{%
+  \par\vspace{9pt plus 2pt minus 1pt}%
+  \noindent{\tightsecf\spaceskip=3.5pt #1}\par\vspace{4pt}%
+  \tightprose%
+}
+
+\makeatletter
+\def\ps@tighthdr{%
+  \def\@oddhead{\tighthdrf\spaceskip=2.22pt Autonomous Planetary Robotics Review\hfill Vol.~12, No.~4, 2026}%
+  \def\@evenhead{\tighthdrf\spaceskip=2.22pt Autonomous Planetary Robotics Review\hfill Vol.~12, No.~4, 2026}%
+  \def\@oddfoot{\hfill\tightrm\spaceskip=2.25pt Page \thepage\ of 2}%
+  \def\@evenfoot{\hfill\tightrm\spaceskip=2.25pt Page \thepage\ of 2}%
+}
+\makeatother
+\pagestyle{tighthdr}
+
+\begin{document}
+\tightprose
+
+\tightsec{1 Introduction}
+Robotic platforms operating across unstructured planetary terrains must preserve closed-loop stability while executing whole-body manipulation tasks under severe communication latency. When typesetting templates compress justified inter-word spaces toward two points, naive selection strings silently concatenate adjacent words into unreadable tokens.
+
+Beyond locomotion, autonomous surface missions require coordinated force control, real-time obstacle avoidance, and explicit safety verification across irregular regolith slopes. Our controller enforces torque bounds up to 2.5\kern 3.1pt m from the base frame while tolerating actuation delays of 40\kern 3.1pt ms during contact transitions.
+
+\tightsec{2 Constrained Policy Architecture}
+We formulate terrain-aware whole-body control over state space {\normalsize $S \subset R$} with bounded disturbance parameter {\normalsize $\epsilon \in (0, 1]$} and discount factor {\normalsize $\gamma = 0.99$}. Rather than relying on hand-tuned penalty weights, each joint-limit violation triggers a calibrated termination probability during rollout collection.
+
+Across 1,200 simulated episodes on Crater-Bench, low-level tracking error remains below 3.4\% without sacrificing end-effector responsiveness. Hyphenated compound descriptors such as safety-constrained and hardware-in-the-loop retain their internal hyphens across column line breaks and never split mid-word.
+
+\newpage
+
+\tightsec{3 System Calibration}
+Actuator torque observers continuously estimate contact wrenches from joint-encoder histories and inertial-measurement streams without external force-torque sensors. Calibration sweeps across regolith simulant beds confirm repeatable foot-ground impedance behavior under variable normal loads.
+
+\clearpage
+
+\tightsec{4 Experimental Evaluation}
+To evaluate robustness under realistic inertial uncertainty, we randomize payload mass, terrain friction, and actuator damping across five difficulty tiers. Every policy checkpoint is tested on steep unconsolidated slopes, embedded boulders, and recessed sample-cache receptacles before deployment.
+
+Quantitative comparisons confirm that constrained rollouts eliminate catastrophic knee-torque spikes while maintaining smooth velocity profiles throughout multi-step grasping sequences. Both left and right prose columns maintain strict reading order from top to bottom on every page of the manuscript.
+
+\newpage
+
+\tightsec{5 Conclusion}
+Recovering exact horizontal glyph clearances from PDF page streams prevents word concatenation on tightly justified two-column layouts while keeping margin headers and page footers cleanly separated from body passages.
+
+\tightsec{References}
+\noindent [1] A.~Rivera and K.~Lindholm, ``Geometric word-boundary recovery in tightly justified scientific documents,'' Proc. Int. Conf. Document Analysis, pp.~104--115, 2025.\par\vspace{4pt}
+\noindent [2] C.~Okafor, ``Safety-constrained locomotion over deformable lunar regolith,'' J. Field Robotics, vol.~43, no.~2, pp.~210--228, 2026.\par
+
+\end{document}
