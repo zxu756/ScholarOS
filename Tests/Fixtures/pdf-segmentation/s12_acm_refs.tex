@@ -1,0 +1,77 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.75in,top=0.90in,bottom=0.90in]{geometry}
+
+\makeatletter
+\def\ps@acmprobe{%
+  \def\@oddhead{\small SurvEval-Probe: Two-Column Ranking Evaluation\hfill Conference '26, November 2026}%
+  \def\@evenhead{\small Conference '26, November 2026\hfill Rivera and Vance}%
+  \def\@oddfoot{\hfill\small\thepage\hfill}%
+  \def\@evenfoot{\hfill\small\thepage\hfill}%
+}
+\makeatother
+\pagestyle{acmprobe}
+
+\title{\textbf{Survival-Weighted Listwise Ranking Evaluation}}
+\author{Alice Rivera \and Bernard Vance}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{acmprobe}
+
+\section*{ABSTRACT}
+We evaluate geometric passage segmentation on two-column conference articles featuring all-caps section headings, spanning benchmark tables, and hanging-indented numbered reference lists. Across 420 evaluation queries, our method preserves bibliography items as body passages.
+
+\section*{1 INTRODUCTION}
+Modern conference templates such as ACM sigconf typeset top-level headings in uppercase and format bibliographies as two-column hanging-indented lists with bracketed numeric labels. Naive table detectors merge left and right bibliography columns across the central gutter.
+
+\section*{2 METHODOLOGY}
+Each page is partitioned into margin furniture, genuine cross-column floats, and two-column prose streams. Only multi-column grids or captioned floats that bridge across the centerline are isolated as spanning figures or tables.
+
+\begin{table*}[t]
+\centering
+\caption{Cross-column evaluation of listwise ranking metrics across two benchmark datasets.}
+\vspace{3pt}
+\begin{tabular}{lcccc}
+\hline
+Model Variant & Dataset A NDCG & Dataset A uAUC & Dataset B NDCG & Latency \\
+\hline
+Pointwise Baseline & 0.7965 & 0.6781 & 0.7022 & 6.4 ms \\
+Permutation Ranker & 0.8312 & 0.7091 & 0.7281 & 11.2 ms \\
+Contextual Evaluator & 0.8450 & 0.7196 & 0.7371 & 12.9 ms \\
+Proposed Listwise Model & 0.8523 & 0.7236 & 0.7450 & 14.1 ms \\
+\hline
+\end{tabular}
+\end{table*}
+
+\section*{3 EXPERIMENTS}
+Table 1 reports ranking performance across both benchmark datasets. Separating true cross-column floats from single-column prose ensures that section boundaries and citation entries remain searchable.
+
+\section*{4 CONCLUSION}
+Distinguishing hanging-indented reference lists from tabular grids preserves both the uppercase REFERENCES heading and individual bibliographic entries in their proper reading columns.
+
+\clearpage
+\section*{REFERENCES}
+{\small
+\begin{list}{[\arabic{enumi}]}{%
+  \usecounter{enumi}%
+  \setlength{\leftmargin}{2.2em}%
+  \setlength{\labelwidth}{1.3em}%
+  \setlength{\labelsep}{0.9em}%
+  \setlength{\itemsep}{2pt}%
+  \setlength{\parsep}{0pt}%
+}
+\item Qingyao Ai, Keping Bi, Jiafeng Guo, and W. Bruce Croft. 2018. Learning a deep listwise context model for ranking refinement. In Proceedings of the 41st International ACM SIGIR Conference. 135--144.
+\item Irwan Bello, Sayali Kulkarni, Sagar Jain, Craig Boutilier, and Ofer Meshi. 2018. Seq2Slate: Re-ranking and slate optimization with pointer networks. arXiv preprint arXiv:1810.02019 (2018).
+\item Yukuo Cen, Jianwei Zhang, Xu Zou, Chang Zhou, and Jie Tang. 2020. Controllable multi-interest framework for recommendation. In Proceedings of the 26th ACM SIGKDD Conference. 2942--2951.
+\item Paul Covington, Jay Adams, and Emre Sargin. 2016. Deep neural networks for video recommendations. In Proceedings of the 10th ACM Conference on Recommender Systems. 191--198.
+\item Alex Kendall, Yarin Gal, and Roberto Cipolla. 2018. Multi-task learning using uncertainty to weigh losses for scene geometry. In Proceedings of the IEEE CVPR Conference. 7482--7491.
+\newpage
+\item Changhua Pei, Yi Zhang, Yongfeng Zhang, Fei Sun, Xiao Lin, and Wenwu Ou. 2019. Personalized re-ranking for recommendation. In Proceedings of the 13th ACM Conference on Recommender Systems. 3--11.
+\item Yuxin Ren, Qiya Yang, Yichun Wu, Wei Xu, and Zhiqiang Zhang. 2024. Non-autoregressive generative models for reranking recommendation. In Proceedings of the 30th ACM SIGKDD Conference. 5625--5634.
+\item Xiaowen Shi, Fan Yang, Ze Wang, Xiaoxu Wu, and Dong Wang. 2023. Permutation-level interest-based end-to-end re-ranking framework. In Proceedings of the 29th ACM SIGKDD Conference. 4823--4831.
+\item Liang Pang, Jun Xu, Qingyao Ai, Yanyan Lan, and Jirong Wen. 2020. SetRank: Learning a permutation-invariant ranking model for information retrieval. In Proceedings of the 43rd ACM SIGIR Conference. 499--508.
+\item Tao Zhuang, Wenwu Ou, and Zhirong Wang. 2018. Globally optimized mutual influence aware ranking in search. arXiv preprint arXiv:1805.08524 (2018).
+\end{list}
+}
+\end{document}

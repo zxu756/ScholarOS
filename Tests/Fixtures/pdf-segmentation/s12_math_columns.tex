@@ -1,0 +1,79 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=0.70in,top=0.85in,bottom=0.85in]{geometry}
+\usepackage{amsmath}
+
+\title{\textbf{Covariant Field Operators and Generating Functionals in Two-Column Layouts}}
+\author{Irene Ovchinnikova}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Scientific articles in theoretical physics interleave numbered section headings with dense inline diacritics and single-column display equations. Geometric segmenters must preserve column streams without mistaking aligned equation fragments across the central gutter for spanning tables.
+\end{abstract}
+
+\section*{1. Introduction}
+We consider stochastic evolution operators over supersymmetric doublets where operator hats and bars appear throughout both columns. In baseline pipelines, inline accents split PDF lines into multiple fragments:
+\begin{equation}
+\hat{H} = [\hat{Q}, \bar{Q}], \qquad \hat{Q} \cdot \hat{Q} = \bar{Q} \cdot \bar{Q} = 0.
+\end{equation}
+
+\section*{2. Stochastic Dynamics and Operators}
+The conserved charges commute with the evolution operator and satisfy the graded algebra across spatial coordinates:
+\begin{equation}
+[\hat{N}, \hat{Q}] = \hat{Q}, \qquad \hat{q}(r) = \chi(r) i \hat{B}(r).
+\end{equation}
+Here $\hat{n}(r) = \chi(r) i \bar{\chi}(r)$ denotes the local fermion density in the path-integral representation of the system.
+
+\clearpage
+\section*{3. Global Symmetries and Supergauge Field}
+The topological symmetry is defined by its nilpotent supercharge acting on the slow doublet fields $\psi = (\phi, \eta)$ in the long-wavelength regime:
+\begin{equation}
+\hat{Q} \psi(r) = \eta(r), \quad \bar{q}(r) = \chi(r) i \hat{B}(r), \quad \bar{Q}\psi(r) = 0.
+\end{equation}
+Another global symmetry is fermion number conservation with covariant derivative $\hat{D} = \partial + \hat{A}(x)$ acting on field multiplets:
+\begin{equation}
+\hat{Q}\bar{\eta}(x) = \pi(x), \quad \hat{D}\hat{\Phi}(x) = (\partial + \hat{A}(x))\hat{\Phi}(x).
+\end{equation}
+
+\section*{4. Effective Field Theory}
+Constructing the low-energy action via the background field method introduces the covariant generating functional over slow order parameters:
+\begin{equation}
+G(A) = -\log Z(A, \bar{\psi}, \psi), \quad \hat{r}(x) = e \hat{s}(x), \quad \hat{h}(x) = e \hat{I}.
+\end{equation}
+The resulting Lagrangian density remains cohomologically exact under the extended operator transformation in two dimensions:
+\begin{equation}
+\hat{Q}\bar{\eta}\hat{L}\phi = \pi \hat{L}\phi - \bar{\eta}\hat{L}\eta, \quad \hat{L} = \partial - \nabla.
+\end{equation}
+
+\newpage
+\noindent Here, $\hat{r} = (\hat{n}, \hat{q}, \bar{q}, \hat{h})$ represents the spatial densities of the conserved charges, with components running over the algebra:
+\begin{equation}
+\hat{\Phi}(x) \to \hat{g}(x)\hat{\Phi}(x)\bar{g}(x), \quad \hat{g}(x) = \exp(c(x)\hat{r}(x)).
+\end{equation}
+Under an infinitesimal gauge variation $\delta\hat{\Phi}(x) = c[\hat{r}(x), \hat{\Phi}(x)]$, the superconnection transforms as:
+\begin{equation}
+\hat{A}(x) \to \hat{A}(x) - \bar{g}(x)\partial \hat{g}(x), \quad [\hat{Q}, \hat{D}] = [\hat{A}, \hat{r}].
+\end{equation}
+In terms of the background supergauge potential $\hat{A}(x) = A(x)\hat{r}(x)$, the two-point current correlator satisfies:
+\begin{equation}
+\langle \hat{J}(0) \hat{J}(x) \rangle = \tau (g \nabla - \partial) f(x), \quad \langle \bar{\eta}(0)\eta(z) \rangle = G(z).
+\end{equation}
+Finally, consistent with conformal radial quantization, the current correlator coefficients reduce to the supertrace expression:
+\begin{equation}
+\tau = \mathrm{sTr}(\hat{r}\bar{r}), \qquad \hat{J}(z) = \bar{\psi}(z)\hat{r}\psi(z).
+\end{equation}
+
+\section*{5. Generating Functional}
+Once the effective action is established, linear response expansion yields universal current correlators across chaotic dynamical models.
+
+\section*{6. Conclusion}
+Preserving column boundaries around display equations prevents section headings and body paragraphs from collapsing into false spanning tables.
+
+\section*{References}
+{\small
+\noindent [1] I. Ovchinnikov, ``Topological supersymmetry in stochastic dynamics,'' Entropy, vol.~18, p.~108, 2016.\par\smallskip
+\noindent [2] E. Witten, ``Topological quantum field theory,'' Commun. Math. Phys., vol.~117, pp.~353--386, 1988.\par
+}
+\end{document}
