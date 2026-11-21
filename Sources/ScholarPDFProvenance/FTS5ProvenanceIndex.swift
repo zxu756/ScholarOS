@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 import ScholarModels
 
-// MARK: - SQLite FTS5 BM25 Claim-to-Bounding-Box Provenance Index
+// MARK: - SQLite FTS5 BM25 Local PDF Passage Index (M4 Citation-Key-Isolated & CJK Bigram Enabled)
 
 private let SQLITE_TRANSIENT_BRIDGE = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -46,19 +46,42 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
             bbox_y REAL NOT NULL,
             bbox_w REAL NOT NULL,
             bbox_h REAL NOT NULL,
-            passage_text TEXT NOT NULL
+            passage_text TEXT NOT NULL,
+            chunk_kind TEXT NOT NULL DEFAULT 'body'
         );
         CREATE INDEX IF NOT EXISTS idx_pdf_passages_cite ON pdf_passages(cite_key);
 
         CREATE VIRTUAL TABLE IF NOT EXISTS pdf_passages_fts USING fts5(
             passage_id UNINDEXED,
-            cite_key,
             section_title,
             passage_text,
+            cjk_tokens,
             tokenize = 'porter unicode61'
         );
         """
         try executeRaw(ddl)
+        try ensureChunkKindColumnExists()
+    }
+
+    private func ensureChunkKindColumnExists() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(pdf_passages);", -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+        var hasChunkKind = false
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let colNamePtr = sqlite3_column_text(stmt, 1) {
+                if String(cString: colNamePtr) == "chunk_kind" {
+                    hasChunkKind = true
+                    break
+                }
+            }
+        }
+        if !hasChunkKind {
+            try executeUnlocked("ALTER TABLE pdf_passages ADD COLUMN chunk_kind TEXT NOT NULL DEFAULT 'body';")
+        }
     }
 
     public func indexPassages(_ passages: [PDFPassageChunk]) throws {
@@ -73,11 +96,11 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
             let insMeta = """
             INSERT INTO pdf_passages (
                 passage_id, cite_key, pdf_file_name, section_title, column_index, reading_seq,
-                page_index, bbox_x, bbox_y, bbox_w, bbox_h, passage_text
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12);
+                page_index, bbox_x, bbox_y, bbox_w, bbox_h, passage_text, chunk_kind
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);
             """
             let insFTS = """
-            INSERT INTO pdf_passages_fts (passage_id, cite_key, section_title, passage_text)
+            INSERT INTO pdf_passages_fts (passage_id, section_title, passage_text, cjk_tokens)
             VALUES (?1, ?2, ?3, ?4);
             """
 
@@ -101,12 +124,20 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
                     sqlite3_bind_double(stmt, 10, chunk.boundingBox.width)
                     sqlite3_bind_double(stmt, 11, chunk.boundingBox.height)
                     sqlite3_bind_text(stmt, 12, chunk.passageText, -1, SQLITE_TRANSIENT_BRIDGE)
+                    sqlite3_bind_text(stmt, 13, chunk.kind.rawValue, -1, SQLITE_TRANSIENT_BRIDGE)
                 }
-                try runStatement(db: db, sql: insFTS) { stmt in
-                    sqlite3_bind_text(stmt, 1, chunk.id, -1, SQLITE_TRANSIENT_BRIDGE)
-                    sqlite3_bind_text(stmt, 2, chunk.citeKey, -1, SQLITE_TRANSIENT_BRIDGE)
-                    sqlite3_bind_text(stmt, 3, chunk.sectionTitle, -1, SQLITE_TRANSIENT_BRIDGE)
-                    sqlite3_bind_text(stmt, 4, chunk.passageText, -1, SQLITE_TRANSIENT_BRIDGE)
+
+                // Header and footer margin furniture never enter the searchable FTS5 index
+                if !chunk.kind.isHeaderOrFooter {
+                    let cjkJoined = EvidenceLocatorAndNumericChecker
+                        .extractCJKTerms(from: chunk.sectionTitle + " " + chunk.passageText)
+                        .joined(separator: " ")
+                    try runStatement(db: db, sql: insFTS) { stmt in
+                        sqlite3_bind_text(stmt, 1, chunk.id, -1, SQLITE_TRANSIENT_BRIDGE)
+                        sqlite3_bind_text(stmt, 2, chunk.sectionTitle, -1, SQLITE_TRANSIENT_BRIDGE)
+                        sqlite3_bind_text(stmt, 3, chunk.passageText, -1, SQLITE_TRANSIENT_BRIDGE)
+                        sqlite3_bind_text(stmt, 4, cjkJoined, -1, SQLITE_TRANSIENT_BRIDGE)
+                    }
                 }
             }
             try executeUnlocked("COMMIT;")
@@ -126,8 +157,12 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
         return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
     }
 
-    public func searchPassages(query: String, citeKeyFilter: String? = nil, limit: Int = 8) throws -> [(chunk: PDFPassageChunk, bm25Magnitude: Double)] {
-        let terms = buildFTS5MatchExpression(from: query)
+    public func searchPassages(
+        query: String,
+        citeKeyFilter: String? = nil,
+        limit: Int = 8
+    ) throws -> [(chunk: PDFPassageChunk, bm25Magnitude: Double)] {
+        let terms = Self.buildFTS5MatchExpression(from: query)
         guard !terms.isEmpty else { return [] }
 
         lock.lock()
@@ -138,22 +173,25 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
         if citeKeyFilter != nil {
             sql = """
             SELECT m.passage_id, m.cite_key, m.pdf_file_name, m.section_title, m.column_index, m.reading_seq,
-                   m.page_index, m.bbox_x, m.bbox_y, m.bbox_w, m.bbox_h, m.passage_text,
-                   (-bm25(pdf_passages_fts, 0.0, 0.5, 1.5, 3.0)) AS rank_score
+                   m.page_index, m.bbox_x, m.bbox_y, m.bbox_w, m.bbox_h, m.passage_text, m.chunk_kind,
+                   (-bm25(pdf_passages_fts, 0.0, 1.5, 3.0, 3.0)) AS rank_score
             FROM pdf_passages_fts
             JOIN pdf_passages m ON m.passage_id = pdf_passages_fts.passage_id
-            WHERE pdf_passages_fts MATCH ?1 AND m.cite_key = ?2
+            WHERE pdf_passages_fts MATCH ?1
+              AND m.cite_key = ?2
+              AND m.chunk_kind NOT IN ('header', 'footer')
             ORDER BY rank_score DESC
             LIMIT ?3;
             """
         } else {
             sql = """
             SELECT m.passage_id, m.cite_key, m.pdf_file_name, m.section_title, m.column_index, m.reading_seq,
-                   m.page_index, m.bbox_x, m.bbox_y, m.bbox_w, m.bbox_h, m.passage_text,
-                   (-bm25(pdf_passages_fts, 0.0, 0.5, 1.5, 3.0)) AS rank_score
+                   m.page_index, m.bbox_x, m.bbox_y, m.bbox_w, m.bbox_h, m.passage_text, m.chunk_kind,
+                   (-bm25(pdf_passages_fts, 0.0, 1.5, 3.0, 3.0)) AS rank_score
             FROM pdf_passages_fts
             JOIN pdf_passages m ON m.passage_id = pdf_passages_fts.passage_id
             WHERE pdf_passages_fts MATCH ?1
+              AND m.chunk_kind NOT IN ('header', 'footer')
             ORDER BY rank_score DESC
             LIMIT ?2;
             """
@@ -177,107 +215,108 @@ public final class FTS5ProvenanceIndex: @unchecked Sendable {
 
         var hits: [(PDFPassageChunk, Double)] = []
         while sqlite3_step(prepared) == SQLITE_ROW {
-            let pid = String(cString: sqlite3_column_text(prepared, 0))
-            let ckey = String(cString: sqlite3_column_text(prepared, 1))
-            let fname = String(cString: sqlite3_column_text(prepared, 2))
-            let sec = String(cString: sqlite3_column_text(prepared, 3))
-            let col = Int(sqlite3_column_int(prepared, 4))
-            let seq = Int(sqlite3_column_int(prepared, 5))
-            let page = Int(sqlite3_column_int(prepared, 6))
-            let bx = sqlite3_column_double(prepared, 7)
-            let by = sqlite3_column_double(prepared, 8)
-            let bw = sqlite3_column_double(prepared, 9)
-            let bh = sqlite3_column_double(prepared, 10)
-            let ptext = String(cString: sqlite3_column_text(prepared, 11))
-            let score = max(0.01, sqlite3_column_double(prepared, 12))
-
-            let chunk = PDFPassageChunk(
-                id: pid,
-                citeKey: ckey,
-                pdfFileName: fname,
-                sectionTitle: sec,
-                columnIndex: col,
-                readingSequence: seq,
-                boundingBox: PDFPageRegionBox(pageIndex: page, x: bx, y: by, width: bw, height: bh),
-                passageText: ptext
-            )
+            let chunk = Self.decodeChunkRow(prepared)
+            let score = max(0.01, sqlite3_column_double(prepared, 13))
             hits.append((chunk, score))
         }
         return hits
     }
 
-    /// Links a manuscript claim sentence citing `citeKey` to its highest-ranking PDF bounding box and verifies quantitative consistency.
-    public func verifyClaimProvenance(
-        manuscriptFile: String,
-        manuscriptLine: Int,
-        claimSentence: String,
-        citeKey: String
-    ) throws -> ClaimEvidenceProvenance {
-        let hits = try searchPassages(query: claimSentence, citeKeyFilter: citeKey, limit: 3)
-        guard let best = hits.first else {
-            return ClaimEvidenceProvenance(
-                manuscriptFile: manuscriptFile,
-                manuscriptLine: manuscriptLine,
-                manuscriptClaim: claimSentence,
-                citeKey: citeKey,
-                passageID: "\(citeKey)#unmatched",
-                pdfExcerpt: "No matching passage found in attached PDF for '\(citeKey)'.",
-                boundingBox: PDFPageRegionBox(pageIndex: 0, x: 0, y: 0, width: 0, height: 0),
-                bm25Score: 0.0,
-                verdict: .unsupportedClaim
-            )
-        }
+    internal func loadSearchablePassages(citeKeyFilter: String? = nil) throws -> [PDFPassageChunk] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db else { return [] }
 
-        let claimNumbers = extractNumericTokens(claimSentence)
-        let passageNumbers = extractNumericTokens(best.chunk.passageText)
-        let verdict: EvidenceSupportVerdict
-        if !claimNumbers.isEmpty && !claimNumbers.isSubset(of: passageNumbers) {
-            verdict = .numericDiscrepancy
-        } else if best.bm25Magnitude >= 2.2 {
-            verdict = .groundedEntailment
+        let sql: String
+        if citeKeyFilter != nil {
+            sql = """
+            SELECT passage_id, cite_key, pdf_file_name, section_title, column_index, reading_seq,
+                   page_index, bbox_x, bbox_y, bbox_w, bbox_h, passage_text, chunk_kind
+            FROM pdf_passages
+            WHERE cite_key = ?1 AND chunk_kind NOT IN ('header', 'footer')
+            ORDER BY reading_seq ASC;
+            """
         } else {
-            verdict = .partialEvidence
+            sql = """
+            SELECT passage_id, cite_key, pdf_file_name, section_title, column_index, reading_seq,
+                   page_index, bbox_x, bbox_y, bbox_w, bbox_h, passage_text, chunk_kind
+            FROM pdf_passages
+            WHERE chunk_kind NOT IN ('header', 'footer')
+            ORDER BY reading_seq ASC;
+            """
         }
 
-        return ClaimEvidenceProvenance(
-            manuscriptFile: manuscriptFile,
-            manuscriptLine: manuscriptLine,
-            manuscriptClaim: claimSentence,
-            citeKey: citeKey,
-            passageID: best.chunk.id,
-            pdfExcerpt: best.chunk.passageText,
-            boundingBox: best.chunk.boundingBox,
-            bm25Score: best.bm25Magnitude,
-            verdict: verdict
+        var stmt: OpaquePointer?
+        let rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+        guard rc == SQLITE_OK, let prepared = stmt else {
+            throw ScholarOSError.sqliteError(code: rc, message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(prepared) }
+
+        if let citeKeyFilter {
+            sqlite3_bind_text(prepared, 1, citeKeyFilter, -1, SQLITE_TRANSIENT_BRIDGE)
+        }
+
+        var chunks: [PDFPassageChunk] = []
+        while sqlite3_step(prepared) == SQLITE_ROW {
+            chunks.append(Self.decodeChunkRow(prepared))
+        }
+        return chunks
+    }
+
+    /// Unified M4 entry point on `FTS5ProvenanceIndex`: locates candidate passages meeting the majority keyword threshold
+    /// and checks explicit `<number + unit/classifier/noun>` bindings. Replaces legacy `verifyClaimProvenance`.
+    public func locateClaimEvidence(
+        claim: String,
+        citeKeyFilter: String? = nil,
+        pdfFileName: String? = nil,
+        topK: Int = 3
+    ) throws -> EvidenceLocalizationResult {
+        try EvidenceLocatorAndNumericChecker().locateEvidence(
+            claim: claim,
+            in: self,
+            citeKeyFilter: citeKeyFilter,
+            pdfFileName: pdfFileName,
+            topK: topK
         )
     }
 
-    private func buildFTS5MatchExpression(from raw: String) -> String {
-        let stopWords: Set<String> = [
-            "the", "and", "that", "this", "with", "from", "were", "have", "been",
-            "into", "their", "while", "where", "which", "cite", "citet", "citep"
-        ]
-        let tokens = raw.lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.count >= 3 && !stopWords.contains($0) }
-        var seen = Set<String>()
-        let unique = tokens.filter { seen.insert($0).inserted }.prefix(14)
-        return unique.map { "\"\($0)\"" }.joined(separator: " OR ")
+    public static func buildFTS5MatchExpression(from raw: String) -> String {
+        let rawTerms = EvidenceLocatorAndNumericChecker.extractFTS5QueryTerms(from: raw)
+        guard !rawTerms.isEmpty else { return "" }
+        return rawTerms.prefix(24).map { term in
+            let safe = term.replacingOccurrences(of: "\"", with: "")
+            return "\"\(safe)\""
+        }.joined(separator: " OR ")
     }
 
-    private func extractNumericTokens(_ text: String) -> Set<String> {
-        let pattern = #"\b\d+(?:\.\d+)?%?"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let ns = text as NSString
-        let matches = regex.matches(in: text, range: NSRange(location: 0, length: ns.length))
-        var nums = Set<String>()
-        for m in matches {
-            let tok = ns.substring(with: m.range)
-            // Ignore typical publication years 1990..2030 so year citations don't trigger numeric mismatch
-            if let yr = Int(tok), (1990...2030).contains(yr) { continue }
-            nums.insert(tok)
-        }
-        return nums
+    private static func decodeChunkRow(_ stmt: OpaquePointer) -> PDFPassageChunk {
+        let pid = String(cString: sqlite3_column_text(stmt, 0))
+        let ckey = String(cString: sqlite3_column_text(stmt, 1))
+        let fname = String(cString: sqlite3_column_text(stmt, 2))
+        let sec = String(cString: sqlite3_column_text(stmt, 3))
+        let col = Int(sqlite3_column_int(stmt, 4))
+        let seq = Int(sqlite3_column_int(stmt, 5))
+        let page = Int(sqlite3_column_int(stmt, 6))
+        let bx = sqlite3_column_double(stmt, 7)
+        let by = sqlite3_column_double(stmt, 8)
+        let bw = sqlite3_column_double(stmt, 9)
+        let bh = sqlite3_column_double(stmt, 10)
+        let ptext = String(cString: sqlite3_column_text(stmt, 11))
+        let kindStr = sqlite3_column_text(stmt, 12).map { String(cString: $0) } ?? "body"
+        let kind = PDFPassageChunkKind(rawValue: kindStr) ?? .body
+
+        return PDFPassageChunk(
+            id: pid,
+            citeKey: ckey,
+            pdfFileName: fname,
+            sectionTitle: sec,
+            columnIndex: col,
+            readingSequence: seq,
+            boundingBox: PDFPageRegionBox(pageIndex: page, x: bx, y: by, width: bw, height: bh),
+            passageText: ptext,
+            kind: kind
+        )
     }
 
     private func executeRaw(_ sql: String) throws {

@@ -907,15 +907,15 @@ public struct SyntheticAcademicPDFFixtureGenerator: Sendable {
         let kendallTau = Self.computeKendallTauRankCorrelation(pairs: matchedPairsOrder)
 
         // Check numeric token preservation across PDFKit extraction
-        let auditor = NumericClaimAndCitationEntailmentAuditor()
+        let locator = EvidenceLocatorAndNumericChecker()
         let gtAllText = gtNarrative.map(\.groundTruthText).joined(separator: "\n")
         let extAllText = extracted.map(\.passageText).joined(separator: "\n")
-        let gtNums = auditor.extractQuantitativeTokens(from: gtAllText)
-        let extNums = auditor.extractQuantitativeTokens(from: extAllText)
+        let gtNums = locator.extractQuantitativeBindings(from: gtAllText)
+        let extNums = locator.extractQuantitativeBindings(from: extAllText)
 
         let preservedCount = gtNums.filter { gTok in
             extNums.contains { eTok in
-                eTok.kind == gTok.kind && abs(eTok.canonicalValue - gTok.canonicalValue) <= (gTok.halfLastDecimalPlaceTolerance + 1e-6)
+                eTok.family == gTok.family && abs(eTok.canonicalValue - gTok.canonicalValue) <= (gTok.halfULPTolerance + 1e-6)
             }
         }.count
         let quantRate = gtNums.isEmpty ? 1.0 : Double(preservedCount) / Double(gtNums.count)
@@ -1146,7 +1146,7 @@ public struct SyntheticAcademicPDFFixtureGenerator: Sendable {
         \\section{Related Work}
         Snapshot-forked microVMs achieve 6.4 ms cold-restore boot latency and a 3.4x speedup across N = 1,240 agent workloads while maintaining a 94.2\\% task completion rate ($p < 0.001$) \\cite{chen2025aegisvm}.
         Bounding-box entailment auditing detects numeric distortions with F1 = 92.6 and reduces quantitative hallucinations by 78.4\\% at 4.8 ms per page \\cite{patel2026vericite}.
-        However, an unverified draft erroneously claimed a 99.1\\% task completion rate and 1.2 ms startup latency \\cite{chen2025aegisvm}.
+        AegisVM achieves a 99.1\\% task completion rate and 1.2 ms cold-restore boot latency \\cite{chen2025aegisvm}.
         """
 
         return SyntheticProvenanceBenchmarkBundle(

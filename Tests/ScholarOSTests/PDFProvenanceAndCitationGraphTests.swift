@@ -552,7 +552,7 @@ struct PDFProvenanceAndCitationGraphTests {
         #expect(hits[0].bm25Magnitude > 0.0)
     }
 
-    @Test("FTS5ProvenanceIndex.verifyClaimProvenance distinguishes GROUNDED vs NUMERIC_MISMATCH vs UNSUPPORTED")
+    @Test("FTS5ProvenanceIndex.locateClaimEvidence distinguishes FOUND vs NUMERIC_MISMATCH vs NOT_FOUND")
     func fts5VerifyClaimProvenanceVerdicts() throws {
         let index = try FTS5ProvenanceIndex()
         var passages: [PDFPassageChunk] = [
@@ -584,47 +584,46 @@ struct PDFProvenanceAndCitationGraphTests {
         }
         try index.indexPassages(passages)
 
-        // 1. Exact quantitative agreement -> GROUNDED
-        let grounded = try index.verifyClaimProvenance(
-            manuscriptFile: "main.tex",
-            manuscriptLine: 14,
-            claimSentence: "FlashAttention achieves 3.2x wall-clock training speedup and reduces HBM memory footprint by 84.5% \\cite{dao2022}.",
-            citeKey: "dao2022"
+        // 1. Exact quantitative agreement -> FOUND
+        let found = try index.locateClaimEvidence(
+            claim: "FlashAttention achieves 3.2x wall-clock training speedup and reduces HBM memory footprint by 84.5% \\cite{dao2022}.",
+            citeKeyFilter: "dao2022"
         )
-        #expect(grounded.verdict == .groundedEntailment)
-        #expect(grounded.bm25Score >= 2.2)
+        #expect(found.verdict == .found)
+        #expect(found.page == 4)
+        #expect(found.pageIndex == 3)
+        #expect((found.coverage ?? 0.0) >= 0.60)
 
         // 2. Fabricated/inflated number (9.8x instead of 3.2x) -> NUMERIC_MISMATCH
-        let distorted = try index.verifyClaimProvenance(
-            manuscriptFile: "main.tex",
-            manuscriptLine: 19,
-            claimSentence: "FlashAttention achieves 9.8x wall-clock training speedup and reduces HBM memory footprint by 99.1% \\cite{dao2022}.",
-            citeKey: "dao2022"
+        let distorted = try index.locateClaimEvidence(
+            claim: "FlashAttention achieves 9.8x wall-clock training speedup and reduces HBM memory footprint by 99.1% \\cite{dao2022}.",
+            citeKeyFilter: "dao2022"
         )
-        #expect(distorted.verdict == .numericDiscrepancy)
+        #expect(distorted.verdict == .numericMismatch)
+        #expect(!distorted.discrepancies.isEmpty)
 
-        // 3. Unindexed citeKey -> UNSUPPORTED
-        let unsupported = try index.verifyClaimProvenance(
-            manuscriptFile: "main.tex",
-            manuscriptLine: 25,
-            claimSentence: "Protein folding converges in 12 picoseconds \\cite{unknown2024}.",
-            citeKey: "unknown2024"
+        // 3. Unindexed citeKey -> NOT_FOUND
+        let notFound = try index.locateClaimEvidence(
+            claim: "Protein folding converges in 12 picoseconds \\cite{unknown2024}.",
+            citeKeyFilter: "unknown2024"
         )
-        #expect(unsupported.verdict == .unsupportedClaim)
+        #expect(notFound.verdict == .notFound)
+        #expect(notFound.matches.isEmpty)
     }
 
-    @Test("NumericClaimAndCitationEntailmentAuditor extracts units, speedups, p-values, and audits manuscript claims")
+    @Test("EvidenceLocatorAndNumericChecker extracts units, speedups, p-values, and checks manuscript claims")
     func numericClaimAuditorUnitConversionRoundingAndDistortionDetection() throws {
-        let auditor = NumericClaimAndCitationEntailmentAuditor()
+        let locator = EvidenceLocatorAndNumericChecker()
 
-        let tokens = auditor.extractQuantitativeTokens(
+        let tokens = locator.extractQuantitativeBindings(
             from: "Latency dropped to 14.5 ms (3.2x speedup, 84.5% reduction, p < 0.01, N = 1200)."
         )
-        let kinds = Set(tokens.map(\.kind))
-        #expect(kinds.contains(.latencyOrDuration))
-        #expect(kinds.contains(.speedupOrMultiplier))
-        #expect(kinds.contains(.percentage))
-        #expect(kinds.contains(.pValueSignificance))
+        let families = Set(tokens.map(\.family))
+        #expect(families.contains(.duration))
+        #expect(families.contains(.multiplier))
+        #expect(families.contains(.percent))
+        #expect(families.contains(.pValue))
+        #expect(families.contains(.sampleSize))
 
         let passages: [PDFPassageChunk] = [
             PDFPassageChunk(
@@ -645,18 +644,18 @@ struct PDFProvenanceAndCitationGraphTests {
         However, an inflated draft erroneously claims fused attention latency reaches 2.1 ms with a 15.0x throughput speedup \\cite{kernel2024}.
         """
 
-        let report = auditor.auditManuscriptAgainstPassages(
+        let report = locator.locateManuscriptClaims(
             manuscriptSource: manuscript,
             filePath: "main.tex",
             passages: passages
         )
-        #expect(report.totalCitedClaimsAudited == 2)
-        #expect(report.groundedEntailmentCount >= 1)
-        #expect(report.numericDiscrepancyCount >= 1)
+        #expect(report.totalCitedClaimsChecked == 2)
+        #expect(report.foundCount >= 1)
+        #expect(report.numericMismatchCount >= 1)
         #expect(!report.lspDiagnostics.isEmpty)
     }
 
-    @Test("Canonical provenance benchmark bundle end-to-end FTS5 + numeric entailment audit")
+    @Test("Canonical provenance benchmark bundle end-to-end FTS5 + evidence localization check")
     func canonicalProvenanceBenchmarkBundleEndToEndAudit() throws {
         let generator = SyntheticAcademicPDFFixtureGenerator()
         let bundle = try generator.buildCanonicalBenchmarkBundle()
@@ -669,15 +668,15 @@ struct PDFProvenanceAndCitationGraphTests {
         }
         #expect(index.passageCount() > 0)
 
-        let auditor = NumericClaimAndCitationEntailmentAuditor()
-        let report = try auditor.auditManuscriptAgainstIndex(
+        let locator = EvidenceLocatorAndNumericChecker()
+        let report = try locator.locateManuscriptClaims(
             manuscriptSource: bundle.sampleManuscriptWithGroundedAndMismatchedClaims,
             filePath: "main.tex",
             provenanceIndex: index
         )
-        #expect(report.totalCitedClaimsAudited >= 2)
-        #expect(report.groundedEntailmentCount >= 1)
-        #expect(report.numericDiscrepancyCount >= 1)
+        #expect(report.totalCitedClaimsChecked >= 2)
+        #expect(report.foundCount >= 1)
+        #expect(report.numericMismatchCount >= 1)
     }
 
     // MARK: - 3. Barnes-Hut Quadtree Layout, PageRank, Louvain, Brandes, Bursts & Main Path Tests
@@ -975,9 +974,9 @@ struct PDFProvenanceAndCitationGraphTests {
         }
     }
 
-    @Test("Numeric entailment auditor verifies p-value inequality entailment vs significance inflation")
+    @Test("EvidenceLocatorAndNumericChecker verifies p-value inequality compatibility vs significance inflation")
     func numericAuditorPValueInequalityEntailmentAndUnitEquivalence() {
-        let auditor = NumericClaimAndCitationEntailmentAuditor()
+        let locator = EvidenceLocatorAndNumericChecker()
         let passages = [
             PDFPassageChunk(
                 id: "trial2023#p5-c1-1",
@@ -991,23 +990,403 @@ struct PDFProvenanceAndCitationGraphTests {
             )
         ]
 
-        // p = 0.008 in PDF entails claim p < 0.05, and 0.015 s equals 15 ms!
+        // p = 0.008 in PDF satisfies claim p < 0.05, and 0.015 s equals 15 ms -> FOUND
         let validManuscript = "Intervention reduced error rates significantly across cohorts (p < 0.05, latency 0.015 s) \\cite{trial2023}."
-        let validAudit = auditor.auditManuscriptAgainstPassages(
+        let validReport = locator.locateManuscriptClaims(
             manuscriptSource: validManuscript,
             filePath: "main.tex",
             passages: passages
         )
-        #expect(validAudit.numericDiscrepancyCount == 0)
+        #expect(validReport.foundCount == 1)
+        #expect(validReport.numericMismatchCount == 0)
 
-        // Claiming p < 0.001 when PDF only achieved p = 0.008 is significance inflation!
+        // Claiming p < 0.001 when PDF only achieved p = 0.008 is significance inflation -> NUMERIC_MISMATCH
         let inflatedManuscript = "Intervention reduced error rates significantly across cohorts (p < 0.001) \\cite{trial2023}."
-        let inflatedAudit = auditor.auditManuscriptAgainstPassages(
+        let inflatedReport = locator.locateManuscriptClaims(
             manuscriptSource: inflatedManuscript,
             filePath: "main.tex",
             passages: passages
         )
-        #expect(inflatedAudit.numericDiscrepancyCount == 1)
+        #expect(inflatedReport.numericMismatchCount == 1)
+        #expect(inflatedReport.claimChecks.first?.result.discrepancies.first?.pdfText == "p = 0.008")
+    }
+
+    // MARK: - 4. S13 Evidence Localization & Quantitative Alignment Tests (M4 Stage 2)
+
+    @Test("S13-1: 12+1 English claims (C01-C09 incl. C01B, C06 unit conversion, C07 negation non-entailment) against s12_paper.pdf")
+    func s13TwelveClaimsAgainstS12PaperPDF() throws {
+        let pdfURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let chunks = try PDFMultiColumnSegmenter().segmentPDF(at: pdfURL, citeKey: "rivera2026")
+        let locator = EvidenceLocatorAndNumericChecker()
+
+        // Also build a multi-document FTS5 index to verify citation keys never leak into full-text OR queries
+        let multiIndex = try FTS5ProvenanceIndex()
+        var indexedChunks = chunks
+        for idx in 1...10 {
+            indexedChunks.append(
+                PDFPassageChunk(
+                    id: "bg\(idx)#p1-c1-\(idx)",
+                    citeKey: "bg\(idx)",
+                    pdfFileName: "bg\(idx).pdf",
+                    sectionTitle: "Background",
+                    columnIndex: 1,
+                    readingSequence: idx,
+                    boundingBox: PDFPageRegionBox(pageIndex: 0, x: 48, y: 200, width: 220, height: 50),
+                    passageText: "Classical algebraic lattice homomorphisms over finite commutative rings in cohort \(idx)."
+                )
+            )
+        }
+        try multiIndex.indexPassages(indexedChunks)
+
+        // C01_EXACT: Exact numbers & units -> FOUND on page 1
+        let c01 = locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 368 regression tests in 14.5 ms \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c01.schema == "scholaros.evidence/1")
+        #expect(c01.verdict == .found)
+        #expect(c01.page == 1)
+        #expect(c01.pageIndex == 0)
+        #expect(c01.sectionTitle == "1 Introduction")
+        #expect((c01.coverage ?? 0.0) >= 0.60)
+        #expect(c01.discrepancies.isEmpty)
+        #expect((c01.boundingBox?.width ?? 0.0) > 0.0)
+        #expect((c01.boundingBox?.height ?? 0.0) > 0.0)
+
+        let c01FTS = try locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 368 regression tests in 14.5 ms \\cite{rivera2026}.",
+            in: multiIndex,
+            citeKeyFilter: "rivera2026",
+            pdfFileName: "s12_paper.pdf"
+        )
+        #expect(c01FTS.verdict == .found)
+        #expect(c01FTS.page == 1)
+
+        // C01B_PARAPHRASE: Paraphrased articles/prepositions -> FOUND on page 1
+        let c01b = locator.locateEvidence(
+            claim: "The deterministic verifier completes static analysis on 368 regression tests in 14.5 ms \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c01b.verdict == .found)
+        #expect(c01b.page == 1)
+        #expect(c01b.discrepancies.isEmpty)
+
+        // C02_NUM_9999_PLUS_MS: Bare count changed 368 -> 9999 while 14.5 ms matches -> NUMERIC_MISMATCH pointing to 368
+        let c02 = locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 9999 regression tests in 14.5 ms \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c02.verdict == .numericMismatch)
+        #expect(c02.page == 1)
+        #expect(c02.discrepancies.contains {
+            $0.claimText.contains("9999") && ($0.pdfText?.contains("368") == true)
+        })
+
+        // C03_NUM_3680_ONLY: Bare count changed 368 -> 3680 with no unit in claim -> NUMERIC_MISMATCH pointing to 368
+        let c03 = locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 3680 regression tests on a single CPU core \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c03.verdict == .numericMismatch)
+        #expect(c03.page == 1)
+        #expect(c03.discrepancies.contains {
+            $0.claimText.contains("3680") && ($0.pdfText?.contains("368") == true)
+        })
+
+        // C04_CROSS_NOUN_48: Cross-noun collision (48 benchmark queries vs PDF 1,240 benchmark queries + 48 MB) -> NUMERIC_MISMATCH
+        let c04 = locator.locateEvidence(
+            claim: "Across 48 benchmark queries, memory consumption remained 48 MB \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c04.verdict == .numericMismatch)
+        #expect(c04.page == 1)
+        #expect(c04.columnIndex == 2)
+        #expect(c04.sectionTitle == "4 Experimental Evaluation")
+        #expect(c04.discrepancies.contains {
+            $0.claimText.contains("48 benchmark queries") && ($0.pdfText?.contains("1,240 benchmark queries") == true)
+        })
+
+        // C05A_UNIT_S_VS_MS: 14.5 s vs PDF 14.5 ms -> NUMERIC_MISMATCH
+        let c05a = locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 368 regression tests in 14.5 s \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c05a.verdict == .numericMismatch)
+        #expect(c05a.page == 1)
+        #expect(c05a.discrepancies.contains {
+            $0.claimText.contains("14.5 s") && ($0.pdfText?.contains("14.5 ms") == true)
+        })
+
+        // C05B_UNIT_GB_VS_MB: 48 GB vs PDF 48 MB -> NUMERIC_MISMATCH
+        let c05b = locator.locateEvidence(
+            claim: "Across 1,240 benchmark queries, memory consumption remained 48 GB while achieving 94.2\\% precision \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c05b.verdict == .numericMismatch)
+        #expect(c05b.page == 1)
+        #expect(c05b.columnIndex == 2)
+        #expect(c05b.sectionTitle == "4 Experimental Evaluation")
+        #expect(c05b.discrepancies.contains {
+            $0.claimText.contains("48 GB") && ($0.pdfText?.contains("48 MB") == true)
+        })
+
+        // C05C_UNIT_DAYS_VS_HOURS: 2.5 days vs PDF 2.5 hours -> NUMERIC_MISMATCH
+        let c05c = locator.locateEvidence(
+            claim: "Dataset preparation required 2.5 days across 18 distinct conference templates \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c05c.verdict == .numericMismatch)
+        #expect(c05c.page == 1)
+        #expect(c05c.columnIndex == 2)
+        #expect(c05c.sectionTitle == "4 Experimental Evaluation")
+        #expect(c05c.discrepancies.contains {
+            $0.claimText.contains("2.5 days") && ($0.pdfText?.contains("2.5 hours") == true)
+        })
+
+        // C06_UNIT_CONVERTED: 0.0145 s == PDF 14.5 ms -> FOUND on page 1
+        let c06 = locator.locateEvidence(
+            claim: "Our deterministic verifier completes static analysis across 368 regression tests in 0.0145 s \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c06.verdict == .found)
+        #expect(c06.page == 1)
+        #expect(c06.discrepancies.isEmpty)
+
+        // C07_NEGATION_INVERT: "relies on large neural network components" vs PDF "without any neural network components".
+        // NOTE: Expected verdict is FOUND — this tool locates lexically similar passages and checks explicit numbers;
+        // it deliberately does NOT judge semantic entailment or whether the passage supports the author's conclusion.
+        let c07 = locator.locateEvidence(
+            claim: "Our deterministic verifier relies on large neural network components to complete static analysis \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c07.verdict == .found)
+        #expect(c07.page == 1)
+        #expect((c07.coverage ?? 0.0) >= 0.60)
+
+        // C08A_MOON_PURE_EN: Unrelated English claim (even with \cite{rivera2026}) -> NOT_FOUND (both in-memory & FTS5)
+        let c08a = locator.locateEvidence(
+            claim: "The moon is made of green cheese \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c08a.verdict == .notFound)
+        #expect(c08a.matches.isEmpty)
+        #expect(c08a.boundingBox == nil)
+
+        let c08aFTS = try locator.locateEvidence(
+            claim: "The moon is made of green cheese \\cite{rivera2026}.",
+            in: multiIndex,
+            citeKeyFilter: "rivera2026",
+            pdfFileName: "s12_paper.pdf"
+        )
+        #expect(c08aFTS.verdict == .notFound)
+        #expect(c08aFTS.matches.isEmpty)
+
+        // C08B_MOON_SHARED_WORD: Unrelated claim sharing 1 common word ("analysis") -> NOT_FOUND (cov = 0.20 < 0.60, no BM25 OR bypass)
+        let c08b = locator.locateEvidence(
+            claim: "The moon is made of green cheese in our analysis \\cite{rivera2026}.",
+            passages: chunks,
+            pdfFileName: "s12_paper.pdf",
+            citeKeyFilter: "rivera2026"
+        )
+        #expect(c08b.verdict == .notFound)
+        #expect(c08b.matches.isEmpty)
+
+        let c08bFTS = try locator.locateEvidence(
+            claim: "The moon is made of green cheese in our analysis \\cite{rivera2026}.",
+            in: multiIndex,
+            citeKeyFilter: "rivera2026",
+            pdfFileName: "s12_paper.pdf"
+        )
+        #expect(c08bFTS.verdict == .notFound)
+        #expect(c08bFTS.matches.isEmpty)
+
+        // C09_MOON_ZH: Unrelated Chinese claim with \cite{rivera2026} -> NOT_FOUND
+        let c09 = try locator.locateEvidence(
+            claim: "月亮是绿奶酪做的 \\cite{rivera2026}。",
+            in: multiIndex,
+            citeKeyFilter: "rivera2026",
+            pdfFileName: "s12_paper.pdf"
+        )
+        #expect(c09.verdict == .notFound)
+        #expect(c09.matches.isEmpty)
+    }
+
+    @Test("S13-2: 4 Chinese claims against Chinese passages and cross-language Chinese claim against English PDF returning NOT_FOUND")
+    func s13ChineseClaimsAndSameLanguageBoundary() throws {
+        let locator = EvidenceLocatorAndNumericChecker()
+        let zhChunks: [PDFPassageChunk] = [
+            PDFPassageChunk(
+                id: "zhou2026#p1-c1-1",
+                citeKey: "zhou2026",
+                pdfFileName: "zhou2026_zh.pdf",
+                sectionTitle: "1 引言",
+                columnIndex: 1,
+                readingSequence: 1,
+                boundingBox: PDFPageRegionBox(pageIndex: 0, x: 52, y: 510, width: 230, height: 64),
+                passageText: "确定性验证器在单核处理器上用 14.5 毫秒完成了 368 个测试的静态分析。"
+            ),
+            PDFPassageChunk(
+                id: "zhou2026#p2-c2-2",
+                citeKey: "zhou2026",
+                pdfFileName: "zhou2026_zh.pdf",
+                sectionTitle: "4 实验评估",
+                columnIndex: 2,
+                readingSequence: 2,
+                boundingBox: PDFPageRegionBox(pageIndex: 1, x: 318, y: 420, width: 230, height: 60),
+                passageText: "在 1,240 个基准查询上，内存占用保持在 48 MB，准确率达到 94.2%。"
+            )
+        ]
+
+        let zhIndex = try FTS5ProvenanceIndex()
+        try zhIndex.indexPassages(zhChunks)
+
+        // ZH-1: Matching numbers & units -> FOUND (both in-memory and FTS5)
+        let zh1 = try locator.locateEvidence(
+            claim: "确定性验证器用 14.5 毫秒完成了 368 个测试的静态分析 \\cite{zhou2026}。",
+            in: zhIndex,
+            citeKeyFilter: "zhou2026",
+            pdfFileName: "zhou2026_zh.pdf"
+        )
+        #expect(zh1.verdict == .found)
+        #expect(zh1.page == 1)
+        #expect(zh1.discrepancies.isEmpty)
+
+        // ZH-2: Bare count + classifier + noun mismatch (9999 个测试 vs 368 个测试) -> NUMERIC_MISMATCH
+        let zh2 = try locator.locateEvidence(
+            claim: "确定性验证器用 14.5 毫秒完成了 9999 个测试的静态分析 \\cite{zhou2026}。",
+            in: zhIndex,
+            citeKeyFilter: "zhou2026",
+            pdfFileName: "zhou2026_zh.pdf"
+        )
+        #expect(zh2.verdict == .numericMismatch)
+        #expect(zh2.page == 1)
+        #expect(zh2.discrepancies.contains {
+            $0.claimText.contains("9999") && ($0.pdfText?.contains("368") == true)
+        })
+
+        // ZH-3: Chinese time unit mismatch (14.5 秒 vs 14.5 毫秒) -> NUMERIC_MISMATCH
+        let zh3 = try locator.locateEvidence(
+            claim: "确定性验证器用 14.5 秒完成了 368 个测试的静态分析 \\cite{zhou2026}。",
+            in: zhIndex,
+            citeKeyFilter: "zhou2026",
+            pdfFileName: "zhou2026_zh.pdf"
+        )
+        #expect(zh3.verdict == .numericMismatch)
+        #expect(zh3.page == 1)
+        #expect(zh3.discrepancies.contains {
+            $0.claimText.contains("14.5") && ($0.pdfText?.contains("14.5 毫秒") == true)
+        })
+
+        // ZH-4: Unrelated Chinese claim -> NOT_FOUND
+        let zh4 = try locator.locateEvidence(
+            claim: "月亮是绿奶酪做的 \\cite{zhou2026}。",
+            in: zhIndex,
+            citeKeyFilter: "zhou2026",
+            pdfFileName: "zhou2026_zh.pdf"
+        )
+        #expect(zh4.verdict == .notFound)
+        #expect(zh4.matches.isEmpty)
+
+        // Cross-language boundary (User decision #5): Chinese claim against English PDF returns NOT_FOUND
+        let enPDFURL = Self.pdfSegmentationFixturesURL.appendingPathComponent("s12_paper.pdf")
+        let zhOnEn1 = try locator.locateEvidence(
+            claim: "确定性验证器在单核上用 14.5 毫秒完成了 368 个回归测试的静态分析 \\cite{rivera2026}。",
+            inPDFAt: enPDFURL,
+            citeKey: "rivera2026"
+        )
+        #expect(zhOnEn1.verdict == .notFound)
+        #expect(zhOnEn1.matches.isEmpty)
+
+        let zhOnEn2 = try locator.locateEvidence(
+            claim: "在 single CPU core 上完成了 368 个回归测试 \\cite{rivera2026}。",
+            inPDFAt: enPDFURL,
+            citeKey: "rivera2026"
+        )
+        #expect(zhOnEn2.verdict == .notFound)
+        #expect(zhOnEn2.matches.isEmpty)
+    }
+
+    @Test("S13-3: Retrieval enforces |Q|=0/1/2 rules, excludes header/footer chunks, prioritizes body over References, and skips structural numbers")
+    func s13ThresholdHeaderExclusionBodyPriorityAndStructuralNumbers() throws {
+        let locator = EvidenceLocatorAndNumericChecker()
+        let chunks: [PDFPassageChunk] = [
+            PDFPassageChunk(
+                id: "doc#hdr",
+                citeKey: "doc2026",
+                pdfFileName: "doc2026.pdf",
+                sectionTitle: "Front Matter & Abstract",
+                columnIndex: 0,
+                readingSequence: 1,
+                boundingBox: PDFPageRegionBox(pageIndex: 0, x: 48, y: 740, width: 500, height: 14),
+                passageText: "Exclusive Header Sentinel Token QuantumAnnealingHeader",
+                kind: .header
+            ),
+            PDFPassageChunk(
+                id: "doc#ref",
+                citeKey: "doc2026",
+                pdfFileName: "doc2026.pdf",
+                sectionTitle: "References",
+                columnIndex: 2,
+                readingSequence: 2,
+                boundingBox: PDFPageRegionBox(pageIndex: 2, x: 318, y: 200, width: 230, height: 40),
+                passageText: "[12] Rivera (2024). Speculative decoding kernels accelerate token generation.",
+                kind: .body
+            ),
+            PDFPassageChunk(
+                id: "doc#body",
+                citeKey: "doc2026",
+                pdfFileName: "doc2026.pdf",
+                sectionTitle: "3. Evaluation",
+                columnIndex: 1,
+                readingSequence: 3,
+                boundingBox: PDFPageRegionBox(pageIndex: 1, x: 48, y: 400, width: 230, height: 55),
+                passageText: "As shown in Section 3, Table 1, and Fig. 2 [12], speculative decoding kernels accelerate token generation across 64 sequences in 2024.",
+                kind: .body
+            )
+        ]
+
+        // 1. |Q| = 0 (only stopwords / citations / bare numbers) -> NOT_FOUND
+        let emptyQ = locator.locateEvidence(claim: "In \\cite{doc2026}, 2026.", passages: chunks)
+        #expect(emptyQ.verdict == .notFound)
+
+        // 2. |Q| = 2 -> must match BOTH keywords (1/2 = 0.50 -> NOT_FOUND)
+        let twoWordPartial = locator.locateEvidence(claim: "Speculative teleportation.", passages: chunks)
+        #expect(twoWordPartial.verdict == .notFound)
+
+        // 3. Header/footer chunks never participate in retrieval
+        let headerQuery = locator.locateEvidence(claim: "Exclusive Header Sentinel Token QuantumAnnealingHeader.", passages: chunks)
+        #expect(headerQuery.verdict == .notFound)
+
+        // 4. Body chunk prioritized over References chunk at equal coverage, and structural numbers (Section 4, Table 2, Fig. 9, [33], 2026) do not trigger false numeric mismatch
+        let bodyPreferred = locator.locateEvidence(
+            claim: "In Section 4 and Table 2 (Fig. 9) [33], speculative decoding kernels accelerate token generation across 64 sequences (2026).",
+            passages: chunks
+        )
+        #expect(bodyPreferred.verdict == .found)
+        #expect(bodyPreferred.page == 2)
+        #expect(bodyPreferred.sectionTitle == "3. Evaluation")
     }
 
     @Test("MainPathAndLiteratureGapAnalyzer breaks mutual-citation cycles into a valid DAG without hanging")
