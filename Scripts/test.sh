@@ -176,10 +176,14 @@ working_tree_state() {
 
 CREATED_REPORT_TMPDIR=""
 M3_STEP_TMP=""
+M3_HOME_SNAP_TMP=""
 M4_STEP_TMP=""
 cleanup_test_sh() {
     if [[ -n "$M3_STEP_TMP" && -d "$M3_STEP_TMP" ]]; then
         rm -rf "$M3_STEP_TMP"
+    fi
+    if [[ -n "$M3_HOME_SNAP_TMP" && -d "$M3_HOME_SNAP_TMP" ]]; then
+        rm -rf "$M3_HOME_SNAP_TMP"
     fi
     if [[ -n "$M4_STEP_TMP" && -d "$M4_STEP_TMP" ]]; then
         rm -rf "$M4_STEP_TMP"
@@ -200,95 +204,13 @@ select_report_dir() {
     fi
 }
 
+# Records/compares Milestone 3 real-home hygiene manifests via Scripts/acceptance/m3_home_hygiene.py (see VOLATILE_SUBDIRS).
 snapshot_real_home_full_hygiene() {
-    python3 -I - "$REAL_USER_HOME" <<'PY'
-import glob, hashlib, os, sys
-
-home = sys.argv[1]
-lib_entries = []
-for sub in ("Caches", "Preferences", "Application Support"):
-    base = os.path.join(home, "Library", sub)
-    if not os.path.isdir(base):
-        lib_entries.append(f"{base}:ABSENT")
-        continue
-    for name in sorted(os.listdir(base)):
-        if "scholaros" in name.lower():
-            p = os.path.join(base, name)
-            if os.path.isdir(p) and not os.path.islink(p):
-                lib_entries.append(f"{p}:DIR")
-                for root, dirs, files in os.walk(p):
-                    dirs.sort()
-                    for fn in sorted(files):
-                        fp = os.path.join(root, fn)
-                        try:
-                            st = os.lstat(fp)
-                            lib_entries.append(f"{fp}:{st.st_size}:{st.st_mtime_ns}")
-                        except OSError:
-                            lib_entries.append(f"{fp}:ERR")
-            else:
-                try:
-                    st = os.lstat(p)
-                    lib_entries.append(f"{p}:{st.st_size}:{st.st_mtime_ns}")
-                except OSError:
-                    lib_entries.append(f"{p}:ERR")
-
-VOLATILE_SUBDIRS = {
-    ".claude": {"projects", "todos", "statsig", "debug", "shell-snapshots", "session-env", "ide", "telemetry", "file-history", "logs", "cache", "backups"},
-    ".codex": {"sessions", "archived_sessions", "log", "logs", "tmp", "shell_snapshots", "sqlite"},
+    python3 -I "$REPO_ROOT/Scripts/acceptance/m3_home_hygiene.py" snapshot "$REAL_USER_HOME" "$1" --scope all
 }
-VOLATILE_FILENAMES = {"history.jsonl", ".claude.json.lock"}
 
-client_targets = sorted(set(glob.glob(os.path.join(home, ".claude*")))) + [
-    os.path.join(home, ".codex"),
-    os.path.join(home, ".config", "opencode"),
-]
-h = hashlib.sha256()
-for t in client_targets:
-    rel_t = os.path.relpath(t, home)
-    base_t = os.path.basename(t)
-    if base_t in VOLATILE_FILENAMES or base_t.startswith(".claude.json.backup") or base_t.startswith(".claude.json.tmp"):
-        continue
-    if not os.path.lexists(t):
-        h.update(f"{rel_t}:ABSENT\n".encode("utf-8"))
-        continue
-    st0 = os.lstat(t)
-    if os.path.isfile(t) and not os.path.islink(t):
-        h.update(f"{rel_t}:FILE:{st0.st_size}:".encode("utf-8"))
-        if st0.st_size <= 8 * 1024 * 1024:
-            try:
-                h.update(hashlib.sha256(open(t, "rb").read()).hexdigest().encode("utf-8"))
-            except OSError:
-                h.update(b"UNREADABLE")
-        h.update(b"\n")
-    elif os.path.isdir(t) and not os.path.islink(t):
-        skip_top = VOLATILE_SUBDIRS.get(rel_t, set())
-        h.update(f"{rel_t}:DIR\n".encode("utf-8"))
-        for root, dirs, files in os.walk(t):
-            rel_r = os.path.relpath(root, home)
-            if rel_r == rel_t:
-                dirs[:] = sorted(d for d in dirs if d not in skip_top)
-            else:
-                dirs.sort()
-            h.update(f"D:{rel_r}\n".encode("utf-8"))
-            for fn in sorted(files):
-                if fn in VOLATILE_FILENAMES or fn.endswith((".sqlite", ".sqlite-wal", ".sqlite-shm", ".lock")):
-                    continue
-                fp = os.path.join(root, fn)
-                rel_f = os.path.relpath(fp, home)
-                try:
-                    st = os.lstat(fp)
-                    h.update(f"F:{rel_f}:{st.st_mode}:{st.st_size}".encode("utf-8"))
-                    if st.st_size <= 8 * 1024 * 1024 and not os.path.islink(fp):
-                        h.update(b":" + hashlib.sha256(open(fp, "rb").read()).hexdigest().encode("utf-8"))
-                    h.update(b"\n")
-                except OSError:
-                    h.update(f"F:{rel_f}:ERR\n".encode("utf-8"))
-    else:
-        h.update(f"{rel_t}:OTHER:{st0.st_mode}\n".encode("utf-8"))
-
-lib_hash = hashlib.sha256("\n".join(lib_entries).encode("utf-8")).hexdigest()
-print(f"lib={lib_hash}|clients={h.hexdigest()}")
-PY
+diff_real_home_full_hygiene() {
+    python3 -I "$REPO_ROOT/Scripts/acceptance/m3_home_hygiene.py" diff "$REAL_USER_HOME" "$1" "$2" --max-items 30
 }
 
 snapshot_real_home_library_scholaros_only() {
@@ -618,8 +540,9 @@ case "$MODE" in
                 TREE_BEFORE="$(working_tree_state)"
                 PREFS_BEFORE="$(count_scholaros_preference_files)"
                 CACHE_BEFORE="$(scholaros_cache_dir_state)"
-                FULL_HOME_BEFORE="$(snapshot_real_home_full_hygiene)"
                 TMP_BEFORE="$(snapshot_scholaros_tmpdir)"
+                M3_HOME_SNAP_TMP="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m3-home.XXXXXX")"
+                snapshot_real_home_full_hygiene "$M3_HOME_SNAP_TMP/before.json"
                 BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
 
                 SCHOLAR_REPORT_DIR="$(select_report_dir "$RECORD")"
@@ -637,6 +560,9 @@ case "$MODE" in
                     HOME="$M3_STEP_TMP/h-scope" CFFIXED_USER_HOME="$M3_STEP_TMP/h-scope" \
                         swift_test --no-parallel --filter "(BibCSLAndFirewallTests|LSPEngineAndSyncTeXTests|PluginSDKMCPAndShellTests|ZZZCacheHomeIsolationGuardTests)"
                 )
+
+                echo "[test.sh] Running M3 home hygiene Python unit tests..."
+                python3 -I -B -m unittest discover -s "$REPO_ROOT/Scripts/acceptance" -p "test_m3_*.py"
 
                 echo "[test.sh] Running network-denied full unit tests (without SCHOLAR_CACHE_DIR)..."
                 (
@@ -693,7 +619,14 @@ case "$MODE" in
 
                 assert_post_run_hygiene "$RECORD" "$PREFS_BEFORE" "$CACHE_BEFORE" "$TREE_BEFORE"
 
-                FULL_HOME_AFTER="$(snapshot_real_home_full_hygiene)"
+                snapshot_real_home_full_hygiene "$M3_HOME_SNAP_TMP/after.json"
+                set +e
+                FULL_HOME_DIFF="$(diff_real_home_full_hygiene "$M3_HOME_SNAP_TMP/before.json" "$M3_HOME_SNAP_TMP/after.json")"
+                FULL_HOME_DIFF_EXIT=$?
+                set -e
+                rm -rf "$M3_HOME_SNAP_TMP"
+                M3_HOME_SNAP_TMP=""
+
                 TMP_AFTER="$(snapshot_scholaros_tmpdir)"
                 BENCH_STATUS_AFTER="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
                 set +e
@@ -705,8 +638,9 @@ case "$MODE" in
                     echo "ERROR: temporary directories left behind in TMPDIR (before='$TMP_BEFORE' after='$TMP_AFTER')." >&2
                     exit 1
                 fi
-                if [[ "$FULL_HOME_BEFORE" != "$FULL_HOME_AFTER" ]]; then
-                    echo "ERROR: real ~/Library ScholarOS entries or ~/.claude* / ~/.codex / ~/.config/opencode changed during milestone 3." >&2
+                if [[ "$FULL_HOME_DIFF_EXIT" -ne 0 ]]; then
+                    echo "ERROR: real ~/Library ScholarOS entries or ~/.claude* / ~/.codex / ~/.config/opencode changed during milestone 3:" >&2
+                    printf '%s\n' "$FULL_HOME_DIFF" >&2
                     exit 1
                 fi
                 if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then

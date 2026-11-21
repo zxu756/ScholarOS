@@ -152,105 +152,15 @@ m3_swift_test() {
 REAL_USER_HOME="$(python3 -I -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
 
 snapshot_real_home_library_scholaros() {
-    python3 -I - "$REAL_USER_HOME" <<'PY'
-import os, sys
-
-home = sys.argv[1]
-entries = []
-for sub in ("Caches", "Preferences", "Application Support"):
-    base = os.path.join(home, "Library", sub)
-    if not os.path.isdir(base):
-        entries.append(f"{base}:ABSENT")
-        continue
-    for name in sorted(os.listdir(base)):
-        if "scholaros" in name.lower():
-            p = os.path.join(base, name)
-            if os.path.isdir(p) and not os.path.islink(p):
-                entries.append(f"{p}:DIR")
-                for root, dirs, files in os.walk(p):
-                    dirs.sort()
-                    for fn in sorted(files):
-                        fp = os.path.join(root, fn)
-                        try:
-                            st = os.lstat(fp)
-                            entries.append(f"{fp}:{st.st_size}:{st.st_mtime_ns}")
-                        except OSError:
-                            entries.append(f"{fp}:ERR")
-            else:
-                try:
-                    st = os.lstat(p)
-                    entries.append(f"{p}:{st.st_size}:{st.st_mtime_ns}")
-                except OSError:
-                    entries.append(f"{p}:ERR")
-print("\n".join(entries))
-PY
+    python3 -I "$REPO_ROOT/Scripts/acceptance/m3_home_hygiene.py" snapshot "$REAL_USER_HOME" "$1" --scope library
 }
 
 snapshot_real_home_client_configs() {
-    python3 -I - "$REAL_USER_HOME" <<'PY'
-import glob, hashlib, os, sys
-
-home = sys.argv[1]
-# Ignore live session/transcript/daemon directories written asynchronously by host Claude/Codex sessions,
-# while strictly hashing every MCP registration & client configuration file under ~/.claude*, ~/.codex, ~/.config/opencode.
-VOLATILE_SUBDIRS = {
-    ".claude": {"projects", "todos", "statsig", "debug", "shell-snapshots", "session-env", "ide", "telemetry", "file-history", "logs", "cache", "backups"},
-    ".codex": {"sessions", "archived_sessions", "log", "logs", "tmp", "shell_snapshots", "sqlite"},
+    python3 -I "$REPO_ROOT/Scripts/acceptance/m3_home_hygiene.py" snapshot "$REAL_USER_HOME" "$1" --scope clients
 }
-VOLATILE_FILENAMES = {"history.jsonl", ".claude.json.lock"}
 
-targets = sorted(set(glob.glob(os.path.join(home, ".claude*")))) + [
-    os.path.join(home, ".codex"),
-    os.path.join(home, ".config", "opencode"),
-]
-h = hashlib.sha256()
-count = 0
-for t in targets:
-    rel_t = os.path.relpath(t, home)
-    base_t = os.path.basename(t)
-    if base_t in VOLATILE_FILENAMES or base_t.startswith(".claude.json.backup") or base_t.startswith(".claude.json.tmp"):
-        continue
-    if not os.path.lexists(t):
-        h.update(f"{rel_t}:ABSENT\n".encode("utf-8"))
-        continue
-    st0 = os.lstat(t)
-    if os.path.isfile(t) and not os.path.islink(t):
-        count += 1
-        h.update(f"{rel_t}:FILE:{st0.st_size}:".encode("utf-8"))
-        if st0.st_size <= 8 * 1024 * 1024:
-            try:
-                h.update(hashlib.sha256(open(t, "rb").read()).hexdigest().encode("utf-8"))
-            except OSError:
-                h.update(b"UNREADABLE")
-        h.update(b"\n")
-    elif os.path.isdir(t) and not os.path.islink(t):
-        skip_top = VOLATILE_SUBDIRS.get(rel_t, set())
-        h.update(f"{rel_t}:DIR\n".encode("utf-8"))
-        for root, dirs, files in os.walk(t):
-            rel_r = os.path.relpath(root, home)
-            if rel_r == rel_t:
-                dirs[:] = sorted(d for d in dirs if d not in skip_top)
-            else:
-                dirs.sort()
-            h.update(f"D:{rel_r}\n".encode("utf-8"))
-            for fn in sorted(files):
-                if fn in VOLATILE_FILENAMES or fn.endswith((".sqlite", ".sqlite-wal", ".sqlite-shm", ".lock")):
-                    continue
-                fp = os.path.join(root, fn)
-                rel_f = os.path.relpath(fp, home)
-                count += 1
-                try:
-                    st = os.lstat(fp)
-                    h.update(f"F:{rel_f}:{st.st_mode}:{st.st_size}".encode("utf-8"))
-                    if st.st_size <= 8 * 1024 * 1024 and not os.path.islink(fp):
-                        h.update(b":" + hashlib.sha256(open(fp, "rb").read()).hexdigest().encode("utf-8"))
-                    h.update(b"\n")
-                except OSError:
-                    h.update(f"F:{rel_f}:ERR\n".encode("utf-8"))
-    else:
-        h.update(f"{rel_t}:OTHER:{st0.st_mode}\n".encode("utf-8"))
-print(f"files={count}:sha256={h.hexdigest()}")
-PY
+diff_real_home_hygiene_manifests() {
+    python3 -I "$REPO_ROOT/Scripts/acceptance/m3_home_hygiene.py" diff "$REAL_USER_HOME" "$1" "$2" --max-items 30
 }
 
 snapshot_tmpdir_m3() {
@@ -282,15 +192,16 @@ print("\n".join(items))
 PY
 }
 
-HOME_LIB_SNAP_BEFORE="$(snapshot_real_home_library_scholaros)"
-CLIENT_CFG_SNAP_BEFORE="$(snapshot_real_home_client_configs)"
 TMP_SNAP_BEFORE="$(snapshot_tmpdir_m3)"
 BENCH_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- Benchmarks || true)"
 REPORTS_STATUS_BEFORE="$(git -C "$REPO_ROOT" status --porcelain -- reports || true)"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/scholaros-m3-work.XXXXXX")"
 WORK_SCRATCH="$WORK/scratch"
-mkdir -p "$WORK_SCRATCH"
+WORK_HYGIENE="$WORK/hygiene"
+mkdir -p "$WORK_SCRATCH" "$WORK_HYGIENE"
+snapshot_real_home_library_scholaros "$WORK_HYGIENE/lib-before.json"
+snapshot_real_home_client_configs "$WORK_HYGIENE/clients-before.json"
 CREATED_TEMP_REPORT_DIR=""
 
 cleanup() {
@@ -2862,8 +2773,15 @@ PY
     if should_run_row 23; then
         echo "== [Row 23] 跑后洁净检查 (临时目录清理、真实 ~/Library 无新增 ScholarOS 项、~/.claude* ~/.codex ~/.config/opencode 未被写、git diff --exit-code Benchmarks/) =="
         rm -rf "$WORK_SCRATCH"
-        HOME_LIB_SNAP_AFTER="$(snapshot_real_home_library_scholaros)"
-        CLIENT_CFG_SNAP_AFTER="$(snapshot_real_home_client_configs)"
+        snapshot_real_home_library_scholaros "$WORK_HYGIENE/lib-after.json"
+        snapshot_real_home_client_configs "$WORK_HYGIENE/clients-after.json"
+        set +e
+        HOME_LIB_DIFF="$(diff_real_home_hygiene_manifests "$WORK_HYGIENE/lib-before.json" "$WORK_HYGIENE/lib-after.json")"
+        HOME_LIB_DIFF_EXIT=$?
+        CLIENT_CFG_DIFF="$(diff_real_home_hygiene_manifests "$WORK_HYGIENE/clients-before.json" "$WORK_HYGIENE/clients-after.json")"
+        CLIENT_CFG_DIFF_EXIT=$?
+        set -e
+        rm -rf "$WORK_HYGIENE"
         OWN_WORK_BASE="$(basename "$WORK")"
         OWN_REPORT_BASE=""
         if [[ -n "$CREATED_TEMP_REPORT_DIR" ]]; then
@@ -2886,12 +2804,14 @@ PY
             echo "  FAIL: stray temporary directories left in TMPDIR (before='$TMP_SNAP_BEFORE' after='$TMP_SNAP_AFTER')"
             R23_OK=0
         fi
-        if [[ "$HOME_LIB_SNAP_BEFORE" != "$HOME_LIB_SNAP_AFTER" ]]; then
-            echo "  FAIL: real ~/Library (Caches / Preferences / Application Support) ScholarOS entries changed"
+        if [[ "$HOME_LIB_DIFF_EXIT" -ne 0 ]]; then
+            echo "  FAIL: real ~/Library (Caches / Preferences / Application Support) ScholarOS entries changed:"
+            printf '%s\n' "$HOME_LIB_DIFF"
             R23_OK=0
         fi
-        if [[ "$CLIENT_CFG_SNAP_BEFORE" != "$CLIENT_CFG_SNAP_AFTER" ]]; then
-            echo "  FAIL: real client configuration directories (~/.claude*, ~/.codex, ~/.config/opencode) changed (before=$CLIENT_CFG_SNAP_BEFORE after=$CLIENT_CFG_SNAP_AFTER)"
+        if [[ "$CLIENT_CFG_DIFF_EXIT" -ne 0 ]]; then
+            echo "  FAIL: real client configuration directories (~/.claude*, ~/.codex, ~/.config/opencode) changed:"
+            printf '%s\n' "$CLIENT_CFG_DIFF"
             R23_OK=0
         fi
         if [[ "$BENCH_DIFF_EXIT" -ne 0 || "$BENCH_STATUS_BEFORE" != "$BENCH_STATUS_AFTER" ]]; then
@@ -2903,7 +2823,7 @@ PY
             R23_OK=0
         fi
 
-        echo "  scratch_cleaned=$([[ ! -e "$WORK_SCRATCH" ]] && echo true || echo false) tmp_clean=$([[ "$TMP_SNAP_BEFORE" == "$TMP_SNAP_AFTER" ]] && echo true || echo false) real_library_scholaros_untouched=$([[ "$HOME_LIB_SNAP_BEFORE" == "$HOME_LIB_SNAP_AFTER" ]] && echo true || echo false) client_configs_untouched=$([[ "$CLIENT_CFG_SNAP_BEFORE" == "$CLIENT_CFG_SNAP_AFTER" ]] && echo true || echo false) benchmarks_diff_exit=$BENCH_DIFF_EXIT reports_untouched=$([[ "$RECORD" -eq 1 || "$REPORTS_STATUS_BEFORE" == "$REPORTS_STATUS_AFTER" ]] && echo true || echo false)"
+        echo "  scratch_cleaned=$([[ ! -e "$WORK_SCRATCH" ]] && echo true || echo false) tmp_clean=$([[ "$TMP_SNAP_BEFORE" == "$TMP_SNAP_AFTER" ]] && echo true || echo false) real_library_scholaros_untouched=$([[ "$HOME_LIB_DIFF_EXIT" -eq 0 ]] && echo true || echo false) client_configs_untouched=$([[ "$CLIENT_CFG_DIFF_EXIT" -eq 0 ]] && echo true || echo false) benchmarks_diff_exit=$BENCH_DIFF_EXIT reports_untouched=$([[ "$RECORD" -eq 1 || "$REPORTS_STATUS_BEFORE" == "$REPORTS_STATUS_AFTER" ]] && echo true || echo false)"
         if [[ "$R23_OK" -eq 1 ]]; then
             record_pass 23 "Temporary directories cleaned, real ~/Library free of new ScholarOS items, client configs untouched, and git diff --exit-code Benchmarks/ passed"
         else
